@@ -7,7 +7,7 @@
 
 ## 当前迭代计划 (Next Steps)
 
-1. **Phase 5 P0 全部完成**：P1 可扩展性改造待推进（Query Executor Filter Registry、配置外置、Trace 调试闭环）。详见 `需求描述.md` Phase 5 详细规划。
+1. **Phase 5 P1 推进中**：Chaldea 依赖边界已完成（自动 clone/pull + CHALDEA_SRC_PATH），剩余 P1（Query Executor Filter Registry、知识与配置外置、配置热更新、Trace 调试闭环）。详见 `需求描述.md` Phase 5 详细规划。
 2. **多语言 UI 本地化支持 (I18n)**: 按照系统本地的语言（Locale）做显示。
 3. **更多查询维度的支持**: 增加指令卡性能、宝具 NP 回收等进阶硬核数值查询。
 

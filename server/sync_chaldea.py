@@ -15,6 +15,7 @@ Laplace — Schema Mirror 知识库同步脚本
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -25,9 +26,13 @@ from pathlib import Path
 
 # === 路径配置 ===
 PROJECT_ROOT = Path(__file__).parent.parent
-CHALDEA_ROOT = PROJECT_ROOT / "chaldea-center" / "chaldea"
+_default_chaldea = str(PROJECT_ROOT / "chaldea-center" / "chaldea")
+CHALDEA_ROOT = Path(os.getenv("CHALDEA_SRC_PATH", _default_chaldea))
 GAMEDATA_DIR = CHALDEA_ROOT / "lib" / "models" / "gamedata"
 OUTPUT_DIR = Path(__file__).parent / "knowledge"
+
+# Chaldea 源码仓库地址
+CHALDEA_REPO_URL = "https://github.com/chaldea-center/chaldea.git"
 
 # Dart 源文件路径
 FUNC_DART = GAMEDATA_DIR / "func.dart"
@@ -270,7 +275,45 @@ def _add_chinese_aliases(effects: list[dict]) -> None:
 
 
 # ============================================================
-# 3. 元数据生成
+# 3. Chaldea 源码管理
+# ============================================================
+
+def _ensure_chaldea_source() -> None:
+    """确保 Chaldea 源码可用：不存在则 clone，已存在则 pull。"""
+    if GAMEDATA_DIR.exists():
+        print("   🔄 Chaldea 源码已存在，执行 git pull...")
+        try:
+            result = subprocess.run(
+                ["git", "pull", "--ff-only"],
+                cwd=str(CHALDEA_ROOT),
+                capture_output=True, text=True, timeout=60,
+            )
+            if result.returncode == 0:
+                print(f"   ✅ 更新成功: {result.stdout.strip()}")
+            else:
+                print(f"   ⚠️  git pull 失败（可能有本地修改），继续使用现有版本")
+        except subprocess.TimeoutExpired:
+            print("   ⚠️  git pull 超时，继续使用现有版本")
+        return
+
+    print(f"   📥 Chaldea 源码不存在，正在克隆到 {CHALDEA_ROOT}...")
+    CHALDEA_ROOT.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        result = subprocess.run(
+            ["git", "clone", "--depth", "1", CHALDEA_REPO_URL, str(CHALDEA_ROOT)],
+            capture_output=True, text=True, timeout=300,
+        )
+        if result.returncode != 0:
+            print(f"   ❌ git clone 失败: {result.stderr.strip()}")
+            sys.exit(1)
+        print("   ✅ 克隆完成")
+    except subprocess.TimeoutExpired:
+        print("   ❌ git clone 超时，请检查网络连接")
+        sys.exit(1)
+
+
+# ============================================================
+# 4. 元数据生成
 # ============================================================
 
 def get_chaldea_commit() -> str:
@@ -302,7 +345,7 @@ def download_mapping_data(filename: str) -> dict:
 
 
 # ============================================================
-# 4. 主流程
+# 5. 主流程
 # ============================================================
 
 def main():
@@ -310,10 +353,12 @@ def main():
     print("🔮 Laplace — Schema Mirror Sync")
     print("=" * 55)
 
-    # 检查 Chaldea 源码是否存在
+    # 确保 Chaldea 源码可用（自动 clone 或 pull）
+    print(f"\n📂 Chaldea 源码路径: {CHALDEA_ROOT}")
+    _ensure_chaldea_source()
+
     if not GAMEDATA_DIR.exists():
-        print(f"❌ 未找到 Chaldea 源码: {GAMEDATA_DIR}")
-        print("   请先 clone Chaldea 仓库到 chaldea-center/chaldea")
+        print(f"❌ 同步后仍未找到 Chaldea 数据目录: {GAMEDATA_DIR}")
         sys.exit(1)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

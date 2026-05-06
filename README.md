@@ -77,8 +77,10 @@ python3 -m server.data_loader
 **Chaldea 依赖说明**：
 - `chaldea-center/chaldea` **不是 runtime 强依赖**，仅在运行 `sync_chaldea.py` 更新领域知识时需要。
 - 普通运行只依赖已生成的 `server/knowledge/*.json` 与 `server/data/servants_db.json`。
-- 如需重新同步知识库，从 https://github.com/chaldea-center/chaldea.git 拉取 Chaldea 源码到 `chaldea-center/chaldea` 目录。
-- 支持通过 `CHALDEA_SRC_PATH` 环境变量指定 Chaldea 源码路径：
+- 运行 `sync_chaldea.py` 时，脚本会**自动管理** Chaldea 源码：
+  - 不存在 → 自动 `git clone --depth 1`（浅克隆节省磁盘）
+  - 已存在 → 自动 `git pull` 更新到最新
+- 支持通过 `CHALDEA_SRC_PATH` 环境变量指定自定义源码路径：
   ```bash
   export CHALDEA_SRC_PATH=/path/to/your/chaldea
   python3 server/sync_chaldea.py
@@ -114,6 +116,7 @@ RUN_LIVE_LLM_TESTS=1 python -m pytest tests/test_llm_client_live.py -s
 | `CORS_ORIGINS` | CORS 白名单（逗号分隔） | `http://localhost:8000,http://127.0.0.1:8000` |
 | `RATE_LIMIT_PER_MINUTE` | 单 IP 每分钟最大请求数 | `10` |
 | `RATE_LIMIT_GLOBAL_PER_MINUTE` | 全站每分钟最大请求数（0=不限） | `100` |
+| `CHALDEA_SRC_PATH` | Chaldea 源码路径（仅 sync 时使用） | `chaldea-center/chaldea` |
 
 > **本地开发提示**：如果在其他设备上测试时 uvicorn 绑定了非默认地址（如 `http://192.168.x.x:8000`），需要将该地址添加到 `CORS_ORIGINS` 中，否则浏览器会因 CORS 策略拦截请求。示例：
 > ```bash
