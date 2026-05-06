@@ -8,8 +8,10 @@ Laplace — Query Executor
 
 import json
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
+
+from server.config_loader import CachedConfig
 from server.individuality import filter_by_traits
 
 DATA_PATH = Path(__file__).parent / "data" / "servants_db.json"
@@ -17,8 +19,6 @@ NICKNAMES_PATH = Path(__file__).parent / "config" / "nicknames.json"
 
 # 全局缓存
 _servants_db: list[dict] | None = None
-
-from server.config_loader import CachedConfig
 
 _nicknames_cache = CachedConfig(NICKNAMES_PATH)
 
@@ -39,7 +39,7 @@ def load_database() -> list[dict]:
     """加载从者数据库（带缓存）。"""
     global _servants_db
     if _servants_db is None:
-        with open(DATA_PATH, "r", encoding="utf-8") as f:
+        with open(DATA_PATH, encoding="utf-8") as f:
             _servants_db = json.load(f)
         # 统计
         has_effects = sum(1 for s in _servants_db if s.get("skillEffects"))
@@ -73,7 +73,7 @@ def execute_query(conditions: dict) -> list[dict]:
         匹配的从者列表
     """
     db = load_database()
-    
+
     # 检查是否为多从者对比查询
     names = conditions.get("names")
     if names and isinstance(names, list) and len(names) > 0:
@@ -83,12 +83,12 @@ def execute_query(conditions: dict) -> list[dict]:
             # 为每个名称创建单独的查询条件
             single_conditions = {k: v for k, v in conditions.items() if k != "names"}
             single_conditions["name"] = name
-            
+
             for servant in db:
                 if _match_servant(servant, single_conditions):
                     all_results.append(servant)
                     break  # 找到匹配的第一个从者即可
-        
+
         # 去重（按 ID）
         seen_ids = set()
         unique_results = []
@@ -96,11 +96,11 @@ def execute_query(conditions: dict) -> list[dict]:
             if svt["id"] not in seen_ids:
                 seen_ids.add(svt["id"])
                 unique_results.append(svt)
-        
+
         # 按稀有度降序 → collectionNo 升序排序
         unique_results.sort(key=lambda x: (-x["rarity"], x["collectionNo"]))
         return unique_results
-    
+
     # 单从者查询或多条件筛选（原有逻辑）
     results = []
     for servant in db:
@@ -126,16 +126,19 @@ def register_filter(*field_names: str):
     同一个函数可注册多个字段（如 traits + excludeTraits），
     _match_servant 会通过 seen_filters 去重，确保只执行一次。
     """
+
     def decorator(fn: Callable[[dict, dict], bool]):
         for name in field_names:
             FILTER_REGISTRY[name] = fn
         return fn
+
     return decorator
 
 
 # ============================================================
 # 过滤器实现（按复杂度从低到高排列）
 # ============================================================
+
 
 @register_filter("className")
 def _filter_class(servant: dict, conditions: dict) -> bool:
@@ -188,10 +191,7 @@ def _filter_np_charge(servant: dict, conditions: dict) -> bool:
     op = np_cond.get("op", "eq")
     value = np_cond.get("value", 0)
     if op == "eq":
-        return any(
-            c["chargePercent"] == value
-            for c in servant.get("npCharges", [])
-        )
+        return any(c["chargePercent"] == value for c in servant.get("npCharges", []))
     elif op == "gte":
         return charge >= value
     elif op == "gt":
@@ -311,23 +311,29 @@ def _filter_name(servant: dict, conditions: dict) -> bool:
     # 阶段 1: 精确匹配（有映射名时优先检查映射）
     if mapped_name:
         normalized_mapped_name = _normalize_text(mapped_name)
-        if (normalized_mapped_name == normalized_en_name or
-            normalized_mapped_name == normalized_cn_name or
-            normalized_mapped_name == normalized_jp_name):
+        if (
+            normalized_mapped_name == normalized_en_name
+            or normalized_mapped_name == normalized_cn_name
+            or normalized_mapped_name == normalized_jp_name
+        ):
             name_matched = True
 
     # 阶段 2: 子串模糊匹配（"武尊" in "大和武尊"）
     if not name_matched and len(normalized_query_name) >= 2:
-        if (normalized_query_name in normalized_en_name or
-            normalized_query_name in normalized_cn_name or
-            normalized_query_name in normalized_jp_name):
+        if (
+            normalized_query_name in normalized_en_name
+            or normalized_query_name in normalized_cn_name
+            or normalized_query_name in normalized_jp_name
+        ):
             name_matched = True
 
     # 阶段 3: 反向子串匹配
     if not name_matched:
-        if (normalized_en_name and normalized_en_name in normalized_query_name) or \
-           (normalized_cn_name and normalized_cn_name in normalized_query_name) or \
-           (normalized_jp_name and normalized_jp_name in normalized_query_name):
+        if (
+            (normalized_en_name and normalized_en_name in normalized_query_name)
+            or (normalized_cn_name and normalized_cn_name in normalized_query_name)
+            or (normalized_jp_name and normalized_jp_name in normalized_query_name)
+        ):
             name_matched = True
 
     return name_matched
@@ -336,6 +342,7 @@ def _filter_name(servant: dict, conditions: dict) -> bool:
 # ============================================================
 # 核心匹配逻辑
 # ============================================================
+
 
 def _match_servant(servant: dict, conditions: dict) -> bool:
     """检查单个从者是否匹配所有已注册的过滤条件。"""
@@ -351,9 +358,7 @@ def _match_servant(servant: dict, conditions: dict) -> bool:
     return True
 
 
-def _match_effect(
-    servant: dict, effect_name: str, target_type: str | None = None
-) -> bool:
+def _match_effect(servant: dict, effect_name: str, target_type: str | None = None) -> bool:
     """
     检查从者是否拥有特定效果。
 

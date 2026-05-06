@@ -5,9 +5,9 @@ Laplace — IP Rate Limiter Middleware
 仅对指定路径生效，超限返回 HTTP 429。
 """
 
-import time
 import json
 import logging
+import time
 from collections import defaultdict, deque
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -31,8 +31,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         paths: 需要限制的路径前缀列表（默认 ["/api/chat"]）
     """
 
-    def __init__(self, app, max_requests: int = 10, global_max_requests: int = 100,
-                 window_seconds: int = 60, paths: list[str] | None = None):
+    def __init__(
+        self,
+        app,
+        max_requests: int = 10,
+        global_max_requests: int = 100,
+        window_seconds: int = 60,
+        paths: list[str] | None = None,
+    ):
         super().__init__(app)
         self.max_requests = max_requests
         self.global_max_requests = global_max_requests
@@ -61,7 +67,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return
         self._last_cleanup = now
         expired_ips = [
-            ip for ip, timestamps in self.requests.items()
+            ip
+            for ip, timestamps in self.requests.items()
             if not timestamps or timestamps[-1] < now - self.window_seconds
         ]
         for ip in expired_ips:
@@ -69,14 +76,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def _make_429(self, reason: str, client_ip: str, path: str, count: int, limit: int) -> Response:
         """构造 429 响应并记录日志。"""
-        logger.warning({
-            "event": "rate_limit_exceeded",
-            "reason": reason,
-            "client_ip": client_ip,
-            "path": path,
-            "requests_in_window": count,
-            "limit": limit,
-        })
+        logger.warning(
+            {
+                "event": "rate_limit_exceeded",
+                "reason": reason,
+                "client_ip": client_ip,
+                "path": path,
+                "requests_in_window": count,
+                "limit": limit,
+            }
+        )
         return Response(
             content=json.dumps(
                 {"error": "请求过于频繁，请稍后再试", "retry_after": self.window_seconds},

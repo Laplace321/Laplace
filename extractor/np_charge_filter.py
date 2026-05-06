@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from server.data_loader import fetch_servants, extract_np_charges
+    from server.data_loader import extract_np_charges, fetch_servants
 except ImportError as e:
     print(f"❌ 导入失败: {e}", file=sys.stderr)
     print("请确保在项目根目录运行此脚本", file=sys.stderr)
@@ -58,18 +58,20 @@ def main():
                 # 按从者 ID 去重，保留第一个匹配的技能
                 if svt["id"] not in seen_ids:
                     seen_ids.add(svt["id"])
-                    all_results.append({
-                        "id": svt["id"],
-                        "collectionNo": svt.get("collectionNo", 0),
-                        "name": svt.get("name", "Unknown"),
-                        "rarity": svt.get("rarity", 0),
-                        "className": svt.get("className", "unknown"),
-                        "chargePercent": charge["chargePercent"],
-                        "skillName": charge["skillName"],
-                        "skillNum": charge["skillNum"],
-                        "targetType": charge["targetType"],
-                        "faceUrl": svt.get("faceUrl", ""),
-                    })
+                    all_results.append(
+                        {
+                            "id": svt["id"],
+                            "collectionNo": svt.get("collectionNo", 0),
+                            "name": svt.get("name", "Unknown"),
+                            "rarity": svt.get("rarity", 0),
+                            "className": svt.get("className", "unknown"),
+                            "chargePercent": charge["chargePercent"],
+                            "skillName": charge["skillName"],
+                            "skillNum": charge["skillNum"],
+                            "targetType": charge["targetType"],
+                            "faceUrl": svt.get("faceUrl", ""),
+                        }
+                    )
                 break  # 找到第一个匹配后跳到下一个从者
 
     # 按稀有度降序 → collectionNo 升序排列
@@ -102,9 +104,11 @@ def main():
     # 打印前 5 个作为预览
     print("\n📋 预览 (前 5 个):")
     for svt in all_results[:5]:
-        print(f"   ★{'★' * (svt['rarity'] - 1)} {svt['name']} "
-              f"({svt['className']}) — {svt['skillName']} "
-              f"[{svt['chargePercent']}%]")
+        print(
+            f"   ★{'★' * (svt['rarity'] - 1)} {svt['name']} "
+            f"({svt['className']}) — {svt['skillName']} "
+            f"[{svt['chargePercent']}%]"
+        )
 
     print("\n✨ 完成!")
     return all_results

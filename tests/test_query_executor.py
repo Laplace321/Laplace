@@ -1,6 +1,5 @@
 import server.query_executor as qe
 
-
 SERVANTS = [
     {
         "id": 1,
@@ -121,9 +120,7 @@ def names(results):
 
 
 def test_np_charge_exact_and_gte_filters():
-    assert names(qe.execute_query({"npCharge": {"op": "eq", "value": 30}})) == [
-        "Altria Pendragon"
-    ]
+    assert names(qe.execute_query({"npCharge": {"op": "eq", "value": 30}})) == ["Altria Pendragon"]
     assert names(qe.execute_query({"npCharge": {"op": "gte", "value": 50}})) == [
         "James Moriarty",
         "Altria Caster",
@@ -131,9 +128,7 @@ def test_np_charge_exact_and_gte_filters():
 
 
 def test_rarity_class_and_nickname_filters():
-    assert names(qe.execute_query({"rarity": {"op": "eq", "value": 5}, "className": "saber"})) == [
-        "Altria Pendragon"
-    ]
+    assert names(qe.execute_query({"rarity": {"op": "eq", "value": 5}, "className": "saber"})) == ["Altria Pendragon"]
     assert names(qe.execute_query({"name": "呆毛"})) == ["Altria Pendragon"]
     assert names(qe.execute_query({"name": "小教授"})) == ["James Moriarty"]
     assert names(qe.execute_query({"name": "水 C 呆"})) == ["Altria Caster"]
@@ -141,25 +136,20 @@ def test_rarity_class_and_nickname_filters():
 
 
 def test_single_effect_and_target_type_filters():
-    assert names(qe.execute_query({"skillEffect": "upAtk", "targetType": "party"})) == [
-        "Altria Pendragon"
-    ]
+    assert names(qe.execute_query({"skillEffect": "upAtk", "targetType": "party"})) == ["Altria Pendragon"]
     assert qe.execute_query({"skillEffect": "upAtk", "targetType": "self"}) == []
 
 
 def test_skill_effects_and_or_filters():
-    assert names(qe.execute_query({"skillEffects": ["avoidance", "guts"]})) == [
-        "James Moriarty"
+    assert names(qe.execute_query({"skillEffects": ["avoidance", "guts"]})) == ["James Moriarty"]
+    assert names(qe.execute_query({"skillEffects": ["invincible", "guts"], "skillEffectsOp": "or"})) == [
+        "Altria Pendragon",
+        "James Moriarty",
     ]
-    assert names(
-        qe.execute_query({"skillEffects": ["invincible", "guts"], "skillEffectsOp": "or"})
-    ) == ["Altria Pendragon", "James Moriarty"]
 
 
 def test_traits_cards_np_card_and_np_target_filters():
-    assert names(qe.execute_query({"traits": [300, 303], "excludeTraits": [1002]})) == [
-        "Altria Pendragon"
-    ]
+    assert names(qe.execute_query({"traits": [300, 303], "excludeTraits": [1002]})) == ["Altria Pendragon"]
     assert names(qe.execute_query({"cards": {"arts": 3}, "npCard": "arts"})) == [
         "James Moriarty",
         "Altria Caster",

@@ -53,9 +53,7 @@ async def log_chat_trace_async(
     error: str = None,
 ):
     """异步版 trace 日志写入（通过线程池避免阻塞 Event Loop）。"""
-    trace_data = _build_trace_data(
-        trace_id, user_message, parsed_intent, found_count, final_reply, context, error
-    )
+    trace_data = _build_trace_data(trace_id, user_message, parsed_intent, found_count, final_reply, context, error)
     await asyncio.to_thread(_write_trace_sync, trace_data)
 
 
@@ -69,9 +67,7 @@ def log_chat_trace(
     error: str = None,
 ):
     """同步版 trace 日志写入（供测试和非异步上下文使用）。"""
-    trace_data = _build_trace_data(
-        trace_id, user_message, parsed_intent, found_count, final_reply, context, error
-    )
+    trace_data = _build_trace_data(trace_id, user_message, parsed_intent, found_count, final_reply, context, error)
     _write_trace_sync(trace_data)
 
 
@@ -80,7 +76,7 @@ def read_traces(limit: int = 20) -> list[dict]:
     if not LOG_FILE.exists():
         return []
     traces = []
-    with open(LOG_FILE, "r", encoding="utf-8") as f:
+    with open(LOG_FILE, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:
@@ -95,7 +91,7 @@ def find_trace(trace_id: str) -> dict | None:
     """按 trace_id 查找单条 trace。"""
     if not LOG_FILE.exists():
         return None
-    with open(LOG_FILE, "r", encoding="utf-8") as f:
+    with open(LOG_FILE, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:

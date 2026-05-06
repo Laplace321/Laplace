@@ -12,15 +12,15 @@ Rate Limiter 中间件测试。
 import time
 from unittest.mock import patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from server.rate_limiter import RateLimitMiddleware
 
 
-def _create_app(max_requests: int = 3, global_max_requests: int = 0,
-                window_seconds: int = 2, paths: list[str] | None = None):
+def _create_app(
+    max_requests: int = 3, global_max_requests: int = 0, window_seconds: int = 2, paths: list[str] | None = None
+):
     """创建带 RateLimitMiddleware 的测试应用。"""
     app = FastAPI()
     app.add_middleware(
@@ -191,8 +191,6 @@ class TestCorsConfiguration:
 
     def test_cors_origins_from_env(self):
         with patch.dict("os.environ", {"CORS_ORIGINS": "http://example.com,http://test.com"}):
-            import importlib
-            import server.main as main_mod
             # 验证环境变量解析逻辑
             origins_str = "http://example.com,http://test.com"
             origins = [o.strip() for o in origins_str.split(",") if o.strip()]

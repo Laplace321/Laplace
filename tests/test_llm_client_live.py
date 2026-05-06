@@ -5,7 +5,6 @@ import pytest
 
 from server.llm_client import chat_completion
 
-
 pytestmark = pytest.mark.skipif(
     os.getenv("RUN_LIVE_LLM_TESTS") != "1",
     reason="Set RUN_LIVE_LLM_TESTS=1 to call the real LLM API.",
@@ -29,7 +28,4 @@ def test_live_json_mode_smoke():
     assert result["intent"] == "query_servants"
     assert isinstance(result["conditions"], dict)
     assert result["_response_format"] in {"json_schema", "text_fallback"}
-    print(
-        "LIVE_LLM_JSON_MODE_RESULT "
-        f"model={result['_model']} response_format={result['_response_format']}"
-    )
+    print(f"LIVE_LLM_JSON_MODE_RESULT model={result['_model']} response_format={result['_response_format']}")

@@ -18,7 +18,7 @@ def _load_effect_names() -> str:
     if not schema_path.exists():
         return ""
 
-    with open(schema_path, "r", encoding="utf-8") as f:
+    with open(schema_path, encoding="utf-8") as f:
         data = json.load(f)
 
     lines = []

@@ -29,9 +29,7 @@ BASE_URL = os.getenv("LLM_BASE_URL", "https://x.obao.cloud/v1")
 API_KEY = os.getenv("LLM_API_KEY", "")
 PRIMARY_MODEL = os.getenv("LLM_MODEL", "claude-sonnet-4-6")
 FALLBACK_MODELS = [
-    m.strip()
-    for m in os.getenv("LLM_FALLBACK_MODELS", "Deepseek-V4-Flash,gpt-5.4").split(",")
-    if m.strip()
+    m.strip() for m in os.getenv("LLM_FALLBACK_MODELS", "Deepseek-V4-Flash,gpt-5.4").split(",") if m.strip()
 ]
 
 
@@ -72,7 +70,6 @@ async def chat_completion(
     models_to_try = [model or PRIMARY_MODEL] + FALLBACK_MODELS
     attempts_log: list[dict] = []
 
-    last_error = None
     for m in models_to_try:
         try:
             result = await _call_model(
@@ -88,7 +85,6 @@ async def chat_completion(
         except Exception as e:
             attempts_log.append({"model": m, "error": str(e)})
             print(f"⚠️  模型 {m} 调用失败: {e}")
-            last_error = e
             continue
 
     raise Exception(f"所有模型都调用失败。尝试记录: {attempts_log}")
@@ -155,8 +151,12 @@ async def _retry_call(
     for attempt in range(MAX_RETRIES):
         try:
             return await _post_response(
-                model, instructions, input_text,
-                max_tokens, temperature, use_structured_output,
+                model,
+                instructions,
+                input_text,
+                max_tokens,
+                temperature,
+                use_structured_output,
             )
         except LLMResponseFormatUnsupported:
             raise  # 格式不支持不重试，直接抛出让上层降级
@@ -261,7 +261,7 @@ def _extract_response_text(data: dict) -> str:
     # Responses API 提供 output_text 辅助字段
     if "output_text" in data:
         return data["output_text"]
-    
+
     # 兼容格式：从 output 数组中提取
     if "output" in data:
         for item in data["output"]:
@@ -273,7 +273,7 @@ def _extract_response_text(data: dict) -> str:
                             return part.get("text", "")
                 elif isinstance(content, str):
                     return content
-    
+
     raise ValueError("Responses API response has no text content")
 
 

@@ -41,22 +41,24 @@ SKILL_LV10_INDEX = 9
 # 知识库加载
 # ============================================================
 
+
 def load_effect_schema() -> list[dict]:
     """加载 effect_schema.json 知识库。"""
     schema_path = KNOWLEDGE_DIR / "effect_schema.json"
     if not schema_path.exists():
         print("⚠️  effect_schema.json 不存在，请先运行 sync_chaldea.py")
         return []
-    with open(schema_path, "r", encoding="utf-8") as f:
+    with open(schema_path, encoding="utf-8") as f:
         data = json.load(f)
     return data.get("effects", [])
+
 
 def load_svt_names_mapping() -> dict:
     """加载 mappings.json 中的从者中文翻译。"""
     mappings_path = KNOWLEDGE_DIR / "mappings.json"
     if not mappings_path.exists():
         return {}
-    with open(mappings_path, "r", encoding="utf-8") as f:
+    with open(mappings_path, encoding="utf-8") as f:
         data = json.load(f)
     return data.get("svt_names", {})
 
@@ -88,16 +90,14 @@ def build_effect_matcher(effects: list[dict]) -> dict:
 # 数据提取
 # ============================================================
 
+
 def fetch_servants() -> list[dict]:
     """从 Atlas Academy API 拉取全量从者数据。"""
     print("📡 正在从 Atlas Academy API 拉取从者数据...")
     resp = requests.get(NICE_SERVANT_URL, timeout=120)
     resp.raise_for_status()
     servants = resp.json()
-    normal = [
-        s for s in servants
-        if s.get("type") == "normal" and s.get("collectionNo", 0) > 0
-    ]
+    normal = [s for s in servants if s.get("type") == "normal" and s.get("collectionNo", 0) > 0]
     print(f"   ✅ 获取到 {len(normal)} 个从者")
     return normal
 
@@ -158,36 +158,45 @@ def classify_target_type(func_target_type: str) -> str:
 def refine_card_effects(func: dict, matched_effects: set[str]) -> set[str]:
     """根据 Buff 名称精确过滤卡色魔放，防止通用枚举导致的污染。"""
     buffs = func.get("buffs", [])
-    has_generic_buff = any(b.get("type") in ("upCommandall", "upCommandatk", "upCommandstar", "upCommandnp") for b in buffs)
-    
+    has_generic_buff = any(
+        b.get("type") in ("upCommandall", "upCommandatk", "upCommandstar", "upCommandnp") for b in buffs
+    )
+
     if not has_generic_buff:
         return matched_effects
-        
+
     # 如果当前集合中有卡色效果，则根据 buff name 进行二次判定
     card_effects = {"upArts", "upQuick", "upBuster"}
     if not (matched_effects & card_effects):
         return matched_effects
-        
+
     refined = set()
     for eff in matched_effects:
         if eff in card_effects:
             for b in buffs:
                 b_name = b.get("name", "").lower()
                 # 显式包含颜色名称才保留
-                if eff == "upArts" and "arts" in b_name: refined.add(eff)
-                if eff == "upQuick" and "quick" in b_name: refined.add(eff)
-                if eff == "upBuster" and "buster" in b_name: refined.add(eff)
+                if eff == "upArts" and "arts" in b_name:
+                    refined.add(eff)
+                if eff == "upQuick" and "quick" in b_name:
+                    refined.add(eff)
+                if eff == "upBuster" and "buster" in b_name:
+                    refined.add(eff)
                 # 如果是真正的三色提升 (Command Performance Up)
-                if "command" in b_name and ("performance" in b_name or "up" in b_name) and "arts" not in b_name and "quick" not in b_name and "buster" not in b_name:
+                if (
+                    "command" in b_name
+                    and ("performance" in b_name or "up" in b_name)
+                    and "arts" not in b_name
+                    and "quick" not in b_name
+                    and "buster" not in b_name
+                ):
                     refined.add(eff)
         else:
             refined.add(eff)
     return refined
 
 
-def extract_skill_effects(
-    servant: dict, matcher: dict
-) -> tuple[set[str], list[dict]]:
+def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[dict]]:
     """
     提取从者所有技能中的全部效果。
 
@@ -219,18 +228,22 @@ def extract_skill_effects(
 
             for effect_name in matched_effects:
                 all_effects.add(effect_name)
-                skill_effects.append({
-                    "type": effect_name,
-                    "funcType": func_type,
-                    "targetType": classify_target_type(target_type),
-                })
+                skill_effects.append(
+                    {
+                        "type": effect_name,
+                        "funcType": func_type,
+                        "targetType": classify_target_type(target_type),
+                    }
+                )
 
         if skill_effects:
-            skill_details.append({
-                "skillName": skill.get("name", ""),
-                "skillNum": skill.get("num", 0),
-                "effects": skill_effects,
-            })
+            skill_details.append(
+                {
+                    "skillName": skill.get("name", ""),
+                    "skillNum": skill.get("num", 0),
+                    "effects": skill_effects,
+                }
+            )
 
     return all_effects, skill_details
 
@@ -268,16 +281,16 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
                 # 解析宝具目标与附带特效
                 for func in np.get("functions", []):
                     ftype = func.get("funcType", "")
-                    
+
                     # 提取宝具特效 (复用技能提取逻辑)
                     matched_effects = set(matcher["funcType"].get(ftype, []))
                     for buff in func.get("buffs", []):
                         buff_type = buff.get("type", "")
                         matched_effects.update(matcher["buffType"].get(buff_type, []))
-                    
+
                     # 二次精炼：防止卡色污染
                     matched_effects = refine_card_effects(func, matched_effects)
-                    
+
                     np_effects_set.update(matched_effects)
 
                     if "damage" in ftype.lower():
@@ -288,7 +301,7 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
                             np_target = "one"
                         else:
                             np_target = "support"
-                
+
                 # 如果是纯辅助宝具（没有伤害函数）
                 if np_target == "unknown":
                     np_target = "support"
@@ -324,15 +337,17 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
             "hasNpCharge": bool(self_charges) or bool(party_charges) or len(charges) > 0,
             "skillEffects": sorted(list(skill_effects)),
             "npEffects": sorted(list(np_effects_set)),
-            "skillDetails": skill_details
+            "skillDetails": skill_details,
         }
         db.append(entry)
         if skill_effects:
             total_with_effects += 1
 
-    print(f"   ✅ 构建数据库: {len(db)} 个从者, "
-          f"{sum(1 for s in db if s['hasNpCharge'])} 个有自充, "
-          f"{total_with_effects} 个有效果数据")
+    print(
+        f"   ✅ 构建数据库: {len(db)} 个从者, "
+        f"{sum(1 for s in db if s['hasNpCharge'])} 个有自充, "
+        f"{total_with_effects} 个有效果数据"
+    )
     return db
 
 

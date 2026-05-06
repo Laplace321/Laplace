@@ -19,9 +19,9 @@ import os
 import re
 import subprocess
 import sys
-import urllib.request
 import urllib.error
-from datetime import datetime, timezone
+import urllib.request
+from datetime import UTC, datetime
 from pathlib import Path
 
 # === 路径配置 ===
@@ -44,6 +44,7 @@ COMMON_DART = GAMEDATA_DIR / "common.dart"
 # ============================================================
 # 1. 枚举解析器
 # ============================================================
+
 
 def parse_dart_enum(file_path: Path, enum_name: str) -> list[dict]:
     """
@@ -93,6 +94,7 @@ def parse_dart_enum(file_path: Path, enum_name: str) -> list[dict]:
 # 2. SkillEffect 分类解析器
 # ============================================================
 
+
 def parse_effect_schema(file_path: Path) -> list[dict]:
     """
     从 effect.dart 提取 SkillEffect 静态字段定义。
@@ -129,12 +131,14 @@ def parse_effect_schema(file_path: Path) -> list[dict]:
         r"['\"](\w+)['\"],\s*BuffType\.(\w+)",
         content,
     ):
-        effects.append({
-            "name": m.group(2),
-            "category": categories.get(m.group(1), "unknown"),
-            "funcTypes": [],
-            "buffTypes": [m.group(3)],
-        })
+        effects.append(
+            {
+                "name": m.group(2),
+                "category": categories.get(m.group(1), "unknown"),
+                "funcTypes": [],
+                "buffTypes": [m.group(3)],
+            }
+        )
 
     # 模式 2: SkillEffect._func('name', FuncType.xxx)
     for m in re.finditer(
@@ -142,12 +146,14 @@ def parse_effect_schema(file_path: Path) -> list[dict]:
         r"['\"](\w+)['\"],\s*FuncType\.(\w+)",
         content,
     ):
-        effects.append({
-            "name": m.group(2),
-            "category": categories.get(m.group(1), "unknown"),
-            "funcTypes": [m.group(3)],
-            "buffTypes": [],
-        })
+        effects.append(
+            {
+                "name": m.group(2),
+                "category": categories.get(m.group(1), "unknown"),
+                "funcTypes": [m.group(3)],
+                "buffTypes": [],
+            }
+        )
 
     # 模式 3: SkillEffect('name', funcTypes: [...], buffTypes: [...])
     # 需要更灵活的正则——找到完整的构造函数调用
@@ -195,12 +201,14 @@ def parse_effect_schema(file_path: Path) -> list[dict]:
         if any(e["name"] == effect_name for e in effects):
             continue
 
-        effects.append({
-            "name": effect_name,
-            "category": categories.get(var_name, "unknown"),
-            "funcTypes": func_types,
-            "buffTypes": buff_types,
-        })
+        effects.append(
+            {
+                "name": effect_name,
+                "category": categories.get(var_name, "unknown"),
+                "funcTypes": func_types,
+                "buffTypes": buff_types,
+            }
+        )
 
     # 添加中文别名
     _add_chinese_aliases(effects)
@@ -278,6 +286,7 @@ def _add_chinese_aliases(effects: list[dict]) -> None:
 # 3. Chaldea 源码管理
 # ============================================================
 
+
 def _ensure_chaldea_source() -> None:
     """确保 Chaldea 源码可用：不存在则 clone，已存在则 pull。"""
     if GAMEDATA_DIR.exists():
@@ -286,12 +295,14 @@ def _ensure_chaldea_source() -> None:
             result = subprocess.run(
                 ["git", "pull", "--ff-only"],
                 cwd=str(CHALDEA_ROOT),
-                capture_output=True, text=True, timeout=60,
+                capture_output=True,
+                text=True,
+                timeout=60,
             )
             if result.returncode == 0:
                 print(f"   ✅ 更新成功: {result.stdout.strip()}")
             else:
-                print(f"   ⚠️  git pull 失败（可能有本地修改），继续使用现有版本")
+                print("   ⚠️  git pull 失败（可能有本地修改），继续使用现有版本")
         except subprocess.TimeoutExpired:
             print("   ⚠️  git pull 超时，继续使用现有版本")
         return
@@ -301,7 +312,9 @@ def _ensure_chaldea_source() -> None:
     try:
         result = subprocess.run(
             ["git", "clone", "--depth", "1", CHALDEA_REPO_URL, str(CHALDEA_ROOT)],
-            capture_output=True, text=True, timeout=300,
+            capture_output=True,
+            text=True,
+            timeout=300,
         )
         if result.returncode != 0:
             print(f"   ❌ git clone 失败: {result.stderr.strip()}")
@@ -315,6 +328,7 @@ def _ensure_chaldea_source() -> None:
 # ============================================================
 # 4. 元数据生成
 # ============================================================
+
 
 def get_chaldea_commit() -> str:
     """获取 Chaldea 仓库的当前 commit hash。"""
@@ -336,9 +350,9 @@ def download_mapping_data(filename: str) -> dict:
     url = f"https://raw.githubusercontent.com/chaldea-center/chaldea-data/main/mappings/{filename}"
     print(f"   ⬇️ 下载 {filename}...")
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=15) as response:
-            return json.loads(response.read().decode('utf-8'))
+            return json.loads(response.read().decode("utf-8"))
     except Exception as e:
         print(f"   ⚠️ 下载 {filename} 失败: {e}")
         return {}
@@ -347,6 +361,7 @@ def download_mapping_data(filename: str) -> dict:
 # ============================================================
 # 5. 主流程
 # ============================================================
+
 
 def main():
     print("=" * 55)
@@ -366,45 +381,57 @@ def main():
     # --- Step 1: FuncType 枚举 ---
     print("\n📋 Step 1: 解析 FuncType 枚举...")
     func_types = parse_dart_enum(FUNC_DART, "FuncType")
-    _write_json(OUTPUT_DIR / "func_types.json", {
-        "enumName": "FuncType",
-        "source": "func.dart",
-        "count": len(func_types),
-        "values": func_types,
-    })
+    _write_json(
+        OUTPUT_DIR / "func_types.json",
+        {
+            "enumName": "FuncType",
+            "source": "func.dart",
+            "count": len(func_types),
+            "values": func_types,
+        },
+    )
     print(f"   ✅ 提取 {len(func_types)} 个 FuncType")
 
     # --- Step 2: FuncTargetType 枚举 ---
     print("\n📋 Step 1b: 解析 FuncTargetType 枚举...")
     func_target_types = parse_dart_enum(FUNC_DART, "FuncTargetType")
-    _write_json(OUTPUT_DIR / "func_target_types.json", {
-        "enumName": "FuncTargetType",
-        "source": "func.dart",
-        "count": len(func_target_types),
-        "values": func_target_types,
-    })
+    _write_json(
+        OUTPUT_DIR / "func_target_types.json",
+        {
+            "enumName": "FuncTargetType",
+            "source": "func.dart",
+            "count": len(func_target_types),
+            "values": func_target_types,
+        },
+    )
     print(f"   ✅ 提取 {len(func_target_types)} 个 FuncTargetType")
 
     # --- Step 3: BuffType 枚举 ---
     print("\n📋 Step 2: 解析 BuffType 枚举...")
     buff_types = parse_dart_enum(BUFF_DART, "BuffType")
-    _write_json(OUTPUT_DIR / "buff_types.json", {
-        "enumName": "BuffType",
-        "source": "buff.dart",
-        "count": len(buff_types),
-        "values": buff_types,
-    })
+    _write_json(
+        OUTPUT_DIR / "buff_types.json",
+        {
+            "enumName": "BuffType",
+            "source": "buff.dart",
+            "count": len(buff_types),
+            "values": buff_types,
+        },
+    )
     print(f"   ✅ 提取 {len(buff_types)} 个 BuffType")
 
     # --- Step 4: SkillEffect 分类 ---
     print("\n📋 Step 3: 解析 SkillEffect 效果分类...")
     effects = parse_effect_schema(EFFECT_DART)
-    _write_json(OUTPUT_DIR / "effect_schema.json", {
-        "source": "effect.dart",
-        "count": len(effects),
-        "categories": ["attack", "defence", "debuff", "others"],
-        "effects": effects,
-    })
+    _write_json(
+        OUTPUT_DIR / "effect_schema.json",
+        {
+            "source": "effect.dart",
+            "count": len(effects),
+            "categories": ["attack", "defence", "debuff", "others"],
+            "effects": effects,
+        },
+    )
     print(f"   ✅ 提取 {len(effects)} 个效果分类")
     for cat in ["attack", "defence", "debuff", "others"]:
         cat_count = sum(1 for e in effects if e["category"] == cat)
@@ -414,35 +441,38 @@ def main():
     print("\n📋 Step 4: 解析 SvtClass 枚举...")
     svt_classes = parse_dart_enum(COMMON_DART, "SvtClass")
     # 筛选出玩家可用的职阶（value 1-28, 排除 beast/lore/unknown 等）
-    playable_classes = [
-        c for c in svt_classes
-        if c["value"] in {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 23, 25, 28}
-    ]
-    _write_json(OUTPUT_DIR / "class_mapping.json", {
-        "enumName": "SvtClass",
-        "source": "common.dart",
-        "totalCount": len(svt_classes),
-        "playableCount": len(playable_classes),
-        "playable": playable_classes,
-        "all": svt_classes,
-    })
+    playable_classes = [c for c in svt_classes if c["value"] in {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 23, 25, 28}]
+    _write_json(
+        OUTPUT_DIR / "class_mapping.json",
+        {
+            "enumName": "SvtClass",
+            "source": "common.dart",
+            "totalCount": len(svt_classes),
+            "playableCount": len(playable_classes),
+            "playable": playable_classes,
+            "all": svt_classes,
+        },
+    )
     print(f"   ✅ 提取 {len(svt_classes)} 个职阶 ({len(playable_classes)} 可用)")
 
     # --- Step 6: 下载多语言映射 ---
     print("\n📋 Step 5: 下载多语言映射数据...")
     svt_names = download_mapping_data("svt_names.json")
     traits_map = download_mapping_data("trait.json")
-    _write_json(OUTPUT_DIR / "mappings.json", {
-        "svt_names": svt_names,
-        "traits": traits_map,
-    })
+    _write_json(
+        OUTPUT_DIR / "mappings.json",
+        {
+            "svt_names": svt_names,
+            "traits": traits_map,
+        },
+    )
     print(f"   ✅ 保存 mappings.json (含 {len(svt_names)} 个从者名, {len(traits_map)} 个特性)")
 
     # --- Step 7: 元数据 ---
     print("\n📋 Step 6: 生成元数据...")
     commit = get_chaldea_commit()
     meta = {
-        "syncedAt": datetime.now(timezone.utc).isoformat(),
+        "syncedAt": datetime.now(UTC).isoformat(),
         "chaldeaCommit": commit,
         "chaldeaPath": str(CHALDEA_ROOT),
         "files": {
@@ -459,7 +489,7 @@ def main():
     # 总结
     print("\n" + "=" * 55)
     print(f"✨ 同步完成! 输出目录: {OUTPUT_DIR}")
-    print(f"   📁 共生成 6 个知识库文件")
+    print("   📁 共生成 6 个知识库文件")
     print("=" * 55)
 
 

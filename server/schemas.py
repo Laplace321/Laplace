@@ -9,7 +9,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
 CompareOp = Literal["eq", "gte", "lte", "gt", "lt"]
 
 

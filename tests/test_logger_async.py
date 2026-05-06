@@ -1,7 +1,7 @@
 """异步日志写入测试。"""
+
 import asyncio
 import json
-import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -22,8 +22,8 @@ def _patch_log_file():
         yield
 
 
-# ── 导入被测模块 ──
-from server.logger import (
+# ── 导入被测模块（必须在 patch fixture 之后，否则 LOG_FILE 无法被替换） ──
+from server.logger import (  # noqa: E402
     _build_trace_data,
     _write_trace_sync,
     log_chat_trace,
@@ -103,10 +103,7 @@ class TestLogChatTraceAsync:
 
     async def test_concurrent_writes_no_data_loss(self):
         """并发写入 50 条日志，验证无数据丢失。"""
-        tasks = [
-            log_chat_trace_async(f"c{i}", f"q{i}", {}, i, f"r{i}")
-            for i in range(50)
-        ]
+        tasks = [log_chat_trace_async(f"c{i}", f"q{i}", {}, i, f"r{i}") for i in range(50)]
         await asyncio.gather(*tasks)
         lines = _tmp_log.read_text().strip().split("\n")
         assert len(lines) == 50

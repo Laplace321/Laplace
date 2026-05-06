@@ -5,7 +5,6 @@ import pytest
 
 import server.llm_client as llm_client
 
-
 VALID_JSON = '{"intent":"query_servants","conditions":{"npCharge":{"op":"eq","value":30}}}'
 
 
@@ -22,17 +21,8 @@ class FakeResponse:
             "object": "response",
             "output_text": self._content,
             "output": [
-                {
-                    "type": "message",
-                    "role": "assistant",
-                    "content": [
-                        {
-                            "type": "output_text",
-                            "text": self._content
-                        }
-                    ]
-                }
-            ]
+                {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": self._content}]}
+            ],
         }
 
     def raise_for_status(self):

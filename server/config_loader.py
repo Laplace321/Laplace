@@ -27,7 +27,7 @@ class CachedConfig:
         except FileNotFoundError:
             return self._data or {}
         if self._data is None or current_mtime > self._mtime:
-            with open(self._path, "r", encoding="utf-8") as f:
+            with open(self._path, encoding="utf-8") as f:
                 self._data = json.load(f)
             self._mtime = current_mtime
         return self._data

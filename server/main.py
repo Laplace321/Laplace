@@ -5,27 +5,24 @@ Laplace — FastAPI Server
 支持传统 JSON 端点和 SSE 流式端点。
 """
 
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-
-import asyncio
 import json
 import os
 import uuid
 from pathlib import Path
-from server.prompts import get_system_prompt, get_generation_prompt
-from server.llm_client import chat_completion
-from server.query_executor import execute_query, load_database
-from server.logger import log_chat_trace_async, read_traces, find_trace
-from fastapi.responses import JSONResponse
-from server.rate_limiter import RateLimitMiddleware
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 # 预消化翻译字典（从 config/translations.json 加载，支持热更新）
 from server.config_loader import CachedConfig
+from server.llm_client import chat_completion
+from server.logger import find_trace, log_chat_trace_async, read_traces
+from server.prompts import get_generation_prompt, get_system_prompt
+from server.query_executor import execute_query, load_database
+from server.rate_limiter import RateLimitMiddleware
 
 _translations_cache = CachedConfig(Path(__file__).parent / "config" / "translations.json")
 
@@ -41,7 +38,9 @@ def _get_np_card_map() -> dict:
 def _get_np_target_map() -> dict:
     return _translations_cache.get()["npTarget"]
 
+
 _effect_map = None
+
 
 def get_effect_translation(effect_code: str) -> str:
     global _effect_map
@@ -49,7 +48,7 @@ def get_effect_translation(effect_code: str) -> str:
         _effect_map = {}
         schema_path = Path(__file__).parent / "knowledge" / "effect_schema.json"
         if schema_path.exists():
-            with open(schema_path, "r", encoding="utf-8") as f:
+            with open(schema_path, encoding="utf-8") as f:
                 data = json.load(f)
                 for effect in data.get("effects", []):
                     name = effect.get("name")
@@ -86,25 +85,33 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
         translated_np_effects = [get_effect_translation(e) for e in raw_np_effects]
 
         card_buff_status = []
-        if "upArts" in raw_effects: card_buff_status.append("有蓝卡提升")
-        else: card_buff_status.append("无蓝卡提升")
-        if "upQuick" in raw_effects: card_buff_status.append("有绿卡提升")
-        else: card_buff_status.append("无绿卡提升")
-        if "upBuster" in raw_effects: card_buff_status.append("有红卡提升")
-        else: card_buff_status.append("无红卡提升")
+        if "upArts" in raw_effects:
+            card_buff_status.append("有蓝卡提升")
+        else:
+            card_buff_status.append("无蓝卡提升")
+        if "upQuick" in raw_effects:
+            card_buff_status.append("有绿卡提升")
+        else:
+            card_buff_status.append("无绿卡提升")
+        if "upBuster" in raw_effects:
+            card_buff_status.append("有红卡提升")
+        else:
+            card_buff_status.append("无红卡提升")
 
-        top_results.append({
-            "name": s.get("name"),
-            "aliasCN": s.get("aliasCN"),
-            "className": _get_class_map().get(str(raw_class_name).lower(), raw_class_name),
-            "rarity": s.get("rarity"),
-            "totalSelfCharge": s.get("totalSelfCharge"),
-            "npCard": _get_np_card_map().get(str(raw_np_card).lower(), raw_np_card),
-            "npTarget": _get_np_target_map().get(str(raw_np_target).lower(), raw_np_target),
-            "skillEffects": translated_effects,
-            "npEffects": translated_np_effects,
-            "__internal_card_buff_check": " | ".join(card_buff_status),
-        })
+        top_results.append(
+            {
+                "name": s.get("name"),
+                "aliasCN": s.get("aliasCN"),
+                "className": _get_class_map().get(str(raw_class_name).lower(), raw_class_name),
+                "rarity": s.get("rarity"),
+                "totalSelfCharge": s.get("totalSelfCharge"),
+                "npCard": _get_np_card_map().get(str(raw_np_card).lower(), raw_np_card),
+                "npTarget": _get_np_target_map().get(str(raw_np_target).lower(), raw_np_target),
+                "skillEffects": translated_effects,
+                "npEffects": translated_np_effects,
+                "__internal_card_buff_check": " | ".join(card_buff_status),
+            }
+        )
 
     return {
         "total_found": total_found,
@@ -148,11 +155,13 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     """对话请求。"""
+
     message: str
 
 
 class ChatResponse(BaseModel):
     """对话响应。"""
+
     reply: str
     servants: list[dict]
     count: int
@@ -197,25 +206,24 @@ async def chat(request: ChatRequest):
     """处理用户对话请求。"""
     user_message = request.message
     trace_id = uuid.uuid4().hex[:8]  # 生成一个 8 位的 trace_id
-    
+
     # 1. 意图解析 (第一阶段)
     try:
         parsed = await chat_completion(
-            system_prompt=get_system_prompt(),
-            user_message=user_message,
-            temperature=0.1,
-            json_mode=True
+            system_prompt=get_system_prompt(), user_message=user_message, temperature=0.1, json_mode=True
         )
     except Exception as e:
         print(f"[{trace_id}] LLM Parse Error: {e}")
-        await log_chat_trace_async(trace_id, user_message, {}, 0, "无法连接到 LLM 或解析失败，请检查模型配置。", error=str(e))
+        await log_chat_trace_async(
+            trace_id, user_message, {}, 0, "无法连接到 LLM 或解析失败，请检查模型配置。", error=str(e)
+        )
         return ChatResponse(
             reply="抱歉，我遇到了网络问题或模型暂时不可用，请稍后再试。",
             servants=[],
             count=0,
             query={},
             model="error",
-            traceId=trace_id
+            traceId=trace_id,
         )
 
     model_used = parsed.pop("_model", "unknown")
@@ -224,14 +232,7 @@ async def chat(request: ChatRequest):
     if parsed.get("intent") != "query_servants":
         reply_text = parsed.get("rawResponse", "抱歉，我目前只能回答 FGO 从者相关的问题。")
         await log_chat_trace_async(trace_id, user_message, parsed, 0, reply_text)
-        return ChatResponse(
-            reply=reply_text,
-            servants=[],
-            count=0,
-            query=parsed,
-            model=model_used,
-            traceId=trace_id
-        )
+        return ChatResponse(reply=reply_text, servants=[], count=0, query=parsed, model=model_used, traceId=trace_id)
 
     # 3. 执行查询
     conditions = parsed.get("conditions", {})
@@ -244,14 +245,14 @@ async def chat(request: ChatRequest):
 
     # 5. 第二阶段：生成自然语言回复 (RAG)
     generation_prompt = get_generation_prompt(user_message, json.dumps(context_data, ensure_ascii=False))
-    
+
     try:
         # LLM 的第二次调用（非严格 JSON，返回纯文本）
         generation_response = await chat_completion(
             system_prompt="You are a helpful AI assistant. You MUST strictly follow the provided data and NEVER use your internal knowledge about FGO.",
             user_message=generation_prompt,
             temperature=0.1,
-            json_mode=False
+            json_mode=False,
         )
         final_reply = generation_response.get("text", "").strip()
         if not final_reply:
@@ -273,7 +274,7 @@ async def chat(request: ChatRequest):
         parsed_intent=conditions,
         found_count=total_found,
         final_reply=final_reply,
-        context=context_data
+        context=context_data,
     )
 
     # 限制返回给前端的数量，避免响应过大
@@ -285,7 +286,7 @@ async def chat(request: ChatRequest):
         count=total_found,
         query=conditions,
         model=model_used,
-        traceId=trace_id
+        traceId=trace_id,
     )
 
 
@@ -317,11 +318,14 @@ async def chat_stream(message: str):
         parsed.pop("_response_format", None)
 
         # 推送解析结果
-        yield _sse_event("thinking", {
-            "phase": "parsed",
-            "intent": parsed.get("intent", "unknown"),
-            "conditions": parsed.get("conditions", {}),
-        })
+        yield _sse_event(
+            "thinking",
+            {
+                "phase": "parsed",
+                "intent": parsed.get("intent", "unknown"),
+                "conditions": parsed.get("conditions", {}),
+            },
+        )
 
         # 非查询意图 — 直接返回文本
         if parsed.get("intent") != "query_servants":
@@ -340,20 +344,21 @@ async def chat_stream(message: str):
         returned_servants = servants[:MAX_RESULTS]
 
         # 卡片先行 — 立即推送从者数据
-        yield _sse_event("servants", {
-            "servants": returned_servants,
-            "count": len(returned_servants),
-            "total": total_found,
-        })
+        yield _sse_event(
+            "servants",
+            {
+                "servants": returned_servants,
+                "count": len(returned_servants),
+                "total": total_found,
+            },
+        )
 
         # ── 阶段 3: RAG 生成 ──
         yield _sse_event("thinking", {"phase": "generating", "message": "正在生成分析..."})
 
         context_data, _ = _build_context(servants)
         context_data["query_conditions"] = conditions
-        generation_prompt = get_generation_prompt(
-            message, json.dumps(context_data, ensure_ascii=False)
-        )
+        generation_prompt = get_generation_prompt(message, json.dumps(context_data, ensure_ascii=False))
 
         try:
             generation_response = await chat_completion(
@@ -408,6 +413,7 @@ async def chat_stream(message: str):
 async def health():
     """健康检查。"""
     return {"status": "ok", "service": "laplace"}
+
 
 # 挂载前端静态文件目录
 app.mount("/", StaticFiles(directory="demo", html=True), name="static")

@@ -4,6 +4,7 @@
 
 | 日期 | 事件 | 备注 |
 | :--- | :--- | :--- |
+| 2026-05-06 | Phase 5 完成 | P1（Filter Registry、知识配置分离、Chaldea 依赖边界、配置热更新、Trace Debug）+ P2（LLM Retry、前端 UX、异步日志、工程自动化 ruff + GitHub Actions CI） |
 | 2026-05-06 | Thinking Steps SSE | 新增 SSE 流式端点，分阶段展示 AI 思考过程（解析→检索→生成），卡片先行渲染 |
 | 2026-05-06 | Phase 5 Batch 2 - P0 | 完成数据入口单一化：extractor/np_charge_filter.py 从 191 行降至 52 行，复用 data_loader.py |
 | 2026-05-06 | LLM API 迁移 | 从 Chat Completions API 迁移至 OpenAI Responses API（2025 推荐） |
