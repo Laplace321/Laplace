@@ -11,6 +11,7 @@ intent contract for JSON-mode calls.
 - 结构化输出：response_format → text.format
 """
 
+import asyncio
 import json
 import os
 from typing import Any
@@ -32,6 +33,11 @@ FALLBACK_MODELS = [
     for m in os.getenv("LLM_FALLBACK_MODELS", "Deepseek-V4-Flash,gpt-5.4").split(",")
     if m.strip()
 ]
+
+
+# Retry 配置
+MAX_RETRIES = 3
+RETRY_BACKOFF = [1.0, 2.0, 4.0]  # exponential backoff 秒数
 
 
 class LLMResponseFormatUnsupported(Exception):
@@ -64,11 +70,12 @@ async def chat_completion(
         Exception: 所有模型都失败时
     """
     models_to_try = [model or PRIMARY_MODEL] + FALLBACK_MODELS
+    attempts_log: list[dict] = []
 
     last_error = None
     for m in models_to_try:
         try:
-            return await _call_model(
+            result = await _call_model(
                 m,
                 system_prompt,
                 user_message,
@@ -76,12 +83,15 @@ async def chat_completion(
                 temperature,
                 json_mode,
             )
+            result["_attempts"] = attempts_log
+            return result
         except Exception as e:
+            attempts_log.append({"model": m, "error": str(e)})
             print(f"⚠️  模型 {m} 调用失败: {e}")
             last_error = e
             continue
 
-    raise Exception(f"所有模型都调用失败。最后的错误: {last_error}")
+    raise Exception(f"所有模型都调用失败。尝试记录: {attempts_log}")
 
 
 async def _call_model(
@@ -94,7 +104,7 @@ async def _call_model(
 ) -> dict:
     """调用单个模型；JSON 模式优先尝试 text.format 结构化输出。"""
     if not json_mode:
-        data = await _post_response(
+        data = await _retry_call(
             model,
             system_prompt,
             user_message,
@@ -107,7 +117,7 @@ async def _call_model(
 
     response_format = "json_schema"
     try:
-        data = await _post_response(
+        data = await _retry_call(
             model,
             system_prompt,
             user_message,
@@ -117,7 +127,7 @@ async def _call_model(
         )
     except LLMResponseFormatUnsupported:
         response_format = "text_fallback"
-        data = await _post_response(
+        data = await _retry_call(
             model,
             system_prompt,
             user_message,
@@ -130,6 +140,33 @@ async def _call_model(
     parsed["_model"] = model
     parsed["_response_format"] = response_format
     return parsed
+
+
+async def _retry_call(
+    model: str,
+    instructions: str,
+    input_text: str,
+    max_tokens: int,
+    temperature: float,
+    use_structured_output: bool,
+) -> dict:
+    """对 _post_response 执行带 exponential backoff 的重试。"""
+    last_error = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            return await _post_response(
+                model, instructions, input_text,
+                max_tokens, temperature, use_structured_output,
+            )
+        except LLMResponseFormatUnsupported:
+            raise  # 格式不支持不重试，直接抛出让上层降级
+        except Exception as e:
+            last_error = e
+            if attempt < MAX_RETRIES - 1:
+                wait = RETRY_BACKOFF[attempt]
+                print(f"  ↻ 模型 {model} 第 {attempt + 1} 次失败，{wait}s 后重试: {e}")
+                await asyncio.sleep(wait)
+    raise last_error
 
 
 async def _post_response(

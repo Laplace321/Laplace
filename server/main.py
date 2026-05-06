@@ -264,7 +264,9 @@ async def chat(request: ChatRequest):
         if total_found > MAX_CONTEXT_SIZE:
             final_reply += f"（仅显示前 {MAX_CONTEXT_SIZE} 位详情，更多请查看卡片）"
 
-    # 记录完整链路
+    # 记录完整链路（含 LLM 调用元数据）
+    context_data["llm_attempts"] = parsed.get("_attempts", [])
+    context_data["llm_model"] = model_used
     log_chat_trace(
         trace_id=trace_id,
         user_message=user_message,
@@ -376,7 +378,9 @@ async def chat_stream(message: str):
         # 推送生成的文本
         yield _sse_event("delta", {"text": final_reply})
 
-        # 记录完整链路
+        # 记录完整链路（含 LLM 调用元数据）
+        context_data["llm_attempts"] = parsed.get("_attempts", [])
+        context_data["llm_model"] = model_used
         log_chat_trace(
             trace_id=trace_id,
             user_message=message,
