@@ -23,17 +23,30 @@ from server.rate_limiter import RateLimitMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-# 预消化翻译字典
-NP_CARD_MAP = {"buster": "红卡", "arts": "蓝卡", "quick": "绿卡"}
-NP_TARGET_MAP = {"all": "全体(光炮)", "one": "单体", "support": "辅助"}
-CLASS_MAP = {
-    "saber": "剑阶", "archer": "弓阶", "lancer": "枪阶",
-    "rider": "骑阶", "caster": "术阶", "assassin": "杀阶",
-    "berserker": "狂阶", "ruler": "裁定者(Ruler)", "avenger": "复仇者(Avenger)",
-    "mooncancer": "月癌(MoonCancer)", "alterego": "他人格(AlterEgo)",
-    "foreigner": "降临者(Foreigner)", "pretender": "伪装者(Pretender)",
-    "shielder": "盾阶", "beast": "兽阶(Beast)"
-}
+# 预消化翻译字典（从 config/translations.json 加载）
+_translations: dict | None = None
+
+
+def _load_translations() -> dict:
+    """加载翻译配置（带缓存）。"""
+    global _translations
+    if _translations is None:
+        config_path = Path(__file__).parent / "config" / "translations.json"
+        with open(config_path, "r", encoding="utf-8") as f:
+            _translations = json.load(f)
+    return _translations
+
+
+def _get_class_map() -> dict:
+    return _load_translations()["className"]
+
+
+def _get_np_card_map() -> dict:
+    return _load_translations()["npCard"]
+
+
+def _get_np_target_map() -> dict:
+    return _load_translations()["npTarget"]
 
 _effect_map = None
 
@@ -90,11 +103,11 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
         top_results.append({
             "name": s.get("name"),
             "aliasCN": s.get("aliasCN"),
-            "className": CLASS_MAP.get(str(raw_class_name).lower(), raw_class_name),
+            "className": _get_class_map().get(str(raw_class_name).lower(), raw_class_name),
             "rarity": s.get("rarity"),
             "totalSelfCharge": s.get("totalSelfCharge"),
-            "npCard": NP_CARD_MAP.get(str(raw_np_card).lower(), raw_np_card),
-            "npTarget": NP_TARGET_MAP.get(str(raw_np_target).lower(), raw_np_target),
+            "npCard": _get_np_card_map().get(str(raw_np_card).lower(), raw_np_card),
+            "npTarget": _get_np_target_map().get(str(raw_np_target).lower(), raw_np_target),
             "skillEffects": translated_effects,
             "npEffects": translated_np_effects,
             "__internal_card_buff_check": " | ".join(card_buff_status),

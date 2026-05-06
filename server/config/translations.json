@@ -1,0 +1,29 @@
+{
+  "className": {
+    "saber": "剑阶",
+    "archer": "弓阶",
+    "lancer": "枪阶",
+    "rider": "骑阶",
+    "caster": "术阶",
+    "assassin": "杀阶",
+    "berserker": "狂阶",
+    "ruler": "裁定者(Ruler)",
+    "avenger": "复仇者(Avenger)",
+    "mooncancer": "月癌(MoonCancer)",
+    "alterego": "他人格(AlterEgo)",
+    "foreigner": "降临者(Foreigner)",
+    "pretender": "伪装者(Pretender)",
+    "shielder": "盾阶",
+    "beast": "兽阶(Beast)"
+  },
+  "npCard": {
+    "buster": "红卡",
+    "arts": "蓝卡",
+    "quick": "绿卡"
+  },
+  "npTarget": {
+    "all": "全体(光炮)",
+    "one": "单体",
+    "support": "辅助"
+  }
+}

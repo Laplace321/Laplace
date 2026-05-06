@@ -13,7 +13,7 @@ from typing import Callable
 from server.individuality import filter_by_traits
 
 DATA_PATH = Path(__file__).parent / "data" / "servants_db.json"
-NICKNAMES_PATH = Path(__file__).parent / "knowledge" / "nicknames.json"
+NICKNAMES_PATH = Path(__file__).parent / "config" / "nicknames.json"
 
 # 全局缓存
 _servants_db: list[dict] | None = None
