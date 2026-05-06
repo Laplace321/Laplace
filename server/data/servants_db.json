@@ -4,7 +4,7 @@
     "collectionNo": 2,
     "name": "Altria Pendragon",
     "originalName": "アルトリア・ペンドラゴン",
-    "aliasCN": "",
+    "aliasCN": "阿尔托莉雅·潘德拉贡",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1001003.png",
@@ -139,7 +139,7 @@
     "collectionNo": 3,
     "name": "Altria Pendragon (Alter)",
     "originalName": "アルトリア・ペンドラゴン〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "阿尔托莉雅·潘德拉贡〔Alter〕",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1002003.png",
@@ -271,7 +271,7 @@
     "collectionNo": 4,
     "name": "Altria Pendragon (Lily)",
     "originalName": "アルトリア・ペンドラゴン〔リリィ〕",
-    "aliasCN": "",
+    "aliasCN": "阿尔托莉雅·潘德拉贡〔Lily〕",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1003003.png",
@@ -392,7 +392,7 @@
     "collectionNo": 5,
     "name": "Nero Claudius",
     "originalName": "ネロ・クラウディウス",
-    "aliasCN": "",
+    "aliasCN": "尼禄·克劳狄乌斯",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1005003.png",
@@ -572,17 +572,17 @@
             "targetType": "self"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           },
@@ -600,7 +600,7 @@
     "collectionNo": 90,
     "name": "Nero Claudius (Bride)",
     "originalName": "ネロ・クラウディウス〔ブライド〕",
-    "aliasCN": "",
+    "aliasCN": "尼禄·克劳狄乌斯〔新娘〕",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1006003.png",
@@ -745,7 +745,7 @@
     "collectionNo": 123,
     "name": "Gawain",
     "originalName": "ガウェイン",
-    "aliasCN": "",
+    "aliasCN": "高文",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1007003.png",
@@ -876,7 +876,7 @@
     "collectionNo": 6,
     "name": "Siegfried",
     "originalName": "ジークフリート",
-    "aliasCN": "",
+    "aliasCN": "齐格飞",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1008003.png",
@@ -958,12 +958,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -1044,7 +1044,7 @@
     "collectionNo": 76,
     "name": "Mordred",
     "originalName": "モードレッド",
-    "aliasCN": "",
+    "aliasCN": "莫德雷德",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1009003.png",
@@ -1137,12 +1137,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -1212,7 +1212,7 @@
     "collectionNo": 138,
     "name": "Elisabeth Báthory (Brave)",
     "originalName": "エリザベート・バートリー〔ブレイブ〕",
-    "aliasCN": "",
+    "aliasCN": "伊丽莎白·巴托里〔勇者〕",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1010003.png",
@@ -1364,7 +1364,7 @@
     "collectionNo": 126,
     "name": "Bedivere",
     "originalName": "ベディヴィエール",
-    "aliasCN": "",
+    "aliasCN": "贝德维尔",
     "rarity": 3,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1012003.png",
@@ -1487,7 +1487,7 @@
     "collectionNo": 7,
     "name": "Gaius Julius Caesar",
     "originalName": "ガイウス・ユリウス・カエサル",
-    "aliasCN": "",
+    "aliasCN": "盖乌斯·尤利乌斯·恺撒",
     "rarity": 3,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1013003.png",
@@ -1593,7 +1593,7 @@
     "collectionNo": 72,
     "name": "Fergus mac Róich",
     "originalName": "フェルグス・マック・ロイ",
-    "aliasCN": "",
+    "aliasCN": "弗格斯·马克·罗伊",
     "rarity": 3,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1014003.png",
@@ -1720,7 +1720,7 @@
     "collectionNo": 153,
     "name": "Miyamoto Musashi",
     "originalName": "宮本武蔵",
-    "aliasCN": "",
+    "aliasCN": "宫本武藏",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1017003.png",
@@ -1814,12 +1814,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -1853,7 +1853,7 @@
     "collectionNo": 8,
     "name": "Altera",
     "originalName": "アルテラ",
-    "aliasCN": "",
+    "aliasCN": "阿蒂拉",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1018003.png",
@@ -1968,12 +1968,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -2043,7 +2043,7 @@
     "collectionNo": 101,
     "name": "Rama",
     "originalName": "ラーマ",
-    "aliasCN": "",
+    "aliasCN": "罗摩",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1019003.png",
@@ -2183,7 +2183,7 @@
     "collectionNo": 121,
     "name": "Lancelot",
     "originalName": "ランスロット",
-    "aliasCN": "",
+    "aliasCN": "兰斯洛特",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1020003.png",
@@ -2292,7 +2292,7 @@
     "collectionNo": 9,
     "name": "Gilles de Rais",
     "originalName": "ジル・ド・レェ",
-    "aliasCN": "",
+    "aliasCN": "吉尔·德·雷",
     "rarity": 3,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1022003.png",
@@ -2413,7 +2413,7 @@
     "collectionNo": 10,
     "name": "Chevalier d'Eon",
     "originalName": "シュヴァリエ・デオン",
-    "aliasCN": "",
+    "aliasCN": "骑士迪昂",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1026003.png",
@@ -2484,12 +2484,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -2531,12 +2531,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -2569,7 +2569,7 @@
     "collectionNo": 68,
     "name": "Okita Souji",
     "originalName": "沖田総司",
-    "aliasCN": "",
+    "aliasCN": "冲田总司",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1027003.png",
@@ -2704,7 +2704,7 @@
     "collectionNo": 91,
     "name": "Ryougi Shiki",
     "originalName": "両儀式",
-    "aliasCN": "",
+    "aliasCN": "两仪式",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1028003.png",
@@ -2845,7 +2845,7 @@
     "collectionNo": 160,
     "name": "Arthur Pendragon (Prototype)",
     "originalName": "アーサー・ペンドラゴン〔プロトタイプ〕",
-    "aliasCN": "",
+    "aliasCN": "亚瑟·潘德拉贡〔Prototype〕",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1029003.png",
@@ -3007,7 +3007,7 @@
     "collectionNo": 165,
     "name": "Suzuka Gozen",
     "originalName": "鈴鹿御前",
-    "aliasCN": "",
+    "aliasCN": "铃鹿御前",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1030003.png",
@@ -3125,7 +3125,7 @@
     "collectionNo": 176,
     "name": "Frankenstein",
     "originalName": "フランケンシュタイン",
-    "aliasCN": "",
+    "aliasCN": "弗兰肯斯坦",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1031003.png",
@@ -3192,12 +3192,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -3241,7 +3241,7 @@
     "collectionNo": 187,
     "name": "Yagyu Tajima-no-kami Munenori",
     "originalName": "柳生但馬守宗矩",
-    "aliasCN": "",
+    "aliasCN": "柳生但马守宗矩",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1032003.png",
@@ -3365,7 +3365,7 @@
     "collectionNo": 213,
     "name": "Sigurd",
     "originalName": "シグルド",
-    "aliasCN": "",
+    "aliasCN": "齐格鲁德",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1033003.png",
@@ -3484,7 +3484,7 @@
     "collectionNo": 221,
     "name": "Queen Medb",
     "originalName": "女王メイヴ",
-    "aliasCN": "",
+    "aliasCN": "女王梅芙",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1034003.png",
@@ -3570,7 +3570,7 @@
     "collectionNo": 223,
     "name": "Diarmuid Ua Duibhne",
     "originalName": "ディルムッド・オディナ",
-    "aliasCN": "",
+    "aliasCN": "迪尔姆德·奥迪那",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1035003.png",
@@ -3684,7 +3684,7 @@
     "collectionNo": 227,
     "name": "Prince of Lan Ling",
     "originalName": "蘭陵王",
-    "aliasCN": "",
+    "aliasCN": "兰陵王",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1036003.png",
@@ -3773,17 +3773,17 @@
             "targetType": "party"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "party"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "party"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "party"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "party"
           }
@@ -3820,17 +3820,17 @@
             "targetType": "party"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "party"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "party"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "party"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "party"
           },
@@ -3848,7 +3848,7 @@
     "collectionNo": 234,
     "name": "Beni-Enma",
     "originalName": "紅閻魔",
-    "aliasCN": "",
+    "aliasCN": "红阎魔",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1037003.png",
@@ -4006,7 +4006,7 @@
     "collectionNo": 254,
     "name": "Jason",
     "originalName": "イアソン",
-    "aliasCN": "",
+    "aliasCN": "伊阿宋",
     "rarity": 1,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1038003.png",
@@ -4072,12 +4072,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -4137,7 +4137,7 @@
     "collectionNo": 245,
     "name": "Lakshmi Bai",
     "originalName": "ラクシュミー・バーイー",
-    "aliasCN": "",
+    "aliasCN": "拉克什米·芭伊",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1039003.png",
@@ -4254,17 +4254,17 @@
             "targetType": "self"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "party"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "party"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "party"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "party"
           }
@@ -4295,17 +4295,17 @@
             "targetType": "self"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "party"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "party"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "party"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "party"
           }
@@ -4318,7 +4318,7 @@
     "collectionNo": 264,
     "name": "Katsushika Hokusai",
     "originalName": "葛飾北斎",
-    "aliasCN": "",
+    "aliasCN": "葛饰北斋",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1040003.png",
@@ -4425,7 +4425,7 @@
     "collectionNo": 270,
     "name": "Astolfo",
     "originalName": "アストルフォ",
-    "aliasCN": "",
+    "aliasCN": "阿斯托尔福",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1041003.png",
@@ -4498,12 +4498,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -4561,12 +4561,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -4589,7 +4589,7 @@
     "collectionNo": 278,
     "name": "Dioscuri",
     "originalName": "ディオスクロイ",
-    "aliasCN": "",
+    "aliasCN": "狄俄斯库里",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1042003.png",
@@ -4732,7 +4732,7 @@
     "collectionNo": 344,
     "name": "Roland",
     "originalName": "ローラン",
-    "aliasCN": "",
+    "aliasCN": "罗兰",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1043003.png",
@@ -4834,12 +4834,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -4854,12 +4854,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -4898,7 +4898,7 @@
     "collectionNo": 293,
     "name": "Saito Hajime",
     "originalName": "斎藤一",
-    "aliasCN": "",
+    "aliasCN": "斋藤一",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1044003.png",
@@ -5042,7 +5042,7 @@
     "collectionNo": 290,
     "name": "Tomoe Gozen",
     "originalName": "巴御前",
-    "aliasCN": "",
+    "aliasCN": "巴御前",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1045003.png",
@@ -5158,7 +5158,7 @@
     "collectionNo": 299,
     "name": "Ibuki-Douji",
     "originalName": "伊吹童子",
-    "aliasCN": "",
+    "aliasCN": "伊吹童子",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1046003.png",
@@ -5289,7 +5289,7 @@
     "collectionNo": 298,
     "name": "Watanabe-no-Tsuna",
     "originalName": "渡辺綱",
-    "aliasCN": "",
+    "aliasCN": "渡边纲",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1047003.png",
@@ -5399,7 +5399,7 @@
     "collectionNo": 301,
     "name": "Karna (Santa)",
     "originalName": "カルナ〔サンタ〕",
-    "aliasCN": "",
+    "aliasCN": "迦尔纳〔圣诞〕",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1048003.png",
@@ -5527,7 +5527,7 @@
     "collectionNo": 302,
     "name": "Senji Muramasa",
     "originalName": "千子村正",
-    "aliasCN": "",
+    "aliasCN": "千子村正",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1049003.png",
@@ -5665,7 +5665,7 @@
     "collectionNo": 310,
     "name": "Barghest",
     "originalName": "バーゲスト",
-    "aliasCN": "",
+    "aliasCN": "巴格斯特",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1050003.png",
@@ -5759,7 +5759,7 @@
     "collectionNo": 317,
     "name": "Okita Souji (Alter)",
     "originalName": "沖田総司〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "冲田总司〔Alter〕",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1051003.png",
@@ -5888,7 +5888,7 @@
     "collectionNo": 343,
     "name": "Charlemagne",
     "originalName": "シャルルマーニュ",
-    "aliasCN": "",
+    "aliasCN": "查理曼",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1052003.png",
@@ -6040,7 +6040,7 @@
     "collectionNo": 337,
     "name": "Hai Bà Trưng",
     "originalName": "徴姉妹",
-    "aliasCN": "",
+    "aliasCN": "征氏姐妹",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1053003.png",
@@ -6195,7 +6195,7 @@
     "collectionNo": 354,
     "name": "Gareth",
     "originalName": "ガレス",
-    "aliasCN": "",
+    "aliasCN": "加雷斯",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1054003.png",
@@ -6321,7 +6321,7 @@
     "collectionNo": 363,
     "name": "Yamanami Keisuke",
     "originalName": "山南敬助",
-    "aliasCN": "",
+    "aliasCN": "山南敬助",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1055003.png",
@@ -6444,12 +6444,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -6498,7 +6498,7 @@
     "collectionNo": 384,
     "name": "Medusa",
     "originalName": "メドゥーサ",
-    "aliasCN": "",
+    "aliasCN": "美杜莎",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1056003.png",
@@ -6620,7 +6620,7 @@
     "collectionNo": 379,
     "name": "Setanta",
     "originalName": "セタンタ",
-    "aliasCN": "",
+    "aliasCN": "瑟坦特",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1057003.png",
@@ -6688,12 +6688,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -6769,7 +6769,7 @@
     "collectionNo": 396,
     "name": "Theseus",
     "originalName": "テセウス",
-    "aliasCN": "",
+    "aliasCN": "忒修斯",
     "rarity": 3,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1058003.png",
@@ -6899,7 +6899,7 @@
     "collectionNo": 402,
     "name": "Yamato Takeru",
     "originalName": "ヤマトタケル",
-    "aliasCN": "",
+    "aliasCN": "大和武尊",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1059003.png",
@@ -7032,7 +7032,7 @@
     "collectionNo": 405,
     "name": "Miyamoto Iori",
     "originalName": "宮本伊織",
-    "aliasCN": "",
+    "aliasCN": "宫本伊织",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1060003.png",
@@ -7188,7 +7188,7 @@
     "collectionNo": 432,
     "name": "Richard I",
     "originalName": "リチャードⅠ世",
-    "aliasCN": "",
+    "aliasCN": "理查一世",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1061003.png",
@@ -7369,7 +7369,7 @@
     "collectionNo": 434,
     "name": "Kurohime",
     "originalName": "黒姫",
-    "aliasCN": "",
+    "aliasCN": "黑姬",
     "rarity": 4,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1062003.png",
@@ -7527,7 +7527,7 @@
     "collectionNo": 445,
     "name": "Passionlip",
     "originalName": "パッションリップ",
-    "aliasCN": "",
+    "aliasCN": "Passionlip",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1063003.png",
@@ -7641,7 +7641,7 @@
     "collectionNo": 456,
     "name": "Kondo Isami",
     "originalName": "近藤勇",
-    "aliasCN": "",
+    "aliasCN": "近藤勇",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1064003.png",
@@ -7776,7 +7776,7 @@
     "collectionNo": 461,
     "name": "Lord Logres",
     "originalName": "ロード・ログレス",
-    "aliasCN": "",
+    "aliasCN": "领主洛格雷斯",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1065003.png",
@@ -7913,7 +7913,7 @@
     "collectionNo": 466,
     "name": "Jacques de Molay",
     "originalName": "ジャック・ド・モレー",
-    "aliasCN": "",
+    "aliasCN": "雅克·德·莫莱",
     "rarity": 5,
     "className": "saber",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_1066003.png",
@@ -8062,7 +8062,7 @@
     "collectionNo": 11,
     "name": "Emiya",
     "originalName": "エミヤ",
-    "aliasCN": "",
+    "aliasCN": "卫宫",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2001003.png",
@@ -8242,7 +8242,7 @@
     "collectionNo": 12,
     "name": "Gilgamesh",
     "originalName": "ギルガメッシュ",
-    "aliasCN": "",
+    "aliasCN": "吉尔伽美什",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2002003.png",
@@ -8379,7 +8379,7 @@
     "collectionNo": 13,
     "name": "Robin Hood",
     "originalName": "ロビンフッド",
-    "aliasCN": "",
+    "aliasCN": "罗宾汉",
     "rarity": 3,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2003003.png",
@@ -8507,7 +8507,7 @@
     "collectionNo": 14,
     "name": "Atalante",
     "originalName": "アタランテ",
-    "aliasCN": "",
+    "aliasCN": "阿塔兰忒",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2005003.png",
@@ -8610,7 +8610,7 @@
     "collectionNo": 63,
     "name": "David",
     "originalName": "ダビデ",
-    "aliasCN": "",
+    "aliasCN": "大卫",
     "rarity": 3,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2006003.png",
@@ -8681,12 +8681,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -8725,7 +8725,7 @@
     "collectionNo": 122,
     "name": "Tristan",
     "originalName": "トリスタン",
-    "aliasCN": "",
+    "aliasCN": "崔斯坦",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2008003.png",
@@ -8789,12 +8789,12 @@
         "skillNum": 1,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -8831,12 +8831,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -8857,12 +8857,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -8890,7 +8890,7 @@
     "collectionNo": 60,
     "name": "Orion",
     "originalName": "オリオン",
-    "aliasCN": "",
+    "aliasCN": "俄里翁",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2009003.png",
@@ -9030,7 +9030,7 @@
     "collectionNo": 105,
     "name": "Billy the Kid",
     "originalName": "ビリー・ザ・キッド",
-    "aliasCN": "",
+    "aliasCN": "比利小子",
     "rarity": 3,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2010003.png",
@@ -9161,7 +9161,7 @@
     "collectionNo": 77,
     "name": "Nikola Tesla",
     "originalName": "ニコラ・テスラ",
-    "aliasCN": "",
+    "aliasCN": "尼古拉·特斯拉",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2011003.png",
@@ -9324,17 +9324,17 @@
             "targetType": "self"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           },
@@ -9344,17 +9344,17 @@
             "targetType": "party"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "party"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "party"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "party"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "party"
           }
@@ -9367,7 +9367,7 @@
     "collectionNo": 15,
     "name": "Euryale",
     "originalName": "エウリュアレ",
-    "aliasCN": "",
+    "aliasCN": "尤瑞艾莉",
     "rarity": 3,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2012003.png",
@@ -9453,7 +9453,7 @@
     "collectionNo": 16,
     "name": "Arash",
     "originalName": "アーラシュ",
-    "aliasCN": "",
+    "aliasCN": "阿拉什",
     "rarity": 1,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2013003.png",
@@ -9558,7 +9558,7 @@
     "collectionNo": 125,
     "name": "Tawara Touta",
     "originalName": "俵藤太",
-    "aliasCN": "",
+    "aliasCN": "俵藤太",
     "rarity": 3,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2014003.png",
@@ -9683,7 +9683,7 @@
     "collectionNo": 84,
     "name": "Arjuna",
     "originalName": "アルジュナ",
-    "aliasCN": "",
+    "aliasCN": "阿周那",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2015003.png",
@@ -9863,7 +9863,7 @@
     "collectionNo": 157,
     "name": "Emiya (Alter)",
     "originalName": "エミヤ〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "卫宫〔Alter〕",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2016003.png",
@@ -9998,7 +9998,7 @@
     "collectionNo": 95,
     "name": "Gilgamesh (Child)",
     "originalName": "子ギル",
-    "aliasCN": "",
+    "aliasCN": "幼吉尔",
     "rarity": 3,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2018003.png",
@@ -10088,7 +10088,7 @@
     "collectionNo": 142,
     "name": "Ishtar",
     "originalName": "イシュタル",
-    "aliasCN": "",
+    "aliasCN": "伊什塔尔",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2020003.png",
@@ -10204,7 +10204,7 @@
     "collectionNo": 184,
     "name": "Tomoe Gozen",
     "originalName": "巴御前",
-    "aliasCN": "",
+    "aliasCN": "巴御前",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2021003.png",
@@ -10345,7 +10345,7 @@
     "collectionNo": 197,
     "name": "Attila the San(ta)",
     "originalName": "アルテラ・ザ・サン〔タ〕",
-    "aliasCN": "",
+    "aliasCN": "阿蒂拉·the·San〔ta〕",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2022003.png",
@@ -10484,7 +10484,7 @@
     "collectionNo": 156,
     "name": "James Moriarty",
     "originalName": "ジェームズ・モリアーティ",
-    "aliasCN": "",
+    "aliasCN": "詹姆斯·莫里亚蒂",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2023003.png",
@@ -10634,7 +10634,7 @@
     "collectionNo": 69,
     "name": "Oda Nobunaga",
     "originalName": "織田信長",
-    "aliasCN": "",
+    "aliasCN": "织田信长",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2024003.png",
@@ -10747,7 +10747,7 @@
     "collectionNo": 131,
     "name": "Anne Bonny & Mary Read",
     "originalName": "アン・ボニー＆メアリー・リード",
-    "aliasCN": "",
+    "aliasCN": "安妮·伯妮＆玛莉·瑞德",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2025003.png",
@@ -10884,7 +10884,7 @@
     "collectionNo": 129,
     "name": "Altria Pendragon",
     "originalName": "アルトリア・ペンドラゴン",
-    "aliasCN": "",
+    "aliasCN": "阿尔托莉雅·潘德拉贡",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2026003.png",
@@ -11022,7 +11022,7 @@
     "collectionNo": 137,
     "name": "Chloe von Einzbern",
     "originalName": "クロエ・フォン・アインツベルン",
-    "aliasCN": "",
+    "aliasCN": "克洛伊·冯·爱因兹贝伦",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2027003.png",
@@ -11152,17 +11152,17 @@
             "targetType": "self"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "party"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "party"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "party"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "party"
           }
@@ -11175,7 +11175,7 @@
     "collectionNo": 180,
     "name": "Helena Blavatsky",
     "originalName": "エレナ・ブラヴァツキー",
-    "aliasCN": "",
+    "aliasCN": "海伦娜·布拉瓦茨基",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2028003.png",
@@ -11278,7 +11278,7 @@
     "collectionNo": 200,
     "name": "Asagami Fujino",
     "originalName": "浅上藤乃",
-    "aliasCN": "",
+    "aliasCN": "浅上藤乃",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2029003.png",
@@ -11414,7 +11414,7 @@
     "collectionNo": 207,
     "name": "Chiron",
     "originalName": "ケイローン",
-    "aliasCN": "",
+    "aliasCN": "喀戎",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2030003.png",
@@ -11529,7 +11529,7 @@
     "collectionNo": 212,
     "name": "Napoleon",
     "originalName": "ナポレオン",
-    "aliasCN": "",
+    "aliasCN": "拿破仑",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2031003.png",
@@ -11666,7 +11666,7 @@
     "collectionNo": 216,
     "name": "Jeanne d'Arc",
     "originalName": "ジャンヌ・ダルク",
-    "aliasCN": "",
+    "aliasCN": "贞德",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2032003.png",
@@ -11781,7 +11781,7 @@
     "collectionNo": 248,
     "name": "Aśvatthāman",
     "originalName": "アシュヴァッターマン",
-    "aliasCN": "",
+    "aliasCN": "马嘶",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2033003.png",
@@ -11887,7 +11887,7 @@
     "collectionNo": 246,
     "name": "William Tell",
     "originalName": "ウィリアム・テル",
-    "aliasCN": "",
+    "aliasCN": "威廉·退尔",
     "rarity": 3,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2034003.png",
@@ -12000,7 +12000,7 @@
     "collectionNo": 255,
     "name": "Paris",
     "originalName": "パリス",
-    "aliasCN": "",
+    "aliasCN": "帕里斯",
     "rarity": 2,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2035003.png",
@@ -12074,12 +12074,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -12134,7 +12134,7 @@
     "collectionNo": 262,
     "name": "Osakabehime",
     "originalName": "刑部姫",
-    "aliasCN": "",
+    "aliasCN": "刑部姬",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2036003.png",
@@ -12251,7 +12251,7 @@
     "collectionNo": 269,
     "name": "Calamity Jane",
     "originalName": "カラミティ・ジェーン",
-    "aliasCN": "",
+    "aliasCN": "灾星简",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2037003.png",
@@ -12343,17 +12343,17 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "party"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "party"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "party"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "party"
           },
@@ -12437,7 +12437,7 @@
     "collectionNo": 272,
     "name": "Super Orion",
     "originalName": "超人オリオン",
-    "aliasCN": "",
+    "aliasCN": "超人俄里翁",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2038003.png",
@@ -12547,7 +12547,7 @@
     "collectionNo": 271,
     "name": "Florence Nightingale (Santa)",
     "originalName": "ナイチンゲール〔サンタ〕",
-    "aliasCN": "",
+    "aliasCN": "南丁格尔〔圣诞〕",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2039003.png",
@@ -12602,12 +12602,12 @@
         "skillNum": 1,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -12617,12 +12617,12 @@
             "targetType": "enemy"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -12682,7 +12682,7 @@
     "collectionNo": 276,
     "name": "Sei Shounagon",
     "originalName": "清少納言",
-    "aliasCN": "",
+    "aliasCN": "清少纳言",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2040003.png",
@@ -12830,7 +12830,7 @@
     "collectionNo": 294,
     "name": "Oda Nobukatsu",
     "originalName": "織田信勝",
-    "aliasCN": "",
+    "aliasCN": "织田信胜",
     "rarity": 1,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2041003.png",
@@ -12926,7 +12926,7 @@
     "collectionNo": 286,
     "name": "Illyasviel von Einzbern",
     "originalName": "イリヤスフィール・フォン・アインツベルン",
-    "aliasCN": "",
+    "aliasCN": "伊莉雅丝菲尔·冯·爱因兹贝伦",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2042003.png",
@@ -13058,7 +13058,7 @@
     "collectionNo": 311,
     "name": "Baobhan Sith",
     "originalName": "バーヴァン・シー",
-    "aliasCN": "",
+    "aliasCN": "芭万·希",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2043003.png",
@@ -13182,7 +13182,7 @@
     "collectionNo": 318,
     "name": "Anastasia & Viy",
     "originalName": "アナスタシア＆ヴィイ",
-    "aliasCN": "",
+    "aliasCN": "阿纳斯塔西娅＆维",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2044003.png",
@@ -13307,7 +13307,7 @@
     "collectionNo": 325,
     "name": "Zenobia",
     "originalName": "ゼノビア",
-    "aliasCN": "",
+    "aliasCN": "芝诺比阿",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2045003.png",
@@ -13445,7 +13445,7 @@
     "collectionNo": 350,
     "name": "Minamoto-no-Tametomo",
     "originalName": "源為朝",
-    "aliasCN": "",
+    "aliasCN": "源为朝",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2046003.png",
@@ -13559,7 +13559,7 @@
     "collectionNo": 375,
     "name": "Takasugi Shinsaku",
     "originalName": "高杉晋作",
-    "aliasCN": "",
+    "aliasCN": "高杉晋作",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2047003.png",
@@ -13682,7 +13682,7 @@
     "collectionNo": 383,
     "name": "Durga",
     "originalName": "ドゥルガー",
-    "aliasCN": "",
+    "aliasCN": "杜尔伽",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2048003.png",
@@ -13812,7 +13812,7 @@
     "collectionNo": 391,
     "name": "UDK-Barghest",
     "originalName": "ＵＤＫ－バーゲスト",
-    "aliasCN": "",
+    "aliasCN": "ＵＤＫ－巴格斯特",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2049003.png",
@@ -13947,7 +13947,7 @@
     "collectionNo": 394,
     "name": "Ptolemaîos",
     "originalName": "プトレマイオス",
-    "aliasCN": "",
+    "aliasCN": "托勒密",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2050003.png",
@@ -14112,7 +14112,7 @@
     "collectionNo": 395,
     "name": "Sugitani Zenjubou",
     "originalName": "杉谷善住坊",
-    "aliasCN": "",
+    "aliasCN": "杉谷善住坊",
     "rarity": 3,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2051003.png",
@@ -14187,12 +14187,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -14231,7 +14231,7 @@
     "collectionNo": 399,
     "name": "Saika Magoichi",
     "originalName": "雑賀孫一",
-    "aliasCN": "",
+    "aliasCN": "杂贺孙一",
     "rarity": 4,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2052003.png",
@@ -14362,7 +14362,7 @@
     "collectionNo": 427,
     "name": "Tutankhamun",
     "originalName": "ツタンカーメン",
-    "aliasCN": "",
+    "aliasCN": "图坦卡蒙",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2053003.png",
@@ -14495,7 +14495,7 @@
     "collectionNo": 450,
     "name": "Larva/Tiamat",
     "originalName": "ラーヴァ／ティアマト",
-    "aliasCN": "",
+    "aliasCN": "幼体／提亚马特",
     "rarity": 5,
     "className": "archer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_2054003.png",
@@ -14644,7 +14644,7 @@
     "collectionNo": 17,
     "name": "Cú Chulainn",
     "originalName": "クー・フーリン",
-    "aliasCN": "",
+    "aliasCN": "库·丘林",
     "rarity": 3,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3001003.png",
@@ -14730,12 +14730,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -14774,7 +14774,7 @@
     "collectionNo": 71,
     "name": "Diarmuid Ua Duibhne",
     "originalName": "ディルムッド・オディナ",
-    "aliasCN": "",
+    "aliasCN": "迪尔姆德·奥迪那",
     "rarity": 3,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3002003.png",
@@ -14885,7 +14885,7 @@
     "collectionNo": 140,
     "name": "Vlad III (EXTRA)",
     "originalName": "ヴラド三世〔EXTRA〕",
-    "aliasCN": "",
+    "aliasCN": "弗拉德三世〔EXTRA〕",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3003003.png",
@@ -15017,7 +15017,7 @@
     "collectionNo": 85,
     "name": "Karna",
     "originalName": "カルナ",
-    "aliasCN": "",
+    "aliasCN": "迦尔纳",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3004003.png",
@@ -15182,7 +15182,7 @@
     "collectionNo": 18,
     "name": "Elisabeth Báthory",
     "originalName": "エリザベート・バートリー",
-    "aliasCN": "",
+    "aliasCN": "伊丽莎白·巴托里",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3005003.png",
@@ -15281,12 +15281,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -15325,7 +15325,7 @@
     "collectionNo": 19,
     "name": "Musashibou Benkei",
     "originalName": "武蔵坊弁慶",
-    "aliasCN": "",
+    "aliasCN": "武藏坊弁庆",
     "rarity": 2,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3006003.png",
@@ -15398,7 +15398,7 @@
     "collectionNo": 20,
     "name": "Cú Chulainn (Prototype)",
     "originalName": "クー・フーリン〔プロトタイプ〕",
-    "aliasCN": "",
+    "aliasCN": "库·丘林〔Prototype〕",
     "rarity": 3,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3007003.png",
@@ -15514,7 +15514,7 @@
     "collectionNo": 143,
     "name": "Enkidu",
     "originalName": "エルキドゥ",
-    "aliasCN": "",
+    "aliasCN": "恩奇都",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3008003.png",
@@ -15598,12 +15598,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -15624,12 +15624,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -15645,12 +15645,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -15676,12 +15676,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -15704,7 +15704,7 @@
     "collectionNo": 21,
     "name": "Leonidas I",
     "originalName": "レオニダス一世",
-    "aliasCN": "",
+    "aliasCN": "列奥尼达一世",
     "rarity": 2,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3009003.png",
@@ -15812,7 +15812,7 @@
     "collectionNo": 22,
     "name": "Romulus",
     "originalName": "ロムルス",
-    "aliasCN": "",
+    "aliasCN": "罗穆路斯",
     "rarity": 3,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3010003.png",
@@ -15949,7 +15949,7 @@
     "collectionNo": 87,
     "name": "Fionn mac Cumhaill",
     "originalName": "フィン・マックール",
-    "aliasCN": "",
+    "aliasCN": "芬恩·麦克库尔",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3011003.png",
@@ -16110,7 +16110,7 @@
     "collectionNo": 88,
     "name": "Brynhild",
     "originalName": "ブリュンヒルデ",
-    "aliasCN": "",
+    "aliasCN": "布伦希尔德",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3012003.png",
@@ -16243,7 +16243,7 @@
     "collectionNo": 70,
     "name": "Scáthach",
     "originalName": "スカサハ",
-    "aliasCN": "",
+    "aliasCN": "斯卡哈",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3013003.png",
@@ -16391,7 +16391,7 @@
     "collectionNo": 186,
     "name": "Houzouin Inshun",
     "originalName": "宝蔵院胤舜",
-    "aliasCN": "",
+    "aliasCN": "宝藏院胤舜",
     "rarity": 3,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3014003.png",
@@ -16514,7 +16514,7 @@
     "collectionNo": 64,
     "name": "Hektor",
     "originalName": "ヘクトール",
-    "aliasCN": "",
+    "aliasCN": "赫克托耳",
     "rarity": 3,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3016003.png",
@@ -16587,12 +16587,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -16634,12 +16634,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -16667,7 +16667,7 @@
     "collectionNo": 102,
     "name": "Li Shuwen",
     "originalName": "李書文",
-    "aliasCN": "",
+    "aliasCN": "李书文",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3017003.png",
@@ -16790,7 +16790,7 @@
     "collectionNo": 78,
     "name": "Altria Pendragon (Alter)",
     "originalName": "アルトリア・ペンドラゴン〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "阿尔托莉雅·潘德拉贡〔Alter〕",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3019003.png",
@@ -16941,7 +16941,7 @@
     "collectionNo": 119,
     "name": "Altria Pendragon",
     "originalName": "アルトリア・ペンドラゴン",
-    "aliasCN": "",
+    "aliasCN": "阿尔托莉雅·潘德拉贡",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3020003.png",
@@ -17038,12 +17038,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -17103,7 +17103,7 @@
     "collectionNo": 128,
     "name": "Tamamo-no-Mae",
     "originalName": "玉藻の前",
-    "aliasCN": "",
+    "aliasCN": "玉藻前",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3024003.png",
@@ -17284,7 +17284,7 @@
     "collectionNo": 134,
     "name": "Kiyohime",
     "originalName": "清姫",
-    "aliasCN": "",
+    "aliasCN": "清姬",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3025003.png",
@@ -17386,7 +17386,7 @@
     "collectionNo": 141,
     "name": "Jeanne d'Arc Alter Santa Lily",
     "originalName": "ジャンヌ・ダルク・オルタ・サンタ・リリィ",
-    "aliasCN": "",
+    "aliasCN": "贞德·Alter·Santa·Lily",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3026003.png",
@@ -17498,7 +17498,7 @@
     "collectionNo": 146,
     "name": "Medusa",
     "originalName": "メドゥーサ",
-    "aliasCN": "",
+    "aliasCN": "美杜莎",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3027003.png",
@@ -17608,7 +17608,7 @@
     "collectionNo": 148,
     "name": "Jaguar Warrior",
     "originalName": "ジャガーマン",
-    "aliasCN": "",
+    "aliasCN": "豹人",
     "rarity": 3,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3028003.png",
@@ -17758,7 +17758,7 @@
     "collectionNo": 181,
     "name": "Minamoto-no-Raikou",
     "originalName": "源頼光",
-    "aliasCN": "",
+    "aliasCN": "源赖光",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3029003.png",
@@ -17840,12 +17840,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -17879,7 +17879,7 @@
     "collectionNo": 183,
     "name": "Pārvatī",
     "originalName": "パールヴァティー",
-    "aliasCN": "",
+    "aliasCN": "帕尔瓦蒂",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3030003.png",
@@ -18028,7 +18028,7 @@
     "collectionNo": 193,
     "name": "Nezha",
     "originalName": "哪吒",
-    "aliasCN": "",
+    "aliasCN": "哪吒",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3031003.png",
@@ -18139,12 +18139,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -18175,12 +18175,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -18203,7 +18203,7 @@
     "collectionNo": 196,
     "name": "Ereshkigal",
     "originalName": "エレシュキガル",
-    "aliasCN": "",
+    "aliasCN": "埃列什基伽勒",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3032003.png",
@@ -18368,7 +18368,7 @@
     "collectionNo": 214,
     "name": "Valkyrie",
     "originalName": "ワルキューレ",
-    "aliasCN": "",
+    "aliasCN": "瓦尔基里",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3033003.png",
@@ -18488,7 +18488,7 @@
     "collectionNo": 217,
     "name": "Ibaraki-Douji",
     "originalName": "茨木童子",
-    "aliasCN": "",
+    "aliasCN": "茨木童子",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3034003.png",
@@ -18571,12 +18571,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -18625,7 +18625,7 @@
     "collectionNo": 228,
     "name": "Qin Liangyu",
     "originalName": "秦良玉",
-    "aliasCN": "",
+    "aliasCN": "秦良玉",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3035003.png",
@@ -18768,7 +18768,7 @@
     "collectionNo": 232,
     "name": "Bradamante",
     "originalName": "ブラダマンテ",
-    "aliasCN": "",
+    "aliasCN": "布拉达曼特",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3036003.png",
@@ -18870,12 +18870,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -18896,12 +18896,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -18929,7 +18929,7 @@
     "collectionNo": 252,
     "name": "Nagao Kagetora",
     "originalName": "長尾景虎",
-    "aliasCN": "",
+    "aliasCN": "长尾景虎",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3038003.png",
@@ -19071,7 +19071,7 @@
     "collectionNo": 256,
     "name": "Gareth",
     "originalName": "ガレス",
-    "aliasCN": "",
+    "aliasCN": "加雷斯",
     "rarity": 2,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3039003.png",
@@ -19206,7 +19206,7 @@
     "collectionNo": 266,
     "name": "Mysterious Alter Ego Λ",
     "originalName": "謎のアルターエゴ・Λ",
-    "aliasCN": "",
+    "aliasCN": "谜之Alterego·Λ",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3040003.png",
@@ -19329,7 +19329,7 @@
     "collectionNo": 279,
     "name": "Caenis",
     "originalName": "カイニス",
-    "aliasCN": "",
+    "aliasCN": "凯妮斯",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3041003.png",
@@ -19442,7 +19442,7 @@
     "collectionNo": 280,
     "name": "Romulus=Quirinus",
     "originalName": "ロムルス＝クィリヌス",
-    "aliasCN": "",
+    "aliasCN": "罗穆路斯·奎里努斯",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3042003.png",
@@ -19569,7 +19569,7 @@
     "collectionNo": 283,
     "name": "Utsumi Erice",
     "originalName": "宇津見エリセ",
-    "aliasCN": "",
+    "aliasCN": "宇津见绘里濑",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3043003.png",
@@ -19683,7 +19683,7 @@
     "collectionNo": 288,
     "name": "Yu Mei-ren",
     "originalName": "虞美人",
-    "aliasCN": "",
+    "aliasCN": "虞美人",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3044003.png",
@@ -19812,7 +19812,7 @@
     "collectionNo": 300,
     "name": "Vritra",
     "originalName": "ヴリトラ",
-    "aliasCN": "",
+    "aliasCN": "弗栗多",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3046003.png",
@@ -19935,7 +19935,7 @@
     "collectionNo": 313,
     "name": "Percival",
     "originalName": "パーシヴァル",
-    "aliasCN": "",
+    "aliasCN": "珀西瓦尔",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3047003.png",
@@ -20056,7 +20056,7 @@
     "collectionNo": 312,
     "name": "Mélusine",
     "originalName": "メリュジーヌ",
-    "aliasCN": "",
+    "aliasCN": "梅柳齐娜",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3048003.png",
@@ -20213,7 +20213,7 @@
     "collectionNo": 341,
     "name": "Mary Anning",
     "originalName": "メアリー・アニング",
-    "aliasCN": "",
+    "aliasCN": "玛丽·安宁",
     "rarity": 1,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3049003.png",
@@ -20322,7 +20322,7 @@
     "collectionNo": 329,
     "name": "Sakamoto Ryouma",
     "originalName": "坂本龍馬",
-    "aliasCN": "",
+    "aliasCN": "坂本龙马",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3050003.png",
@@ -20451,7 +20451,7 @@
     "collectionNo": 347,
     "name": "Don Quixote",
     "originalName": "ドン・キホーテ",
-    "aliasCN": "",
+    "aliasCN": "堂·吉诃德",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3051003.png",
@@ -20593,7 +20593,7 @@
     "collectionNo": 368,
     "name": "Britomart",
     "originalName": "ブリトマート",
-    "aliasCN": "",
+    "aliasCN": "布里托玛特",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3053003.png",
@@ -20729,7 +20729,7 @@
     "collectionNo": 381,
     "name": "Bhima",
     "originalName": "ビーマ",
-    "aliasCN": "",
+    "aliasCN": "怖军",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3054003.png",
@@ -20809,12 +20809,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -20864,7 +20864,7 @@
     "collectionNo": 419,
     "name": "Dobrynya Nikitich",
     "originalName": "ドブルイニャ・ニキチッチ",
-    "aliasCN": "",
+    "aliasCN": "多布雷尼亚·尼基季奇",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3055003.png",
@@ -21019,7 +21019,7 @@
     "collectionNo": 428,
     "name": "Van Gogh (Miner)",
     "originalName": "ヴァン・ゴッホ〔マイナー〕",
-    "aliasCN": "",
+    "aliasCN": "梵高〔矿工〕",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3056003.png",
@@ -21223,7 +21223,7 @@
     "collectionNo": 433,
     "name": "Biscione",
     "originalName": "ビショーネ",
-    "aliasCN": "",
+    "aliasCN": "比肖内",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3057003.png",
@@ -21292,17 +21292,17 @@
         "skillNum": 1,
         "effects": [
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           },
@@ -21362,7 +21362,7 @@
     "collectionNo": 439,
     "name": "King Ashoka",
     "originalName": "アショカ王",
-    "aliasCN": "",
+    "aliasCN": "阿育王",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3058003.png",
@@ -21494,7 +21494,7 @@
     "collectionNo": 442,
     "name": "Indra",
     "originalName": "インドラ",
-    "aliasCN": "",
+    "aliasCN": "因陀罗",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3059003.png",
@@ -21626,7 +21626,7 @@
     "collectionNo": 449,
     "name": "Miyu Edelfelt",
     "originalName": "美遊・エーデルフェルト",
-    "aliasCN": "",
+    "aliasCN": "美游·艾德费尔特",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3060003.png",
@@ -21766,7 +21766,7 @@
     "collectionNo": 455,
     "name": "Harada Sanosuke",
     "originalName": "原田左之助",
-    "aliasCN": "",
+    "aliasCN": "原田左之助",
     "rarity": 4,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3061003.png",
@@ -21890,7 +21890,7 @@
     "collectionNo": 457,
     "name": "Elisabeth Báthory",
     "originalName": "エリザベート・バートリー",
-    "aliasCN": "",
+    "aliasCN": "伊丽莎白·巴托里",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3062003.png",
@@ -22019,7 +22019,7 @@
     "collectionNo": 465,
     "name": "Demeter",
     "originalName": "デメテル",
-    "aliasCN": "",
+    "aliasCN": "得墨忒耳",
     "rarity": 5,
     "className": "lancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_3064003.png",
@@ -22103,12 +22103,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -22183,7 +22183,7 @@
     "collectionNo": 23,
     "name": "Medusa",
     "originalName": "メドゥーサ",
-    "aliasCN": "",
+    "aliasCN": "美杜莎",
     "rarity": 3,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4001003.png",
@@ -22298,7 +22298,7 @@
     "collectionNo": 108,
     "name": "Iskandar",
     "originalName": "イスカンダル",
-    "aliasCN": "",
+    "aliasCN": "伊斯坎达尔",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4002003.png",
@@ -22438,7 +22438,7 @@
     "collectionNo": 65,
     "name": "Francis Drake",
     "originalName": "フランシス・ドレイク",
-    "aliasCN": "",
+    "aliasCN": "弗朗西斯·德雷克",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4003003.png",
@@ -22590,7 +22590,7 @@
     "collectionNo": 94,
     "name": "Astolfo",
     "originalName": "アストルフォ",
-    "aliasCN": "",
+    "aliasCN": "阿斯托尔福",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4004003.png",
@@ -22714,7 +22714,7 @@
     "collectionNo": 24,
     "name": "Georgios",
     "originalName": "ゲオルギウス",
-    "aliasCN": "",
+    "aliasCN": "乔尔乔斯",
     "rarity": 2,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4006003.png",
@@ -22816,7 +22816,7 @@
     "collectionNo": 25,
     "name": "Edward Teach",
     "originalName": "エドワード・ティーチ",
-    "aliasCN": "",
+    "aliasCN": "爱德华·蒂奇",
     "rarity": 2,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4008003.png",
@@ -22921,7 +22921,7 @@
     "collectionNo": 66,
     "name": "Anne Bonny & Mary Read",
     "originalName": "アン・ボニー＆メアリー・リード",
-    "aliasCN": "",
+    "aliasCN": "安妮·伯妮＆玛莉·瑞德",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4009003.png",
@@ -23061,7 +23061,7 @@
     "collectionNo": 26,
     "name": "Boudica",
     "originalName": "ブーディカ",
-    "aliasCN": "",
+    "aliasCN": "布狄卡",
     "rarity": 3,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4011003.png",
@@ -23179,7 +23179,7 @@
     "collectionNo": 118,
     "name": "Ozymandias",
     "originalName": "オジマンディアス",
-    "aliasCN": "",
+    "aliasCN": "奥斯曼狄斯",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4012003.png",
@@ -23283,17 +23283,17 @@
             "targetType": "party"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "party"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "party"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "party"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "party"
           }
@@ -23327,7 +23327,7 @@
     "collectionNo": 99,
     "name": "Queen Medb",
     "originalName": "女王メイヴ",
-    "aliasCN": "",
+    "aliasCN": "女王梅芙",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4013003.png",
@@ -23472,7 +23472,7 @@
     "collectionNo": 27,
     "name": "Ushiwakamaru",
     "originalName": "牛若丸",
-    "aliasCN": "",
+    "aliasCN": "牛若丸",
     "rarity": 3,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4014003.png",
@@ -23605,7 +23605,7 @@
     "collectionNo": 28,
     "name": "Alexander",
     "originalName": "アレキサンダー",
-    "aliasCN": "",
+    "aliasCN": "亚历山大",
     "rarity": 3,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4015003.png",
@@ -23714,12 +23714,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -23737,7 +23737,7 @@
     "collectionNo": 29,
     "name": "Marie Antoinette",
     "originalName": "マリー・アントワネット",
-    "aliasCN": "",
+    "aliasCN": "玛丽·安托瓦内特",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4017003.png",
@@ -23808,17 +23808,17 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           },
@@ -23847,7 +23847,7 @@
     "collectionNo": 144,
     "name": "Quetzalcoatl",
     "originalName": "ケツァル・コアトル",
-    "aliasCN": "",
+    "aliasCN": "魁札尔·科亚特尔",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4018003.png",
@@ -24016,7 +24016,7 @@
     "collectionNo": 30,
     "name": "Martha",
     "originalName": "マルタ",
-    "aliasCN": "",
+    "aliasCN": "玛尔达",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4019003.png",
@@ -24097,12 +24097,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -24118,12 +24118,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -24170,12 +24170,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -24193,7 +24193,7 @@
     "collectionNo": 73,
     "name": "Altria Pendragon (Santa Alter)",
     "originalName": "アルトリア・ペンドラゴン〔サンタオルタ〕",
-    "aliasCN": "",
+    "aliasCN": "阿尔托莉雅·潘德拉贡〔圣诞Alter〕",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4022003.png",
@@ -24324,7 +24324,7 @@
     "collectionNo": 115,
     "name": "Sakata Kintoki",
     "originalName": "坂田金時",
-    "aliasCN": "",
+    "aliasCN": "坂田金时",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4023003.png",
@@ -24433,7 +24433,7 @@
     "collectionNo": 132,
     "name": "Mordred",
     "originalName": "モードレッド",
-    "aliasCN": "",
+    "aliasCN": "莫德雷德",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4024003.png",
@@ -24539,7 +24539,7 @@
     "collectionNo": 172,
     "name": "Christopher Columbus",
     "originalName": "クリストファー・コロンブス",
-    "aliasCN": "",
+    "aliasCN": "克里斯托弗·哥伦布",
     "rarity": 3,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4025003.png",
@@ -24646,7 +24646,7 @@
     "collectionNo": 182,
     "name": "Ishtar",
     "originalName": "イシュタル",
-    "aliasCN": "",
+    "aliasCN": "伊什塔尔",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4026003.png",
@@ -24833,7 +24833,7 @@
     "collectionNo": 179,
     "name": "Altria Pendragon (Alter)",
     "originalName": "アルトリア・ペンドラゴン〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "阿尔托莉雅·潘德拉贡〔Alter〕",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4027003.png",
@@ -24949,7 +24949,7 @@
     "collectionNo": 205,
     "name": "Ivan the Terrible",
     "originalName": "イヴァン雷帝",
-    "aliasCN": "",
+    "aliasCN": "伊凡雷帝",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4028003.png",
@@ -25019,12 +25019,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -25061,12 +25061,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -25102,12 +25102,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -25125,7 +25125,7 @@
     "collectionNo": 206,
     "name": "Achilles",
     "originalName": "アキレウス",
-    "aliasCN": "",
+    "aliasCN": "阿喀琉斯",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4029003.png",
@@ -25252,7 +25252,7 @@
     "collectionNo": 211,
     "name": "Sakamoto Ryouma",
     "originalName": "坂本龍馬",
-    "aliasCN": "",
+    "aliasCN": "坂本龙马",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4030003.png",
@@ -25358,7 +25358,7 @@
     "collectionNo": 231,
     "name": "Red Hare",
     "originalName": "赤兎馬",
-    "aliasCN": "",
+    "aliasCN": "赤兔马",
     "rarity": 3,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4031003.png",
@@ -25502,7 +25502,7 @@
     "collectionNo": 241,
     "name": "Sima Yi (Reines)",
     "originalName": "司馬懿〔ライネス〕",
-    "aliasCN": "",
+    "aliasCN": "司马懿〔莱妮丝〕",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4032003.png",
@@ -25654,7 +25654,7 @@
     "collectionNo": 257,
     "name": "Bartholomew Roberts",
     "originalName": "バーソロミュー・ロバーツ",
-    "aliasCN": "",
+    "aliasCN": "巴沙洛缪·罗伯茨",
     "rarity": 1,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4034003.png",
@@ -25776,7 +25776,7 @@
     "collectionNo": 253,
     "name": "Leonardo da Vinci",
     "originalName": "レオナルド・ダ・ヴィンチ",
-    "aliasCN": "",
+    "aliasCN": "莱昂纳多·达·芬奇",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4035003.png",
@@ -25926,7 +25926,7 @@
     "collectionNo": 263,
     "name": "Carmilla",
     "originalName": "カーミラ",
-    "aliasCN": "",
+    "aliasCN": "卡米拉",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4036003.png",
@@ -25999,7 +25999,7 @@
     "collectionNo": 296,
     "name": "Nemo",
     "originalName": "ネモ",
-    "aliasCN": "",
+    "aliasCN": "尼莫",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4037003.png",
@@ -26158,7 +26158,7 @@
     "collectionNo": 277,
     "name": "Odysseus",
     "originalName": "オデュッセウス",
-    "aliasCN": "",
+    "aliasCN": "奥德修斯",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4038003.png",
@@ -26299,7 +26299,7 @@
     "collectionNo": 273,
     "name": "Mandricardo",
     "originalName": "マンドリカルド",
-    "aliasCN": "",
+    "aliasCN": "曼迪卡尔多",
     "rarity": 3,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4039003.png",
@@ -26431,7 +26431,7 @@
     "collectionNo": 274,
     "name": "Europa",
     "originalName": "エウロペ",
-    "aliasCN": "",
+    "aliasCN": "欧罗巴",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4040003.png",
@@ -26552,7 +26552,7 @@
     "collectionNo": 291,
     "name": "Murasaki Shikibu",
     "originalName": "紫式部",
-    "aliasCN": "",
+    "aliasCN": "紫式部",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4041003.png",
@@ -26628,7 +26628,7 @@
     "collectionNo": 315,
     "name": "Habetrot",
     "originalName": "ハベトロット",
-    "aliasCN": "",
+    "aliasCN": "哈贝特洛特",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4042003.png",
@@ -26751,12 +26751,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -26774,7 +26774,7 @@
     "collectionNo": 331,
     "name": "Taigong Wang",
     "originalName": "太公望",
-    "aliasCN": "",
+    "aliasCN": "太公望",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4043003.png",
@@ -26891,7 +26891,7 @@
     "collectionNo": 332,
     "name": "Dobrynya Nikitich",
     "originalName": "ドブルイニャ・ニキチッチ",
-    "aliasCN": "",
+    "aliasCN": "多布雷尼亚·尼基季奇",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4044003.png",
@@ -27024,7 +27024,7 @@
     "collectionNo": 322,
     "name": "Caenis",
     "originalName": "カイニス",
-    "aliasCN": "",
+    "aliasCN": "凯妮斯",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4045003.png",
@@ -27155,7 +27155,7 @@
     "collectionNo": 326,
     "name": "Elisabeth Báthory (Cinderella)",
     "originalName": "エリザベート・バートリー〔シンデレラ〕",
-    "aliasCN": "",
+    "aliasCN": "伊丽莎白·巴托里〔灰姑娘〕",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4046003.png",
@@ -27275,7 +27275,7 @@
     "collectionNo": 342,
     "name": "Kōnstantînos XI",
     "originalName": "コンスタンティノス11世",
-    "aliasCN": "",
+    "aliasCN": "君士坦丁十一世",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4047003.png",
@@ -27413,7 +27413,7 @@
     "collectionNo": 349,
     "name": "Kyokutei Bakin",
     "originalName": "曲亭馬琴",
-    "aliasCN": "",
+    "aliasCN": "曲亭马琴",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4048003.png",
@@ -27561,7 +27561,7 @@
     "collectionNo": 366,
     "name": "Huang Feihu",
     "originalName": "黄飛虎",
-    "aliasCN": "",
+    "aliasCN": "黄飞虎",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4049003.png",
@@ -27687,7 +27687,7 @@
     "collectionNo": 387,
     "name": "Suzuka Gozen (Summer Vacation)",
     "originalName": "鈴鹿御前〔サマバケ〕",
-    "aliasCN": "",
+    "aliasCN": "铃鹿御前〔暑假〕",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4050003.png",
@@ -27817,7 +27817,7 @@
     "collectionNo": 397,
     "name": "Takeda Harunobu",
     "originalName": "武田晴信",
-    "aliasCN": "",
+    "aliasCN": "武田晴信",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4052003.png",
@@ -27937,7 +27937,7 @@
     "collectionNo": 401,
     "name": "Nemo (Santa)",
     "originalName": "ネモ〔サンタ〕",
-    "aliasCN": "",
+    "aliasCN": "尼莫〔圣诞〕",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4053003.png",
@@ -28079,7 +28079,7 @@
     "collectionNo": 406,
     "name": "Andromeda",
     "originalName": "アンドロメダ",
-    "aliasCN": "",
+    "aliasCN": "安德洛墨达",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4055003.png",
@@ -28213,7 +28213,7 @@
     "collectionNo": 468,
     "name": "Hippolyte",
     "originalName": "ヒッポリュテ",
-    "aliasCN": "",
+    "aliasCN": "希波吕忒",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4056003.png",
@@ -28348,7 +28348,7 @@
     "collectionNo": 452,
     "name": "Nemo/Noah",
     "originalName": "ネモ／ノア",
-    "aliasCN": "",
+    "aliasCN": "尼莫／诺亚",
     "rarity": 5,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4057003.png",
@@ -28440,12 +28440,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -28530,7 +28530,7 @@
     "collectionNo": 446,
     "name": "Kriemhild",
     "originalName": "クリームヒルト",
-    "aliasCN": "",
+    "aliasCN": "克里姆希尔德",
     "rarity": 4,
     "className": "rider",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_4058003.png",
@@ -28654,12 +28654,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -28687,7 +28687,7 @@
     "collectionNo": 31,
     "name": "Medea",
     "originalName": "メディア",
-    "aliasCN": "",
+    "aliasCN": "美狄亚",
     "rarity": 3,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5001003.png",
@@ -28776,12 +28776,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -28817,12 +28817,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -28845,7 +28845,7 @@
     "collectionNo": 32,
     "name": "Gilles de Rais",
     "originalName": "ジル・ド・レェ",
-    "aliasCN": "",
+    "aliasCN": "吉尔·德·雷",
     "rarity": 3,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5002003.png",
@@ -28891,17 +28891,17 @@
         "skillNum": 1,
         "effects": [
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           },
@@ -28919,7 +28919,7 @@
     "collectionNo": 62,
     "name": "Tamamo-no-Mae",
     "originalName": "玉藻の前",
-    "aliasCN": "",
+    "aliasCN": "玉藻前",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5003003.png",
@@ -29032,7 +29032,7 @@
     "collectionNo": 74,
     "name": "Nursery Rhyme",
     "originalName": "ナーサリー・ライム",
-    "aliasCN": "",
+    "aliasCN": "童谣",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5004003.png",
@@ -29147,12 +29147,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -29206,7 +29206,7 @@
     "collectionNo": 33,
     "name": "Hans Christian Andersen",
     "originalName": "ハンス・クリスチャン・アンデルセン",
-    "aliasCN": "",
+    "aliasCN": "汉斯·克里斯蒂安·安徒生",
     "rarity": 2,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5005003.png",
@@ -29350,7 +29350,7 @@
     "collectionNo": 34,
     "name": "William Shakespeare",
     "originalName": "ウィリアム・シェイクスピア",
-    "aliasCN": "",
+    "aliasCN": "威廉·莎士比亚",
     "rarity": 2,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5007003.png",
@@ -29484,7 +29484,7 @@
     "collectionNo": 150,
     "name": "Merlin",
     "originalName": "マーリン",
-    "aliasCN": "",
+    "aliasCN": "梅林",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5008003.png",
@@ -29637,7 +29637,7 @@
     "collectionNo": 127,
     "name": "Leonardo da Vinci",
     "originalName": "レオナルド・ダ・ヴィンチ",
-    "aliasCN": "",
+    "aliasCN": "莱昂纳多·达·芬奇",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5009003.png",
@@ -29818,7 +29818,7 @@
     "collectionNo": 79,
     "name": "Paracelsus von Hohenheim",
     "originalName": "ヴァン・ホーエンハイム・パラケルスス",
-    "aliasCN": "",
+    "aliasCN": "冯·霍恩海姆·帕拉塞尔苏斯",
     "rarity": 3,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5010003.png",
@@ -29925,7 +29925,7 @@
     "collectionNo": 80,
     "name": "Charles Babbage",
     "originalName": "チャールズ・バベッジ",
-    "aliasCN": "",
+    "aliasCN": "查尔斯·巴贝奇",
     "rarity": 3,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5011003.png",
@@ -30080,7 +30080,7 @@
     "collectionNo": 120,
     "name": "Nitocris",
     "originalName": "ニトクリス",
-    "aliasCN": "",
+    "aliasCN": "尼托克丽丝",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5012003.png",
@@ -30179,12 +30179,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -30223,7 +30223,7 @@
     "collectionNo": 35,
     "name": "Mephistopheles",
     "originalName": "メフィストフェレス",
-    "aliasCN": "",
+    "aliasCN": "梅菲斯托费勒斯",
     "rarity": 3,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5014003.png",
@@ -30319,7 +30319,7 @@
     "collectionNo": 36,
     "name": "Wolfgang Amadeus Mozart",
     "originalName": "ヴォルフガング・アマデウス・モーツァルト",
-    "aliasCN": "",
+    "aliasCN": "沃尔夫冈·阿马德乌斯·莫扎特",
     "rarity": 1,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5015003.png",
@@ -30389,7 +30389,7 @@
     "collectionNo": 104,
     "name": "Geronimo",
     "originalName": "ジェロニモ",
-    "aliasCN": "",
+    "aliasCN": "杰罗尼莫",
     "rarity": 3,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5016003.png",
@@ -30490,7 +30490,7 @@
     "collectionNo": 67,
     "name": "Medea (Lily)",
     "originalName": "メディア〔リリィ〕",
-    "aliasCN": "",
+    "aliasCN": "美狄亚〔Lily〕",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5017003.png",
@@ -30567,12 +30567,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -30604,12 +30604,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -30648,7 +30648,7 @@
     "collectionNo": 145,
     "name": "Gilgamesh",
     "originalName": "ギルガメッシュ",
-    "aliasCN": "",
+    "aliasCN": "吉尔伽美什",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5018003.png",
@@ -30739,17 +30739,17 @@
             "targetType": "party"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "party"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "party"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "party"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "party"
           }
@@ -30783,7 +30783,7 @@
     "collectionNo": 37,
     "name": "Zhuge Liang (Lord El-Melloi II)",
     "originalName": "諸葛孔明〔エルメロイⅡ世〕",
-    "aliasCN": "",
+    "aliasCN": "诸葛孔明〔埃尔梅罗Ⅱ世〕",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5019003.png",
@@ -30945,7 +30945,7 @@
     "collectionNo": 111,
     "name": "Irisviel (Holy Grail)",
     "originalName": "アイリスフィール〔天の衣〕",
-    "aliasCN": "",
+    "aliasCN": "爱丽丝菲尔〔天之衣〕",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5020003.png",
@@ -31070,7 +31070,7 @@
     "collectionNo": 38,
     "name": "Cú Chulainn",
     "originalName": "クー・フーリン",
-    "aliasCN": "",
+    "aliasCN": "库·丘林",
     "rarity": 3,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5021003.png",
@@ -31171,12 +31171,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -31218,12 +31218,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -31251,7 +31251,7 @@
     "collectionNo": 113,
     "name": "Xuanzang Sanzang",
     "originalName": "玄奘三蔵",
-    "aliasCN": "",
+    "aliasCN": "玄奘三藏",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5022003.png",
@@ -31397,7 +31397,7 @@
     "collectionNo": 100,
     "name": "Helena Blavatsky",
     "originalName": "エレナ・ブラヴァツキー",
-    "aliasCN": "",
+    "aliasCN": "海伦娜·布拉瓦茨基",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5023003.png",
@@ -31534,7 +31534,7 @@
     "collectionNo": 103,
     "name": "Thomas Edison",
     "originalName": "トーマス・エジソン",
-    "aliasCN": "",
+    "aliasCN": "托马斯·爱迪生",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5025003.png",
@@ -31665,7 +31665,7 @@
     "collectionNo": 61,
     "name": "Elisabeth Báthory (Halloween)",
     "originalName": "エリザベート・バートリー〔ハロウィン〕",
-    "aliasCN": "",
+    "aliasCN": "伊丽莎白·巴托里〔万圣节〕",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5026003.png",
@@ -31788,12 +31788,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -31803,12 +31803,12 @@
             "targetType": "enemy"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -31823,12 +31823,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -31867,7 +31867,7 @@
     "collectionNo": 130,
     "name": "Marie Antoinette",
     "originalName": "マリー・アントワネット",
-    "aliasCN": "",
+    "aliasCN": "玛丽·安托瓦内特",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5027003.png",
@@ -31968,7 +31968,7 @@
     "collectionNo": 136,
     "name": "Illyasviel von Einzbern",
     "originalName": "イリヤスフィール・フォン・アインツベルン",
-    "aliasCN": "",
+    "aliasCN": "伊莉雅丝菲尔·冯·爱因兹贝伦",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5028003.png",
@@ -32102,7 +32102,7 @@
     "collectionNo": 169,
     "name": "Scheherazade",
     "originalName": "シェヘラザード",
-    "aliasCN": "",
+    "aliasCN": "山鲁佐德",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5030003.png",
@@ -32226,7 +32226,7 @@
     "collectionNo": 175,
     "name": "Nero Claudius",
     "originalName": "ネロ・クラウディウス",
-    "aliasCN": "",
+    "aliasCN": "尼禄·克劳狄乌斯",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5032003.png",
@@ -32339,7 +32339,7 @@
     "collectionNo": 192,
     "name": "Circe",
     "originalName": "キルケー",
-    "aliasCN": "",
+    "aliasCN": "喀耳刻",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5033003.png",
@@ -32430,12 +32430,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -32471,12 +32471,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -32494,7 +32494,7 @@
     "collectionNo": 194,
     "name": "Queen of Sheba",
     "originalName": "シバの女王",
-    "aliasCN": "",
+    "aliasCN": "示巴女王",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5034003.png",
@@ -32618,7 +32618,7 @@
     "collectionNo": 201,
     "name": "Anastasia",
     "originalName": "アナスタシア",
-    "aliasCN": "",
+    "aliasCN": "阿纳斯塔西娅",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5035003.png",
@@ -32729,7 +32729,7 @@
     "collectionNo": 203,
     "name": "Avicebron",
     "originalName": "アヴィケブロン",
-    "aliasCN": "",
+    "aliasCN": "阿维斯布隆",
     "rarity": 3,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5036003.png",
@@ -32813,7 +32813,7 @@
     "collectionNo": 208,
     "name": "Sieg",
     "originalName": "ジーク",
-    "aliasCN": "",
+    "aliasCN": "齐格",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5038003.png",
@@ -32914,7 +32914,7 @@
     "collectionNo": 215,
     "name": "Scáthach-Skadi",
     "originalName": "スカサハ＝スカディ",
-    "aliasCN": "",
+    "aliasCN": "斯卡哈·斯卡蒂",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5039003.png",
@@ -33008,7 +33008,7 @@
     "collectionNo": 225,
     "name": "Shuten-Douji",
     "originalName": "酒呑童子",
-    "aliasCN": "",
+    "aliasCN": "酒吞童子",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5040003.png",
@@ -33106,7 +33106,7 @@
     "collectionNo": 236,
     "name": "Miyu Edelfelt",
     "originalName": "美遊・エーデルフェルト",
-    "aliasCN": "",
+    "aliasCN": "美游·艾德费尔特",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5041003.png",
@@ -33203,17 +33203,17 @@
             "targetType": "party"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "party"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "party"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "party"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "party"
           }
@@ -33226,7 +33226,7 @@
     "collectionNo": 237,
     "name": "Murasaki Shikibu",
     "originalName": "紫式部",
-    "aliasCN": "",
+    "aliasCN": "紫式部",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5042003.png",
@@ -33366,7 +33366,7 @@
     "collectionNo": 249,
     "name": "Asclepius",
     "originalName": "アスクレピオス",
-    "aliasCN": "",
+    "aliasCN": "阿斯克勒庇俄斯",
     "rarity": 3,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5043003.png",
@@ -33470,12 +33470,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -33496,12 +33496,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -33534,7 +33534,7 @@
     "collectionNo": 258,
     "name": "Chen Gong",
     "originalName": "陳宮",
-    "aliasCN": "",
+    "aliasCN": "陈宫",
     "rarity": 2,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5044003.png",
@@ -33653,7 +33653,7 @@
     "collectionNo": 284,
     "name": "Altria Caster",
     "originalName": "アルトリア・キャスター",
-    "aliasCN": "",
+    "aliasCN": "阿尔托莉雅·卡斯特",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5045003.png",
@@ -33777,7 +33777,7 @@
     "collectionNo": 307,
     "name": "Miss Crane",
     "originalName": "ミス・クレーン",
-    "aliasCN": "",
+    "aliasCN": "克莱恩小姐",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5046003.png",
@@ -33906,7 +33906,7 @@
     "collectionNo": 340,
     "name": "Daikokuten",
     "originalName": "大黒天",
-    "aliasCN": "",
+    "aliasCN": "大黑天",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5047003.png",
@@ -34030,7 +34030,7 @@
     "collectionNo": 319,
     "name": "Charlotte Corday",
     "originalName": "シャルロット・コルデー",
-    "aliasCN": "",
+    "aliasCN": "夏洛特·科黛",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5048003.png",
@@ -34139,7 +34139,7 @@
     "collectionNo": 327,
     "name": "Izumo-no-Okuni",
     "originalName": "出雲阿国",
-    "aliasCN": "",
+    "aliasCN": "出云阿国",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5049003.png",
@@ -34287,7 +34287,7 @@
     "collectionNo": 330,
     "name": "Martha (Santa)",
     "originalName": "マルタ〔サンタ〕",
-    "aliasCN": "",
+    "aliasCN": "玛尔达〔圣诞〕",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5050003.png",
@@ -34399,7 +34399,7 @@
     "collectionNo": 348,
     "name": "Zhang Jue",
     "originalName": "張角",
-    "aliasCN": "",
+    "aliasCN": "张角",
     "rarity": 3,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5051003.png",
@@ -34486,12 +34486,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -34540,7 +34540,7 @@
     "collectionNo": 358,
     "name": "Wu Zetian",
     "originalName": "武則天",
-    "aliasCN": "",
+    "aliasCN": "武则天",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5052003.png",
@@ -34646,12 +34646,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -34669,7 +34669,7 @@
     "collectionNo": 385,
     "name": "Aesc the Rain Witch",
     "originalName": "雨の魔女トネリコ",
-    "aliasCN": "",
+    "aliasCN": "雨之魔女梣",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5053003.png",
@@ -34820,7 +34820,7 @@
     "collectionNo": 404,
     "name": "Yui Shousetsu",
     "originalName": "由井正雪",
-    "aliasCN": "",
+    "aliasCN": "由井正雪",
     "rarity": 4,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5054003.png",
@@ -34955,7 +34955,7 @@
     "collectionNo": 415,
     "name": "Kuonji Alice",
     "originalName": "久遠寺有珠",
-    "aliasCN": "",
+    "aliasCN": "久远寺有珠",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5055003.png",
@@ -35087,7 +35087,7 @@
     "collectionNo": 467,
     "name": "François Prélat",
     "originalName": "フランソワ・プレラーティ",
-    "aliasCN": "",
+    "aliasCN": "弗朗索瓦·普勒拉蒂",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5056003.png",
@@ -35105,6 +35105,7 @@
       2011,
       2037,
       2040,
+      2780,
       2851,
       2858,
       2973,
@@ -35195,7 +35196,7 @@
     "collectionNo": 435,
     "name": "Ono no Komachi",
     "originalName": "小野小町",
-    "aliasCN": "",
+    "aliasCN": "小野小町",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5058003.png",
@@ -35331,7 +35332,7 @@
     "collectionNo": 462,
     "name": "Hanasaka no Okina",
     "originalName": "花咲翁",
-    "aliasCN": "",
+    "aliasCN": "花咲翁",
     "rarity": 5,
     "className": "caster",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_5059003.png",
@@ -35466,7 +35467,7 @@
     "collectionNo": 39,
     "name": "Sasaki Kojirou",
     "originalName": "佐々木小次郎",
-    "aliasCN": "",
+    "aliasCN": "佐佐木小次郎",
     "rarity": 1,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6001003.png",
@@ -35536,12 +35537,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -35578,12 +35579,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -35627,7 +35628,7 @@
     "collectionNo": 40,
     "name": "Hassan of the Cursed Arm",
     "originalName": "呪腕のハサン",
-    "aliasCN": "",
+    "aliasCN": "咒腕哈桑",
     "rarity": 2,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6002003.png",
@@ -35733,7 +35734,7 @@
     "collectionNo": 110,
     "name": "Hassan of the Hundred Personas",
     "originalName": "百貌のハサン",
-    "aliasCN": "",
+    "aliasCN": "百貌哈桑",
     "rarity": 3,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6003003.png",
@@ -35845,12 +35846,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -35881,17 +35882,17 @@
             "targetType": "self"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           },
@@ -35909,7 +35910,7 @@
     "collectionNo": 75,
     "name": "Jack the Ripper",
     "originalName": "ジャック・ザ・リッパー",
-    "aliasCN": "",
+    "aliasCN": "开膛手杰克",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6005003.png",
@@ -35989,12 +35990,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -36049,7 +36050,7 @@
     "collectionNo": 81,
     "name": "Henry Jekyll & Hyde",
     "originalName": "ヘンリー・ジキル＆ハイド",
-    "aliasCN": "",
+    "aliasCN": "亨利·杰基尔＆海德",
     "rarity": 3,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6007003.png",
@@ -36128,11 +36129,6 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
@@ -36154,6 +36150,11 @@
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           }
@@ -36203,7 +36204,7 @@
     "collectionNo": 139,
     "name": "Cleopatra",
     "originalName": "クレオパトラ",
-    "aliasCN": "",
+    "aliasCN": "克娄巴特拉",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6008003.png",
@@ -36322,12 +36323,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -36368,17 +36369,17 @@
             "targetType": "self"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           }
@@ -36391,7 +36392,7 @@
     "collectionNo": 124,
     "name": "Hassan of the Serenity",
     "originalName": "静謐のハサン",
-    "aliasCN": "",
+    "aliasCN": "静谧哈桑",
     "rarity": 3,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6009003.png",
@@ -36460,17 +36461,17 @@
             "targetType": "self"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           }
@@ -36502,17 +36503,17 @@
             "targetType": "self"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           },
@@ -36530,7 +36531,7 @@
     "collectionNo": 41,
     "name": "Stheno",
     "originalName": "ステンノ",
-    "aliasCN": "",
+    "aliasCN": "斯忒诺",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6010003.png",
@@ -36644,7 +36645,7 @@
     "collectionNo": 42,
     "name": "Jing Ke",
     "originalName": "荊軻",
-    "aliasCN": "",
+    "aliasCN": "荆轲",
     "rarity": 3,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6011003.png",
@@ -36756,7 +36757,7 @@
     "collectionNo": 43,
     "name": "Charles-Henri Sanson",
     "originalName": "シャルル＝アンリ・サンソン",
-    "aliasCN": "",
+    "aliasCN": "夏尔·亨利·桑松",
     "rarity": 2,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6012003.png",
@@ -36855,12 +36856,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -36909,7 +36910,7 @@
     "collectionNo": 44,
     "name": "Phantom of the Opera",
     "originalName": "ファントム・オブ・ジ・オペラ",
-    "aliasCN": "",
+    "aliasCN": "剧院魅影",
     "rarity": 2,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6013003.png",
@@ -36977,17 +36978,17 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           },
@@ -37003,12 +37004,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -37034,17 +37035,17 @@
             "targetType": "party"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           },
@@ -37062,7 +37063,7 @@
     "collectionNo": 45,
     "name": "Mata Hari",
     "originalName": "マタ・ハリ",
-    "aliasCN": "",
+    "aliasCN": "玛塔·哈丽",
     "rarity": 1,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6014003.png",
@@ -37153,7 +37154,7 @@
     "collectionNo": 109,
     "name": "Emiya (Assassin)",
     "originalName": "エミヤ〔アサシン〕",
-    "aliasCN": "",
+    "aliasCN": "卫宫〔Assassin〕",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6015003.png",
@@ -37268,7 +37269,7 @@
     "collectionNo": 46,
     "name": "Carmilla",
     "originalName": "カーミラ",
-    "aliasCN": "",
+    "aliasCN": "卡米拉",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6017003.png",
@@ -37350,7 +37351,7 @@
     "collectionNo": 86,
     "name": "Mysterious Heroine X",
     "originalName": "謎のヒロインX",
-    "aliasCN": "",
+    "aliasCN": "谜之女主角X",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6018003.png",
@@ -37471,7 +37472,7 @@
     "collectionNo": 117,
     "name": "Fuuma \"Evil-wind\" Kotarou",
     "originalName": "風魔小太郎",
-    "aliasCN": "",
+    "aliasCN": "风魔小太郎",
     "rarity": 3,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6019003.png",
@@ -37563,7 +37564,7 @@
     "collectionNo": 112,
     "name": "Shuten-Douji",
     "originalName": "酒呑童子",
-    "aliasCN": "",
+    "aliasCN": "酒吞童子",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6021003.png",
@@ -37675,7 +37676,7 @@
     "collectionNo": 92,
     "name": "Ryougi Shiki",
     "originalName": "両儀式",
-    "aliasCN": "",
+    "aliasCN": "两仪式",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6023003.png",
@@ -37800,7 +37801,7 @@
     "collectionNo": 133,
     "name": "Scáthach",
     "originalName": "スカサハ",
-    "aliasCN": "",
+    "aliasCN": "斯卡哈",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6024003.png",
@@ -37948,7 +37949,7 @@
     "collectionNo": 154,
     "name": "\"First Hassan\"",
     "originalName": "“山の翁”",
-    "aliasCN": "",
+    "aliasCN": "“山中老人”",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6025003.png",
@@ -38085,7 +38086,7 @@
     "collectionNo": 159,
     "name": "Yan Qing",
     "originalName": "燕青",
-    "aliasCN": "",
+    "aliasCN": "燕青",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6026003.png",
@@ -38224,7 +38225,7 @@
     "collectionNo": 170,
     "name": "Wu Zetian",
     "originalName": "武則天",
-    "aliasCN": "",
+    "aliasCN": "武则天",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6027003.png",
@@ -38373,7 +38374,7 @@
     "collectionNo": 177,
     "name": "Nitocris",
     "originalName": "ニトクリス",
-    "aliasCN": "",
+    "aliasCN": "尼托克丽丝",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6028003.png",
@@ -38497,7 +38498,7 @@
     "collectionNo": 185,
     "name": "Mochizuki Chiyome",
     "originalName": "望月千代女",
-    "aliasCN": "",
+    "aliasCN": "望月千代女",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6029003.png",
@@ -38599,7 +38600,7 @@
     "collectionNo": 188,
     "name": "Katou \"Black Kite\" Danzo",
     "originalName": "加藤段蔵",
-    "aliasCN": "",
+    "aliasCN": "加藤段藏",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6030003.png",
@@ -38701,7 +38702,7 @@
     "collectionNo": 189,
     "name": "Osakabehime",
     "originalName": "刑部姫",
-    "aliasCN": "",
+    "aliasCN": "刑部姬",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6031003.png",
@@ -38806,12 +38807,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -38876,7 +38877,7 @@
     "collectionNo": 199,
     "name": "Semiramis",
     "originalName": "セミラミス",
-    "aliasCN": "",
+    "aliasCN": "塞弥拉弥斯",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6032003.png",
@@ -38995,7 +38996,7 @@
     "collectionNo": 210,
     "name": "Okada Izo",
     "originalName": "岡田以蔵",
-    "aliasCN": "",
+    "aliasCN": "冈田以藏",
     "rarity": 3,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6033003.png",
@@ -39112,7 +39113,7 @@
     "collectionNo": 218,
     "name": "Ushiwakamaru",
     "originalName": "牛若丸",
-    "aliasCN": "",
+    "aliasCN": "牛若丸",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6034003.png",
@@ -39221,7 +39222,7 @@
     "collectionNo": 230,
     "name": "Yu Mei-ren",
     "originalName": "虞美人",
-    "aliasCN": "",
+    "aliasCN": "虞美人",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6035003.png",
@@ -39377,7 +39378,7 @@
     "collectionNo": 235,
     "name": "Li Shuwen",
     "originalName": "李書文",
-    "aliasCN": "",
+    "aliasCN": "李书文",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6036003.png",
@@ -39530,7 +39531,7 @@
     "collectionNo": 239,
     "name": "Kama",
     "originalName": "カーマ",
-    "aliasCN": "",
+    "aliasCN": "迦摩",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6037003.png",
@@ -39650,7 +39651,7 @@
     "collectionNo": 259,
     "name": "Charlotte Corday",
     "originalName": "シャルロット・コルデー",
-    "aliasCN": "",
+    "aliasCN": "夏洛特·科黛",
     "rarity": 1,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6038003.png",
@@ -39793,7 +39794,7 @@
     "collectionNo": 243,
     "name": "Gray",
     "originalName": "グレイ",
-    "aliasCN": "",
+    "aliasCN": "格蕾",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6039003.png",
@@ -39908,7 +39909,7 @@
     "collectionNo": 267,
     "name": "Okita Souji",
     "originalName": "沖田総司",
-    "aliasCN": "",
+    "aliasCN": "冲田总司",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6040003.png",
@@ -39989,12 +39990,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -40065,7 +40066,7 @@
     "collectionNo": 304,
     "name": "Kiichi Hogen",
     "originalName": "鬼一法眼",
-    "aliasCN": "",
+    "aliasCN": "鬼一法眼",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6041003.png",
@@ -40202,7 +40203,7 @@
     "collectionNo": 314,
     "name": "Koyanskaya of Light",
     "originalName": "光のコヤンスカヤ",
-    "aliasCN": "",
+    "aliasCN": "光之高扬斯卡娅",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6042003.png",
@@ -40328,7 +40329,7 @@
     "collectionNo": 361,
     "name": "Ortlinde",
     "originalName": "オルトリンデ",
-    "aliasCN": "",
+    "aliasCN": "奥特琳德",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6043003.png",
@@ -40464,7 +40465,7 @@
     "collectionNo": 360,
     "name": "Hildr",
     "originalName": "ヒルド",
-    "aliasCN": "",
+    "aliasCN": "希露德",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6044003.png",
@@ -40600,7 +40601,7 @@
     "collectionNo": 359,
     "name": "Thrúd",
     "originalName": "スルーズ",
-    "aliasCN": "",
+    "aliasCN": "斯露德",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6045003.png",
@@ -40736,7 +40737,7 @@
     "collectionNo": 365,
     "name": "Huyan Zhuo",
     "originalName": "呼延灼",
-    "aliasCN": "",
+    "aliasCN": "呼延灼",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6046003.png",
@@ -40864,7 +40865,7 @@
     "collectionNo": 371,
     "name": "Tezcatlipoca",
     "originalName": "テスカトリポカ",
-    "aliasCN": "",
+    "aliasCN": "特斯卡特利波卡",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6047003.png",
@@ -41002,7 +41003,7 @@
     "collectionNo": 378,
     "name": "Locusta",
     "originalName": "ロクスタ",
-    "aliasCN": "",
+    "aliasCN": "洛库斯塔",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6048003.png",
@@ -41118,7 +41119,7 @@
     "collectionNo": 380,
     "name": "Kashin Koji",
     "originalName": "果心居士",
-    "aliasCN": "",
+    "aliasCN": "果心居士",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6049003.png",
@@ -41238,7 +41239,7 @@
     "collectionNo": 408,
     "name": "Hassan of the Shining Star",
     "originalName": "耀星のハサン",
-    "aliasCN": "",
+    "aliasCN": "耀星哈桑",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6050003.png",
@@ -41348,7 +41349,7 @@
     "collectionNo": 453,
     "name": "Kawakami Gensai",
     "originalName": "河上彦斎",
-    "aliasCN": "",
+    "aliasCN": "河上彦斋",
     "rarity": 5,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6051003.png",
@@ -41473,7 +41474,7 @@
     "collectionNo": 463,
     "name": "Hebi Nyōbō",
     "originalName": "蛇女房",
-    "aliasCN": "",
+    "aliasCN": "蛇女房",
     "rarity": 4,
     "className": "assassin",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_6052003.png",
@@ -41610,7 +41611,7 @@
     "collectionNo": 47,
     "name": "Heracles",
     "originalName": "ヘラクレス",
-    "aliasCN": "",
+    "aliasCN": "赫拉克勒斯",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7001003.png",
@@ -41721,7 +41722,7 @@
     "collectionNo": 48,
     "name": "Lancelot",
     "originalName": "ランスロット",
-    "aliasCN": "",
+    "aliasCN": "兰斯洛特",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7002003.png",
@@ -41812,7 +41813,7 @@
     "collectionNo": 49,
     "name": "Lu Bu Fengxian",
     "originalName": "呂布奉先",
-    "aliasCN": "",
+    "aliasCN": "吕布奉先",
     "rarity": 3,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7003003.png",
@@ -41912,7 +41913,7 @@
     "collectionNo": 82,
     "name": "Frankenstein",
     "originalName": "フランケンシュタイン",
-    "aliasCN": "",
+    "aliasCN": "弗兰肯斯坦",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7004003.png",
@@ -41995,7 +41996,7 @@
     "collectionNo": 50,
     "name": "Spartacus",
     "originalName": "スパルタクス",
-    "aliasCN": "",
+    "aliasCN": "斯巴达克斯",
     "rarity": 1,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7005003.png",
@@ -42110,7 +42111,7 @@
     "collectionNo": 51,
     "name": "Sakata Kintoki",
     "originalName": "坂田金時",
-    "aliasCN": "",
+    "aliasCN": "坂田金时",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7006003.png",
@@ -42212,7 +42213,7 @@
     "collectionNo": 52,
     "name": "Vlad III",
     "originalName": "ヴラド三世",
-    "aliasCN": "",
+    "aliasCN": "弗拉德三世",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7007003.png",
@@ -42346,7 +42347,7 @@
     "collectionNo": 89,
     "name": "Beowulf",
     "originalName": "ベオウルフ",
-    "aliasCN": "",
+    "aliasCN": "贝奥武夫",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7008003.png",
@@ -42488,7 +42489,7 @@
     "collectionNo": 53,
     "name": "Asterios",
     "originalName": "アステリオス",
-    "aliasCN": "",
+    "aliasCN": "阿斯忒里俄斯",
     "rarity": 1,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7009003.png",
@@ -42617,7 +42618,7 @@
     "collectionNo": 54,
     "name": "Caligula",
     "originalName": "カリギュラ",
-    "aliasCN": "",
+    "aliasCN": "卡利古拉",
     "rarity": 2,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7010003.png",
@@ -42710,7 +42711,7 @@
     "collectionNo": 55,
     "name": "Darius III",
     "originalName": "ダレイオス三世",
-    "aliasCN": "",
+    "aliasCN": "大流士三世",
     "rarity": 3,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7011003.png",
@@ -42782,12 +42783,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -42858,7 +42859,7 @@
     "collectionNo": 56,
     "name": "Kiyohime",
     "originalName": "清姫",
-    "aliasCN": "",
+    "aliasCN": "清姬",
     "rarity": 3,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7013003.png",
@@ -42937,12 +42938,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -42992,7 +42993,7 @@
     "collectionNo": 97,
     "name": "Florence Nightingale",
     "originalName": "ナイチンゲール",
-    "aliasCN": "",
+    "aliasCN": "南丁格尔",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7014003.png",
@@ -43129,7 +43130,7 @@
     "collectionNo": 57,
     "name": "Eric Bloodaxe",
     "originalName": "エイリーク・ブラッドアクス",
-    "aliasCN": "",
+    "aliasCN": "血斧埃里克",
     "rarity": 2,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7015003.png",
@@ -43190,12 +43191,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -43218,7 +43219,7 @@
     "collectionNo": 58,
     "name": "Tamamo Cat",
     "originalName": "タマモキャット",
-    "aliasCN": "",
+    "aliasCN": "玉藻猫",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7016003.png",
@@ -43327,7 +43328,7 @@
     "collectionNo": 98,
     "name": "Cú Chulainn (Alter)",
     "originalName": "クー・フーリン〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "库·丘林〔Alter〕",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7020003.png",
@@ -43410,7 +43411,7 @@
     "collectionNo": 116,
     "name": "Ibaraki-Douji",
     "originalName": "茨木童子",
-    "aliasCN": "",
+    "aliasCN": "茨木童子",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7022003.png",
@@ -43494,12 +43495,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -43536,12 +43537,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -43579,7 +43580,7 @@
     "collectionNo": 114,
     "name": "Minamoto-no-Raikou",
     "originalName": "源頼光",
-    "aliasCN": "",
+    "aliasCN": "源赖光",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7023003.png",
@@ -43726,7 +43727,7 @@
     "collectionNo": 155,
     "name": "Mysterious Heroine X (Alter)",
     "originalName": "謎のヒロインX〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "谜之女主角X〔Alter〕",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7024003.png",
@@ -43874,7 +43875,7 @@
     "collectionNo": 161,
     "name": "Hijikata Toshizo",
     "originalName": "土方歳三",
-    "aliasCN": "",
+    "aliasCN": "土方岁三",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7025003.png",
@@ -43955,12 +43956,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -43997,12 +43998,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -44051,7 +44052,7 @@
     "collectionNo": 162,
     "name": "Chacha",
     "originalName": "茶々",
-    "aliasCN": "",
+    "aliasCN": "茶茶",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7026003.png",
@@ -44139,7 +44140,7 @@
     "collectionNo": 171,
     "name": "Penthesilea",
     "originalName": "ペンテシレイア",
-    "aliasCN": "",
+    "aliasCN": "彭忒西勒亚",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7027003.png",
@@ -44268,7 +44269,7 @@
     "collectionNo": 174,
     "name": "Paul Bunyan",
     "originalName": "ポール・バニヤン",
-    "aliasCN": "",
+    "aliasCN": "保罗·班扬",
     "rarity": 1,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7028003.png",
@@ -44348,7 +44349,7 @@
     "collectionNo": 178,
     "name": "Oda Nobunaga",
     "originalName": "織田信長",
-    "aliasCN": "",
+    "aliasCN": "织田信长",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7029003.png",
@@ -44463,7 +44464,7 @@
     "collectionNo": 202,
     "name": "Atalante (Alter)",
     "originalName": "アタランテ〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "阿塔兰忒〔Alter〕",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7030003.png",
@@ -44582,7 +44583,7 @@
     "collectionNo": 219,
     "name": "Jeanne d'Arc (Alter)",
     "originalName": "ジャンヌ・ダルク〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "贞德〔Alter〕",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7031003.png",
@@ -44680,7 +44681,7 @@
     "collectionNo": 226,
     "name": "Xiang Yu",
     "originalName": "項羽",
-    "aliasCN": "",
+    "aliasCN": "项羽",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7032003.png",
@@ -44809,7 +44810,7 @@
     "collectionNo": 247,
     "name": "Arjuna (Alter)",
     "originalName": "アルジュナ〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "阿周那〔Alter〕",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7033003.png",
@@ -44925,7 +44926,7 @@
     "collectionNo": 260,
     "name": "Salome",
     "originalName": "サロメ",
-    "aliasCN": "",
+    "aliasCN": "莎乐美",
     "rarity": 2,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7034003.png",
@@ -45028,7 +45029,7 @@
     "collectionNo": 251,
     "name": "Mori Nagayoshi",
     "originalName": "森長可",
-    "aliasCN": "",
+    "aliasCN": "森长可",
     "rarity": 3,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7035003.png",
@@ -45110,7 +45111,7 @@
     "collectionNo": 261,
     "name": "Miyamoto Musashi",
     "originalName": "宮本武蔵",
-    "aliasCN": "",
+    "aliasCN": "宫本武藏",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7036003.png",
@@ -45219,7 +45220,7 @@
     "collectionNo": 282,
     "name": "Kijyo Koyo",
     "originalName": "鬼女紅葉",
-    "aliasCN": "",
+    "aliasCN": "鬼女红叶",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7037003.png",
@@ -45321,12 +45322,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -45349,7 +45350,7 @@
     "collectionNo": 287,
     "name": "Brynhild",
     "originalName": "ブリュンヒルデ",
-    "aliasCN": "",
+    "aliasCN": "布伦希尔德",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7038003.png",
@@ -45468,7 +45469,7 @@
     "collectionNo": 306,
     "name": "Galatea",
     "originalName": "ガラテア",
-    "aliasCN": "",
+    "aliasCN": "伽拉忒亚",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7039003.png",
@@ -45572,7 +45573,7 @@
     "collectionNo": 309,
     "name": "Morgan",
     "originalName": "モルガン",
-    "aliasCN": "",
+    "aliasCN": "摩根",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7040003.png",
@@ -45706,7 +45707,7 @@
     "collectionNo": 323,
     "name": "Sei Shounagon",
     "originalName": "清少納言",
-    "aliasCN": "",
+    "aliasCN": "清少纳言",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7041003.png",
@@ -45832,7 +45833,7 @@
     "collectionNo": 345,
     "name": "Kriemhild",
     "originalName": "クリームヒルト",
-    "aliasCN": "",
+    "aliasCN": "克里姆希尔德",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7042003.png",
@@ -45944,7 +45945,7 @@
     "collectionNo": 355,
     "name": "Ibuki-Douji",
     "originalName": "伊吹童子",
-    "aliasCN": "",
+    "aliasCN": "伊吹童子",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7043003.png",
@@ -46089,7 +46090,7 @@
     "collectionNo": 362,
     "name": "Sen-no-Rikyu",
     "originalName": "千利休",
-    "aliasCN": "",
+    "aliasCN": "千利休",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7044003.png",
@@ -46210,7 +46211,7 @@
     "collectionNo": 382,
     "name": "Duryodhana",
     "originalName": "ドゥリーヨダナ",
-    "aliasCN": "",
+    "aliasCN": "难敌",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7046003.png",
@@ -46333,7 +46334,7 @@
     "collectionNo": 386,
     "name": "Altria Caster",
     "originalName": "アルトリア・キャスター",
-    "aliasCN": "",
+    "aliasCN": "阿尔托莉雅·卡斯特",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7047003.png",
@@ -46469,7 +46470,7 @@
     "collectionNo": 398,
     "name": "Nagakura Shinpachi",
     "originalName": "永倉新八",
-    "aliasCN": "",
+    "aliasCN": "永仓新八",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7048003.png",
@@ -46581,7 +46582,7 @@
     "collectionNo": 414,
     "name": "Shizuki Soujuurou",
     "originalName": "静希草十郎",
-    "aliasCN": "",
+    "aliasCN": "静希草十郎",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7049003.png",
@@ -46682,7 +46683,7 @@
     "collectionNo": 429,
     "name": "Louhi",
     "originalName": "ロウヒ",
-    "aliasCN": "",
+    "aliasCN": "娄希",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7050003.png",
@@ -46771,12 +46772,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -46820,7 +46821,7 @@
     "collectionNo": 440,
     "name": "Lilith",
     "originalName": "リリス",
-    "aliasCN": "",
+    "aliasCN": "莉莉丝",
     "rarity": 5,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7051003.png",
@@ -46953,7 +46954,7 @@
     "collectionNo": 447,
     "name": "Huyan Zhuo",
     "originalName": "呼延灼",
-    "aliasCN": "",
+    "aliasCN": "呼延灼",
     "rarity": 4,
     "className": "berserker",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_7052003.png",
@@ -47084,7 +47085,7 @@
     "collectionNo": 59,
     "name": "Jeanne d'Arc",
     "originalName": "ジャンヌ・ダルク",
-    "aliasCN": "",
+    "aliasCN": "贞德",
     "rarity": 5,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9001003.png",
@@ -47176,7 +47177,7 @@
     "collectionNo": 93,
     "name": "Amakusa Shirou",
     "originalName": "天草四郎",
-    "aliasCN": "",
+    "aliasCN": "天草四郎",
     "rarity": 5,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9002003.png",
@@ -47302,7 +47303,7 @@
     "collectionNo": 135,
     "name": "Martha",
     "originalName": "マルタ",
-    "aliasCN": "",
+    "aliasCN": "玛尔达",
     "rarity": 4,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9004003.png",
@@ -47402,7 +47403,7 @@
     "collectionNo": 173,
     "name": "Sherlock Holmes",
     "originalName": "シャーロック・ホームズ",
-    "aliasCN": "",
+    "aliasCN": "夏洛克·福尔摩斯",
     "rarity": 5,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9005003.png",
@@ -47537,7 +47538,7 @@
     "collectionNo": 229,
     "name": "Qin Shi Huang",
     "originalName": "始皇帝",
-    "aliasCN": "",
+    "aliasCN": "始皇帝",
     "rarity": 5,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9006003.png",
@@ -47619,12 +47620,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -47650,12 +47651,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -47693,7 +47694,7 @@
     "collectionNo": 233,
     "name": "Quetzalcoatl (Samba/Santa)",
     "originalName": "ケツァル・コアトル〔サンバ／サンタ〕",
-    "aliasCN": "",
+    "aliasCN": "魁札尔·科亚特尔〔桑巴／圣诞〕",
     "rarity": 4,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9007003.png",
@@ -47802,7 +47803,7 @@
     "collectionNo": 242,
     "name": "Astraea",
     "originalName": "アストライア",
-    "aliasCN": "",
+    "aliasCN": "阿斯特赖亚",
     "rarity": 4,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9008003.png",
@@ -47930,7 +47931,7 @@
     "collectionNo": 265,
     "name": "Altria Pendragon",
     "originalName": "アルトリア・ペンドラゴン",
-    "aliasCN": "",
+    "aliasCN": "阿尔托莉雅·潘德拉贡",
     "rarity": 5,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9009003.png",
@@ -48083,7 +48084,7 @@
     "collectionNo": 292,
     "name": "Himiko",
     "originalName": "卑弥呼",
-    "aliasCN": "",
+    "aliasCN": "卑弥呼",
     "rarity": 5,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9010003.png",
@@ -48207,7 +48208,7 @@
     "collectionNo": 305,
     "name": "Amor (Caren)",
     "originalName": "アムール〔カレン〕",
-    "aliasCN": "",
+    "aliasCN": "阿摩耳〔卡莲〕",
     "rarity": 5,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9011003.png",
@@ -48351,7 +48352,7 @@
     "collectionNo": 320,
     "name": "Leonardo da Vinci",
     "originalName": "レオナルド・ダ・ヴィンチ",
-    "aliasCN": "",
+    "aliasCN": "莱昂纳多·达·芬奇",
     "rarity": 4,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9012003.png",
@@ -48469,7 +48470,7 @@
     "collectionNo": 346,
     "name": "James Moriarty",
     "originalName": "ジェームズ・モリアーティ",
-    "aliasCN": "",
+    "aliasCN": "詹姆斯·莫里亚蒂",
     "rarity": 5,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9013003.png",
@@ -48602,7 +48603,7 @@
     "collectionNo": 357,
     "name": "Scáthach-Skadi",
     "originalName": "スカサハ＝スカディ",
-    "aliasCN": "",
+    "aliasCN": "斯卡哈·斯卡蒂",
     "rarity": 5,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9014003.png",
@@ -48736,7 +48737,7 @@
     "collectionNo": 364,
     "name": "Iyo",
     "originalName": "壱与",
-    "aliasCN": "",
+    "aliasCN": "壹与",
     "rarity": 4,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9015003.png",
@@ -48865,7 +48866,7 @@
     "collectionNo": 374,
     "name": "Pope Johanna",
     "originalName": "女教皇ヨハンナ",
-    "aliasCN": "",
+    "aliasCN": "女教皇若安",
     "rarity": 5,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9016003.png",
@@ -48995,7 +48996,7 @@
     "collectionNo": 390,
     "name": "Mélusine",
     "originalName": "メリュジーヌ",
-    "aliasCN": "",
+    "aliasCN": "梅柳齐娜",
     "rarity": 5,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9017003.png",
@@ -49147,7 +49148,7 @@
     "collectionNo": 400,
     "name": "Uesugi Kenshin",
     "originalName": "上杉謙信",
-    "aliasCN": "",
+    "aliasCN": "上杉谦信",
     "rarity": 5,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9018003.png",
@@ -49281,7 +49282,7 @@
     "collectionNo": 438,
     "name": "Metatron Jeanne",
     "originalName": "メタトロン・ジャンヌ",
-    "aliasCN": "",
+    "aliasCN": "梅塔特隆·贞德",
     "rarity": 5,
     "className": "ruler",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_9019003.png",
@@ -49425,7 +49426,7 @@
     "collectionNo": 164,
     "name": "Passionlip",
     "originalName": "パッションリップ",
-    "aliasCN": "",
+    "aliasCN": "Passionlip",
     "rarity": 4,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10001003.png",
@@ -49604,7 +49605,7 @@
     "collectionNo": 163,
     "name": "Meltryllis",
     "originalName": "メルトリリス",
-    "aliasCN": "",
+    "aliasCN": "Meltryllis",
     "rarity": 5,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10002003.png",
@@ -49743,7 +49744,7 @@
     "collectionNo": 167,
     "name": "Sessyoin Kiara",
     "originalName": "殺生院キアラ",
-    "aliasCN": "",
+    "aliasCN": "杀生院祈荒",
     "rarity": 5,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10003003.png",
@@ -49879,12 +49880,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -49948,7 +49949,7 @@
     "collectionNo": 190,
     "name": "Mecha Eli-chan",
     "originalName": "メカエリチャン",
-    "aliasCN": "",
+    "aliasCN": "机械伊丽亲",
     "rarity": 4,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10004003.png",
@@ -50039,12 +50040,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -50086,12 +50087,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -50119,7 +50120,7 @@
     "collectionNo": 191,
     "name": "Mecha Eli-chan Mk.II",
     "originalName": "メカエリチャンⅡ号機",
-    "aliasCN": "",
+    "aliasCN": "机械伊丽亲Ⅱ号机",
     "rarity": 4,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10005003.png",
@@ -50210,12 +50211,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -50257,12 +50258,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -50290,7 +50291,7 @@
     "collectionNo": 209,
     "name": "Okita Souji (Alter)",
     "originalName": "沖田総司〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "冲田总司〔Alter〕",
     "rarity": 5,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10007003.png",
@@ -50465,7 +50466,7 @@
     "collectionNo": 224,
     "name": "Sitonai",
     "originalName": "シトナイ",
-    "aliasCN": "",
+    "aliasCN": "志度内",
     "rarity": 5,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10008003.png",
@@ -50617,7 +50618,7 @@
     "collectionNo": 238,
     "name": "Kingprotea",
     "originalName": "キングプロテア",
-    "aliasCN": "",
+    "aliasCN": "Kingprotea",
     "rarity": 5,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10009003.png",
@@ -50695,12 +50696,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -50761,7 +50762,7 @@
     "collectionNo": 297,
     "name": "Ashiya Douman",
     "originalName": "蘆屋道満",
-    "aliasCN": "",
+    "aliasCN": "芦屋道满",
     "rarity": 5,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10010003.png",
@@ -50884,7 +50885,7 @@
     "collectionNo": 336,
     "name": "Manannán mac Lir (Bazett)",
     "originalName": "マナナン・マク・リール〔バゼット〕",
-    "aliasCN": "",
+    "aliasCN": "马纳南·麦克·利尔〔巴泽特〕",
     "rarity": 5,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10011003.png",
@@ -51023,7 +51024,7 @@
     "collectionNo": 338,
     "name": "Taisui Xingjun",
     "originalName": "太歳星君",
-    "aliasCN": "",
+    "aliasCN": "太岁星君",
     "rarity": 4,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10012003.png",
@@ -51150,7 +51151,7 @@
     "collectionNo": 339,
     "name": "Super Bunyan",
     "originalName": "スーパーバニヤン",
-    "aliasCN": "",
+    "aliasCN": "超级班扬",
     "rarity": 5,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10013003.png",
@@ -51256,7 +51257,7 @@
     "collectionNo": 352,
     "name": "Xu Fu",
     "originalName": "徐福",
-    "aliasCN": "",
+    "aliasCN": "徐福",
     "rarity": 3,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10014003.png",
@@ -51325,12 +51326,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -51400,7 +51401,7 @@
     "collectionNo": 369,
     "name": "Kotomine Kirei",
     "originalName": "言峰綺礼",
-    "aliasCN": "",
+    "aliasCN": "言峰绮礼",
     "rarity": 5,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10015003.png",
@@ -51473,12 +51474,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -51574,7 +51575,7 @@
     "collectionNo": 376,
     "name": "Larva/Tiamat",
     "originalName": "ラーヴァ／ティアマト",
-    "aliasCN": "",
+    "aliasCN": "幼体／提亚马特",
     "rarity": 5,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10016003.png",
@@ -51703,7 +51704,7 @@
     "collectionNo": 416,
     "name": "Hibiki & Chikagi",
     "originalName": "ひびき＆千鍵",
-    "aliasCN": "",
+    "aliasCN": "响＆千键",
     "rarity": 5,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10017003.png",
@@ -51832,7 +51833,7 @@
     "collectionNo": 426,
     "name": "Kazuradrop",
     "originalName": "カズラドロップ",
-    "aliasCN": "",
+    "aliasCN": "Kazuradrop",
     "rarity": 5,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10018003.png",
@@ -51895,17 +51896,17 @@
         "skillNum": 1,
         "effects": [
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           }
@@ -51937,12 +51938,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -51965,7 +51966,7 @@
     "collectionNo": 451,
     "name": "Jeunesse Crane",
     "originalName": "ジュネス・クレーン",
-    "aliasCN": "",
+    "aliasCN": "热内斯·克莱恩",
     "rarity": 4,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10019003.png",
@@ -52075,17 +52076,17 @@
             "targetType": "party"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "party"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "party"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "party"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "party"
           },
@@ -52119,7 +52120,7 @@
     "collectionNo": 464,
     "name": "Flora",
     "originalName": "フローラ",
-    "aliasCN": "",
+    "aliasCN": "芙萝拉",
     "rarity": 4,
     "className": "alterEgo",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_10020003.png",
@@ -52271,7 +52272,7 @@
     "collectionNo": 107,
     "name": "Aŋra Mainiiu",
     "originalName": "アンリマユ",
-    "aliasCN": "",
+    "aliasCN": "安哥拉曼纽",
     "rarity": 0,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11001003.png",
@@ -52386,7 +52387,7 @@
     "collectionNo": 96,
     "name": "Edmond Dantès",
     "originalName": "巌窟王",
-    "aliasCN": "",
+    "aliasCN": "岩窟王",
     "rarity": 5,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11002003.png",
@@ -52479,12 +52480,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -52523,7 +52524,7 @@
     "collectionNo": 106,
     "name": "Jeanne d'Arc (Alter)",
     "originalName": "ジャンヌ・ダルク〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "贞德〔Alter〕",
     "rarity": 5,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11003003.png",
@@ -52654,7 +52655,7 @@
     "collectionNo": 147,
     "name": "Gorgon",
     "originalName": "ゴルゴーン",
-    "aliasCN": "",
+    "aliasCN": "戈耳工",
     "rarity": 4,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11004003.png",
@@ -52787,7 +52788,7 @@
     "collectionNo": 158,
     "name": "Hessian Lobo",
     "originalName": "ヘシアン・ロボ",
-    "aliasCN": "",
+    "aliasCN": "黑森·罗伯",
     "rarity": 4,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11005003.png",
@@ -52869,12 +52870,12 @@
         "skillNum": 3,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -52908,7 +52909,7 @@
     "collectionNo": 204,
     "name": "Antonio Salieri",
     "originalName": "アントニオ・サリエリ",
-    "aliasCN": "",
+    "aliasCN": "安东尼奥·萨列里",
     "rarity": 3,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11006003.png",
@@ -53001,7 +53002,7 @@
     "collectionNo": 250,
     "name": "Demon King Nobunaga",
     "originalName": "魔王信長",
-    "aliasCN": "",
+    "aliasCN": "魔王信长",
     "rarity": 5,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11007003.png",
@@ -53173,7 +53174,7 @@
     "collectionNo": 268,
     "name": "Space Ishtar",
     "originalName": "スペース・イシュタル",
-    "aliasCN": "",
+    "aliasCN": "太空伊什塔尔",
     "rarity": 5,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11009003.png",
@@ -53301,7 +53302,7 @@
     "collectionNo": 303,
     "name": "Taira-no-Kagekiyo",
     "originalName": "平景清",
-    "aliasCN": "",
+    "aliasCN": "平景清",
     "rarity": 5,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11010003.png",
@@ -53462,7 +53463,7 @@
     "collectionNo": 321,
     "name": "Kama",
     "originalName": "カーマ",
-    "aliasCN": "",
+    "aliasCN": "迦摩",
     "rarity": 5,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11011003.png",
@@ -53571,7 +53572,7 @@
     "collectionNo": 328,
     "name": "Mysterious Ranmaru X",
     "originalName": "謎の蘭丸X",
-    "aliasCN": "",
+    "aliasCN": "谜之兰丸X",
     "rarity": 4,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11012003.png",
@@ -53644,12 +53645,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -53699,7 +53700,7 @@
     "collectionNo": 407,
     "name": "Marie Antoinette (Alter)",
     "originalName": "マリー・アントワネット〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "玛丽·安托瓦内特〔Alter〕",
     "rarity": 5,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11013003.png",
@@ -53822,7 +53823,7 @@
     "collectionNo": 356,
     "name": "Utsumi Erice",
     "originalName": "宇津見エリセ",
-    "aliasCN": "",
+    "aliasCN": "宇津见绘里濑",
     "rarity": 4,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11014003.png",
@@ -53954,7 +53955,7 @@
     "collectionNo": 370,
     "name": "Nitocris (Alter)",
     "originalName": "ニトクリス〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "尼托克丽丝〔Alter〕",
     "rarity": 5,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11015003.png",
@@ -54094,7 +54095,7 @@
     "collectionNo": 388,
     "name": "Chloe von Einzbern",
     "originalName": "クロエ・フォン・アインツベルン",
-    "aliasCN": "",
+    "aliasCN": "克洛伊·冯·爱因兹贝伦",
     "rarity": 4,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11016003.png",
@@ -54187,12 +54188,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -54210,7 +54211,7 @@
     "collectionNo": 409,
     "name": "The Count of Monte Cristo",
     "originalName": "巌窟王　モンテ・クリスト",
-    "aliasCN": "",
+    "aliasCN": "岩窟王　基督山",
     "rarity": 5,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11017003.png",
@@ -54338,7 +54339,7 @@
     "collectionNo": 403,
     "name": "Minamoto-no-Raikou/Ushi Gozen",
     "originalName": "源頼光／丑御前",
-    "aliasCN": "",
+    "aliasCN": "源赖光／丑御前",
     "rarity": 5,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11018003.png",
@@ -54468,7 +54469,7 @@
     "collectionNo": 420,
     "name": "Xu Fu",
     "originalName": "徐福",
-    "aliasCN": "",
+    "aliasCN": "徐福",
     "rarity": 4,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11019003.png",
@@ -54612,7 +54613,7 @@
     "collectionNo": 469,
     "name": "John Lackland",
     "originalName": "ジョン・ラックランド",
-    "aliasCN": "",
+    "aliasCN": "无地王约翰",
     "rarity": 5,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11020003.png",
@@ -54691,12 +54692,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -54771,7 +54772,7 @@
     "collectionNo": 454,
     "name": "Tōdō Heisuke",
     "originalName": "藤堂平助",
-    "aliasCN": "",
+    "aliasCN": "藤堂平助",
     "rarity": 4,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11021003.png",
@@ -54899,7 +54900,7 @@
     "collectionNo": 458,
     "name": "Elisabeth of the End",
     "originalName": "終わりのエリザベート",
-    "aliasCN": "",
+    "aliasCN": "终结之伊丽莎白",
     "rarity": 4,
     "className": "avenger",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_11022003.png",
@@ -55036,7 +55037,7 @@
     "collectionNo": 166,
     "name": "BB",
     "originalName": "ＢＢ",
-    "aliasCN": "",
+    "aliasCN": "BB",
     "rarity": 4,
     "className": "moonCancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_23001003.png",
@@ -55092,12 +55093,12 @@
         "skillNum": 1,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "party"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "party"
           },
@@ -55123,12 +55124,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -55183,7 +55184,7 @@
     "collectionNo": 220,
     "name": "BB",
     "originalName": "ＢＢ",
-    "aliasCN": "",
+    "aliasCN": "BB",
     "rarity": 5,
     "className": "moonCancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_23002003.png",
@@ -55334,7 +55335,7 @@
     "collectionNo": 244,
     "name": "Jinako Carigiri",
     "originalName": "ジナコ＝カリギリ",
-    "aliasCN": "",
+    "aliasCN": "吉娜可·加里吉利",
     "rarity": 5,
     "className": "moonCancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_23003003.png",
@@ -55494,7 +55495,7 @@
     "collectionNo": 285,
     "name": "Sessyoin Kiara",
     "originalName": "殺生院キアラ",
-    "aliasCN": "",
+    "aliasCN": "杀生院祈荒",
     "rarity": 5,
     "className": "moonCancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_23004003.png",
@@ -55563,12 +55564,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -55615,12 +55616,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -55638,7 +55639,7 @@
     "collectionNo": 351,
     "name": "Archetype: Earth",
     "originalName": "アーキタイプ：アース",
-    "aliasCN": "",
+    "aliasCN": "Archetype：Earth",
     "rarity": 5,
     "className": "moonCancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_23005003.png",
@@ -55744,7 +55745,7 @@
     "collectionNo": 421,
     "name": "BB Dubai",
     "originalName": "ＢＢドバイ",
-    "aliasCN": "",
+    "aliasCN": "ＢＢ迪拜",
     "rarity": 5,
     "className": "moonCancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_23006003.png",
@@ -55846,12 +55847,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -55895,7 +55896,7 @@
     "collectionNo": 424,
     "name": "Kishinami Hakuno",
     "originalName": "岸波白野",
-    "aliasCN": "",
+    "aliasCN": "岸波白野",
     "rarity": 4,
     "className": "moonCancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_23007003.png",
@@ -56017,7 +56018,7 @@
     "collectionNo": 425,
     "name": "Kishinami Hakuno",
     "originalName": "岸波白野",
-    "aliasCN": "",
+    "aliasCN": "岸波白野",
     "rarity": 4,
     "className": "moonCancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_23008003.png",
@@ -56139,7 +56140,7 @@
     "collectionNo": 418,
     "name": "Mysterious Executor C.I.E.L",
     "originalName": "謎の代行者C.I.E.L",
-    "aliasCN": "",
+    "aliasCN": "谜之代行者C.I.E.L",
     "rarity": 5,
     "className": "moonCancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_23009003.png",
@@ -56280,7 +56281,7 @@
     "collectionNo": 422,
     "name": "Tenochtitlan",
     "originalName": "テノチティトラン",
-    "aliasCN": "",
+    "aliasCN": "特诺奇蒂特兰",
     "rarity": 4,
     "className": "moonCancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_23010003.png",
@@ -56428,7 +56429,7 @@
     "collectionNo": 448,
     "name": "Jade Rabbit",
     "originalName": "玉兎",
-    "aliasCN": "",
+    "aliasCN": "玉兔",
     "rarity": 5,
     "className": "moonCancer",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_23011003.png",
@@ -56520,12 +56521,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -56545,12 +56546,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -56624,7 +56625,7 @@
     "collectionNo": 195,
     "name": "Abigail Williams",
     "originalName": "アビゲイル・ウィリアムズ",
-    "aliasCN": "",
+    "aliasCN": "阿比盖尔·威廉姆斯",
     "rarity": 5,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25001003.png",
@@ -56749,7 +56750,7 @@
     "collectionNo": 198,
     "name": "Katsushika Hokusai",
     "originalName": "葛飾北斎",
-    "aliasCN": "",
+    "aliasCN": "葛饰北斋",
     "rarity": 5,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25002003.png",
@@ -56866,7 +56867,7 @@
     "collectionNo": 222,
     "name": "Mysterious Heroine XX",
     "originalName": "謎のヒロインXX",
-    "aliasCN": "",
+    "aliasCN": "谜之女主角XX",
     "rarity": 4,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25003003.png",
@@ -56982,7 +56983,7 @@
     "collectionNo": 275,
     "name": "Yang Guifei",
     "originalName": "楊貴妃",
-    "aliasCN": "",
+    "aliasCN": "杨贵妃",
     "rarity": 5,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25004003.png",
@@ -57152,7 +57153,7 @@
     "collectionNo": 281,
     "name": "Voyager",
     "originalName": "ボイジャー",
-    "aliasCN": "",
+    "aliasCN": "旅行者",
     "rarity": 5,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25005003.png",
@@ -57303,7 +57304,7 @@
     "collectionNo": 295,
     "name": "Van Gogh",
     "originalName": "ヴァン・ゴッホ",
-    "aliasCN": "",
+    "aliasCN": "梵高",
     "rarity": 5,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25006003.png",
@@ -57448,7 +57449,7 @@
     "collectionNo": 289,
     "name": "Abigail Williams (Summer)",
     "originalName": "アビゲイル・ウィリアムズ〔夏〕",
-    "aliasCN": "",
+    "aliasCN": "阿比盖尔·威廉姆斯〔夏〕",
     "rarity": 5,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25007003.png",
@@ -57516,12 +57517,12 @@
         "skillNum": 1,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -57542,17 +57543,17 @@
             "targetType": "self"
           },
           {
-            "type": "upGrantstatePositive",
-            "funcType": "addStateShort",
-            "targetType": "self"
-          },
-          {
             "type": "upGrantstateNegative",
             "funcType": "addStateShort",
             "targetType": "self"
           },
           {
             "type": "upGrantstate",
+            "funcType": "addStateShort",
+            "targetType": "self"
+          },
+          {
+            "type": "upGrantstatePositive",
             "funcType": "addStateShort",
             "targetType": "self"
           }
@@ -57576,7 +57577,7 @@
     "collectionNo": 308,
     "name": "Mysterious Idol X (Alter)",
     "originalName": "謎のアイドルX〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "谜之偶像X〔Alter〕",
     "rarity": 4,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25008003.png",
@@ -57689,7 +57690,7 @@
     "collectionNo": 334,
     "name": "Koyanskaya of Dark",
     "originalName": "闇のコヤンスカヤ",
-    "aliasCN": "",
+    "aliasCN": "暗之高扬斯卡娅",
     "rarity": 5,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25009003.png",
@@ -57811,7 +57812,7 @@
     "collectionNo": 324,
     "name": "Jacques de Molay",
     "originalName": "ジャック・ド・モレー",
-    "aliasCN": "",
+    "aliasCN": "雅克·德·莫莱",
     "rarity": 5,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25010003.png",
@@ -57996,7 +57997,7 @@
     "collectionNo": 373,
     "name": "Kukulcan",
     "originalName": "ククルカン",
-    "aliasCN": "",
+    "aliasCN": "库库尔坎",
     "rarity": 5,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25011003.png",
@@ -58128,7 +58129,7 @@
     "collectionNo": 389,
     "name": "Cnoc na Riabh Yaraan-doo",
     "originalName": "ノクナレア・ヤラアーンドゥ",
-    "aliasCN": "",
+    "aliasCN": "诺克娜蕾·雅兰杜",
     "rarity": 4,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25012003.png",
@@ -58255,7 +58256,7 @@
     "collectionNo": 393,
     "name": "Wandjina",
     "originalName": "ワンジナ",
-    "aliasCN": "",
+    "aliasCN": "旺吉娜",
     "rarity": 5,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25013003.png",
@@ -58390,7 +58391,7 @@
     "collectionNo": 413,
     "name": "Aozaki Aoko",
     "originalName": "蒼崎青子",
-    "aliasCN": "",
+    "aliasCN": "苍崎青子",
     "rarity": 5,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25014003.png",
@@ -58502,7 +58503,7 @@
     "collectionNo": 423,
     "name": "Mysterious Heroine XX (Alter)",
     "originalName": "謎のヒロインXX〔オルタ〕",
-    "aliasCN": "",
+    "aliasCN": "谜之女主角XX〔Alter〕",
     "rarity": 4,
     "className": "foreigner",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_25016003.png",
@@ -58642,7 +58643,7 @@
     "collectionNo": 316,
     "name": "Oberon",
     "originalName": "オベロン",
-    "aliasCN": "",
+    "aliasCN": "奥伯龙",
     "rarity": 5,
     "className": "pretender",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_28001003.png",
@@ -58759,7 +58760,7 @@
     "collectionNo": 335,
     "name": "Hephaistíon",
     "originalName": "ヘファイスティオン",
-    "aliasCN": "",
+    "aliasCN": "赫费斯提翁",
     "rarity": 4,
     "className": "pretender",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_28002003.png",
@@ -58874,7 +58875,7 @@
     "collectionNo": 353,
     "name": "Lady Avalon",
     "originalName": "レディ・アヴァロン",
-    "aliasCN": "",
+    "aliasCN": "阿瓦隆女士",
     "rarity": 5,
     "className": "pretender",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_28003003.png",
@@ -58993,12 +58994,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -59016,7 +59017,7 @@
     "collectionNo": 367,
     "name": "Nine-Tattoo Dragon Elisa",
     "originalName": "九紋竜エリザ",
-    "aliasCN": "",
+    "aliasCN": "九纹龙伊丽莎",
     "rarity": 4,
     "className": "pretender",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_28004003.png",
@@ -59157,7 +59158,7 @@
     "collectionNo": 372,
     "name": "Tenochtitlan",
     "originalName": "テノチティトラン",
-    "aliasCN": "",
+    "aliasCN": "特诺奇蒂特兰",
     "rarity": 4,
     "className": "pretender",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_28005003.png",
@@ -59261,12 +59262,12 @@
             "targetType": "party"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -59310,7 +59311,7 @@
     "collectionNo": 392,
     "name": "Cait Cú Cerpriestess",
     "originalName": "ケット・クー・ミコケル",
-    "aliasCN": "",
+    "aliasCN": "凯特·库·米可科尔",
     "rarity": 4,
     "className": "pretender",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_28006003.png",
@@ -59403,12 +59404,12 @@
         "skillNum": 2,
         "effects": [
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "enemy"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "enemy"
           },
@@ -59462,7 +59463,7 @@
     "collectionNo": 410,
     "name": "Alessandro di Cagliostro",
     "originalName": "アレッサンドロ・ディ・カリオストロ",
-    "aliasCN": "",
+    "aliasCN": "亚历山德罗·迪·卡利奥斯特罗",
     "rarity": 4,
     "className": "pretender",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_28007003.png",
@@ -59572,7 +59573,7 @@
     "collectionNo": 430,
     "name": "Abigail Williams (Santa)",
     "originalName": "アビゲイル・ウィリアムズ〔サンタ〕",
-    "aliasCN": "",
+    "aliasCN": "阿比盖尔·威廉姆斯〔圣诞〕",
     "rarity": 4,
     "className": "pretender",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_28008003.png",
@@ -59709,7 +59710,7 @@
     "collectionNo": 431,
     "name": "Phantasmoon",
     "originalName": "ファンタズムーン",
-    "aliasCN": "",
+    "aliasCN": "Phantasmoon",
     "rarity": 5,
     "className": "pretender",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_28009003.png",
@@ -59853,7 +59854,7 @@
     "collectionNo": 437,
     "name": "Dante Alighieri",
     "originalName": "ダンテ・アリギエーリ",
-    "aliasCN": "",
+    "aliasCN": "但丁·阿利吉耶里",
     "rarity": 5,
     "className": "pretender",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_28010003.png",
@@ -60043,7 +60044,7 @@
     "collectionNo": 441,
     "name": "Typhon Ephemeros",
     "originalName": "テュフォン・エフェメロス",
-    "aliasCN": "",
+    "aliasCN": "堤丰·厄斐墨洛斯",
     "rarity": 5,
     "className": "pretender",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_28011003.png",
@@ -60194,7 +60195,7 @@
     "collectionNo": 459,
     "name": "Solomon",
     "originalName": "ソロモン",
-    "aliasCN": "",
+    "aliasCN": "所罗门",
     "rarity": 5,
     "className": "pretender",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_28012003.png",
@@ -60338,7 +60339,7 @@
     "collectionNo": 377,
     "name": "Sodom's Beast/Draco",
     "originalName": "ソドムズビースト／ドラコー",
-    "aliasCN": "",
+    "aliasCN": "所多玛之兽／德拉科",
     "rarity": 5,
     "className": "beast",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_33001003.png",
@@ -60487,7 +60488,7 @@
     "collectionNo": 417,
     "name": "Ereshkigal",
     "originalName": "エレシュキガル",
-    "aliasCN": "",
+    "aliasCN": "埃列什基伽勒",
     "rarity": 5,
     "className": "beastEresh",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_33002003.png",
@@ -60638,12 +60639,12 @@
             "targetType": "self"
           },
           {
-            "type": "subStatePositive",
+            "type": "subState",
             "funcType": "subState",
             "targetType": "self"
           },
           {
-            "type": "subState",
+            "type": "subStatePositive",
             "funcType": "subState",
             "targetType": "self"
           },
@@ -60671,7 +60672,7 @@
     "collectionNo": 444,
     "name": "U-Olga Marie",
     "originalName": "Ｕ－オルガマリー",
-    "aliasCN": "",
+    "aliasCN": "U－奥尔加玛丽",
     "rarity": 5,
     "className": "unBeastOlgaMarie",
     "faceUrl": "https://static.atlasacademy.io/JP/Faces/f_40001003.png",
