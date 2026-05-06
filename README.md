@@ -101,6 +101,24 @@ RUN_LIVE_LLM_TESTS=1 python -m pytest tests/test_llm_client_live.py -s
 
 当前 LLM smoke test 会输出本次 `json_mode=True` 的实际路径：`json_schema` 表示网关原生支持 `response_format/json_schema`，`text_fallback` 表示自动降级到普通 JSON 文本解析后成功。
 
+### 环境变量配置
+
+在 `.env` 文件中可配置以下选项：
+
+| 变量 | 说明 | 默认值 |
+| :--- | :--- | :--- |
+| `LLM_BASE_URL` | LLM API 基础地址 | - |
+| `LLM_API_KEY` | LLM API 密钥 | - |
+| `LLM_MODEL` | 主模型 | - |
+| `LLM_FALLBACK_MODELS` | 回退模型（逗号分隔） | - |
+| `CORS_ORIGINS` | CORS 白名单（逗号分隔） | `http://localhost:8000,http://127.0.0.1:8000` |
+| `RATE_LIMIT_PER_MINUTE` | 每 IP 每分钟最大请求数 | `30` |
+
+> **本地开发提示**：如果在其他设备上测试时 uvicorn 绑定了非默认地址（如 `http://192.168.x.x:8000`），需要将该地址添加到 `CORS_ORIGINS` 中，否则浏览器会因 CORS 策略拦截请求。示例：
+> ```bash
+> CORS_ORIGINS=http://localhost:8000,http://127.0.0.1:8000,http://192.168.1.100:8000
+> ```
+
 ## 项目结构
 
 ```

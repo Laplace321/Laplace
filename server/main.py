@@ -12,12 +12,14 @@ from pydantic import BaseModel
 
 import asyncio
 import json
+import os
 import uuid
 from pathlib import Path
 from server.prompts import get_system_prompt, get_generation_prompt
 from server.llm_client import chat_completion
 from server.query_executor import execute_query, load_database
 from server.logger import log_chat_trace
+from server.rate_limiter import RateLimitMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
@@ -117,12 +119,22 @@ app = FastAPI(
     version="0.2.0",
 )
 
-# CORS — 允许前端跨域访问
+# CORS — 从环境变量读取白名单（默认仅本地开发）
+_default_origins = "http://localhost:8000,http://127.0.0.1:8000"
+cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Rate Limit — 保护 LLM quota
+_rate_limit = int(os.getenv("RATE_LIMIT_PER_MINUTE", "30"))
+app.add_middleware(
+    RateLimitMiddleware,
+    max_requests=_rate_limit,
+    paths=["/api/chat", "/api/chat/stream"],
 )
 
 
