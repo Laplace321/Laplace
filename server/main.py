@@ -18,7 +18,7 @@ from pathlib import Path
 from server.prompts import get_system_prompt, get_generation_prompt
 from server.llm_client import chat_completion
 from server.query_executor import execute_query, load_database
-from server.logger import log_chat_trace, read_traces, find_trace
+from server.logger import log_chat_trace_async, read_traces, find_trace
 from fastapi.responses import JSONResponse
 from server.rate_limiter import RateLimitMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -208,7 +208,7 @@ async def chat(request: ChatRequest):
         )
     except Exception as e:
         print(f"[{trace_id}] LLM Parse Error: {e}")
-        log_chat_trace(trace_id, user_message, {}, 0, "无法连接到 LLM 或解析失败，请检查模型配置。", error=str(e))
+        await log_chat_trace_async(trace_id, user_message, {}, 0, "无法连接到 LLM 或解析失败，请检查模型配置。", error=str(e))
         return ChatResponse(
             reply="抱歉，我遇到了网络问题或模型暂时不可用，请稍后再试。",
             servants=[],
@@ -223,7 +223,7 @@ async def chat(request: ChatRequest):
     # 2. 检查意图
     if parsed.get("intent") != "query_servants":
         reply_text = parsed.get("rawResponse", "抱歉，我目前只能回答 FGO 从者相关的问题。")
-        log_chat_trace(trace_id, user_message, parsed, 0, reply_text)
+        await log_chat_trace_async(trace_id, user_message, parsed, 0, reply_text)
         return ChatResponse(
             reply=reply_text,
             servants=[],
@@ -267,7 +267,7 @@ async def chat(request: ChatRequest):
     # 记录完整链路（含 LLM 调用元数据）
     context_data["llm_attempts"] = parsed.get("_attempts", [])
     context_data["llm_model"] = model_used
-    log_chat_trace(
+    await log_chat_trace_async(
         trace_id=trace_id,
         user_message=user_message,
         parsed_intent=conditions,
@@ -309,7 +309,7 @@ async def chat_stream(message: str):
             )
         except Exception as e:
             print(f"[{trace_id}] LLM Parse Error: {e}")
-            log_chat_trace(trace_id, message, {}, 0, "意图解析失败", error=str(e))
+            await log_chat_trace_async(trace_id, message, {}, 0, "意图解析失败", error=str(e))
             yield _sse_event("error", {"phase": "parsing", "message": "意图解析失败，请稍后重试"})
             return
 
@@ -326,7 +326,7 @@ async def chat_stream(message: str):
         # 非查询意图 — 直接返回文本
         if parsed.get("intent") != "query_servants":
             reply_text = parsed.get("rawResponse", "抱歉，我目前只能回答 FGO 从者相关的问题。")
-            log_chat_trace(trace_id, message, parsed, 0, reply_text)
+            await log_chat_trace_async(trace_id, message, parsed, 0, reply_text)
             yield _sse_event("delta", {"text": reply_text})
             yield _sse_event("done", {"model": model_used, "traceId": trace_id})
             return
@@ -381,7 +381,7 @@ async def chat_stream(message: str):
         # 记录完整链路（含 LLM 调用元数据）
         context_data["llm_attempts"] = parsed.get("_attempts", [])
         context_data["llm_model"] = model_used
-        log_chat_trace(
+        await log_chat_trace_async(
             trace_id=trace_id,
             user_message=message,
             parsed_intent=conditions,
