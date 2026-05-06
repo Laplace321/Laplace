@@ -9,6 +9,7 @@ Laplace — Query Executor
 import json
 import re
 from pathlib import Path
+from typing import Callable
 from server.individuality import filter_by_traits
 
 DATA_PATH = Path(__file__).parent / "data" / "servants_db.json"
@@ -116,167 +117,134 @@ def execute_query(conditions: dict) -> list[dict]:
     return results
 
 
-def _match_servant(servant: dict, conditions: dict) -> bool:
-    """检查单个从者是否匹配条件。"""
+# ============================================================
+# Filter Registry 机制
+# ============================================================
 
-    # NP 充能条件
-    np_cond = conditions.get("npCharge")
-    if np_cond is not None:
-        charge = servant.get("totalSelfCharge", 0)
-        if not servant.get("hasNpCharge", False):
-            return False
-        op = np_cond.get("op", "eq")
-        value = np_cond.get("value", 0)
-        if op == "eq":
-            has_exact = any(
-                c["chargePercent"] == value
-                for c in servant.get("npCharges", [])
-            )
-            if not has_exact:
-                return False
-        elif op == "gte":
-            if charge < value:
-                return False
-        elif op == "gt":
-            if charge <= value:
-                return False
-        elif op == "lte":
-            if charge > value:
-                return False
+FILTER_REGISTRY: dict[str, Callable[[dict, dict], bool]] = {}
 
-    # 稀有度条件
-    rarity_cond = conditions.get("rarity")
-    if rarity_cond is not None:
-        rarity = servant.get("rarity", 0)
-        op = rarity_cond.get("op", "eq")
-        value = rarity_cond.get("value", 0)
-        if not _compare(rarity, op, value):
-            return False
 
-    # 职阶条件
+def register_filter(*field_names: str):
+    """装饰器：将过滤函数注册到对应的 conditions 字段名。
+
+    同一个函数可注册多个字段（如 traits + excludeTraits），
+    _match_servant 会通过 seen_filters 去重，确保只执行一次。
+    """
+    def decorator(fn: Callable[[dict, dict], bool]):
+        for name in field_names:
+            FILTER_REGISTRY[name] = fn
+        return fn
+    return decorator
+
+
+# ============================================================
+# 过滤器实现（按复杂度从低到高排列）
+# ============================================================
+
+@register_filter("className")
+def _filter_class(servant: dict, conditions: dict) -> bool:
+    """职阶精确匹配。"""
     class_name = conditions.get("className")
-    if class_name is not None:
-        if servant.get("className", "").lower() != class_name.lower():
-            return False
+    if class_name is None:
+        return True
+    return servant.get("className", "").lower() == class_name.lower()
 
-    # 名称搜索（支持英文、日文和中文翻译，以及昵称映射）
-    # 分级匹配：精确 → 子串模糊 → 昵称映射
-    name = conditions.get("name")
-    if name is not None and isinstance(name, str) and name.strip():
-        query_name = name.strip()
-        normalized_query_name = _normalize_text(query_name)
-        
-        # 尝试昵称转换
-        nicknames = load_nicknames()
-        mapped_data = None
-        for nick, data in nicknames.items():
-            if _normalize_text(nick) == normalized_query_name:
-                mapped_data = data
-                break
-        
-        # 处理昵称映射
-        mapped_name = None
-        extra_filters = {}
-        if isinstance(mapped_data, str):
-            mapped_name = mapped_data.lower()
-        elif isinstance(mapped_data, dict):
-            mapped_name = mapped_data.get("name", "").lower()
-            # 提取额外的过滤条件，如 className
-            for k, v in mapped_data.items():
-                if k != "name":
-                    extra_filters[k] = v
 
-        # 检查额外过滤器（如职阶）
-        for attr, val in extra_filters.items():
-            if attr == "className":
-                if servant.get("className", "").lower() != val.lower():
-                    return False
-            # 可以根据需要扩展其他属性过滤
-        
-        en_name = servant.get("name", "").lower()
-        cn_name = servant.get("aliasCN", "").lower()
-        jp_name = servant.get("originalName", "").lower()
-        normalized_en_name = _normalize_text(en_name)
-        normalized_cn_name = _normalize_text(cn_name)
-        normalized_jp_name = _normalize_text(jp_name)
-        
-        # 分级匹配策略
-        name_matched = False
-        
-        # 阶段 1: 精确匹配（有映射名时优先检查映射）
-        if mapped_name:
-            normalized_mapped_name = _normalize_text(mapped_name)
-            if (normalized_mapped_name == normalized_en_name or
-                normalized_mapped_name == normalized_cn_name or
-                normalized_mapped_name == normalized_jp_name):
-                name_matched = True
-        
-        # 阶段 2: 子串模糊匹配（"武尊" in "大和武尊"）
-        if not name_matched and len(normalized_query_name) >= 2:
-            if (normalized_query_name in normalized_en_name or
-                normalized_query_name in normalized_cn_name or
-                normalized_query_name in normalized_jp_name):
-                name_matched = True
-        
-        # 阶段 3: 反向子串匹配（"大和武尊" in "武尊" 不可能，但处理特殊情况）
-        if not name_matched:
-            if (normalized_en_name and normalized_en_name in normalized_query_name) or \
-               (normalized_cn_name and normalized_cn_name in normalized_query_name) or \
-               (normalized_jp_name and normalized_jp_name in normalized_query_name):
-                name_matched = True
-        
-        if not name_matched:
-            return False
+@register_filter("gender")
+def _filter_gender(servant: dict, conditions: dict) -> bool:
+    """性别筛选。"""
+    gender = conditions.get("gender")
+    if gender is None:
+        return True
+    return servant.get("gender", "") == gender
 
-    # 单效果筛选
+
+@register_filter("attribute")
+def _filter_attribute(servant: dict, conditions: dict) -> bool:
+    """阵营筛选。"""
+    attribute = conditions.get("attribute")
+    if attribute is None:
+        return True
+    return servant.get("attribute", "") == attribute
+
+
+@register_filter("rarity")
+def _filter_rarity(servant: dict, conditions: dict) -> bool:
+    """稀有度比较。"""
+    rarity_cond = conditions.get("rarity")
+    if rarity_cond is None:
+        return True
+    rarity = servant.get("rarity", 0)
+    op = rarity_cond.get("op", "eq")
+    value = rarity_cond.get("value", 0)
+    return _compare(rarity, op, value)
+
+
+@register_filter("npCharge")
+def _filter_np_charge(servant: dict, conditions: dict) -> bool:
+    """NP 充能条件（含 op 判断 + 精确值匹配）。"""
+    np_cond = conditions.get("npCharge")
+    if np_cond is None:
+        return True
+    if not servant.get("hasNpCharge", False):
+        return False
+    charge = servant.get("totalSelfCharge", 0)
+    op = np_cond.get("op", "eq")
+    value = np_cond.get("value", 0)
+    if op == "eq":
+        return any(
+            c["chargePercent"] == value
+            for c in servant.get("npCharges", [])
+        )
+    elif op == "gte":
+        return charge >= value
+    elif op == "gt":
+        return charge > value
+    elif op == "lte":
+        return charge <= value
+    return True
+
+
+@register_filter("skillEffect")
+def _filter_skill_effect(servant: dict, conditions: dict) -> bool:
+    """单效果筛选。"""
     skill_effect = conditions.get("skillEffect")
-    if skill_effect is not None:
-        target_type = conditions.get("targetType")
-        if not _match_effect(servant, skill_effect, target_type):
-            return False
+    if skill_effect is None:
+        return True
+    target_type = conditions.get("targetType")
+    return _match_effect(servant, skill_effect, target_type)
 
-    # 多效果组合筛选
+
+@register_filter("skillEffects")
+def _filter_skill_effects(servant: dict, conditions: dict) -> bool:
+    """多效果组合筛选（AND/OR）。"""
     skill_effects = conditions.get("skillEffects")
-    if skill_effects is not None and isinstance(skill_effects, list):
-        target_type = conditions.get("targetType")
-        op = conditions.get("skillEffectsOp", "and").lower()
-        
-        if op == "or":
-            # 只要满足其中一个效果即可
-            matched = False
-            for effect in skill_effects:
-                if _match_effect(servant, effect, target_type):
-                    matched = True
-                    break
-            if not matched:
-                return False
-        else:
-            # 必须满足所有效果 (AND)
-            for effect in skill_effects:
-                if not _match_effect(servant, effect, target_type):
-                    return False
+    if skill_effects is None or not isinstance(skill_effects, list):
+        return True
+    target_type = conditions.get("targetType")
+    op = conditions.get("skillEffectsOp", "and").lower()
 
-    # 特性筛选
+    if op == "or":
+        return any(_match_effect(servant, eff, target_type) for eff in skill_effects)
+    else:
+        return all(_match_effect(servant, eff, target_type) for eff in skill_effects)
+
+
+@register_filter("traits", "excludeTraits")
+def _filter_traits(servant: dict, conditions: dict) -> bool:
+    """特性筛选（委托 filter_by_traits）。"""
     traits = conditions.get("traits")
     exclude_traits = conditions.get("excludeTraits")
-    if traits or exclude_traits:
-        servant_traits = servant.get("traits", [])
-        if not filter_by_traits(servant_traits, traits, exclude_traits):
-            return False
+    if not traits and not exclude_traits:
+        return True
+    servant_traits = servant.get("traits", [])
+    return filter_by_traits(servant_traits, traits, exclude_traits)
 
-    # 性别筛选
-    gender = conditions.get("gender")
-    if gender is not None:
-        if servant.get("gender", "") != gender:
-            return False
 
-    # 阵营筛选
-    attribute = conditions.get("attribute")
-    if attribute is not None:
-        if servant.get("attribute", "") != attribute:
-            return False
-
-    # 配卡筛选
+@register_filter("cards", "npCard", "npTarget")
+def _filter_cards(servant: dict, conditions: dict) -> bool:
+    """配卡 + 宝具颜色 + 宝具目标筛选。"""
+    # 配卡
     cards = conditions.get("cards")
     if cards is not None and isinstance(cards, dict):
         servant_cards = servant.get("cards", {})
@@ -284,18 +252,106 @@ def _match_servant(servant: dict, conditions: dict) -> bool:
             if servant_cards.get(card_type, 0) < count:
                 return False
 
-    # 宝具颜色筛选
+    # 宝具颜色
     np_card = conditions.get("npCard")
     if np_card is not None:
         if servant.get("npCard", "") != np_card:
             return False
 
-    # 宝具目标/类型筛选
+    # 宝具目标
     np_target = conditions.get("npTarget")
     if np_target is not None:
         if servant.get("npTarget", "") != np_target:
             return False
 
+    return True
+
+
+@register_filter("name")
+def _filter_name(servant: dict, conditions: dict) -> bool:
+    """名称分级匹配：精确 → 子串模糊 → 昵称映射。"""
+    name = conditions.get("name")
+    if name is None or not isinstance(name, str) or not name.strip():
+        return True
+
+    query_name = name.strip()
+    normalized_query_name = _normalize_text(query_name)
+
+    # 尝试昵称转换
+    nicknames = load_nicknames()
+    mapped_data = None
+    for nick, data in nicknames.items():
+        if _normalize_text(nick) == normalized_query_name:
+            mapped_data = data
+            break
+
+    # 处理昵称映射
+    mapped_name = None
+    extra_filters = {}
+    if isinstance(mapped_data, str):
+        mapped_name = mapped_data.lower()
+    elif isinstance(mapped_data, dict):
+        mapped_name = mapped_data.get("name", "").lower()
+        for k, v in mapped_data.items():
+            if k != "name":
+                extra_filters[k] = v
+
+    # 检查额外过滤器（如职阶）
+    for attr, val in extra_filters.items():
+        if attr == "className":
+            if servant.get("className", "").lower() != val.lower():
+                return False
+
+    en_name = servant.get("name", "").lower()
+    cn_name = servant.get("aliasCN", "").lower()
+    jp_name = servant.get("originalName", "").lower()
+    normalized_en_name = _normalize_text(en_name)
+    normalized_cn_name = _normalize_text(cn_name)
+    normalized_jp_name = _normalize_text(jp_name)
+
+    # 分级匹配策略
+    name_matched = False
+
+    # 阶段 1: 精确匹配（有映射名时优先检查映射）
+    if mapped_name:
+        normalized_mapped_name = _normalize_text(mapped_name)
+        if (normalized_mapped_name == normalized_en_name or
+            normalized_mapped_name == normalized_cn_name or
+            normalized_mapped_name == normalized_jp_name):
+            name_matched = True
+
+    # 阶段 2: 子串模糊匹配（"武尊" in "大和武尊"）
+    if not name_matched and len(normalized_query_name) >= 2:
+        if (normalized_query_name in normalized_en_name or
+            normalized_query_name in normalized_cn_name or
+            normalized_query_name in normalized_jp_name):
+            name_matched = True
+
+    # 阶段 3: 反向子串匹配
+    if not name_matched:
+        if (normalized_en_name and normalized_en_name in normalized_query_name) or \
+           (normalized_cn_name and normalized_cn_name in normalized_query_name) or \
+           (normalized_jp_name and normalized_jp_name in normalized_query_name):
+            name_matched = True
+
+    return name_matched
+
+
+# ============================================================
+# 核心匹配逻辑
+# ============================================================
+
+def _match_servant(servant: dict, conditions: dict) -> bool:
+    """检查单个从者是否匹配所有已注册的过滤条件。"""
+    seen_filters: set[int] = set()
+    for field, filter_fn in FILTER_REGISTRY.items():
+        fn_id = id(filter_fn)
+        if fn_id in seen_filters:
+            continue  # 同一函数注册了多个字段，只执行一次
+        if conditions.get(field) is not None:
+            seen_filters.add(fn_id)
+            if not filter_fn(servant, conditions):
+                return False
     return True
 
 
