@@ -26,7 +26,16 @@
 ```
 类型包括：`feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
-2. **强制同步远程代码库**：
+2. **Push 前必须通过三步本地验证**：
+> **[非常重要]** 每次 `git commit` 前，必须依次执行以下三步验证，全部通过后才能 commit + push：
+> ```bash
+> ruff check server/ tests/ extractor/       # lint 检查
+> ruff format --check server/ tests/          # 格式检查
+> python -m pytest                            # 回归测试
+> ```
+> 缺少任何一步都可能导致 CI 红掉。`ruff check` 和 `ruff format` 是两个独立检查，不可互相替代。
+
+3. **强制同步远程代码库**：
 > **[非常重要]** 所有的本地 `git commit` 动作完成后，必须立即执行 `git push`（或 `git push origin main`）将代码推送到 GitHub 远程仓库，除非当时明确处于断网或实验性分支。不要只把代码留在本地！
 
 ## 工作流程
