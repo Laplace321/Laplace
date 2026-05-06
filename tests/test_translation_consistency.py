@@ -26,8 +26,7 @@ def test_class_translation_covers_all_playable_classes():
 
     missing = playable_names - translated_names
     assert not missing, (
-        f"以下可玩职阶缺少中文翻译: {sorted(missing)}，"
-        f"请在 server/config/translations.json 的 className 中补充"
+        f"以下可玩职阶缺少中文翻译: {sorted(missing)}，请在 server/config/translations.json 的 className 中补充"
     )
 
 

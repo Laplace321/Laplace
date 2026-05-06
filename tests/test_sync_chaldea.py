@@ -94,9 +94,7 @@ def test_effect_schema_covers_minimum_func_types():
     for e in schema.get("effects", []):
         for ft in e.get("funcTypes", []):
             func_types.add(ft)
-    assert len(func_types) >= MIN_FUNC_TYPES, (
-        f"FuncType 数量 {len(func_types)} 低于预期下限 {MIN_FUNC_TYPES}"
-    )
+    assert len(func_types) >= MIN_FUNC_TYPES, f"FuncType 数量 {len(func_types)} 低于预期下限 {MIN_FUNC_TYPES}"
 
 
 def test_effect_schema_covers_minimum_buff_types():
@@ -106,9 +104,7 @@ def test_effect_schema_covers_minimum_buff_types():
     for e in schema.get("effects", []):
         for bt in e.get("buffTypes", []):
             buff_types.add(bt)
-    assert len(buff_types) >= MIN_BUFF_TYPES, (
-        f"BuffType 数量 {len(buff_types)} 低于预期下限 {MIN_BUFF_TYPES}"
-    )
+    assert len(buff_types) >= MIN_BUFF_TYPES, f"BuffType 数量 {len(buff_types)} 低于预期下限 {MIN_BUFF_TYPES}"
 
 
 def test_effect_schema_every_entry_has_required_fields():
@@ -122,9 +118,7 @@ def test_effect_schema_every_entry_has_required_fields():
         has_func = bool(effect.get("funcTypes"))
         has_buff = bool(effect.get("buffTypes"))
         has_aliases = bool(effect.get("aliases_zh"))
-        assert has_func or has_buff or has_aliases, (
-            f"{effect['name']} 既没有 funcTypes/buffTypes 也没有 aliases_zh"
-        )
+        assert has_func or has_buff or has_aliases, f"{effect['name']} 既没有 funcTypes/buffTypes 也没有 aliases_zh"
 
 
 def test_effect_schema_has_key_effects():
@@ -134,18 +128,16 @@ def test_effect_schema_has_key_effects():
 
     # 这些是用户最常查询的效果，绝对不能丢失
     critical_effects = [
-        "gainNp",       # NP 充能
-        "upAtk",        # 攻击力提升
-        "invincible",   # 无敌
-        "guts",         # 毅力
-        "avoidance",    # 回避
+        "gainNp",  # NP 充能
+        "upAtk",  # 攻击力提升
+        "invincible",  # 无敌
+        "guts",  # 毅力
+        "avoidance",  # 回避
         "upCriticaldamage",  # 暴击威力
-        "upArts",       # 蓝卡提升
-        "upQuick",      # 绿卡提升
-        "upBuster",     # 红卡提升
-        "upNpdamage",   # 宝具威力
+        "upArts",  # 蓝卡提升
+        "upQuick",  # 绿卡提升
+        "upBuster",  # 红卡提升
+        "upNpdamage",  # 宝具威力
     ]
     for name in critical_effects:
-        assert name in effect_names, (
-            f"关键效果 '{name}' 在 effect_schema.json 中缺失"
-        )
+        assert name in effect_names, f"关键效果 '{name}' 在 effect_schema.json 中缺失"
