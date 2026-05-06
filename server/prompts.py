@@ -95,6 +95,9 @@ def _build_system_prompt() -> str:
     "skillEffect": "invincible",
     "skillEffects": ["avoidance", "guts"],
     "skillEffectsOp": "or",
+    "npEffect": null,
+    "npEffects": null,
+    "npEffectsOp": null,
     "targetType": "self",
     "traits": [300, 303],
     "excludeTraits": [1],
@@ -116,7 +119,10 @@ def _build_system_prompt() -> str:
   - `name`: 从者名称搜索关键词。如果用户没搜索特定从者，设为 null。
   - `skillEffect`: 单个技能效果名称。如果用户只查询一种效果，用此字段。设为 null 表示不筛选效果。
   - `skillEffects`: 多个技能效果名称数组。如果用户查询多种效果组合，用此字段。设为 null 表示不筛选。
-  - `skillEffectsOp`: 多效果的逻辑关系。可选 "and"（必须同时拥有所有效果）或 "or"（只要满足其中一个效果即可）。例如用户问“有无敌或回避技能”，设为 "or"。没提且只有一个效果设为 null。
+  - `skillEffectsOp`: 多效果的逻辑关系。可选 "and"（必须同时拥有所有效果）或 "or"（只要满足其中一个效果即可）。例如用户问"有无敌或回避技能"，设为 "or"。没提且只有一个效果设为 null。
+  - `npEffect`: 单个**宝具**效果名称。当用户明确说"宝具有XX效果"时使用此字段。设为 null 表示不筛选宝具效果。效果名与 skillEffect 相同（如 upAtk、invincible 等）。
+  - `npEffects`: 多个**宝具**效果名称数组。当用户查询多种宝具效果组合时使用。设为 null 表示不筛选。
+  - `npEffectsOp`: 宝具多效果的逻辑关系。可选 "and" 或 "or"。没提设为 null。
   - `targetType`: 效果目标类型。可选 "self"（自身）、"party"（全体己方）、"enemy"（敌方）。设为 null 表示不筛选目标。
   - `traits`: 必须拥有的特性 ID 数组。常见：秩序=300, 混沌=301, 中立=302, 善=303, 恶=304, 中庸=305, 狂=306, 夏=308, 神性=2000, 人类=2001, 龙=2002, 罗马=2004, 猛兽=2005, 阿尔托莉雅脸=2007, 骑乘=2009, 亚瑟=2010, 死灵=1002, 魔兽=1004, 魔性=2019, 妖精=1177, 鬼=1132。例如秩序善就是 [300, 303]。没提设为 null。
   - `excludeTraits`: 不能拥有的特性 ID 数组。没提设为 null。
@@ -125,6 +131,19 @@ def _build_system_prompt() -> str:
   - `cards`: 必须包含的指令卡数量。例如三红配卡是 {{"buster": 3}}。键可选 buster, arts, quick。没提设为 null。
   - `npCard`: 宝具颜色。buster(红卡), arts(蓝卡), quick(绿卡)。没提设为 null。
   - `npTarget`: 宝具目标/类型。one(单体), all(光炮), support(辅助)。没提设为 null。
+
+## 技能效果 vs 宝具效果
+- 当用户说"有XX**技能**的从者"或未明确说明时，使用 `skillEffect` / `skillEffects`
+- 当用户明确说"**宝具**有XX效果"时，使用 `npEffect` / `npEffects`
+- 例如："有加攻效果的从者" → skillEffect（默认查技能）
+- 例如："宝具有加攻效果的从者" → npEffect
+
+## 配卡术语消歧
+- "蓝卡配卡" / "蓝卡从者" / "蓝卡宝具" → `npCard: "arts"`（指宝具颜色）
+- "红卡配卡" / "红卡从者" → `npCard: "buster"`
+- "绿卡配卡" / "绿卡从者" → `npCard: "quick"`
+- "N蓝配卡"（N为数字，如"3蓝配卡"）→ `cards: {{"arts": N}}`（指指令卡数量）
+- 注意："蓝卡配卡"指的是宝具颜色，不是指令卡数量！
 
 ## 职阶中文映射
 - 剑阶/剑士 = saber
@@ -165,7 +184,17 @@ def _build_system_prompt() -> str:
 
 用户："对比千子村正和大和武尊"
 ```json
-{{"intent": "query_servants", "conditions": {{"npCharge": null, "rarity": null, "className": null, "name": null, "names": ["千子村正", "大和武尊"], "skillEffect": null, "skillEffects": null, "skillEffectsOp": null, "targetType": null, "traits": null, "excludeTraits": null, "gender": null, "attribute": null, "cards": null, "npCard": null, "npTarget": null}}}}
+{{"intent": "query_servants", "conditions": {{"npCharge": null, "rarity": null, "className": null, "name": null, "names": ["千子村正", "大和武尊"], "skillEffect": null, "skillEffects": null, "skillEffectsOp": null, "npEffect": null, "npEffects": null, "npEffectsOp": null, "targetType": null, "traits": null, "excludeTraits": null, "gender": null, "attribute": null, "cards": null, "npCard": null, "npTarget": null}}}}
+```
+
+用户："宝具有加攻效果的从者"
+```json
+{{"intent": "query_servants", "conditions": {{"npCharge": null, "rarity": null, "className": null, "name": null, "skillEffect": null, "skillEffects": null, "skillEffectsOp": null, "npEffect": "upAtk", "npEffects": null, "npEffectsOp": null, "targetType": null, "traits": null, "excludeTraits": null, "gender": null, "attribute": null, "cards": null, "npCard": null, "npTarget": null}}}}
+```
+
+用户："蓝卡配卡的剑阶从者"
+```json
+{{"intent": "query_servants", "conditions": {{"npCharge": null, "rarity": null, "className": "saber", "name": null, "skillEffect": null, "skillEffects": null, "skillEffectsOp": null, "npEffect": null, "npEffects": null, "npEffectsOp": null, "targetType": null, "traits": null, "excludeTraits": null, "gender": null, "attribute": null, "cards": null, "npCard": "arts", "npTarget": null}}}}
 ```
 
 请严格遵循以上格式，只输出 JSON，不要有任何多余文字。"""

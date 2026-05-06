@@ -453,7 +453,7 @@ server/schemas.py             # 简化为通用结构
 ```
 轻量级 Skill 系统 (Phase 5.6)
     ↓ (当技能数量 > 10 或需要对接外部工具时)
-完整 MCP 协议 (Phase 7+)
+完整 MCP 协议 (Phase 8+)
 ```
 
 ---

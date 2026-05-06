@@ -13,6 +13,7 @@ SERVANTS = [
         "totalSelfCharge": 30,
         "hasNpCharge": True,
         "skillEffects": ["gainNp", "invincible", "upAtk"],
+        "npEffects": ["upAtk"],
         "skillDetails": [
             {
                 "skillName": "Charisma",
@@ -41,6 +42,7 @@ SERVANTS = [
         "totalSelfCharge": 50,
         "hasNpCharge": True,
         "skillEffects": ["gainNp", "avoidance", "guts"],
+        "npEffects": ["invincible", "upAtk"],
         "skillDetails": [
             {
                 "skillName": "Escape",
@@ -69,6 +71,7 @@ SERVANTS = [
         "totalSelfCharge": 0,
         "hasNpCharge": False,
         "skillEffects": ["upCriticaldamage"],
+        "npEffects": [],
         "skillDetails": [],
         "traits": [302],
         "gender": "male",
@@ -89,6 +92,7 @@ SERVANTS = [
         "totalSelfCharge": 50,
         "hasNpCharge": True,
         "skillEffects": ["gainNp", "upArts"],
+        "npEffects": ["upArts", "gainNp"],
         "skillDetails": [],
         "traits": [308],
         "gender": "female",
@@ -158,4 +162,29 @@ def test_traits_cards_np_card_and_np_target_filters():
     assert names(qe.execute_query({"npTarget": "support"})) == [
         "Altria Caster",
         "Hans Christian Andersen",
+    ]
+
+
+def test_np_effect_single_filter():
+    """宝具效果单个筛选：upAtk 宝具效果应匹配 Altria 和 Moriarty。"""
+    assert names(qe.execute_query({"npEffect": "upAtk"})) == [
+        "Altria Pendragon",
+        "James Moriarty",
+    ]
+    # gainNp 宝具效果只有 Altria Caster 有
+    assert names(qe.execute_query({"npEffect": "gainNp"})) == ["Altria Caster"]
+    # 无宝具效果的从者不应被返回
+    assert names(qe.execute_query({"npEffect": "upCriticaldamage"})) == []
+
+
+def test_np_effects_and_or_filters():
+    """宝具效果多条件 AND/OR 筛选。"""
+    # AND: 宝具同时有 invincible 和 upAtk → 只有 Moriarty
+    assert names(qe.execute_query({"npEffects": ["invincible", "upAtk"], "npEffectsOp": "and"})) == [
+        "James Moriarty",
+    ]
+    # OR: 宝具有 invincible 或 upArts → Moriarty(invincible) + Altria(upAtk 不算) + Caster(upArts)
+    assert names(qe.execute_query({"npEffects": ["invincible", "upArts"], "npEffectsOp": "or"})) == [
+        "James Moriarty",
+        "Altria Caster",
     ]

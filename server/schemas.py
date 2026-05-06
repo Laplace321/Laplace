@@ -34,6 +34,9 @@ class QueryConditions(BaseModel):
     skillEffect: str | None = None
     skillEffects: list[str] | None = None
     skillEffectsOp: Literal["and", "or"] | None = None
+    npEffect: str | None = None
+    npEffects: list[str] | None = None
+    npEffectsOp: Literal["and", "or"] | None = None
     targetType: Literal["self", "party", "enemy"] | None = None
     traits: list[int] | None = None
     excludeTraits: list[int] | None = None
@@ -43,7 +46,7 @@ class QueryConditions(BaseModel):
     npCard: Literal["buster", "arts", "quick"] | None = None
     npTarget: Literal["one", "all", "support"] | None = None
 
-    @field_validator("className", "name", "skillEffect", mode="before")
+    @field_validator("className", "name", "skillEffect", "npEffect", mode="before")
     @classmethod
     def _blank_to_none(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
@@ -60,7 +63,7 @@ class QueryConditions(BaseModel):
             return cleaned if cleaned else None
         return value
 
-    @field_validator("skillEffects", "traits", "excludeTraits", mode="before")
+    @field_validator("skillEffects", "npEffects", "traits", "excludeTraits", mode="before")
     @classmethod
     def _empty_list_to_none(cls, value: object) -> object:
         if value == []:

@@ -226,6 +226,30 @@ def _filter_skill_effects(servant: dict, conditions: dict) -> bool:
         return all(_match_effect(servant, eff, target_type) for eff in skill_effects)
 
 
+@register_filter("npEffect")
+def _filter_np_effect(servant: dict, conditions: dict) -> bool:
+    """单个宝具效果筛选。"""
+    np_effect = conditions.get("npEffect")
+    if np_effect is None:
+        return True
+    return np_effect in servant.get("npEffects", [])
+
+
+@register_filter("npEffects")
+def _filter_np_effects(servant: dict, conditions: dict) -> bool:
+    """多宝具效果组合筛选（AND/OR）。"""
+    np_effects = conditions.get("npEffects")
+    if np_effects is None or not isinstance(np_effects, list):
+        return True
+    servant_np_effects = set(servant.get("npEffects", []))
+    op = conditions.get("npEffectsOp", "and").lower()
+
+    if op == "or":
+        return any(eff in servant_np_effects for eff in np_effects)
+    else:
+        return all(eff in servant_np_effects for eff in np_effects)
+
+
 @register_filter("traits", "excludeTraits")
 def _filter_traits(servant: dict, conditions: dict) -> bool:
     """特性筛选（委托 filter_by_traits）。"""
