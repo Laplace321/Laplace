@@ -17,7 +17,10 @@ NICKNAMES_PATH = Path(__file__).parent / "config" / "nicknames.json"
 
 # 全局缓存
 _servants_db: list[dict] | None = None
-_nicknames: dict[str, str] | None = None
+
+from server.config_loader import CachedConfig
+
+_nicknames_cache = CachedConfig(NICKNAMES_PATH)
 
 
 def _normalize_text(value: str) -> str:
@@ -28,15 +31,8 @@ def _normalize_text(value: str) -> str:
 
 
 def load_nicknames() -> dict[str, str]:
-    """加载昵称映射。"""
-    global _nicknames
-    if _nicknames is None:
-        if NICKNAMES_PATH.exists():
-            with open(NICKNAMES_PATH, "r", encoding="utf-8") as f:
-                _nicknames = json.load(f)
-        else:
-            _nicknames = {}
-    return _nicknames
+    """加载昵称映射（支持热更新）。"""
+    return _nicknames_cache.get()
 
 
 def load_database() -> list[dict]:

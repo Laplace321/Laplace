@@ -7,7 +7,7 @@
 
 ## 当前迭代计划 (Next Steps)
 
-1. **Phase 5 P1 推进中**：Chaldea 依赖边界 + Filter Registry + 知识与配置外置已完成，剩余 P1（配置热更新、Trace 调试闭环）。详见 `需求描述.md` Phase 5 详细规划。
+1. **Phase 5 P1 推进中**：Chaldea 依赖边界 + Filter Registry + 知识与配置外置 + 配置热更新已完成，剩余 P1（Trace 调试闭环）。详见 `需求描述.md` Phase 5 详细规划。
 2. **多语言 UI 本地化支持 (I18n)**: 按照系统本地的语言（Locale）做显示。
 3. **更多查询维度的支持**: 增加指令卡性能、宝具 NP 回收等进阶硬核数值查询。
 

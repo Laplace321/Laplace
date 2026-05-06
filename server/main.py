@@ -23,30 +23,22 @@ from server.rate_limiter import RateLimitMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-# 预消化翻译字典（从 config/translations.json 加载）
-_translations: dict | None = None
+# 预消化翻译字典（从 config/translations.json 加载，支持热更新）
+from server.config_loader import CachedConfig
 
-
-def _load_translations() -> dict:
-    """加载翻译配置（带缓存）。"""
-    global _translations
-    if _translations is None:
-        config_path = Path(__file__).parent / "config" / "translations.json"
-        with open(config_path, "r", encoding="utf-8") as f:
-            _translations = json.load(f)
-    return _translations
+_translations_cache = CachedConfig(Path(__file__).parent / "config" / "translations.json")
 
 
 def _get_class_map() -> dict:
-    return _load_translations()["className"]
+    return _translations_cache.get()["className"]
 
 
 def _get_np_card_map() -> dict:
-    return _load_translations()["npCard"]
+    return _translations_cache.get()["npCard"]
 
 
 def _get_np_target_map() -> dict:
-    return _load_translations()["npTarget"]
+    return _translations_cache.get()["npTarget"]
 
 _effect_map = None
 
