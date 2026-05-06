@@ -119,6 +119,21 @@
   3. 更清晰的语义（instructions vs input 分离）
   4. 未来 GPT-5+ 模型将优先支持 Responses API
 
+### ADR-013: Thinking Steps SSE 流式交互
+- **日期**: 2026-05-06
+- **状态**: 已采纳
+- **背景**: 用户发送查询后只看到三个跳动圆点（typing indicator），3-8 秒的等待全程黑盒，体验差
+- **决策**:
+  1. 新增 `GET /api/chat/stream` SSE 端点，分阶段推送事件（thinking → servants → delta → done）
+  2. 前端使用 `fetch` + `ReadableStream` 消费 SSE，逐阶段渲染 Thinking Steps
+  3. 从者卡片在数据查询完成后立即展示（卡片先行），不等 RAG 生成
+  4. 保留原有 `POST /api/chat` 端点向后兼容
+  5. 提取 `_build_context()` 共享函数，供两个端点复用
+- **理由**:
+  1. 零额外 Token 消耗 — 只改变传输方式，不改变 LLM 调用逻辑
+  2. 参考主流 AI 产品（Perplexity / ChatGPT）的 Thinking Steps 交互模式
+  3. 用户感知等待时间从"3-8s 黑盒"降低为"每阶段 1-3s 有持续反馈"
+
 ## 已知问题 & 解决方案
 
 - **macOS pip 外部管理**: `pip install` 报错 `externally-managed-environment`，需要使用 `python3 -m venv .venv` 创建虚拟环境
@@ -140,6 +155,7 @@
 | 2026-05-05 | Phase 5 Batch 1 | 完成 LLM Contract、Query Executor 回归测试、Schema Mirror 回归测试与真实 LLM JSON Schema smoke test |
 | 2026-05-06 | LLM API 迁移 | 从 Chat Completions API 迁移至 OpenAI Responses API（2025 推荐） |
 | 2026-05-06 | Phase 5 Batch 2 - P0 | 完成数据入口单一化：extractor/np_charge_filter.py 从 191 行降至 52 行，复用 data_loader.py |
+| 2026-05-06 | Thinking Steps SSE | 新增 SSE 流式端点，分阶段展示 AI 思考过程（解析→检索→生成），卡片先行渲染 |
 
 ## 技术备忘
 

@@ -1,10 +1,12 @@
 /**
- * Laplace — Chat App Logic v2
+ * Laplace — Chat App Logic v3
  *
- * 对话式交互：发送消息 → 调用后端 API → 渲染 AI 响应 + 从者卡片
+ * 对话式交互：发送消息 → SSE 流式接收 → 分阶段渲染 Thinking Steps + 卡片 + 文字
+ * 向后兼容：保留旧 JSON 端点常量供调试使用
  */
 
 const API_URL = "http://localhost:8000/api/chat";
+const STREAM_API_URL = "/api/chat/stream";
 
 // === Class Display Names ===
 const CLASS_NAMES = {
@@ -26,7 +28,15 @@ const chatContainer = document.getElementById("chat-container");
 // === State ===
 let isProcessing = false;
 
-// === Send Message ===
+// === Thinking Step Labels ===
+const THINKING_LABELS = {
+  parsing: "正在理解你的问题...",
+  parsed: "意图识别完成",
+  querying: "正在检索从者数据...",
+  generating: "正在生成分析...",
+};
+
+// === Send Message (SSE Stream) ===
 async function sendMessage() {
   const text = chatInput.value.trim();
   if (!text || isProcessing) return;
@@ -35,42 +45,225 @@ async function sendMessage() {
   sendBtn.disabled = true;
   chatInput.value = "";
 
-  // Render user message
   appendMessage("user", text);
 
-  // Show typing indicator
-  const typingEl = appendTypingIndicator();
+  // Create streaming container (replaces typing indicator)
+  const els = createStreamingContainer();
 
   try {
-    const resp = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text }),
-    });
-
+    const url = `${STREAM_API_URL}?message=${encodeURIComponent(text)}`;
+    const resp = await fetch(url);
     if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
 
-    const data = await resp.json();
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
 
-    // Remove typing indicator
-    typingEl.remove();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    // Update model badge
-    if (data.model && data.model !== "error") {
-      modelName.textContent = data.model;
+      buffer += decoder.decode(value, { stream: true });
+      const events = parseSSE(buffer);
+      buffer = events.remainder;
+
+      for (const ev of events.parsed) {
+        handleStreamEvent(ev.event, ev.data, els);
+      }
     }
 
-    // Render assistant response
-    appendAssistantResponse(data);
+    // Finalize: remove cursor if present
+    const cursor = els.replyBody.querySelector(".stream-cursor");
+    if (cursor) cursor.remove();
 
   } catch (err) {
-    typingEl.remove();
+    els.container.remove();
     appendMessage("assistant", `⚠️ 请求失败: ${err.message}\n\n请确保后端服务已启动 (uvicorn server.main:app)`, true);
   } finally {
     isProcessing = false;
     sendBtn.disabled = false;
     chatInput.focus();
   }
+}
+
+// === Parse SSE Text into Events ===
+function parseSSE(text) {
+  const parsed = [];
+  const lines = text.split("\n");
+  let currentEvent = null;
+  let currentData = null;
+  let lastProcessedIndex = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.startsWith("event: ")) {
+      currentEvent = line.slice(7).trim();
+    } else if (line.startsWith("data: ")) {
+      currentData = line.slice(6);
+    } else if (line === "" && currentEvent && currentData !== null) {
+      try {
+        parsed.push({ event: currentEvent, data: JSON.parse(currentData) });
+      } catch (e) {
+        console.warn("SSE parse error:", currentData);
+      }
+      currentEvent = null;
+      currentData = null;
+      lastProcessedIndex = i + 1;
+    }
+  }
+
+  // Keep unprocessed remainder for next chunk
+  const remainderLines = lines.slice(lastProcessedIndex);
+  const remainder = remainderLines.join("\n");
+
+  return { parsed, remainder };
+}
+
+// === Create Streaming Container ===
+function createStreamingContainer() {
+  const msg = document.createElement("div");
+  msg.className = "message assistant-message";
+
+  const thinkingSteps = document.createElement("div");
+  thinkingSteps.className = "thinking-steps";
+
+  const cardsArea = document.createElement("div");
+  cardsArea.className = "chat-cards-grid";
+  cardsArea.style.display = "none";
+
+  const replyBody = document.createElement("div");
+  replyBody.className = "markdown-body";
+  replyBody.style.display = "none";
+
+  msg.innerHTML = `
+    <div class="message-avatar">⧫</div>
+    <div class="message-content">
+      <div class="message-bubble"></div>
+    </div>
+  `;
+
+  const bubble = msg.querySelector(".message-bubble");
+  bubble.appendChild(thinkingSteps);
+  bubble.appendChild(cardsArea);
+  bubble.appendChild(replyBody);
+
+  chatMessages.appendChild(msg);
+  scrollToBottom();
+
+  return { container: msg, thinkingSteps, cardsArea, replyBody };
+}
+
+// === Handle Stream Event ===
+function handleStreamEvent(eventType, data, els) {
+  switch (eventType) {
+    case "thinking":
+      handleThinking(data, els);
+      break;
+    case "servants":
+      handleServants(data, els);
+      break;
+    case "delta":
+      handleDelta(data, els);
+      break;
+    case "done":
+      handleDone(data);
+      break;
+    case "error":
+      handleError(data, els);
+      break;
+  }
+  scrollToBottom();
+}
+
+// === Handle Thinking Events ===
+function handleThinking(data, els) {
+  // Complete previous active step
+  const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
+  if (activeStep) completeThinkingStep(activeStep);
+
+  const label = data.message || THINKING_LABELS[data.phase] || data.phase;
+  const step = renderThinkingStep(data.phase, label, els.thinkingSteps);
+
+  // If parsed, show conditions detail
+  if (data.phase === "parsed" && data.conditions) {
+    completeThinkingStep(step);
+    const keys = Object.keys(data.conditions);
+    if (keys.length > 0) {
+      const detail = document.createElement("div");
+      detail.className = "thinking-step-detail";
+      detail.textContent = JSON.stringify(data.conditions);
+      els.thinkingSteps.appendChild(detail);
+    }
+  }
+}
+
+// === Handle Servants Event ===
+function handleServants(data, els) {
+  // Complete querying step
+  const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
+  if (activeStep) completeThinkingStep(activeStep);
+
+  if (data.servants && data.servants.length > 0) {
+    els.cardsArea.style.display = "";
+    els.cardsArea.innerHTML = data.servants
+      .map((s, i) => createCardHtml(s, i))
+      .join("");
+  }
+}
+
+// === Handle Delta Event ===
+function handleDelta(data, els) {
+  // Complete generating step
+  const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
+  if (activeStep) completeThinkingStep(activeStep);
+
+  els.replyBody.style.display = "";
+  const replyHtml = typeof marked !== "undefined"
+    ? marked.parse(data.text)
+    : `<p>${escapeHtml(data.text)}</p>`;
+  els.replyBody.innerHTML = replyHtml + '<span class="stream-cursor"></span>';
+}
+
+// === Handle Done Event ===
+function handleDone(data) {
+  if (data.model && data.model !== "error") {
+    modelName.textContent = data.model;
+  }
+}
+
+// === Handle Error Event ===
+function handleError(data, els) {
+  const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
+  if (activeStep) {
+    activeStep.classList.remove("active");
+    activeStep.classList.add("error");
+    const icon = activeStep.querySelector(".thinking-step-icon");
+    if (icon) icon.textContent = "✗";
+  }
+  els.replyBody.style.display = "";
+  els.replyBody.innerHTML = `<p>⚠️ ${escapeHtml(data.message || "请求失败")}</p>`;
+}
+
+// === Render a Thinking Step ===
+function renderThinkingStep(phase, message, container) {
+  const step = document.createElement("div");
+  step.className = "thinking-step active";
+  step.dataset.phase = phase;
+  step.innerHTML = `
+    <span class="thinking-step-icon">◆</span>
+    <span class="thinking-step-text">${escapeHtml(message)}</span>
+  `;
+  container.appendChild(step);
+  return step;
+}
+
+// === Complete a Thinking Step ===
+function completeThinkingStep(stepEl) {
+  stepEl.classList.remove("active");
+  stepEl.classList.add("completed");
+  const icon = stepEl.querySelector(".thinking-step-icon");
+  if (icon) icon.textContent = "✓";
 }
 
 // === Append User/Assistant Message ===

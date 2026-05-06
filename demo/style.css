@@ -412,6 +412,80 @@ body {
   30% { transform: translateY(-6px); opacity: 1; }
 }
 
+/* --- Thinking Steps --- */
+.thinking-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--space-md);
+}
+
+.thinking-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 12px;
+  color: var(--text-secondary);
+  animation: msg-fade-in 0.3s ease both;
+}
+
+.thinking-step-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.thinking-step.active .thinking-step-icon {
+  color: var(--accent-gold);
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+.thinking-step.active .thinking-step-text {
+  color: var(--text-primary);
+}
+
+.thinking-step.completed .thinking-step-icon {
+  color: var(--accent-green);
+  animation: none;
+}
+
+.thinking-step.completed .thinking-step-text {
+  color: var(--text-muted);
+}
+
+.thinking-step.error .thinking-step-icon {
+  color: #ef4444;
+  animation: none;
+}
+
+.thinking-step-detail {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 24px;
+  font-family: 'SF Mono', 'Menlo', monospace;
+  word-break: break-all;
+}
+
+/* --- Stream Cursor --- */
+.stream-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--accent-gold);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: cursor-blink 0.8s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 /* --- Chat Input Area --- */
 #chat-input-area {
   flex-shrink: 0;
