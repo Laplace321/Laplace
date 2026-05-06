@@ -129,12 +129,10 @@ function createStreamingContainer() {
   thinkingSteps.className = "thinking-steps";
 
   const cardsArea = document.createElement("div");
-  cardsArea.className = "chat-cards-grid";
-  cardsArea.style.display = "none";
+  cardsArea.className = "chat-cards-grid stream-hidden";
 
   const replyBody = document.createElement("div");
-  replyBody.className = "markdown-body";
-  replyBody.style.display = "none";
+  replyBody.className = "markdown-body stream-hidden";
 
   msg.innerHTML = `
     <div class="message-avatar">⧫</div>
@@ -205,10 +203,12 @@ function handleServants(data, els) {
   if (activeStep) completeThinkingStep(activeStep);
 
   if (data.servants && data.servants.length > 0) {
-    els.cardsArea.style.display = "";
     els.cardsArea.innerHTML = data.servants
       .map((s, i) => createCardHtml(s, i))
       .join("");
+    // 触发 reflow 后移除 hidden，实现 opacity 渐入
+    void els.cardsArea.offsetHeight;
+    els.cardsArea.classList.remove("stream-hidden");
   }
 }
 
@@ -218,11 +218,12 @@ function handleDelta(data, els) {
   const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
   if (activeStep) completeThinkingStep(activeStep);
 
-  els.replyBody.style.display = "";
   const replyHtml = typeof marked !== "undefined"
     ? marked.parse(data.text)
     : `<p>${escapeHtml(data.text)}</p>`;
   els.replyBody.innerHTML = replyHtml + '<span class="stream-cursor"></span>';
+  void els.replyBody.offsetHeight;
+  els.replyBody.classList.remove("stream-hidden");
 }
 
 // === Handle Done Event ===

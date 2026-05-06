@@ -437,6 +437,11 @@ body {
   justify-content: center;
   flex-shrink: 0;
   font-size: 11px;
+  transition: color 0.3s ease;
+}
+
+.thinking-step-text {
+  transition: color 0.3s ease;
 }
 
 .thinking-step.active .thinking-step-icon {
@@ -448,6 +453,19 @@ body {
   color: var(--text-primary);
 }
 
+/* 省略号循环动画 — 解决 active 状态静止感 */
+.thinking-step.active .thinking-step-text::after {
+  content: "";
+  animation: ellipsis 1.4s steps(4, end) infinite;
+}
+
+@keyframes ellipsis {
+  0%  { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
+
 .thinking-step.completed .thinking-step-icon {
   color: var(--accent-green);
   animation: none;
@@ -455,6 +473,10 @@ body {
 
 .thinking-step.completed .thinking-step-text {
   color: var(--text-muted);
+}
+
+.thinking-step.completed .thinking-step-text::after {
+  content: none;
 }
 
 .thinking-step.error .thinking-step-icon {
@@ -468,6 +490,19 @@ body {
   margin-left: 24px;
   font-family: 'SF Mono', 'Menlo', monospace;
   word-break: break-all;
+}
+
+/* --- Stream Reveal (opacity 渐入) --- */
+.stream-hidden {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.chat-cards-grid:not(.stream-hidden),
+.markdown-body:not(.stream-hidden) {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* --- Stream Cursor --- */
