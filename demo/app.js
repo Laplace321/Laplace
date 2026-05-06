@@ -27,6 +27,8 @@ const chatContainer = document.getElementById("chat-container");
 
 // === State ===
 let isProcessing = false;
+let lastTraceId = null;
+let debugVisible = false;
 
 // === Thinking Step Labels ===
 const THINKING_LABELS = {
@@ -231,6 +233,10 @@ function handleDone(data) {
   if (data.model && data.model !== "error") {
     modelName.textContent = data.model;
   }
+  if (data.traceId) {
+    lastTraceId = data.traceId;
+    updateDebugPanel();
+  }
 }
 
 // === Handle Error Event ===
@@ -409,4 +415,54 @@ document.addEventListener("click", (e) => {
 // Focus input on load
 document.addEventListener("DOMContentLoaded", () => {
   chatInput.focus();
+  createDebugPanel();
+});
+
+// === Debug Panel (Ctrl+D, localhost only) ===
+function createDebugPanel() {
+  const panel = document.createElement("div");
+  panel.id = "debug-panel";
+  panel.className = "debug-panel hidden";
+  panel.innerHTML = `
+    <span class="debug-label">DEBUG</span>
+    <span class="debug-trace">
+      trace: <span id="debug-trace-id">-</span>
+    </span>
+    <button id="debug-copy-btn" class="debug-copy" title="复制 trace_id">复制</button>
+  `;
+  document.body.appendChild(panel);
+
+  document.getElementById("debug-copy-btn").addEventListener("click", () => {
+    if (!lastTraceId) return;
+    navigator.clipboard.writeText(lastTraceId).then(() => {
+      const btn = document.getElementById("debug-copy-btn");
+      btn.textContent = "已复制";
+      setTimeout(() => { btn.textContent = "复制"; }, 1500);
+    });
+  });
+}
+
+function toggleDebugPanel() {
+  const panel = document.getElementById("debug-panel");
+  if (!panel) return;
+  if (debugVisible) {
+    panel.classList.remove("hidden");
+  } else {
+    panel.classList.add("hidden");
+  }
+}
+
+function updateDebugPanel() {
+  const el = document.getElementById("debug-trace-id");
+  if (el && lastTraceId) {
+    el.textContent = lastTraceId;
+  }
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.key === "d") {
+    e.preventDefault();
+    debugVisible = !debugVisible;
+    toggleDebugPanel();
+  }
 });

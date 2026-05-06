@@ -18,7 +18,8 @@ from pathlib import Path
 from server.prompts import get_system_prompt, get_generation_prompt
 from server.llm_client import chat_completion
 from server.query_executor import execute_query, load_database
-from server.logger import log_chat_trace
+from server.logger import log_chat_trace, read_traces, find_trace
+from fastapi.responses import JSONResponse
 from server.rate_limiter import RateLimitMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -158,6 +159,31 @@ class ChatResponse(BaseModel):
     query: dict
     model: str
     traceId: str | None = None
+
+
+def _is_localhost(request: Request) -> bool:
+    """检查请求是否来自本地。"""
+    return request.client.host in ("127.0.0.1", "::1", "localhost")
+
+
+@app.get("/api/traces")
+async def list_traces(request: Request, limit: int = 20):
+    """返回最近 N 条 trace（仅 localhost 可访问）。"""
+    if not _is_localhost(request):
+        return JSONResponse(status_code=403, content={"error": "仅允许本地访问"})
+    traces = read_traces(limit=limit)
+    return traces
+
+
+@app.get("/api/traces/{trace_id}")
+async def get_trace(request: Request, trace_id: str):
+    """按 trace_id 查询单条 trace 详情（仅 localhost 可访问）。"""
+    if not _is_localhost(request):
+        return JSONResponse(status_code=403, content={"error": "仅允许本地访问"})
+    trace = find_trace(trace_id)
+    if trace is None:
+        return JSONResponse(status_code=404, content={"error": f"trace {trace_id} 未找到"})
+    return trace
 
 
 @app.on_event("startup")

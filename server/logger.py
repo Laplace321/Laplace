@@ -52,3 +52,37 @@ def log_chat_trace(trace_id: str, user_message: str, parsed_intent: dict, found_
         logger.error(trace_data)
     else:
         logger.info(trace_data)
+
+
+def read_traces(limit: int = 20) -> list[dict]:
+    """读取最近 N 条 trace 日志（倒序，最新在前）。"""
+    if not LOG_FILE.exists():
+        return []
+    traces = []
+    with open(LOG_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    traces.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    return traces[-limit:][::-1]
+
+
+def find_trace(trace_id: str) -> dict | None:
+    """按 trace_id 查找单条 trace。"""
+    if not LOG_FILE.exists():
+        return None
+    with open(LOG_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+                if entry.get("traceId") == trace_id:
+                    return entry
+            except json.JSONDecodeError:
+                continue
+    return None
