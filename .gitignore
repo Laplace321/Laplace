@@ -22,6 +22,7 @@ out/
 # IDE
 .vscode/
 .idea/
+.aone_copilot/
 *.swp
 *.swo
 *~
