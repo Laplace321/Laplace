@@ -195,10 +195,42 @@ async def get_trace(request: Request, trace_id: str):
     return trace
 
 
+def _validate_translations():
+    """校验 config/translations.json 与 knowledge/class_mapping.json 的一致性。
+
+    检查翻译映射是否覆盖了所有可玩职阶，防止预消化翻译与知识库脱节。
+    不一致时输出警告日志，不阻塞启动。
+    """
+    knowledge_path = Path(__file__).parent / "knowledge" / "class_mapping.json"
+    if not knowledge_path.exists():
+        print("⚠️  knowledge/class_mapping.json 不存在，跳过翻译一致性校验")
+        return
+
+    with open(knowledge_path, encoding="utf-8") as f:
+        class_mapping = json.load(f)
+
+    # 从知识库提取可玩职阶名（全小写）
+    playable_classes = {entry["name"].lower() for entry in class_mapping.get("playable", [])}
+
+    # 从翻译配置提取已有翻译的职阶名（全小写）
+    translated_classes = {k.lower() for k in _get_class_map().keys()}
+
+    missing = playable_classes - translated_classes
+    if missing:
+        print(f"⚠️  翻译映射缺失：以下可玩职阶在 config/translations.json 中没有中文翻译: {sorted(missing)}")
+        print("   请在 server/config/translations.json 的 className 中补充对应翻译")
+
+    extra = translated_classes - playable_classes
+    if extra:
+        # 额外的翻译不是错误（如 beast），仅做信息提示
+        print(f"ℹ️  翻译映射包含非可玩职阶（可忽略）: {sorted(extra)}")
+
+
 @app.on_event("startup")
 async def startup():
-    """启动时预加载数据库。"""
+    """启动时预加载数据库并校验配置一致性。"""
     load_database()
+    _validate_translations()
 
 
 @app.post("/api/chat", response_model=ChatResponse)
