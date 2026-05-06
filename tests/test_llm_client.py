@@ -36,7 +36,7 @@ class FakeAsyncClient:
     requests = []
     responses = []
 
-    def __init__(self, timeout):
+    def __init__(self, timeout, **kwargs):
         self.timeout = timeout
 
     async def __aenter__(self):

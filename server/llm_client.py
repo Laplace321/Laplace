@@ -201,7 +201,8 @@ async def _post_response(
             }
         }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    ssl_verify = os.getenv("LLM_SSL_VERIFY", "false").lower() != "false"
+    async with httpx.AsyncClient(timeout=30.0, verify=ssl_verify) as client:
         resp = await client.post(url, json=payload, headers=headers)
         if use_structured_output and resp.status_code in (400, 422):
             if _looks_like_response_format_error(resp):
