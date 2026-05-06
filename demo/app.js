@@ -363,13 +363,17 @@ function createCardHtml(servant, index) {
   const stars = getStars(servant.rarity);
   const className = CLASS_NAMES[servant.className] || servant.className;
 
-  // 获取最大自充值显示
+  // 获取充能展示（三分类：自充/他充/群充）
   let chargeDisplay = "";
   if (servant.npCharges && servant.npCharges.length > 0) {
-    const charges = servant.npCharges.map(c => `${c.chargePercent}%`).join("+");
+    const charges = servant.npCharges.map(c => {
+      const label = c.targetType === 'self' ? '自充'
+        : c.targetType === 'ptOne' ? '他充' : '群充';
+      return `${label}${c.chargePercent}%`;
+    }).join(' + ');
     chargeDisplay = charges;
   } else if (servant.maxSelfCharge) {
-    chargeDisplay = `${servant.maxSelfCharge}%`;
+    chargeDisplay = `自充${servant.maxSelfCharge}%`;
   }
 
   return `

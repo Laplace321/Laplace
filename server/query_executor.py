@@ -187,7 +187,7 @@ def _filter_np_charge(servant: dict, conditions: dict) -> bool:
         return True
     if not servant.get("hasNpCharge", False):
         return False
-    charge = servant.get("totalSelfCharge", 0)
+    charge = servant.get("totalCharge", 0)
     op = np_cond.get("op", "eq")
     value = np_cond.get("value", 0)
     if op == "eq":

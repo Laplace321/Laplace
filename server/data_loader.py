@@ -139,9 +139,20 @@ def extract_np_charges(servant: dict) -> list[dict]:
                     "skillNum": skill_num,
                     "chargePercent": lv10_value // 100,
                     "chargeValue": lv10_value,
-                    "targetType": "self" if target_type in SELF_TARGET_TYPES else "party",
+                    "targetType": _classify_charge_target(target_type),
                 }
     return list(charge_by_skill.values())
+
+
+def _classify_charge_target(func_target_type: str) -> str:
+    """将充能技能的 funcTargetType 分类为三种充能类型。"""
+    if func_target_type in SELF_TARGET_TYPES:
+        return "self"
+    if func_target_type in PARTY_TARGET_TYPES:
+        return "ptAll"
+    if func_target_type in SINGLE_TARGET_TYPES:
+        return "ptOne"
+    return "self"  # fallback
 
 
 def classify_target_type(func_target_type: str) -> str:
@@ -257,12 +268,14 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
         charges = extract_np_charges(svt)
         skill_effects, skill_details = extract_skill_effects(svt, matcher)
 
-        # 计算 NP 充能统计
+        # 计算 NP 充能统计（三分类：self / ptOne / ptAll）
         self_charges = [c["chargePercent"] for c in charges if c["targetType"] == "self"]
-        party_charges = [c["chargePercent"] for c in charges if c["targetType"] == "party"]
+        pt_one_charges = [c["chargePercent"] for c in charges if c["targetType"] == "ptOne"]
+        pt_all_charges = [c["chargePercent"] for c in charges if c["targetType"] == "ptAll"]
         max_self_charge = max(self_charges) if self_charges else 0
-        max_party_charge = max(party_charges) if party_charges else 0
-        total_self_charge = sum(self_charges) + sum(party_charges)
+        max_pt_one_charge = max(pt_one_charges) if pt_one_charges else 0
+        max_pt_all_charge = max(pt_all_charges) if pt_all_charges else 0
+        total_charge = sum(self_charges) + sum(pt_one_charges) + sum(pt_all_charges)
 
         # 计算卡色构成
         cards_count = {"arts": 0, "buster": 0, "quick": 0}
@@ -332,9 +345,10 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
             # NP 充能数据（向后兼容）
             "npCharges": charges,
             "maxSelfCharge": max_self_charge,
-            "maxPartyCharge": max_party_charge,
-            "totalSelfCharge": total_self_charge,
-            "hasNpCharge": bool(self_charges) or bool(party_charges) or len(charges) > 0,
+            "maxPtOneCharge": max_pt_one_charge,
+            "maxPtAllCharge": max_pt_all_charge,
+            "totalCharge": total_charge,
+            "hasNpCharge": bool(self_charges) or bool(pt_one_charges) or bool(pt_all_charges),
             "skillEffects": sorted(list(skill_effects)),
             "npEffects": sorted(list(np_effects_set)),
             "skillDetails": skill_details,

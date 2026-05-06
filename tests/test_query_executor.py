@@ -10,7 +10,7 @@ SERVANTS = [
         "rarity": 5,
         "className": "saber",
         "npCharges": [{"chargePercent": 30, "targetType": "self"}],
-        "totalSelfCharge": 30,
+        "totalCharge": 30,
         "hasNpCharge": True,
         "skillEffects": ["gainNp", "invincible", "upAtk"],
         "npEffects": ["upAtk"],
@@ -38,8 +38,8 @@ SERVANTS = [
         "aliasCN": "詹姆斯·莫里亚蒂",
         "rarity": 5,
         "className": "ruler",
-        "npCharges": [{"chargePercent": 50, "targetType": "party"}],
-        "totalSelfCharge": 50,
+        "npCharges": [{"chargePercent": 50, "targetType": "ptOne"}],
+        "totalCharge": 50,
         "hasNpCharge": True,
         "skillEffects": ["gainNp", "avoidance", "guts"],
         "npEffects": ["invincible", "upAtk"],
@@ -68,7 +68,7 @@ SERVANTS = [
         "rarity": 2,
         "className": "caster",
         "npCharges": [],
-        "totalSelfCharge": 0,
+        "totalCharge": 0,
         "hasNpCharge": False,
         "skillEffects": ["upCriticaldamage"],
         "npEffects": [],
@@ -88,8 +88,8 @@ SERVANTS = [
         "aliasCN": "阿尔托莉雅·卡斯特",
         "rarity": 5,
         "className": "berserker",
-        "npCharges": [{"chargePercent": 50, "targetType": "party"}],
-        "totalSelfCharge": 50,
+        "npCharges": [{"chargePercent": 30, "targetType": "ptAll"}, {"chargePercent": 20, "targetType": "ptOne"}],
+        "totalCharge": 50,
         "hasNpCharge": True,
         "skillEffects": ["gainNp", "upArts"],
         "npEffects": ["upArts", "gainNp"],
@@ -124,7 +124,11 @@ def names(results):
 
 
 def test_np_charge_exact_and_gte_filters():
-    assert names(qe.execute_query({"npCharge": {"op": "eq", "value": 30}})) == ["Altria Pendragon"]
+    # eq 30: Altria(自充30) + Altria Caster(群充30)
+    assert names(qe.execute_query({"npCharge": {"op": "eq", "value": 30}})) == [
+        "Altria Pendragon",
+        "Altria Caster",
+    ]
     assert names(qe.execute_query({"npCharge": {"op": "gte", "value": 50}})) == [
         "James Moriarty",
         "Altria Caster",

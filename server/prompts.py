@@ -233,7 +233,7 @@ def get_generation_prompt(user_query: str, context_json: str) -> str:
 6. **合理分类**：
    - `skillEffects`: 从者的主动技能效果。
    - `npEffects`: 从者的宝具附带效果（如降防、特攻、无敌贯通等）。
-   - `totalSelfCharge`: 从者的总自充能力。请根据实际情况自然地描述它（如果它主要来自技能，可归入技能特点；如果宝具有后置充能或它是一个核心卖点，可作为核心能力独立说明或放入宝具模块）。
+   - `totalCharge`: 从者的总充能量（含自充 + 他充 + 群充，均可为自身充能）。请根据 npCharges 中的 targetType 区分描述："self" → 自充（仅给自己）、"ptOne" → 他充（给指定一个队友，也可选自己）、"ptAll" → 群充（全队含自己）。请自然地描述充能能力，准确区分充能类型。
 
 ## 检索结果上下文
 ```json
