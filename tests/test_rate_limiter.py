@@ -19,12 +19,14 @@ from fastapi.testclient import TestClient
 from server.rate_limiter import RateLimitMiddleware
 
 
-def _create_app(max_requests: int = 3, window_seconds: int = 2, paths: list[str] | None = None):
+def _create_app(max_requests: int = 3, global_max_requests: int = 0,
+                window_seconds: int = 2, paths: list[str] | None = None):
     """创建带 RateLimitMiddleware 的测试应用。"""
     app = FastAPI()
     app.add_middleware(
         RateLimitMiddleware,
         max_requests=max_requests,
+        global_max_requests=global_max_requests,
         window_seconds=window_seconds,
         paths=paths or ["/api/chat"],
     )
@@ -135,6 +137,53 @@ class TestRateLimiterPathFiltering:
         # 注意：同 IP 的所有限制路径共享计数
         resp = client.get("/api/chat/stream")
         assert resp.status_code == 429
+
+
+class TestGlobalRateLimit:
+    """全局限流测试。"""
+
+    def test_global_limit_blocks_all_ips(self):
+        """全局配额用完后，所有请求都被拒绝。"""
+        app = _create_app(max_requests=100, global_max_requests=3)
+        client = TestClient(app)
+        # 前 3 次正常（Per-IP 限额 100 远大于全局 3）
+        for _ in range(3):
+            resp = client.get("/api/chat")
+            assert resp.status_code == 200
+        # 第 4 次被全局限流
+        resp = client.get("/api/chat")
+        assert resp.status_code == 429
+
+    def test_global_limit_recovers_after_window(self):
+        """全局窗口过期后恢复。"""
+        app = _create_app(max_requests=100, global_max_requests=2, window_seconds=1)
+        client = TestClient(app)
+        for _ in range(2):
+            client.get("/api/chat")
+        resp = client.get("/api/chat")
+        assert resp.status_code == 429
+        time.sleep(1.1)
+        resp = client.get("/api/chat")
+        assert resp.status_code == 200
+
+    def test_per_ip_triggers_before_global(self):
+        """Per-IP 限额先触发时，全局计数不增加。"""
+        app = _create_app(max_requests=2, global_max_requests=10)
+        client = TestClient(app)
+        for _ in range(2):
+            client.get("/api/chat")
+        # Per-IP 超限
+        resp = client.get("/api/chat")
+        assert resp.status_code == 429
+
+    def test_global_zero_means_disabled(self):
+        """global_max_requests=0 表示不启用全局限流。"""
+        app = _create_app(max_requests=100, global_max_requests=0)
+        client = TestClient(app)
+        # 发送大量请求不会被全局限流
+        for _ in range(50):
+            resp = client.get("/api/chat")
+            assert resp.status_code == 200
 
 
 class TestCorsConfiguration:

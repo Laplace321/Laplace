@@ -129,11 +129,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Rate Limit — 保护 LLM quota
-_rate_limit = int(os.getenv("RATE_LIMIT_PER_MINUTE", "30"))
+# Rate Limit — 保护 LLM quota（双层：Per-IP + Global）
+_rate_limit = int(os.getenv("RATE_LIMIT_PER_MINUTE", "10"))
+_rate_limit_global = int(os.getenv("RATE_LIMIT_GLOBAL_PER_MINUTE", "100"))
 app.add_middleware(
     RateLimitMiddleware,
     max_requests=_rate_limit,
+    global_max_requests=_rate_limit_global,
     paths=["/api/chat", "/api/chat/stream"],
 )
 

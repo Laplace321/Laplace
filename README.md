@@ -112,7 +112,8 @@ RUN_LIVE_LLM_TESTS=1 python -m pytest tests/test_llm_client_live.py -s
 | `LLM_MODEL` | 主模型 | - |
 | `LLM_FALLBACK_MODELS` | 回退模型（逗号分隔） | - |
 | `CORS_ORIGINS` | CORS 白名单（逗号分隔） | `http://localhost:8000,http://127.0.0.1:8000` |
-| `RATE_LIMIT_PER_MINUTE` | 每 IP 每分钟最大请求数 | `30` |
+| `RATE_LIMIT_PER_MINUTE` | 单 IP 每分钟最大请求数 | `10` |
+| `RATE_LIMIT_GLOBAL_PER_MINUTE` | 全站每分钟最大请求数（0=不限） | `100` |
 
 > **本地开发提示**：如果在其他设备上测试时 uvicorn 绑定了非默认地址（如 `http://192.168.x.x:8000`），需要将该地址添加到 `CORS_ORIGINS` 中，否则浏览器会因 CORS 策略拦截请求。示例：
 > ```bash
