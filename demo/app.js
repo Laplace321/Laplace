@@ -369,8 +369,8 @@ function createCardHtml(servant, index) {
     const charges = servant.npCharges.map(c => {
       const label = c.targetType === 'self' ? '自充'
         : c.targetType === 'ptOne' ? '他充' : '群充';
-      return `${label}${c.chargePercent}%`;
-    }).join(' + ');
+      return `${c.chargePercent}${label}`;
+    }).join('+');
     chargeDisplay = charges;
   } else if (servant.maxSelfCharge) {
     chargeDisplay = `自充${servant.maxSelfCharge}%`;
@@ -378,16 +378,18 @@ function createCardHtml(servant, index) {
 
   return `
     <div class="chat-card rarity-${servant.rarity}" style="animation-delay: ${Math.min(index * 20, 400)}ms">
-      <div class="chat-card-face">
-        <img src="${servant.faceUrl}" alt="${servant.name}" loading="lazy"
-             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 42 42%22><rect fill=%22%23191c3a%22 width=%2242%22 height=%2242%22/><text x=%2221%22 y=%2225%22 text-anchor=%22middle%22 fill=%22%235c5a6e%22 font-size=%2212%22>?</text></svg>'">
-        <div class="chat-card-face-border"></div>
-      </div>
-      <div class="chat-card-info">
-        <div class="chat-card-name" title="${servant.aliasCN || servant.name}">${servant.aliasCN || servant.name}</div>
-        <div class="chat-card-meta">
-          <span class="chat-card-stars">${stars}</span>
-          <span>${className}</span>
+      <div class="chat-card-row">
+        <div class="chat-card-face">
+          <img src="${servant.faceUrl}" alt="${servant.name}" loading="lazy"
+               onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 42 42%22><rect fill=%22%23191c3a%22 width=%2242%22 height=%2242%22/><text x=%2221%22 y=%2225%22 text-anchor=%22middle%22 fill=%22%235c5a6e%22 font-size=%2212%22>?</text></svg>'">
+          <div class="chat-card-face-border"></div>
+        </div>
+        <div class="chat-card-info">
+          <div class="chat-card-name" title="${servant.aliasCN || servant.name}">${servant.aliasCN || servant.name}</div>
+          <div class="chat-card-meta">
+            <span class="chat-card-stars">${stars}</span>
+            <span>${className}</span>
+          </div>
         </div>
       </div>
       ${chargeDisplay ? `<div class="chat-card-charge">${chargeDisplay}</div>` : ""}
