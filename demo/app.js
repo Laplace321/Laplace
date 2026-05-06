@@ -30,6 +30,11 @@ let isProcessing = false;
 let lastTraceId = null;
 let debugVisible = false;
 
+// === Chat History (localStorage) ===
+const STORAGE_KEY = "laplace_chat_history";
+let currentSessionId = Date.now().toString(36);
+let chatHistory = []; // 当前会话的消息数组
+
 // === Thinking Step Labels ===
 const THINKING_LABELS = {
   parsing: "正在理解你的问题...",
@@ -45,9 +50,12 @@ async function sendMessage() {
 
   isProcessing = true;
   sendBtn.disabled = true;
+  sendBtn.classList.add("loading");
   chatInput.value = "";
 
   appendMessage("user", text);
+  chatHistory.push({ role: "user", text });
+  saveSession();
 
   // Create streaming container (replaces typing indicator)
   const els = createStreamingContainer();
@@ -80,10 +88,11 @@ async function sendMessage() {
 
   } catch (err) {
     els.container.remove();
-    appendMessage("assistant", `⚠️ 请求失败: ${err.message}\n\n请确保后端服务已启动 (uvicorn server.main:app)`, true);
+    showToast(`请求失败: ${err.message}`);
   } finally {
     isProcessing = false;
     sendBtn.disabled = false;
+    sendBtn.classList.remove("loading");
     chatInput.focus();
   }
 }
@@ -144,6 +153,17 @@ function createStreamingContainer() {
   `;
 
   const bubble = msg.querySelector(".message-bubble");
+
+  // 骨架屏占位 — 收到第一个 thinking 事件后移除
+  const skeleton = document.createElement("div");
+  skeleton.className = "skeleton-placeholder";
+  skeleton.innerHTML = `
+    <div class="skeleton-line w80"></div>
+    <div class="skeleton-line w60"></div>
+    <div class="skeleton-line w40"></div>
+  `;
+  bubble.appendChild(skeleton);
+
   bubble.appendChild(thinkingSteps);
   bubble.appendChild(cardsArea);
   bubble.appendChild(replyBody);
@@ -167,7 +187,7 @@ function handleStreamEvent(eventType, data, els) {
       handleDelta(data, els);
       break;
     case "done":
-      handleDone(data);
+      handleDone(data, els);
       break;
     case "error":
       handleError(data, els);
@@ -178,6 +198,10 @@ function handleStreamEvent(eventType, data, els) {
 
 // === Handle Thinking Events ===
 function handleThinking(data, els) {
+  // 移除骨架屏（首次 thinking 事件时）
+  const skel = els.container.querySelector(".skeleton-placeholder");
+  if (skel) skel.remove();
+
   // Complete previous active step
   const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
   if (activeStep) completeThinkingStep(activeStep);
@@ -229,7 +253,7 @@ function handleDelta(data, els) {
 }
 
 // === Handle Done Event ===
-function handleDone(data) {
+function handleDone(data, els) {
   if (data.model && data.model !== "error") {
     modelName.textContent = data.model;
   }
@@ -237,10 +261,21 @@ function handleDone(data) {
     lastTraceId = data.traceId;
     updateDebugPanel();
   }
+  // 追踪助手回复到历史（保存完整 HTML 快照以保留样式）
+  if (els) {
+    const bubbleEl = els.container.querySelector(".message-bubble");
+    const html = bubbleEl ? bubbleEl.innerHTML : "";
+    chatHistory.push({ role: "assistant", html });
+    saveSession();
+  }
 }
 
 // === Handle Error Event ===
 function handleError(data, els) {
+  // 移除骨架屏
+  const skel = els.container.querySelector(".skeleton-placeholder");
+  if (skel) skel.remove();
+
   const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
   if (activeStep) {
     activeStep.classList.remove("active");
@@ -250,6 +285,7 @@ function handleError(data, els) {
   }
   els.replyBody.style.display = "";
   els.replyBody.innerHTML = `<p>⚠️ ${escapeHtml(data.message || "请求失败")}</p>`;
+  showToast(data.message || "请求失败");
 }
 
 // === Render a Thinking Step ===
@@ -376,6 +412,19 @@ function appendTypingIndicator() {
   return msg;
 }
 
+// === Toast ===
+function showToast(message, type = "error") {
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("visible"));
+  setTimeout(() => {
+    toast.classList.remove("visible");
+    toast.addEventListener("transitionend", () => toast.remove());
+  }, 3000);
+}
+
 // === Helpers ===
 function getStars(rarity) {
   if (rarity === 0) return "☆";
@@ -465,4 +514,189 @@ document.addEventListener("keydown", (e) => {
     debugVisible = !debugVisible;
     toggleDebugPanel();
   }
+});
+
+// === Session Persistence ===
+function saveSession() {
+  const sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  const idx = sessions.findIndex(s => s.id === currentSessionId);
+  const sessionData = {
+    id: currentSessionId,
+    timestamp: Date.now(),
+    messages: chatHistory,
+    preview: chatHistory.find(m => m.role === "user")?.text?.slice(0, 40) || "新会话",
+  };
+  if (idx >= 0) sessions[idx] = sessionData;
+  else sessions.push(sessionData);
+  // 最多保留 20 个会话
+  while (sessions.length > 20) sessions.shift();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+}
+
+function loadSessions() {
+  return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]").sort((a, b) => b.timestamp - a.timestamp);
+}
+
+function deleteSession(sessionId) {
+  const sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  const filtered = sessions.filter(s => s.id !== sessionId);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+}
+
+// === History Panel ===
+function createHistoryPanel() {
+  // Overlay
+  const overlay = document.createElement("div");
+  overlay.className = "history-overlay";
+  overlay.id = "history-overlay";
+  overlay.addEventListener("click", closeHistoryPanel);
+  document.body.appendChild(overlay);
+
+  // Panel
+  const panel = document.createElement("div");
+  panel.className = "history-panel";
+  panel.id = "history-panel";
+  panel.innerHTML = `
+    <div class="history-panel-header">
+      <h3>历史会话</h3>
+      <div class="history-header-actions">
+        <button class="history-clear-all-btn" id="history-clear-all-btn" title="清空全部历史">清空</button>
+        <button class="history-close-btn" id="history-close-btn">&times;</button>
+      </div>
+    </div>
+    <div class="history-list" id="history-list"></div>
+  `;
+  document.body.appendChild(panel);
+
+  document.getElementById("history-close-btn").addEventListener("click", closeHistoryPanel);
+  document.getElementById("history-clear-all-btn").addEventListener("click", () => {
+    if (!confirm("确定清空全部历史会话？此操作不可恢复。")) return;
+    localStorage.removeItem(STORAGE_KEY);
+    loadSessionList();
+    showToast("已清空全部历史", "error");
+  });
+}
+
+function openHistoryPanel() {
+  loadSessionList();
+  document.getElementById("history-overlay").classList.add("visible");
+  document.getElementById("history-panel").classList.add("visible");
+}
+
+function closeHistoryPanel() {
+  document.getElementById("history-overlay").classList.remove("visible");
+  document.getElementById("history-panel").classList.remove("visible");
+}
+
+function loadSessionList() {
+  const list = document.getElementById("history-list");
+  const sessions = loadSessions();
+  if (sessions.length === 0) {
+    list.innerHTML = '<div class="history-empty">暂无历史会话</div>';
+    return;
+  }
+  list.innerHTML = sessions.map(s => {
+    const time = new Date(s.timestamp).toLocaleString("zh-CN", {
+      month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit"
+    });
+    const msgCount = s.messages ? s.messages.length : 0;
+    return `
+      <div class="history-item" data-session-id="${s.id}">
+        <div class="history-item-body">
+          <div class="history-item-preview">${escapeHtml(s.preview)}</div>
+          <div class="history-item-time">${time} · ${msgCount} 条消息</div>
+        </div>
+        <button class="history-item-delete" data-delete-id="${s.id}" title="删除此会话">&times;</button>
+      </div>
+    `;
+  }).join("");
+
+  // 点击会话恢复
+  list.querySelectorAll(".history-item-body").forEach(body => {
+    body.addEventListener("click", () => {
+      const sessionId = body.closest(".history-item").dataset.sessionId;
+      restoreSession(sessionId);
+      closeHistoryPanel();
+    });
+  });
+
+  // 单条删除
+  list.querySelectorAll(".history-item-delete").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const deleteId = btn.dataset.deleteId;
+      deleteSession(deleteId);
+      loadSessionList(); // 刷新列表
+    });
+  });
+}
+
+function restoreSession(sessionId) {
+  const sessions = loadSessions();
+  const session = sessions.find(s => s.id === sessionId);
+  if (!session || !session.messages) return;
+
+  // 切换到该会话
+  currentSessionId = sessionId;
+  chatHistory = [...session.messages];
+
+  // 清空聊天区域并重绘（保留完整样式）
+  chatMessages.innerHTML = "";
+  for (const msg of session.messages) {
+    if (msg.role === "assistant" && msg.html) {
+      // 助手消息：使用保存的 HTML 快照恢复完整样式
+      const div = document.createElement("div");
+      div.className = "message assistant-message";
+      div.innerHTML = `
+        <div class="message-avatar">⧫</div>
+        <div class="message-content">
+          <div class="message-bubble">${msg.html}</div>
+        </div>
+      `;
+      chatMessages.appendChild(div);
+    } else {
+      appendMessage(msg.role, msg.text);
+    }
+  }
+  scrollToBottom();
+}
+
+// === Welcome Message ===
+function appendWelcomeMessage() {
+  const msg = document.createElement("div");
+  msg.className = "message assistant-message";
+  msg.innerHTML = `
+    <div class="message-avatar">⧫</div>
+    <div class="message-content">
+      <div class="message-bubble">
+        <p>你好，Master！我是 <strong>Laplace</strong>，你的 FGO 数据助手。</p>
+        <p>你可以用自然语言向我提问，例如：</p>
+        <div class="suggestion-chips">
+          <button class="chip" data-query="帮我找一下 30 自充的从者有哪些">30 自充的从者</button>
+          <button class="chip" data-query="大于 50 自充的从者有哪些">50% 以上自充</button>
+          <button class="chip" data-query="五星 Caster 有自充的从者">五星 Caster 自充</button>
+          <button class="chip" data-query="四星以上的 Berserker 有哪些">四星以上狂阶</button>
+        </div>
+      </div>
+    </div>
+  `;
+  chatMessages.appendChild(msg);
+}
+
+// === Clear + History Button Events ===
+document.getElementById("clear-btn").addEventListener("click", () => {
+  if (!confirm("确定清空当前对话？")) return;
+  chatMessages.innerHTML = "";
+  chatHistory = [];
+  currentSessionId = Date.now().toString(36);
+  appendWelcomeMessage();
+});
+
+document.getElementById("history-btn").addEventListener("click", () => {
+  openHistoryPanel();
+});
+
+// Init history panel on load
+document.addEventListener("DOMContentLoaded", () => {
+  createHistoryPanel();
 });
