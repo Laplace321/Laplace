@@ -49,16 +49,21 @@ source .venv/bin/activate
 # 2. 安装依赖
 pip install -r server/requirements.txt
 
-# 3. 配置 API Key
+# 3. (可选) 安装开发依赖 — 如需运行 lint/test
+pip install -e ".[dev]"
+
+# 4. 配置 API Key
 cp .env.example .env
 # 编辑 .env 填入你的模型 API 密钥
 
-# 4. 启动 FastAPI 服务端
+# 5. 启动 FastAPI 服务端
 python3 -m uvicorn server.main:app --reload
 
-# 5. 打开前端界面
+# 6. 打开前端界面
 # 在浏览器中直接打开 demo/index.html 即可使用
 ```
+
+> **部署 vs 开发**：纯部署只需步骤 1-2-4-5（`requirements.txt` 包含运行所需的全部依赖）。步骤 3 安装的 ruff + pytest 仅用于本地开发和代码检查。
 
 ### 知识库与数据同步
 
@@ -86,10 +91,15 @@ python3 -m server.data_loader
   python3 server/sync_chaldea.py
   ```
 
-### 测试
+### 代码检查与测试
 
 ```bash
 source .venv/bin/activate
+
+# 代码检查（需先安装开发依赖：pip install -e ".[dev]"）
+ruff check server/ tests/ extractor/    # lint 检查
+ruff format --check server/ tests/      # 格式检查（仅检查，不修改）
+ruff format server/ tests/              # 自动格式化
 
 # 默认回归测试（不访问网络、不调用 LLM）
 python -m pytest
@@ -102,6 +112,8 @@ RUN_LIVE_LLM_TESTS=1 python -m pytest tests/test_llm_client_live.py -s
 ```
 
 当前 LLM smoke test 会输出本次 `json_mode=True` 的实际路径：`json_schema` 表示网关原生支持 `response_format/json_schema`，`text_fallback` 表示自动降级到普通 JSON 文本解析后成功。
+
+> **CI 自动化**：每次 push 到 main 或提交 PR，GitHub Actions 会自动运行 ruff check + pytest。结果可在仓库的 [Actions](../../actions) 页面查看。
 
 ### 环境变量配置
 
