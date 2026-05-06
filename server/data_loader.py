@@ -111,11 +111,18 @@ def get_face_url(servant: dict) -> str:
 
 
 def extract_np_charges(servant: dict) -> list[dict]:
-    """提取从者所有技能中的 NP 充能效果。"""
-    charges = []
+    """提取从者所有技能中的 NP 充能效果。
+
+    同一 skillNum 可能因技能强化存在多个版本，仅保留最后出现的
+    （Atlas Academy 数据中强化后版本排在后面）。
+    待办：不同服务器多版本技能的选择逻辑需要产品设计。
+    """
+    # 用 skillNum 作为 key 去重，后出现的覆盖前出现的（即最新版本）
+    charge_by_skill: dict[int, dict] = {}
     for skill in servant.get("skills", []):
         if skill.get("type") != "active":
             continue
+        skill_num = skill.get("num", 0)
         for func in skill.get("functions", []):
             if func.get("funcType") not in GAIN_NP_FUNC_TYPES:
                 continue
@@ -127,14 +134,14 @@ def extract_np_charges(servant: dict) -> list[dict]:
                 continue
             lv10_value = svals[SKILL_LV10_INDEX].get("Value", 0)
             if lv10_value > 0:
-                charges.append({
+                charge_by_skill[skill_num] = {
                     "skillName": skill.get("name", ""),
-                    "skillNum": skill.get("num", 0),
+                    "skillNum": skill_num,
                     "chargePercent": lv10_value // 100,
                     "chargeValue": lv10_value,
                     "targetType": "self" if target_type in SELF_TARGET_TYPES else "party",
-                })
-    return charges
+                }
+    return list(charge_by_skill.values())
 
 
 def classify_target_type(func_target_type: str) -> str:
