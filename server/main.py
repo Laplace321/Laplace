@@ -417,6 +417,44 @@ async def chat(request: ChatRequest):
                 # 单 Skill 预设：直接用 user_params 作为该 Skill 的参数
                 merged_params.update(user_params)
             resolved_skill_calls.append({"skill_name": skill_name, "params": merged_params})
+
+        # B1 策略：用户补充文字走 Stage 2 LLM 路由解析额外 Skills 并合并
+        user_text = user_message.strip()
+        if user_text:
+            try:
+                skill_descriptions = [
+                    {"name": s.name, "description": s.description}
+                    for s in SKILL_REGISTRY.values()
+                    if isinstance(s, QuerySkill)
+                ]
+                routing_prompt = build_routing_prompt(skill_descriptions)
+                extra_routing = await chat_completion(
+                    system_prompt=routing_prompt,
+                    user_message=user_text,
+                    temperature=0.1,
+                    json_mode=True,
+                    response_schema=routing_response_json_schema,
+                    response_validator=parse_routing_response,
+                )
+                extra_routing.pop("_model", None)
+                extra_routing.pop("_response_format", None)
+                extra_routing.pop("_provider", None)
+                extra_routing.pop("_attempts", None)
+                extra_skills = extra_routing.get("skill_calls", [])
+                # 合并：预设 Skills + 额外 Skills（同名去重）
+                existing_names = {s["skill_name"] for s in resolved_skill_calls}
+                for es in extra_skills:
+                    if es.get("skill_name") not in existing_names:
+                        resolved_skill_calls.append(es)
+                        existing_names.add(es["skill_name"])
+                # 如果额外路由建议了不同的 response_skill，优先使用
+                extra_resp_skill = extra_routing.get("response_skill")
+                if extra_resp_skill and extra_resp_skill != "respond_servant_list":
+                    resolved_response_skill = extra_resp_skill
+                print(f"[{trace_id}] Preset B1: merged {len(extra_skills)} extra skills from supplement")
+            except Exception as e:
+                # 补充解析失败不影响预设查询
+                print(f"[{trace_id}] Preset B1 supplement parsing failed (non-blocking): {e}")
     elif request.params:
         # 前端直传 skill_calls（params 格式：[{"skill_name": ..., "params": ...}]）
         if isinstance(request.params, list):

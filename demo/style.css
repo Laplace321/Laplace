@@ -572,127 +572,55 @@ body {
   transform: translateY(0);
 }
 
-/* --- Preset Form Area --- */
-.preset-form-area {
-  max-width: 800px;
-  margin: 0 auto var(--space-sm);
-  background: rgba(25, 28, 58, 0.6);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-  animation: form-slide-down 0.2s ease both;
+/* --- Preset Pill (inside input wrapper) --- */
+.preset-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(74, 125, 255, 0.15);
+  border: 1px solid rgba(74, 125, 255, 0.3);
+  color: var(--accent-blue);
+  padding: 4px 8px 4px 10px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  animation: pill-pop-in 0.15s ease both;
 }
 
-.preset-form-area.hidden {
+.preset-pill.hidden {
   display: none;
 }
 
-@keyframes form-slide-down {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes pill-pop-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
 }
 
-.preset-form-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--accent-blue);
-  margin-bottom: var(--space-sm);
-  letter-spacing: 0.5px;
+.preset-pill-icon {
+  font-size: 10px;
+  opacity: 0.7;
 }
 
-.preset-form-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm) var(--space-md);
-  margin-bottom: var(--space-sm);
+.preset-pill-label {
+  letter-spacing: 0.3px;
 }
 
-.preset-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 100px;
-}
-
-.preset-field-wide {
-  flex: 1;
-  min-width: 200px;
-}
-
-.preset-field-label {
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.preset-field select,
-.preset-field input[type="text"] {
-  background: var(--bg-input);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-body);
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.preset-field select:focus,
-.preset-field input[type="text"]:focus {
-  border-color: var(--accent-blue);
-}
-
-.preset-form-supplement {
-  margin-bottom: var(--space-sm);
-}
-
-.preset-form-supplement input[type="text"] {
-  width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-body);
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.preset-form-supplement input[type="text"]:focus {
-  border-color: var(--accent-blue);
-}
-
-.preset-form-supplement input[type="text"]::placeholder {
-  color: var(--text-muted);
-}
-
-.preset-form-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.preset-form-submit {
-  background: linear-gradient(135deg, var(--accent-blue) 0%, rgba(74, 125, 255, 0.8) 100%);
+.preset-pill-close {
+  background: none;
   border: none;
-  color: #fff;
-  padding: 6px 20px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 600;
+  color: var(--accent-blue);
+  font-size: 14px;
+  line-height: 1;
   cursor: pointer;
-  transition: all 0.2s;
+  padding: 0 2px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
 }
 
-.preset-form-submit:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 10px rgba(74, 125, 255, 0.3);
-}
-
-.preset-form-submit:active {
-  transform: translateY(0);
+.preset-pill-close:hover {
+  opacity: 1;
 }
 
 /* --- Chat Input Area --- */
