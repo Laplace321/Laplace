@@ -35,13 +35,62 @@ const STORAGE_KEY = "laplace_chat_history";
 let currentSessionId = Date.now().toString(36);
 let chatHistory = []; // 当前会话的消息数组
 
-// === Thinking Step Labels ===
+// === Thinking Step Labels (两阶段 LLM 路由) ===
 const THINKING_LABELS = {
-  parsing: "正在理解你的问题...",
-  parsed: "意图识别完成",
+  routing: "正在理解你的问题...",
+  routed: "Skill 路由完成",
+  filling_params: "正在解析查询参数...",
   querying: "正在检索从者数据...",
   generating: "正在生成分析...",
+  // 兼容旧阶段名
+  parsing: "正在理解你的问题...",
+  parsed: "意图识别完成",
 };
+
+// === Preset Definitions (与后端 PRESET_REGISTRY 同步) ===
+const PRESETS = {
+  cycle_farming: {
+    name: "cycle_farming",
+    label: "周回筛选",
+    icon: "⚡",
+    fields: [
+      { key: "search_by_np_charge", label: "NP 充能", type: "number", placeholder: "最低充能百分比（如 30）", default: 30, paramKey: "value", extraParams: { op: "gte" } },
+      { key: "search_by_class", label: "职阶", type: "select", options: ["", "saber", "archer", "lancer", "rider", "caster", "assassin", "berserker", "ruler", "avenger", "alterEgo", "foreigner", "pretender", "moonCancer"], paramKey: "class_name" },
+      { key: "search_by_rarity", label: "星级", type: "select", options: ["", "1", "2", "3", "4", "5"], paramKey: "value", extraParams: { op: "eq" } },
+    ],
+    response_skill: "respond_servant_list",
+  },
+  servant_lookup: {
+    name: "servant_lookup",
+    label: "从者查询",
+    icon: "🔍",
+    fields: [
+      { key: "lookup_servant", label: "从者名称", type: "text", placeholder: "输入从者名称或昵称", paramKey: "name" },
+    ],
+    response_skill: "respond_servant_detail",
+  },
+  servant_compare: {
+    name: "servant_compare",
+    label: "从者对比",
+    icon: "⚖️",
+    fields: [
+      { key: "compare_servants", label: "从者名称", type: "text", placeholder: "用逗号分隔多个名称（如：呆毛,小莫）", paramKey: "names", isArray: true },
+    ],
+    response_skill: "respond_servant_compare",
+  },
+  support_recommend: {
+    name: "support_recommend",
+    label: "辅助推荐",
+    icon: "🛡️",
+    fields: [
+      { key: "search_by_skill_effect", label: "辅助类型", type: "select", options: ["gainNp", "upAtk", "upArts", "upBuster", "upQuick", "invincible", "avoidance"], paramKey: "effects", isArray: true, labels: { gainNp: "充能", upAtk: "攻击力提升", upArts: "Arts 提升", upBuster: "Buster 提升", upQuick: "Quick 提升", invincible: "无敌", avoidance: "回避" } },
+    ],
+    response_skill: "respond_support_analysis",
+  },
+};
+
+// === Preset State ===
+let activePreset = null;
 
 // === Send Message (SSE Stream) ===
 async function sendMessage() {
@@ -449,6 +498,201 @@ function scrollToBottom() {
   });
 }
 
+// === Preset Quick Query ===
+
+function createPresetTabs() {
+  const inputArea = document.getElementById("chat-input-area");
+  const inputWrapper = inputArea.querySelector(".input-wrapper");
+
+  // 创建标签容器
+  const tabsContainer = document.createElement("div");
+  tabsContainer.className = "preset-tabs";
+  tabsContainer.id = "preset-tabs";
+
+  for (const [key, preset] of Object.entries(PRESETS)) {
+    const tab = document.createElement("button");
+    tab.className = "preset-tab";
+    tab.dataset.preset = key;
+    tab.innerHTML = `<span class="preset-tab-icon">${preset.icon}</span><span>${preset.label}</span>`;
+    tab.addEventListener("click", () => togglePreset(key));
+    tabsContainer.appendChild(tab);
+  }
+
+  // 创建参数表单容器
+  const formContainer = document.createElement("div");
+  formContainer.className = "preset-form hidden";
+  formContainer.id = "preset-form";
+
+  // 插入到 input-wrapper 之前
+  inputWrapper.parentNode.insertBefore(tabsContainer, inputWrapper);
+  inputWrapper.parentNode.insertBefore(formContainer, inputWrapper);
+}
+
+function togglePreset(presetKey) {
+  const form = document.getElementById("preset-form");
+  const tabs = document.querySelectorAll(".preset-tab");
+
+  if (activePreset === presetKey) {
+    // 关闭当前预设
+    activePreset = null;
+    form.classList.add("hidden");
+    form.innerHTML = "";
+    tabs.forEach(t => t.classList.remove("active"));
+    chatInput.placeholder = "输入你的问题... 例如「30 自充的从者有哪些」";
+    return;
+  }
+
+  activePreset = presetKey;
+  tabs.forEach(t => {
+    t.classList.toggle("active", t.dataset.preset === presetKey);
+  });
+
+  renderPresetForm(PRESETS[presetKey]);
+  form.classList.remove("hidden");
+  chatInput.placeholder = "补充描述（可选）... 例如「只要五星的」";
+}
+
+function renderPresetForm(preset) {
+  const form = document.getElementById("preset-form");
+  const fieldsHtml = preset.fields.map(field => {
+    if (field.type === "number") {
+      return `
+        <div class="preset-field">
+          <label class="preset-label">${field.label}</label>
+          <input type="number" class="preset-input" data-skill="${field.key}" data-param="${field.paramKey}"
+                 placeholder="${field.placeholder || ''}" value="${field.default || ''}"
+                 ${field.extraParams ? `data-extra='${JSON.stringify(field.extraParams)}'` : ""}>
+        </div>
+      `;
+    } else if (field.type === "text") {
+      return `
+        <div class="preset-field">
+          <label class="preset-label">${field.label}</label>
+          <input type="text" class="preset-input" data-skill="${field.key}" data-param="${field.paramKey}"
+                 placeholder="${field.placeholder || ''}"
+                 ${field.isArray ? 'data-is-array="true"' : ""}>
+        </div>
+      `;
+    } else if (field.type === "select") {
+      const options = field.options.map(opt => {
+        const label = field.labels ? (field.labels[opt] || opt) : (CLASS_NAMES[opt] || opt);
+        return `<option value="${opt}">${opt === "" ? "全部" : label}</option>`;
+      }).join("");
+      return `
+        <div class="preset-field">
+          <label class="preset-label">${field.label}</label>
+          <select class="preset-input" data-skill="${field.key}" data-param="${field.paramKey}"
+                  ${field.isArray ? 'data-is-array="true"' : ""}
+                  ${field.extraParams ? `data-extra='${JSON.stringify(field.extraParams)}'` : ""}>
+            ${options}
+          </select>
+        </div>
+      `;
+    }
+    return "";
+  }).join("");
+
+  form.innerHTML = `
+    <div class="preset-form-header">
+      <span class="preset-form-title">${preset.icon} ${preset.label}</span>
+      <button class="preset-submit-btn" id="preset-submit-btn">查询</button>
+    </div>
+    <div class="preset-fields">${fieldsHtml}</div>
+  `;
+
+  document.getElementById("preset-submit-btn").addEventListener("click", () => sendPresetQuery(preset));
+}
+
+async function sendPresetQuery(preset) {
+  if (isProcessing) return;
+
+  // 收集表单参数
+  const params = {};
+  const inputs = document.querySelectorAll("#preset-form .preset-input");
+  for (const input of inputs) {
+    const skill = input.dataset.skill;
+    const paramKey = input.dataset.param;
+    const value = input.value.trim();
+    if (!value) continue;
+
+    if (!params[skill]) params[skill] = {};
+    const extra = input.dataset.extra ? JSON.parse(input.dataset.extra) : {};
+    Object.assign(params[skill], extra);
+
+    if (input.dataset.isArray === "true") {
+      params[skill][paramKey] = value.includes(",")
+        ? value.split(",").map(s => s.trim()).filter(Boolean)
+        : [value];
+    } else if (input.type === "number") {
+      params[skill][paramKey] = parseInt(value, 10);
+    } else {
+      params[skill][paramKey] = value;
+    }
+  }
+
+  // 检查至少一个参数
+  if (Object.keys(params).length === 0) {
+    showToast("请至少填写一个查询条件");
+    return;
+  }
+
+  const supplement = chatInput.value.trim() || null;
+  const displayText = `[${preset.label}] ${Object.entries(params).map(([k, v]) => JSON.stringify(v)).join(" + ")}${supplement ? ` + "${supplement}"` : ""}`;
+
+  isProcessing = true;
+  sendBtn.disabled = true;
+  sendBtn.classList.add("loading");
+  chatInput.value = "";
+
+  appendMessage("user", displayText);
+  chatHistory.push({ role: "user", text: displayText });
+  saveSession();
+
+  // 使用 POST /api/chat（非 SSE），因为 preset 模式不走 stream
+  const typingEl = appendTypingIndicator();
+
+  try {
+    const resp = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "preset",
+        preset_name: preset.name,
+        params,
+        supplement,
+        response_skill: preset.response_skill,
+      }),
+    });
+
+    typingEl.remove();
+
+    if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
+    const data = await resp.json();
+
+    appendAssistantResponse(data);
+
+    if (data.model) modelName.textContent = data.model;
+    if (data.traceId) {
+      lastTraceId = data.traceId;
+      updateDebugPanel();
+    }
+
+    chatHistory.push({
+      role: "assistant",
+      html: chatMessages.lastElementChild.querySelector(".message-bubble")?.innerHTML || "",
+    });
+    saveSession();
+  } catch (err) {
+    typingEl.remove();
+    showToast(`请求失败: ${err.message}`);
+  } finally {
+    isProcessing = false;
+    sendBtn.disabled = false;
+    sendBtn.classList.remove("loading");
+    chatInput.focus();
+  }
+}
+
 // === Event Listeners ===
 sendBtn.addEventListener("click", sendMessage);
 
@@ -467,10 +711,11 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// Focus input on load
+// Focus input on load + init preset tabs
 document.addEventListener("DOMContentLoaded", () => {
   chatInput.focus();
   createDebugPanel();
+  createPresetTabs();
 });
 
 // === Debug Panel (Ctrl+D, localhost only) ===
