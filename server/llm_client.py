@@ -1,19 +1,21 @@
 """
 Laplace — LLM Client
 
-OpenAI Responses API client with fallback models and a structured
+OpenAI Responses API client with multi-provider fallback and a structured
 intent contract for JSON-mode calls.
 
-迁移说明：
-- 从 Chat Completions API 迁移至 Responses API（2025 推荐）
-- 端点：/v1/chat/completions → /v1/responses
-- 参数：messages → input, system role → instructions
-- 结构化输出：response_format → text.format
+架构：
+- 多提供商降级：通过 .env 扁平变量配置提供商链（LLM_PROVIDERS）
+- 两层降级策略：同提供商内模型降级 → 跨提供商降级
+- 向后兼容：未配置 LLM_PROVIDERS 时回退旧变量 LLM_BASE_URL / LLM_API_KEY 等
+
+端点：OpenAI Responses API（/v1/responses）
 """
 
 import asyncio
 import json
 import os
+from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
@@ -25,13 +27,61 @@ from server.schemas import IntentResponse, intent_response_json_schema
 # 从项目根目录加载 .env
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-BASE_URL = os.getenv("LLM_BASE_URL", "https://x.obao.cloud/v1")
-API_KEY = os.getenv("LLM_API_KEY", "")
-PRIMARY_MODEL = os.getenv("LLM_MODEL", "claude-sonnet-4-6")
-FALLBACK_MODELS = [
-    m.strip() for m in os.getenv("LLM_FALLBACK_MODELS", "Deepseek-V4-Flash,gpt-5.4").split(",") if m.strip()
-]
 
+# --- Provider 数据模型 ---
+
+
+@dataclass
+class LLMProvider:
+    """单个 LLM 提供商配置。"""
+
+    name: str
+    base_url: str
+    api_key: str
+    models: list[str] = field(default_factory=list)
+
+
+def _load_providers() -> list[LLMProvider]:
+    """从环境变量解析提供商链。
+
+    优先读取新格式（LLM_PROVIDERS + LLM_{NAME}_URL/KEY/MODELS），
+    未配置时回退旧格式（LLM_BASE_URL / LLM_API_KEY / LLM_MODEL / LLM_FALLBACK_MODELS）。
+    """
+    providers_str = os.getenv("LLM_PROVIDERS", "").strip()
+
+    if providers_str:
+        # 新格式：多提供商配置
+        providers: list[LLMProvider] = []
+        for name in providers_str.split(","):
+            name = name.strip().upper()
+            if not name:
+                continue
+            base_url = os.getenv(f"LLM_{name}_URL", "").strip()
+            api_key = os.getenv(f"LLM_{name}_KEY", "").strip()
+            models_str = os.getenv(f"LLM_{name}_MODELS", "").strip()
+            if not base_url or not api_key:
+                print(f"⚠️  提供商 {name} 缺少 URL 或 KEY，已跳过")
+                continue
+            models = [m.strip() for m in models_str.split(",") if m.strip()]
+            if not models:
+                print(f"⚠️  提供商 {name} 未配置模型列表，已跳过")
+                continue
+            providers.append(LLMProvider(name=name.lower(), base_url=base_url, api_key=api_key, models=models))
+        if providers:
+            return providers
+        print("⚠️  LLM_PROVIDERS 已配置但无有效提供商，回退旧变量")
+
+    # 旧格式：单提供商兼容
+    base_url = os.getenv("LLM_BASE_URL", "https://x.obao.cloud/v1")
+    api_key = os.getenv("LLM_API_KEY", "")
+    primary = os.getenv("LLM_MODEL", "claude-sonnet-4-6")
+    fallbacks = [m.strip() for m in os.getenv("LLM_FALLBACK_MODELS", "").split(",") if m.strip()]
+    models = [primary] + fallbacks
+    return [LLMProvider(name="default", base_url=base_url, api_key=api_key, models=models)]
+
+
+# 模块加载时解析一次
+PROVIDERS: list[LLMProvider] = _load_providers()
 
 # Retry 配置
 MAX_RETRIES = 3
@@ -50,47 +100,55 @@ async def chat_completion(
     temperature: float = 0.1,
     json_mode: bool = True,
 ) -> dict:
-    """
-    调用 LLM Responses API。
+    """调用 LLM Responses API，支持两层降级。
+
+    降级策略：
+    1. 同提供商内按 models 列表顺序降级
+    2. 同提供商所有模型失败后，切换下一个提供商
 
     Args:
-        system_prompt: 系统指令（对应 Responses API 的 instructions）
-        user_message: 用户消息（对应 Responses API 的 input）
-        model: 模型名称，None 则使用主模型
+        system_prompt: 系统指令（Responses API 的 instructions）
+        user_message: 用户消息（Responses API 的 input）
+        model: 指定模型名称，None 则使用提供商链默认顺序
         max_tokens: 最大 token 数
-        temperature: 温度，低温 = 更确定性
-        json_mode: True 时使用结构化输出（text.format）
+        temperature: 温度
+        json_mode: True 时使用结构化输出
 
     Returns:
         解析后的 JSON 响应或 {"text": "..."}
 
     Raises:
-        Exception: 所有模型都失败时
+        Exception: 所有提供商所有模型都失败时
     """
-    models_to_try = [model or PRIMARY_MODEL] + FALLBACK_MODELS
     attempts_log: list[dict] = []
 
-    for m in models_to_try:
-        try:
-            result = await _call_model(
-                m,
-                system_prompt,
-                user_message,
-                max_tokens,
-                temperature,
-                json_mode,
-            )
-            result["_attempts"] = attempts_log
-            return result
-        except Exception as e:
-            attempts_log.append({"model": m, "error": str(e)})
-            print(f"⚠️  模型 {m} 调用失败: {e}")
-            continue
+    for provider in PROVIDERS:
+        # 如果指定了 model，只在第一个提供商尝试该模型
+        models_to_try = [model] if model else provider.models
+        for m in models_to_try:
+            try:
+                result = await _call_model(
+                    provider,
+                    m,
+                    system_prompt,
+                    user_message,
+                    max_tokens,
+                    temperature,
+                    json_mode,
+                )
+                result["_provider"] = provider.name
+                result["_attempts"] = attempts_log
+                return result
+            except Exception as e:
+                attempts_log.append({"provider": provider.name, "model": m, "error": str(e)})
+                print(f"⚠️  [{provider.name}] 模型 {m} 调用失败: {e}")
+                continue
 
     raise Exception(f"所有模型都调用失败。尝试记录: {attempts_log}")
 
 
 async def _call_model(
+    provider: LLMProvider,
     model: str,
     system_prompt: str,
     user_message: str,
@@ -101,6 +159,7 @@ async def _call_model(
     """调用单个模型；JSON 模式优先尝试 text.format 结构化输出。"""
     if not json_mode:
         data = await _retry_call(
+            provider,
             model,
             system_prompt,
             user_message,
@@ -114,6 +173,7 @@ async def _call_model(
     response_format = "json_schema"
     try:
         data = await _retry_call(
+            provider,
             model,
             system_prompt,
             user_message,
@@ -124,6 +184,7 @@ async def _call_model(
     except LLMResponseFormatUnsupported:
         response_format = "text_fallback"
         data = await _retry_call(
+            provider,
             model,
             system_prompt,
             user_message,
@@ -139,6 +200,7 @@ async def _call_model(
 
 
 async def _retry_call(
+    provider: LLMProvider,
     model: str,
     instructions: str,
     input_text: str,
@@ -151,6 +213,8 @@ async def _retry_call(
     for attempt in range(MAX_RETRIES):
         try:
             return await _post_response(
+                provider.base_url,
+                provider.api_key,
                 model,
                 instructions,
                 input_text,
@@ -164,12 +228,14 @@ async def _retry_call(
             last_error = e
             if attempt < MAX_RETRIES - 1:
                 wait = RETRY_BACKOFF[attempt]
-                print(f"  ↻ 模型 {model} 第 {attempt + 1} 次失败，{wait}s 后重试: {e}")
+                print(f"  ↻ [{provider.name}] 模型 {model} 第 {attempt + 1} 次失败，{wait}s 后重试: {e}")
                 await asyncio.sleep(wait)
     raise last_error
 
 
 async def _post_response(
+    base_url: str,
+    api_key: str,
     model: str,
     instructions: str,
     input_text: str,
@@ -178,10 +244,10 @@ async def _post_response(
     use_structured_output: bool,
 ) -> dict:
     """Send one Responses API request."""
-    url = f"{BASE_URL}/responses"
+    url = f"{base_url}/responses"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {API_KEY}",
+        "Authorization": f"Bearer {api_key}",
     }
     payload: dict[str, Any] = {
         "model": model,
@@ -191,7 +257,6 @@ async def _post_response(
         "temperature": temperature,
     }
     if use_structured_output:
-        # Responses API 使用 text.format 而非 response_format
         payload["text"] = {
             "format": {
                 "type": "json_schema",
