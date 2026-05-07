@@ -37,10 +37,15 @@ let chatHistory = []; // 当前会话的消息数组
 
 // === Thinking Step Labels ===
 const THINKING_LABELS = {
+  // Skill 路由阶段（新）
+  routing: "正在理解你的问题...",
+  routed: "意图识别完成",
+  executing: "正在检索从者数据...",
+  generating: "正在生成分析...",
+  // 旧阶段名兼容映射
   parsing: "正在理解你的问题...",
   parsed: "意图识别完成",
   querying: "正在检索从者数据...",
-  generating: "正在生成分析...",
 };
 
 // === Send Message (SSE Stream) ===
@@ -209,7 +214,19 @@ function handleThinking(data, els) {
   const label = data.message || THINKING_LABELS[data.phase] || data.phase;
   const step = renderThinkingStep(data.phase, label, els.thinkingSteps);
 
-  // If parsed, show conditions detail
+  // If routed (Skill mode), show skill_calls detail
+  if (data.phase === "routed" && data.skill_calls) {
+    completeThinkingStep(step);
+    if (data.skill_calls.length > 0) {
+      const detail = document.createElement("div");
+      detail.className = "thinking-step-detail";
+      const skillNames = data.skill_calls.map(c => c.skill_name || c.name).join(", ");
+      detail.textContent = `Skills: ${skillNames}`;
+      els.thinkingSteps.appendChild(detail);
+    }
+  }
+
+  // If parsed (legacy mode), show conditions detail
   if (data.phase === "parsed" && data.conditions) {
     completeThinkingStep(step);
     const keys = Object.keys(data.conditions);

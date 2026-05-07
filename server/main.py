@@ -526,56 +526,95 @@ async def chat(request: ChatRequest):
 
 @app.get("/api/chat/stream")
 async def chat_stream(message: str):
-    """SSE 流式对话端点 — 分阶段推送思考过程和结果。"""
+    """SSE 流式对话端点 — 分阶段推送思考过程和结果。
+
+    使用 Skill-Based Architecture：Stage 1 LLM 路由 → SkillExecutor → RAG 生成。
+    """
 
     async def event_generator():
         trace_id = uuid.uuid4().hex[:8]
         model_used = "unknown"
 
-        # ── 阶段 1: 意图解析 ──
-        yield _sse_event("thinking", {"phase": "parsing", "message": "正在理解你的问题..."})
+        # ── 阶段 1: Skill 路由 ──
+        yield _sse_event("thinking", {"phase": "routing", "message": "正在理解你的问题..."})
+
+        skill_descriptions = [
+            {"name": s.name, "description": s.description} for s in SKILL_REGISTRY.values() if isinstance(s, QuerySkill)
+        ]
+        routing_prompt = build_routing_prompt(skill_descriptions)
 
         try:
-            parsed = await chat_completion(
-                system_prompt=get_system_prompt(),
+            routing_result = await chat_completion(
+                system_prompt=routing_prompt,
                 user_message=message,
                 temperature=0.1,
                 json_mode=True,
+                response_schema=routing_response_json_schema,
+                response_validator=parse_routing_response,
             )
         except Exception as e:
-            print(f"[{trace_id}] LLM Parse Error: {e}")
-            await log_chat_trace_async(trace_id, message, {}, 0, "意图解析失败", error=str(e))
-            yield _sse_event("error", {"phase": "parsing", "message": "意图解析失败，请稍后重试"})
+            print(f"[{trace_id}] Skill Routing Error: {e}")
+            await log_chat_trace_async(trace_id, message, {}, 0, "路由失败", error=str(e))
+            yield _sse_event("error", {"phase": "routing", "message": "路由失败，请稍后重试"})
             return
 
-        model_used = parsed.pop("_model", "unknown")
-        parsed.pop("_response_format", None)
+        model_used = routing_result.pop("_model", "unknown")
+        routing_result.pop("_response_format", None)
+        routing_result.pop("_provider", None)
+        routing_result.pop("_attempts", None)
 
-        # 推送解析结果
+        skill_calls = routing_result.get("skill_calls", [])
+        response_skill_name = routing_result.get("response_skill", "respond_servant_list")
+
+        # 推送路由结果
         yield _sse_event(
             "thinking",
             {
-                "phase": "parsed",
-                "intent": parsed.get("intent", "unknown"),
-                "conditions": parsed.get("conditions", {}),
+                "phase": "routed",
+                "skill_calls": skill_calls,
+                "response_skill": response_skill_name,
             },
         )
 
-        # 非查询意图 — 直接返回文本
-        if parsed.get("intent") != "query_servants":
-            reply_text = parsed.get("rawResponse", "抱歉，我目前只能回答 FGO 从者相关的问题。")
-            await log_chat_trace_async(trace_id, message, parsed, 0, reply_text)
-            yield _sse_event("delta", {"text": reply_text})
+        # 检查 fallback
+        fallback = routing_result.get("fallback")
+        if fallback is not None:
+            fb_msg = fallback.get("message", "无法理解你的问题，请尝试更具体的描述。")
+            await log_chat_trace_async(trace_id, message, routing_result, 0, fb_msg)
+            yield _sse_event("delta", {"text": fb_msg})
             yield _sse_event("done", {"model": model_used, "traceId": trace_id})
             return
 
-        # ── 阶段 2: 数据检索 ──
-        yield _sse_event("thinking", {"phase": "querying", "message": "正在检索从者数据..."})
+        # 空 skill_calls 且无 fallback
+        if not skill_calls:
+            no_match_msg = "无法从你的问题中识别出查询条件，请尝试更具体的描述。"
+            await log_chat_trace_async(trace_id, message, routing_result, 0, no_match_msg)
+            yield _sse_event("delta", {"text": no_match_msg})
+            yield _sse_event("done", {"model": model_used, "traceId": trace_id})
+            return
 
-        conditions = parsed.get("conditions", {})
-        servants = execute_query(conditions)
-        total_found = len(servants)
+        # ── 阶段 2: Skill 执行 ──
+        yield _sse_event("thinking", {"phase": "executing", "message": "正在检索从者数据..."})
+
+        executor = SkillExecutor()
+        result = executor.execute(skill_calls, response_skill_name)
+        servants = result.servants
+        total_found = result.total_found
         returned_servants = servants[:MAX_RESULTS]
+
+        # 执行阶段 fallback（结果为空）
+        if result.is_fallback:
+            fb_reply = result.fallback_message or "未找到匹配的从者。"
+            await log_chat_trace_async(
+                trace_id,
+                message,
+                {"mode": "skill", "skill_calls": skill_calls},
+                0,
+                fb_reply,
+            )
+            yield _sse_event("delta", {"text": fb_reply})
+            yield _sse_event("done", {"model": model_used, "traceId": trace_id})
+            return
 
         # 卡片先行 — 立即推送从者数据
         yield _sse_event(
@@ -591,8 +630,14 @@ async def chat_stream(message: str):
         yield _sse_event("thinking", {"phase": "generating", "message": "正在生成分析..."})
 
         context_data, _ = _build_context(servants)
-        context_data["query_conditions"] = conditions
-        generation_prompt = get_generation_prompt(message, json.dumps(context_data, ensure_ascii=False))
+        context_data["query_conditions"] = {"skill_calls": skill_calls}
+        context_json = json.dumps(context_data, ensure_ascii=False)
+
+        # 使用 Response Skill 的 prompt（如果可用）
+        if result.response_skill is not None:
+            gen_prompt = result.response_skill.build_prompt(message, context_json)
+        else:
+            gen_prompt = get_generation_prompt(message, context_json)
 
         try:
             generation_response = await chat_completion(
@@ -600,7 +645,7 @@ async def chat_stream(message: str):
                     "You are a helpful AI assistant. You MUST strictly follow "
                     "the provided data and NEVER use your internal knowledge about FGO."
                 ),
-                user_message=generation_prompt,
+                user_message=gen_prompt,
                 temperature=0.1,
                 json_mode=False,
             )
@@ -608,25 +653,19 @@ async def chat_stream(message: str):
             if not final_reply:
                 raise ValueError("Empty response from LLM")
         except Exception as e:
-            print(f"[{trace_id}] RAG Generate Error: {e}")
-            response_template = parsed.get("responseTemplate", "为你找到了以下从者：")
-            final_reply = f"{response_template}（共 {total_found} 位）"
-            if total_found > MAX_CONTEXT_SIZE:
-                final_reply += f"（仅显示前 {MAX_CONTEXT_SIZE} 位详情，更多请查看卡片）"
+            print(f"[{trace_id}] Skill RAG Error: {e}")
+            final_reply = f"为你找到了 {total_found} 位从者。"
 
         # 推送生成的文本
         yield _sse_event("delta", {"text": final_reply})
 
-        # 记录完整链路（含 LLM 调用元数据）
-        context_data["llm_attempts"] = parsed.get("_attempts", [])
-        context_data["llm_model"] = model_used
+        # 记录完整链路
         await log_chat_trace_async(
             trace_id=trace_id,
             user_message=message,
-            parsed_intent=conditions,
+            parsed_intent={"mode": "skill", "skill_calls": skill_calls},
             found_count=total_found,
             final_reply=final_reply,
-            context=context_data,
         )
 
         # ── 完成 ──
