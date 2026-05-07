@@ -3,7 +3,7 @@ Skill 模式 API 集成测试。
 
 测试范围：
 - chat() 的 mode 分发（natural_language vs skill）
-- skill 模式下 preset / params / supplement 各路径
+- skill 模式下 preset / params / B1 补充解析各路径
 - _handle_skill_mode() 的 LLM 路由路径（mock chat_completion）
 - 未知 preset 错误处理
 - 旧模式（natural_language）不受影响
@@ -299,34 +299,75 @@ class TestSkillModeLLMRouting:
 
 
 # ============================================================
-# Supplement 拼接测试
+# Preset B1 策略测试：补充文字走 Stage 2 LLM 路由解析额外 Skills
 # ============================================================
 
 
-class TestSkillModeSupplement:
-    """测试 supplement 字段拼接。"""
+class TestPresetB1SupplementParsing:
+    """测试 preset 模式下补充文字走 Stage 2 解析额外 Skills。"""
 
     @pytest.mark.anyio
-    async def test_supplement_appended_to_message(self, mock_chat_completion_rag):
-        """supplement 应拼接到 user_message 中。"""
-        captured_messages = []
+    async def test_supplement_triggers_stage2_routing(self):
+        """preset + 非空 message 应触发 Stage 2 LLM 路由解析额外 Skills。"""
+        routing_call_count = 0
+
+        async def side_effect(**kwargs):
+            nonlocal routing_call_count
+            if kwargs.get("json_mode") is True:
+                routing_call_count += 1
+                # Stage 2 路由：返回额外的 search_by_skill_effect
+                return {
+                    "skill_calls": [{"skill_name": "search_by_skill_effect", "params": {"effect": "invincible"}}],
+                    "response_skill": "respond_servant_list",
+                    "fallback": None,
+                    "_model": "mock-routing",
+                }
+            # RAG 生成阶段
+            return {"text": "这是 mock 生成的回复。", "_model": "mock-rag"}
+
+        with patch("server.main.chat_completion", new=AsyncMock(side_effect=side_effect)):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post(
+                    "/api/chat",
+                    json={
+                        "message": "有无敌技能的",
+                        "mode": "skill",
+                        "preset_name": "cycle_farming",
+                    },
+                )
+        assert resp.status_code == 200
+        data = resp.json()
+        # Stage 2 路由应被调用一次
+        assert routing_call_count == 1
+        # 合并后的 skill_calls 应包含预设 Skills + 额外的 search_by_skill_effect
+        skill_names = [sc["skill_name"] for sc in data["query"]["skill_calls"]]
+        assert "search_by_skill_effect" in skill_names
+        # 预设的 search_by_np_charge 也应存在
+        assert "search_by_np_charge" in skill_names
+
+    @pytest.mark.anyio
+    async def test_empty_message_skips_stage2(self, mock_chat_completion_rag):
+        """preset + 空 message 不应触发 Stage 2 路由。"""
+        routing_called = False
 
         original_side_effect = mock_chat_completion_rag
 
-        async def capture_side_effect(**kwargs):
-            captured_messages.append(kwargs.get("user_message", ""))
+        async def side_effect(**kwargs):
+            nonlocal routing_called
+            if kwargs.get("json_mode") is True:
+                routing_called = True
             return await original_side_effect(**kwargs)
 
-        with patch("server.main.chat_completion", new=AsyncMock(side_effect=capture_side_effect)):
+        with patch("server.main.chat_completion", new=AsyncMock(side_effect=side_effect)):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                await client.post(
+                resp = await client.post(
                     "/api/chat",
                     json={
-                        "message": "筛选从者",
+                        "message": "",
                         "mode": "skill",
                         "preset_name": "cycle_farming",
-                        "supplement": "只要五星的",
                     },
                 )
-        # RAG 阶段的 user_message 应包含 supplement 内容
-        assert any("只要五星的" in msg for msg in captured_messages)
+        assert resp.status_code == 200
+        # 空 message 不应触发 Stage 2 路由
+        assert not routing_called

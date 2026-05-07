@@ -164,7 +164,6 @@ class ChatRequest(BaseModel):
     mode: str = "skill"
     preset_name: str | None = None
     params: dict | list | None = None
-    supplement: str | None = None
     response_skill: str | None = None
 
 
@@ -384,11 +383,6 @@ async def chat(request: ChatRequest):
     user_message = request.message
     trace_id = uuid.uuid4().hex[:8]
 
-    # 补充信息拼接到 user_message
-    effective_message = user_message
-    if request.supplement:
-        effective_message = f"{user_message}\n补充条件：{request.supplement}"
-
     # 确定 skill_calls 来源：preset > params > LLM 路由
     resolved_skill_calls: list[dict] | None = None
     resolved_response_skill = request.response_skill or "respond_servant_list"
@@ -464,7 +458,7 @@ async def chat(request: ChatRequest):
             resolved_skill_calls = [request.params]
 
     return await _handle_skill_mode(
-        user_message=effective_message,
+        user_message=user_message,
         trace_id=trace_id,
         skill_calls=resolved_skill_calls,  # None 则走 LLM 路由
         response_skill_name=resolved_response_skill,

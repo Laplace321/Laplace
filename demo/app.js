@@ -97,7 +97,9 @@ async function sendPresetQuery(presetName, userText) {
   const typingEl = appendTypingIndicator();
 
   try {
-    const body = { message: userText || "", mode: "skill", preset_name: presetName };
+    // If user typed nothing, send preset's defaultMessage so backend RAG has intent context
+    const effectiveMessage = userText || (preset ? preset.defaultMessage : "") || "";
+    const body = { message: effectiveMessage, mode: "skill", preset_name: presetName };
 
     const resp = await fetch(API_URL, {
       method: "POST",
