@@ -77,48 +77,39 @@ const THINKING_LABELS = {
 };
 
 // === Send Preset Query (via POST /api/chat with mode=skill) ===
-async function sendPresetQuery(presetName, message) {
+// Non-streaming: uses typing indicator + appendAssistantResponse (no skeleton/thinking steps)
+async function sendPresetQuery(presetName, message, supplement) {
   if (isProcessing) return;
 
   isProcessing = true;
   sendBtn.disabled = true;
   sendBtn.classList.add("loading");
 
-  appendMessage("user", message);
-  chatHistory.push({ role: "user", text: message });
+  // Build display message for user bubble
+  const displayMsg = supplement ? `${message}（${supplement}）` : message;
+  appendMessage("user", displayMsg);
+  chatHistory.push({ role: "user", text: displayMsg });
   saveSession();
 
-  const els = createStreamingContainer();
+  const typingEl = appendTypingIndicator();
 
   try {
+    const body = { message: displayMsg, mode: "skill", preset_name: presetName };
+    if (supplement) body.supplement = supplement;
+
     const resp = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, mode: "skill", preset_name: presetName }),
+      body: JSON.stringify(body),
     });
     if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
     const data = await resp.json();
 
-    // 移除骨架屏
-    const skel = els.container.querySelector(".skeleton-placeholder");
-    if (skel) skel.remove();
+    // Remove typing indicator
+    typingEl.remove();
 
-    // 渲染从者卡片
-    if (data.servants && data.servants.length > 0) {
-      els.cardsArea.innerHTML = data.servants
-        .map((s, i) => createCardHtml(s, i))
-        .join("");
-      void els.cardsArea.offsetHeight;
-      els.cardsArea.classList.remove("stream-hidden");
-    }
-
-    // 渲染文字回复
-    const replyHtml = typeof marked !== "undefined"
-      ? marked.parse(data.reply)
-      : `<p>${escapeHtml(data.reply)}</p>`;
-    els.replyBody.innerHTML = replyHtml;
-    void els.replyBody.offsetHeight;
-    els.replyBody.classList.remove("stream-hidden");
+    // Render response using non-streaming path (no skeleton residue)
+    appendAssistantResponse(data);
 
     if (data.model && data.model !== "error") {
       modelName.textContent = data.model;
@@ -128,13 +119,14 @@ async function sendPresetQuery(presetName, message) {
       updateDebugPanel();
     }
 
-    const bubbleEl = els.container.querySelector(".message-bubble");
-    const html = bubbleEl ? bubbleEl.innerHTML : "";
+    // Save to history
+    const lastMsg = chatMessages.querySelector(".message.assistant-message:last-child .message-bubble");
+    const html = lastMsg ? lastMsg.innerHTML : "";
     chatHistory.push({ role: "assistant", html });
     saveSession();
 
   } catch (err) {
-    els.container.remove();
+    typingEl.remove();
     showToast(`请求失败: ${err.message}`);
   } finally {
     isProcessing = false;
@@ -142,6 +134,208 @@ async function sendPresetQuery(presetName, message) {
     sendBtn.classList.remove("loading");
     chatInput.focus();
   }
+}
+
+// === Preset Bar: Render persistent tabs above input ===
+let activePreset = null;
+
+function renderPresetBar() {
+  const bar = document.getElementById("preset-bar");
+  if (!bar) return;
+  bar.innerHTML = PRESETS.map(p =>
+    `<button class="preset-bar-tab" data-preset="${p.name}" title="${escapeHtml(p.description)}">${escapeHtml(p.label)}</button>`
+  ).join("");
+}
+
+// === Preset Form: Render parameter form for selected preset ===
+function renderPresetForm(presetName) {
+  const formArea = document.getElementById("preset-form-area");
+  if (!formArea) return;
+
+  const preset = PRESETS.find(p => p.name === presetName);
+  if (!preset) return;
+
+  let formHtml = "";
+
+  switch (presetName) {
+    case "cycle_farming":
+      formHtml = `
+        <div class="preset-form-title">${escapeHtml(preset.label)}</div>
+        <div class="preset-form-fields">
+          <label class="preset-field">
+            <span class="preset-field-label">充能量</span>
+            <select id="pf-charge-value">
+              <option value="20">20%</option>
+              <option value="30" selected>30%</option>
+              <option value="50">50%</option>
+              <option value="100">100%</option>
+            </select>
+          </label>
+          <label class="preset-field">
+            <span class="preset-field-label">条件</span>
+            <select id="pf-charge-op">
+              <option value="gte" selected>≥</option>
+              <option value="eq">=</option>
+              <option value="lte">≤</option>
+            </select>
+          </label>
+          <label class="preset-field">
+            <span class="preset-field-label">职阶</span>
+            <select id="pf-class">
+              <option value="">全部</option>
+              <option value="saber">Saber</option>
+              <option value="archer">Archer</option>
+              <option value="lancer">Lancer</option>
+              <option value="rider">Rider</option>
+              <option value="caster">Caster</option>
+              <option value="assassin">Assassin</option>
+              <option value="berserker">Berserker</option>
+              <option value="ruler">Ruler</option>
+              <option value="avenger">Avenger</option>
+              <option value="alterEgo">Alter Ego</option>
+              <option value="foreigner">Foreigner</option>
+            </select>
+          </label>
+          <label class="preset-field">
+            <span class="preset-field-label">星级</span>
+            <select id="pf-rarity">
+              <option value="">全部</option>
+              <option value="5">★★★★★</option>
+              <option value="4">★★★★</option>
+              <option value="3">★★★</option>
+              <option value="2">★★</option>
+              <option value="1">★</option>
+            </select>
+          </label>
+        </div>
+        <div class="preset-form-supplement">
+          <input type="text" id="pf-supplement" placeholder="补充描述（可选），如：有无敌技能的" autocomplete="off">
+        </div>
+        <div class="preset-form-actions">
+          <button class="preset-form-submit" id="pf-submit">查询</button>
+        </div>
+      `;
+      break;
+
+    case "servant_lookup":
+      formHtml = `
+        <div class="preset-form-title">${escapeHtml(preset.label)}</div>
+        <div class="preset-form-fields">
+          <label class="preset-field preset-field-wide">
+            <span class="preset-field-label">从者名称</span>
+            <input type="text" id="pf-servant-name" placeholder="例如：梅林、孔明" autocomplete="off">
+          </label>
+        </div>
+        <div class="preset-form-actions">
+          <button class="preset-form-submit" id="pf-submit">查询</button>
+        </div>
+      `;
+      break;
+
+    case "servant_compare":
+      formHtml = `
+        <div class="preset-form-title">${escapeHtml(preset.label)}</div>
+        <div class="preset-form-fields">
+          <label class="preset-field preset-field-wide">
+            <span class="preset-field-label">从者名称（用逗号分隔）</span>
+            <input type="text" id="pf-compare-names" placeholder="例如：村正, 武尊" autocomplete="off">
+          </label>
+        </div>
+        <div class="preset-form-actions">
+          <button class="preset-form-submit" id="pf-submit">对比</button>
+        </div>
+      `;
+      break;
+
+    case "support_recommend":
+      formHtml = `
+        <div class="preset-form-title">${escapeHtml(preset.label)}</div>
+        <div class="preset-form-supplement">
+          <input type="text" id="pf-supplement" placeholder="补充描述（可选），如：有群充技能的" autocomplete="off">
+        </div>
+        <div class="preset-form-actions">
+          <button class="preset-form-submit" id="pf-submit">查询</button>
+        </div>
+      `;
+      break;
+  }
+
+  formArea.innerHTML = formHtml;
+  formArea.classList.remove("hidden");
+
+  // Bind submit
+  const submitBtn = document.getElementById("pf-submit");
+  if (submitBtn) {
+    submitBtn.addEventListener("click", () => handlePresetSubmit(presetName));
+  }
+
+  // Allow Enter key in form inputs to submit
+  formArea.querySelectorAll("input[type=text]").forEach(input => {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handlePresetSubmit(presetName);
+      }
+    });
+  });
+}
+
+// === Handle Preset Form Submit ===
+function handlePresetSubmit(presetName) {
+  let message = "";
+  let supplement = "";
+
+  switch (presetName) {
+    case "cycle_farming": {
+      const chargeVal = document.getElementById("pf-charge-value")?.value || "30";
+      const chargeOp = document.getElementById("pf-charge-op")?.value || "gte";
+      const cls = document.getElementById("pf-class")?.value || "";
+      const rarity = document.getElementById("pf-rarity")?.value || "";
+      supplement = document.getElementById("pf-supplement")?.value?.trim() || "";
+
+      const opLabel = { gte: "大于等于", eq: "等于", lte: "小于等于" }[chargeOp] || "大于等于";
+      const parts = [`${opLabel} ${chargeVal} 自充的从者`];
+      if (cls) parts.unshift(`${CLASS_NAMES[cls] || cls} 职阶`);
+      if (rarity) parts.unshift(`${rarity} 星`);
+      message = parts.join("，");
+      if (supplement) message += `，${supplement}`;
+      break;
+    }
+    case "servant_lookup": {
+      const name = document.getElementById("pf-servant-name")?.value?.trim();
+      if (!name) { showToast("请输入从者名称"); return; }
+      message = `查一下${name}的详细信息`;
+      break;
+    }
+    case "servant_compare": {
+      const names = document.getElementById("pf-compare-names")?.value?.trim();
+      if (!names) { showToast("请输入要对比的从者名称"); return; }
+      message = `对比${names}`;
+      break;
+    }
+    case "support_recommend": {
+      supplement = document.getElementById("pf-supplement")?.value?.trim() || "";
+      message = "有充能技能的辅助从者";
+      if (supplement) message = supplement;
+      break;
+    }
+  }
+
+  // Collapse form after submit
+  collapsePresetForm();
+  sendPresetQuery(presetName, message, supplement);
+}
+
+// === Collapse Preset Form ===
+function collapsePresetForm() {
+  const formArea = document.getElementById("preset-form-area");
+  if (formArea) {
+    formArea.classList.add("hidden");
+    formArea.innerHTML = "";
+  }
+  activePreset = null;
+  // Remove active state from tabs
+  document.querySelectorAll(".preset-bar-tab").forEach(tab => tab.classList.remove("active"));
 }
 
 // === Send Message (SSE Stream) ===
@@ -572,17 +766,24 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-// Suggestion chips + Preset tabs (event delegation)
+// Suggestion chips (event delegation)
 document.addEventListener("click", (e) => {
   if (e.target.classList.contains("chip")) {
     chatInput.value = e.target.dataset.query;
     sendMessage();
   }
-  if (e.target.classList.contains("preset-tab")) {
-    const preset = e.target.dataset.preset;
-    const message = e.target.dataset.message;
-    if (preset && message) {
-      sendPresetQuery(preset, message);
+  // Preset bar tab toggle
+  if (e.target.classList.contains("preset-bar-tab")) {
+    const presetName = e.target.dataset.preset;
+    if (activePreset === presetName) {
+      // Toggle off: collapse form
+      collapsePresetForm();
+    } else {
+      // Switch to new preset
+      document.querySelectorAll(".preset-bar-tab").forEach(t => t.classList.remove("active"));
+      e.target.classList.add("active");
+      activePreset = presetName;
+      renderPresetForm(presetName);
     }
   }
 });
@@ -796,10 +997,7 @@ function appendWelcomeMessage() {
     <div class="message-content">
       <div class="message-bubble">
         <p>你好，Master！我是 <strong>Laplace</strong>，你的 FGO 数据助手。</p>
-        <p>你可以用自然语言向我提问，或使用快捷查询：</p>
-        <div class="preset-tabs">
-          ${PRESETS.map(p => `<button class="preset-tab" data-preset="${p.name}" data-message="${escapeHtml(p.defaultMessage)}" title="${escapeHtml(p.description)}">${escapeHtml(p.label)}</button>`).join("")}
-        </div>
+        <p>你可以用自然语言向我提问，例如：</p>
         <div class="suggestion-chips">
           <button class="chip" data-query="帮我找一下 30 自充的从者有哪些">30 自充的从者</button>
           <button class="chip" data-query="大于 50 自充的从者有哪些">50% 以上自充</button>
@@ -828,7 +1026,8 @@ document.getElementById("history-btn").addEventListener("click", () => {
 // Init on load
 document.addEventListener("DOMContentLoaded", () => {
   createHistoryPanel();
-  // Inject welcome message dynamically (with preset tabs)
+  renderPresetBar();
+  // Inject welcome message dynamically
   if (chatMessages.querySelectorAll(".message").length === 0) {
     appendWelcomeMessage();
   }

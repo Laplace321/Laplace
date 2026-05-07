@@ -259,40 +259,6 @@ body {
   margin-bottom: 4px;
 }
 
-/* --- Preset Tabs --- */
-.preset-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  margin-top: var(--space-md);
-  margin-bottom: var(--space-sm);
-}
-
-.preset-tab {
-  background: rgba(74, 125, 255, 0.1);
-  border: 1px solid rgba(74, 125, 255, 0.25);
-  color: var(--accent-blue);
-  padding: 6px 16px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-family: var(--font-body);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  letter-spacing: 0.5px;
-}
-
-.preset-tab:hover {
-  background: rgba(74, 125, 255, 0.2);
-  border-color: var(--accent-blue);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(74, 125, 255, 0.15);
-}
-
-.preset-tab:active {
-  transform: translateY(0);
-}
-
 /* --- Suggestion Chips --- */
 .suggestion-chips {
   display: flex;
@@ -563,6 +529,170 @@ body {
 @keyframes cursor-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+/* --- Preset Bar (above input) --- */
+.preset-bar {
+  max-width: 800px;
+  margin: 0 auto var(--space-sm);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.preset-bar-tab {
+  background: rgba(74, 125, 255, 0.08);
+  border: 1px solid rgba(74, 125, 255, 0.2);
+  color: var(--accent-blue);
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.5px;
+}
+
+.preset-bar-tab:hover {
+  background: rgba(74, 125, 255, 0.18);
+  border-color: var(--accent-blue);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(74, 125, 255, 0.12);
+}
+
+.preset-bar-tab.active {
+  background: rgba(74, 125, 255, 0.22);
+  border-color: var(--accent-blue);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(74, 125, 255, 0.2);
+}
+
+.preset-bar-tab:active {
+  transform: translateY(0);
+}
+
+/* --- Preset Form Area --- */
+.preset-form-area {
+  max-width: 800px;
+  margin: 0 auto var(--space-sm);
+  background: rgba(25, 28, 58, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  animation: form-slide-down 0.2s ease both;
+}
+
+.preset-form-area.hidden {
+  display: none;
+}
+
+@keyframes form-slide-down {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.preset-form-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-blue);
+  margin-bottom: var(--space-sm);
+  letter-spacing: 0.5px;
+}
+
+.preset-form-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.preset-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 100px;
+}
+
+.preset-field-wide {
+  flex: 1;
+  min-width: 200px;
+}
+
+.preset-field-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.preset-field select,
+.preset-field input[type="text"] {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.preset-field select:focus,
+.preset-field input[type="text"]:focus {
+  border-color: var(--accent-blue);
+}
+
+.preset-form-supplement {
+  margin-bottom: var(--space-sm);
+}
+
+.preset-form-supplement input[type="text"] {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.preset-form-supplement input[type="text"]:focus {
+  border-color: var(--accent-blue);
+}
+
+.preset-form-supplement input[type="text"]::placeholder {
+  color: var(--text-muted);
+}
+
+.preset-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.preset-form-submit {
+  background: linear-gradient(135deg, var(--accent-blue) 0%, rgba(74, 125, 255, 0.8) 100%);
+  border: none;
+  color: #fff;
+  padding: 6px 20px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preset-form-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 10px rgba(74, 125, 255, 0.3);
+}
+
+.preset-form-submit:active {
+  transform: translateY(0);
 }
 
 /* --- Chat Input Area --- */

@@ -7,7 +7,7 @@
   <title>Laplace — FGO 智能助手</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Orbitron:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
   <script src="marked.min.js"></script>
 </head>
 <body>
@@ -51,6 +51,12 @@
 
   <!-- Chat Input -->
   <div id="chat-input-area">
+    <div id="preset-bar" class="preset-bar">
+      <!-- Preset tabs rendered by app.js -->
+    </div>
+    <div id="preset-form-area" class="preset-form-area hidden">
+      <!-- Preset parameter form rendered by app.js -->
+    </div>
     <div class="input-wrapper">
       <input type="text" id="chat-input" placeholder="输入你的问题... 例如「30 自充的从者有哪些」" autocomplete="off">
       <button id="send-btn" title="发送">
@@ -65,6 +71,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
