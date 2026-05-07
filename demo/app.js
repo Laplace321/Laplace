@@ -85,6 +85,7 @@ async function sendPresetQuery(presetName, userText) {
   isProcessing = true;
   sendBtn.disabled = true;
   sendBtn.classList.add("loading");
+  chatInput.value = ""; // ensure input is cleared
 
   const preset = PRESETS.find(p => p.name === presetName);
   const presetLabel = preset ? preset.label : presetName;
@@ -502,6 +503,25 @@ function appendAssistantResponse(data) {
   const msg = document.createElement("div");
   msg.className = "message assistant-message";
 
+  // Thinking steps: show skill_calls from query info (preset mode insight)
+  let thinkingHtml = "";
+  const skillCalls = data.query?.skill_calls || [];
+  if (skillCalls.length > 0) {
+    const skillNames = skillCalls.map(c => c.skill_name || c.name).join(", ");
+    thinkingHtml = `
+      <div class="thinking-steps">
+        <div class="thinking-step completed">
+          <span class="thinking-step-icon">✓</span>
+          <span class="thinking-step-text">意图识别完成</span>
+        </div>
+        <div class="thinking-step-detail">Skills: ${escapeHtml(skillNames)}</div>
+        <div class="thinking-step completed">
+          <span class="thinking-step-icon">✓</span>
+          <span class="thinking-step-text">检索到 ${data.count || 0} 位从者</span>
+        </div>
+      </div>`;
+  }
+
   let cardsHtml = "";
   if (data.servants && data.servants.length > 0) {
     cardsHtml = `<div class="chat-cards-grid">
@@ -516,8 +536,9 @@ function appendAssistantResponse(data) {
     <div class="message-avatar">⧫</div>
     <div class="message-content">
       <div class="message-bubble">
-        <div class="markdown-body">${replyHtml}</div>
+        ${thinkingHtml}
         ${cardsHtml}
+        <div class="markdown-body">${replyHtml}</div>
       </div>
     </div>
   `;

@@ -27,7 +27,7 @@ def _register_presets() -> None:
         Preset(
             name="cycle_farming",
             display_name="周回筛选",
-            query_skills=["search_by_np_charge", "search_by_class", "search_by_rarity"],
+            query_skills=["search_by_np_charge"],
             response_skill="respond_servant_list",
             param_template={
                 "search_by_np_charge": {"op": "gte", "value": 30},
