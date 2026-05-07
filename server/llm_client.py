@@ -15,6 +15,7 @@ intent contract for JSON-mode calls.
 import asyncio
 import json
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -99,6 +100,8 @@ async def chat_completion(
     max_tokens: int = 1024,
     temperature: float = 0.1,
     json_mode: bool = True,
+    response_schema: Callable[[], dict] | None = None,
+    response_validator: Callable[[str | dict], dict] | None = None,
 ) -> dict:
     """调用 LLM Responses API，支持两层降级。
 
@@ -113,6 +116,8 @@ async def chat_completion(
         max_tokens: 最大 token 数
         temperature: 温度
         json_mode: True 时使用结构化输出
+        response_schema: 自定义 JSON Schema 生成函数，默认 intent_response_json_schema
+        response_validator: 自定义响应校验函数，默认 parse_intent_response
 
     Returns:
         解析后的 JSON 响应或 {"text": "..."}
@@ -120,6 +125,12 @@ async def chat_completion(
     Raises:
         Exception: 所有提供商所有模型都失败时
     """
+    # 默认值：保持现有行为（IntentResponse 校验）
+    if response_schema is None:
+        response_schema = intent_response_json_schema
+    if response_validator is None:
+        response_validator = parse_intent_response
+
     attempts_log: list[dict] = []
 
     for provider in PROVIDERS:
@@ -135,6 +146,8 @@ async def chat_completion(
                     max_tokens,
                     temperature,
                     json_mode,
+                    response_schema=response_schema,
+                    response_validator=response_validator,
                 )
                 result["_provider"] = provider.name
                 result["_attempts"] = attempts_log
@@ -155,8 +168,15 @@ async def _call_model(
     max_tokens: int,
     temperature: float,
     json_mode: bool = True,
+    *,
+    response_schema: Callable[[], dict] | None = None,
+    response_validator: Callable[[str | dict], dict] | None = None,
 ) -> dict:
     """调用单个模型；JSON 模式优先尝试 text.format 结构化输出。"""
+    if response_schema is None:
+        response_schema = intent_response_json_schema
+    if response_validator is None:
+        response_validator = parse_intent_response
     if not json_mode:
         data = await _retry_call(
             provider,
@@ -180,6 +200,7 @@ async def _call_model(
             max_tokens,
             temperature,
             use_structured_output=True,
+            response_schema=response_schema,
         )
     except LLMResponseFormatUnsupported:
         response_format = "text_fallback"
@@ -193,7 +214,7 @@ async def _call_model(
             use_structured_output=False,
         )
 
-    parsed = parse_intent_response(_extract_response_text(data))
+    parsed = response_validator(_extract_response_text(data))
     parsed["_model"] = model
     parsed["_response_format"] = response_format
     return parsed
@@ -207,8 +228,12 @@ async def _retry_call(
     max_tokens: int,
     temperature: float,
     use_structured_output: bool,
+    *,
+    response_schema: Callable[[], dict] | None = None,
 ) -> dict:
     """对 _post_response 执行带 exponential backoff 的重试。"""
+    if response_schema is None:
+        response_schema = intent_response_json_schema
     last_error = None
     for attempt in range(MAX_RETRIES):
         try:
@@ -221,6 +246,7 @@ async def _retry_call(
                 max_tokens,
                 temperature,
                 use_structured_output,
+                response_schema=response_schema,
             )
         except LLMResponseFormatUnsupported:
             raise  # 格式不支持不重试，直接抛出让上层降级
@@ -242,8 +268,12 @@ async def _post_response(
     max_tokens: int,
     temperature: float,
     use_structured_output: bool,
+    *,
+    response_schema: Callable[[], dict] | None = None,
 ) -> dict:
     """Send one Responses API request."""
+    if response_schema is None:
+        response_schema = intent_response_json_schema
     url = f"{base_url}/responses"
     headers = {
         "Content-Type": "application/json",
@@ -257,12 +287,13 @@ async def _post_response(
         "temperature": temperature,
     }
     if use_structured_output:
+        schema = response_schema()
         payload["text"] = {
             "format": {
                 "type": "json_schema",
                 "name": "laplace_intent_response",
                 "strict": True,
-                "schema": intent_response_json_schema(),
+                "schema": schema,
             }
         }
 

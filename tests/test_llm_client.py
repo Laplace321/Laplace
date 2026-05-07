@@ -221,3 +221,86 @@ def test_load_providers_multi_provider(monkeypatch):
     assert providers[0].models == ["m1", "m2"]
     assert providers[1].name == "beta"
     assert providers[1].models == ["m3"]
+
+
+# --- 迭代 2：自定义 response_schema / response_validator 测试 ---
+
+CUSTOM_JSON = '{"action":"search","query":"saber"}'
+
+
+def _custom_schema() -> dict:
+    """自定义 JSON Schema（简单对象）。"""
+    return {
+        "type": "object",
+        "properties": {
+            "action": {"type": "string"},
+            "query": {"type": "string"},
+        },
+        "required": ["action", "query"],
+        "additionalProperties": False,
+    }
+
+
+def _custom_validator(content: str | dict) -> dict:
+    """自定义校验函数：直接解析 JSON，不做 Pydantic 校验。"""
+    import json
+
+    raw = content if isinstance(content, dict) else json.loads(llm_client.extract_json_object(content))
+    if "action" not in raw:
+        raise ValueError("Missing 'action' field")
+    return raw
+
+
+def test_custom_schema_is_sent_to_api():
+    """自定义 response_schema 应传递到 API 请求的 text.format.schema 中。"""
+    FakeAsyncClient.responses = [FakeResponse(content=CUSTOM_JSON)]
+
+    result = run(
+        llm_client.chat_completion(
+            "system",
+            "user",
+            model="model-a1",
+            response_schema=_custom_schema,
+            response_validator=_custom_validator,
+        )
+    )
+
+    # 验证自定义 schema 被传递到 API 请求
+    req = FakeAsyncClient.requests[0]
+    schema = req["text"]["format"]["schema"]
+    assert schema["properties"]["action"]["type"] == "string"
+    assert schema["properties"]["query"]["type"] == "string"
+
+    # 验证自定义 validator 正确解析响应
+    assert result["action"] == "search"
+    assert result["query"] == "saber"
+    assert result["_model"] == "model-a1"
+
+
+def test_custom_validator_is_used_for_parsing():
+    """自定义 response_validator 应替代默认的 parse_intent_response。"""
+    FakeAsyncClient.responses = [FakeResponse(content=CUSTOM_JSON)]
+
+    result = run(
+        llm_client.chat_completion(
+            "system",
+            "user",
+            model="model-a1",
+            response_validator=_custom_validator,
+        )
+    )
+
+    # 自定义 validator 不会校验 IntentResponse，所以不会报错
+    assert result["action"] == "search"
+
+
+def test_default_schema_when_none_provided():
+    """不传 response_schema 时应使用默认的 intent_response_json_schema。"""
+    FakeAsyncClient.responses = [FakeResponse(content=VALID_JSON)]
+
+    result = run(llm_client.chat_completion("system", "user", model="model-a1"))
+
+    # 默认行为不变
+    assert result["intent"] == "query_servants"
+    req = FakeAsyncClient.requests[0]
+    assert req["text"]["format"]["type"] == "json_schema"
