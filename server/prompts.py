@@ -245,3 +245,124 @@ def get_generation_prompt(user_query: str, context_json: str) -> str:
 
 请直接输出你的回答文案，不要包含任何多余的 JSON 或代码块标签。
 """
+
+
+# ============================================================
+# Stage 1 路由 Prompt（Skill-Based Architecture, ADR-018）
+# ============================================================
+
+
+def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
+    """构建 Stage 1 路由 Prompt。
+
+    Args:
+        skill_descriptions: [{"name": "search_by_class", "description": "按职阶筛选"}, ...]
+
+    Returns:
+        系统 Prompt 字符串
+    """
+    skills_section = "\n".join(f"- `{s['name']}`: {s['description']}" for s in skill_descriptions)
+
+    return f"""你是 Laplace 路由器。根据用户的自然语言问题，选择需要执行的 Skill 组合。
+
+## 可用 Skills
+{skills_section}
+
+## 可用 Response Skills
+- `respond_servant_list`: 以列表形式展示筛选到的从者（默认）
+- `respond_servant_detail`: 展示单个从者的详细信息
+- `respond_servant_compare`: 对比多个从者并给出分析
+- `respond_support_analysis`: 分析辅助从者的能力并推荐搭配
+
+## 输出格式
+严格按以下 JSON 格式输出，不要有任何其他内容：
+
+```json
+{{
+  "skill_calls": [
+    {{"skill_name": "search_by_class", "params": {{"className": "Caster"}}}},
+    {{"skill_name": "search_by_rarity", "params": {{"op": "eq", "value": 5}}}}
+  ],
+  "response_skill": "respond_servant_list",
+  "fallback": null
+}}
+```
+
+## 路由规则
+1. 将用户问题拆解为一个或多个 Skill 调用，多个 Skill 表示 AND 组合筛选
+2. `params` 中的字段名必须与 Skill 定义的参数名完全一致
+3. 单从者查询用 `lookup_servant`，多从者对比用 `compare_servants`
+4. 如果用户的问题无法匹配任何 Skill，设置 fallback：
+   ```json
+   {{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": {{"code": "no_match", "message": "无法理解你的问题"}}}}
+   ```
+5. 根据查询类型选择合适的 response_skill
+
+## 示例
+
+用户："30自充以上的Caster"
+```json
+{{"skill_calls": [{{"skill_name": "search_by_np_charge", "params": {{"op": "gte", "value": 30}}}}, {{"skill_name": "search_by_class", "params": {{"className": "Caster"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："查一下梅林"
+```json
+{{"skill_calls": [{{"skill_name": "lookup_servant", "params": {{"name": "梅林"}}}}], "response_skill": "respond_servant_detail"}}
+```
+
+用户："对比村正和武尊"
+```json
+{{"skill_calls": [{{"skill_name": "compare_servants", "params": {{"names": ["村正", "武尊"]}}}}], "response_skill": "respond_servant_compare"}}
+```
+"""
+
+
+def build_params_prompt(
+    skill_calls: list[dict],
+    user_message: str,
+    skill_registry: dict,
+) -> str:
+    """构建 Stage 2 参数精填 Prompt。
+
+    当 Stage 1 路由的参数不够精确时，可通过 Stage 2 让 LLM 补充参数细节。
+
+    Args:
+        skill_calls: Stage 1 输出的 SkillCall 列表
+        user_message: 用户原始消息
+        skill_registry: SKILL_REGISTRY
+
+    Returns:
+        系统 Prompt 字符串
+    """
+    calls_desc = []
+    for call in skill_calls:
+        skill_name = call.get("skill_name", "")
+        params = call.get("params", {})
+        skill = skill_registry.get(skill_name)
+        if skill is None:
+            continue
+        schema_info = ""
+        if hasattr(skill, "params_schema") and skill.params_schema is not None:
+            schema_info = f"\n    参数 Schema: {skill.params_schema.model_json_schema()}"
+        calls_desc.append(f"  - Skill: `{skill_name}` — {skill.description}\n    当前参数: {params}{schema_info}")
+
+    calls_section = "\n".join(calls_desc) if calls_desc else "  （无）"
+
+    return f"""你是 Laplace 参数精填器。Stage 1 路由已选定了以下 Skills，请根据用户原始问题补充或修正参数。
+
+## 用户原始问题
+{user_message}
+
+## Stage 1 路由结果
+{calls_section}
+
+## 输出格式
+以 JSON 数组格式输出修正后的 skill_calls，格式与 Stage 1 相同：
+```json
+[
+  {{"skill_name": "xxx", "params": {{...}}}}
+]
+```
+
+只输出 JSON 数组，不要有任何其他内容。
+"""
