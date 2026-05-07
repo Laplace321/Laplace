@@ -117,14 +117,38 @@ RUN_LIVE_LLM_TESTS=1 python -m pytest tests/test_llm_client_live.py -s
 
 ### 环境变量配置
 
-在 `.env` 文件中可配置以下选项：
+复制 `.env.example` 为 `.env` 并填入真实密钥：
+
+```bash
+cp .env.example .env
+```
+
+#### LLM 多提供商配置
+
+支持配置多个 LLM 提供商，按优先级自动降级。降级策略为两层：同提供商内按模型列表顺序降级，全部失败后切换下一个提供商。
+
+```bash
+# 提供商降级链（按优先级排列，逗号分隔）
+LLM_PROVIDERS=obao,openai
+
+# 每个提供商的配置（命名约定：LLM_{NAME}_URL / LLM_{NAME}_KEY / LLM_{NAME}_MODELS）
+LLM_OBAO_URL=https://x.obao.cloud/v1
+LLM_OBAO_KEY=your-obao-api-key
+LLM_OBAO_MODELS=claude-sonnet-4-6,Deepseek-V4-Flash,gpt-5.4
+
+LLM_OPENAI_URL=https://api.openai.com/v1
+LLM_OPENAI_KEY=your-openai-api-key
+LLM_OPENAI_MODELS=gpt-4o,gpt-4o-mini
+```
+
+上例的降级链为：`obao/claude-sonnet` → `obao/Deepseek` → `obao/gpt-5.4` → `openai/gpt-4o` → `openai/gpt-4o-mini`。
+
+> **向后兼容**：未配置 `LLM_PROVIDERS` 时，自动回退旧变量 `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` / `LLM_FALLBACK_MODELS`，零迁移成本。
+
+#### 其他环境变量
 
 | 变量 | 说明 | 默认值 |
 | :--- | :--- | :--- |
-| `LLM_BASE_URL` | LLM API 基础地址 | - |
-| `LLM_API_KEY` | LLM API 密钥 | - |
-| `LLM_MODEL` | 主模型 | - |
-| `LLM_FALLBACK_MODELS` | 回退模型（逗号分隔） | - |
 | `CORS_ORIGINS` | CORS 白名单（逗号分隔） | `http://localhost:8000,http://127.0.0.1:8000` |
 | `RATE_LIMIT_PER_MINUTE` | 单 IP 每分钟最大请求数 | `10` |
 | `RATE_LIMIT_GLOBAL_PER_MINUTE` | 全站每分钟最大请求数（0=不限） | `100` |
