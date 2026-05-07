@@ -13,7 +13,6 @@ intent contract for JSON-mode calls.
 """
 
 import asyncio
-import json
 import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -21,9 +20,6 @@ from typing import Any
 
 import httpx
 from dotenv import load_dotenv
-from pydantic import ValidationError
-
-from server.schemas import IntentResponse, intent_response_json_schema
 
 # 从项目根目录加载 .env
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
@@ -116,8 +112,8 @@ async def chat_completion(
         max_tokens: 最大 token 数
         temperature: 温度
         json_mode: True 时使用结构化输出
-        response_schema: 自定义 JSON Schema 生成函数，默认 intent_response_json_schema
-        response_validator: 自定义响应校验函数，默认 parse_intent_response
+        response_schema: JSON Schema 生成函数（json_mode=True 时必须提供）
+        response_validator: 响应校验函数（json_mode=True 时必须提供）
 
     Returns:
         解析后的 JSON 响应或 {"text": "..."}
@@ -125,11 +121,9 @@ async def chat_completion(
     Raises:
         Exception: 所有提供商所有模型都失败时
     """
-    # 默认值：保持现有行为（IntentResponse 校验）
-    if response_schema is None:
-        response_schema = intent_response_json_schema
-    if response_validator is None:
-        response_validator = parse_intent_response
+    # json_mode=True 时，调用方必须显式传入 schema 和 validator
+    if json_mode and (response_schema is None or response_validator is None):
+        raise ValueError("json_mode=True requires both response_schema and response_validator")
 
     attempts_log: list[dict] = []
 
@@ -173,10 +167,6 @@ async def _call_model(
     response_validator: Callable[[str | dict], dict] | None = None,
 ) -> dict:
     """调用单个模型；JSON 模式优先尝试 text.format 结构化输出。"""
-    if response_schema is None:
-        response_schema = intent_response_json_schema
-    if response_validator is None:
-        response_validator = parse_intent_response
     if not json_mode:
         data = await _retry_call(
             provider,
@@ -232,8 +222,6 @@ async def _retry_call(
     response_schema: Callable[[], dict] | None = None,
 ) -> dict:
     """对 _post_response 执行带 exponential backoff 的重试。"""
-    if response_schema is None:
-        response_schema = intent_response_json_schema
     last_error = None
     for attempt in range(MAX_RETRIES):
         try:
@@ -272,8 +260,6 @@ async def _post_response(
     response_schema: Callable[[], dict] | None = None,
 ) -> dict:
     """Send one Responses API request."""
-    if response_schema is None:
-        response_schema = intent_response_json_schema
     url = f"{base_url}/responses"
     headers = {
         "Content-Type": "application/json",
@@ -304,16 +290,6 @@ async def _post_response(
                 raise LLMResponseFormatUnsupported(_safe_error_text(resp))
         resp.raise_for_status()
         return resp.json()
-
-
-def parse_intent_response(content: str | dict) -> dict:
-    """Parse and validate an LLM intent response."""
-    raw = content if isinstance(content, dict) else json.loads(extract_json_object(content))
-    try:
-        parsed = IntentResponse.model_validate(raw)
-    except ValidationError as e:
-        raise ValueError(f"LLM JSON schema validation failed: {e}") from e
-    return parsed.model_dump(exclude_none=True)
 
 
 def extract_json_object(content: str) -> str:

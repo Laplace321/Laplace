@@ -35,6 +35,34 @@ const STORAGE_KEY = "laplace_chat_history";
 let currentSessionId = Date.now().toString(36);
 let chatHistory = []; // 当前会话的消息数组
 
+// === Preset Definitions (mirror server/skills/presets.py) ===
+const PRESETS = [
+  {
+    name: "cycle_farming",
+    label: "周回筛选",
+    description: "按充能、职阶、稀有度筛选周回从者",
+    defaultMessage: "帮我找适合周回的从者",
+  },
+  {
+    name: "servant_lookup",
+    label: "从者查询",
+    description: "查询单个从者的详细信息",
+    defaultMessage: "查一下梅林的详细信息",
+  },
+  {
+    name: "servant_compare",
+    label: "从者对比",
+    description: "对比多个从者的能力",
+    defaultMessage: "对比村正和武尊",
+  },
+  {
+    name: "support_recommend",
+    label: "辅助推荐",
+    description: "筛选辅助向从者并推荐搭配",
+    defaultMessage: "有充能技能的辅助从者",
+  },
+];
+
 // === Thinking Step Labels ===
 const THINKING_LABELS = {
   // Skill 路由阶段（新）
@@ -47,6 +75,74 @@ const THINKING_LABELS = {
   parsed: "意图识别完成",
   querying: "正在检索从者数据...",
 };
+
+// === Send Preset Query (via POST /api/chat with mode=skill) ===
+async function sendPresetQuery(presetName, message) {
+  if (isProcessing) return;
+
+  isProcessing = true;
+  sendBtn.disabled = true;
+  sendBtn.classList.add("loading");
+
+  appendMessage("user", message);
+  chatHistory.push({ role: "user", text: message });
+  saveSession();
+
+  const els = createStreamingContainer();
+
+  try {
+    const resp = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, mode: "skill", preset_name: presetName }),
+    });
+    if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
+    const data = await resp.json();
+
+    // 移除骨架屏
+    const skel = els.container.querySelector(".skeleton-placeholder");
+    if (skel) skel.remove();
+
+    // 渲染从者卡片
+    if (data.servants && data.servants.length > 0) {
+      els.cardsArea.innerHTML = data.servants
+        .map((s, i) => createCardHtml(s, i))
+        .join("");
+      void els.cardsArea.offsetHeight;
+      els.cardsArea.classList.remove("stream-hidden");
+    }
+
+    // 渲染文字回复
+    const replyHtml = typeof marked !== "undefined"
+      ? marked.parse(data.reply)
+      : `<p>${escapeHtml(data.reply)}</p>`;
+    els.replyBody.innerHTML = replyHtml;
+    void els.replyBody.offsetHeight;
+    els.replyBody.classList.remove("stream-hidden");
+
+    if (data.model && data.model !== "error") {
+      modelName.textContent = data.model;
+    }
+    if (data.traceId) {
+      lastTraceId = data.traceId;
+      updateDebugPanel();
+    }
+
+    const bubbleEl = els.container.querySelector(".message-bubble");
+    const html = bubbleEl ? bubbleEl.innerHTML : "";
+    chatHistory.push({ role: "assistant", html });
+    saveSession();
+
+  } catch (err) {
+    els.container.remove();
+    showToast(`请求失败: ${err.message}`);
+  } finally {
+    isProcessing = false;
+    sendBtn.disabled = false;
+    sendBtn.classList.remove("loading");
+    chatInput.focus();
+  }
+}
 
 // === Send Message (SSE Stream) ===
 async function sendMessage() {
@@ -476,11 +572,18 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-// Suggestion chips
+// Suggestion chips + Preset tabs (event delegation)
 document.addEventListener("click", (e) => {
   if (e.target.classList.contains("chip")) {
     chatInput.value = e.target.dataset.query;
     sendMessage();
+  }
+  if (e.target.classList.contains("preset-tab")) {
+    const preset = e.target.dataset.preset;
+    const message = e.target.dataset.message;
+    if (preset && message) {
+      sendPresetQuery(preset, message);
+    }
   }
 });
 
@@ -693,7 +796,10 @@ function appendWelcomeMessage() {
     <div class="message-content">
       <div class="message-bubble">
         <p>你好，Master！我是 <strong>Laplace</strong>，你的 FGO 数据助手。</p>
-        <p>你可以用自然语言向我提问，例如：</p>
+        <p>你可以用自然语言向我提问，或使用快捷查询：</p>
+        <div class="preset-tabs">
+          ${PRESETS.map(p => `<button class="preset-tab" data-preset="${p.name}" data-message="${escapeHtml(p.defaultMessage)}" title="${escapeHtml(p.description)}">${escapeHtml(p.label)}</button>`).join("")}
+        </div>
         <div class="suggestion-chips">
           <button class="chip" data-query="帮我找一下 30 自充的从者有哪些">30 自充的从者</button>
           <button class="chip" data-query="大于 50 自充的从者有哪些">50% 以上自充</button>

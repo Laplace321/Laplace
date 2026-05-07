@@ -1,8 +1,7 @@
 """
 Schema 单元测试。
 
-测试 RoutingResponse / SkillCall / FallbackReason 的序列化/反序列化，
-以及新旧 Schema（IntentResponse vs RoutingResponse）共存无冲突。
+测试 RoutingResponse / SkillCall / FallbackReason 的序列化/反序列化。
 """
 
 import json
@@ -11,10 +10,8 @@ import pytest
 
 from server.schemas import (
     FallbackReason,
-    IntentResponse,
     RoutingResponse,
     SkillCall,
-    intent_response_json_schema,
     parse_routing_response,
     routing_response_json_schema,
 )
@@ -117,19 +114,6 @@ class TestJsonSchemas:
         assert "skill_calls" in props
         assert "response_skill" in props
 
-    def test_intent_schema_still_works(self):
-        """旧的 intent_response_json_schema 不受影响。"""
-        schema = intent_response_json_schema()
-        props = schema.get("properties", {})
-        assert "intent" in props
-        assert "conditions" in props
-
-    def test_schemas_are_different(self):
-        """新旧 Schema 不会混淆。"""
-        intent = intent_response_json_schema()
-        routing = routing_response_json_schema()
-        assert intent["title"] != routing["title"]
-
 
 # ============================================================
 # parse_routing_response 测试
@@ -166,19 +150,13 @@ class TestParseRoutingResponse:
 
 
 # ============================================================
-# 新旧 Schema 共存测试
+# RoutingResponse 独立验证测试
 # ============================================================
 
 
-class TestSchemaCoexistence:
-    def test_intent_response_still_validates(self):
-        """IntentResponse 仍然可以正常使用。"""
-        data = {"intent": "query_servants", "conditions": {"className": "Saber"}}
-        resp = IntentResponse.model_validate(data)
-        assert resp.intent == "query_servants"
-
-    def test_routing_response_validates_independently(self):
-        """RoutingResponse 可以独立使用，不依赖 IntentResponse。"""
+class TestRoutingResponseValidation:
+    def test_routing_response_validates(self):
+        """RoutingResponse 可以正常使用。"""
         data = {
             "skill_calls": [{"skill_name": "search_by_class", "params": {"className": "Saber"}}],
             "response_skill": "respond_servant_list",
@@ -186,9 +164,8 @@ class TestSchemaCoexistence:
         resp = RoutingResponse.model_validate(data)
         assert len(resp.skill_calls) == 1
 
-    def test_intent_data_does_not_validate_as_routing(self):
-        """IntentResponse 数据不应被误解析为 RoutingResponse。"""
-        intent_data = {"intent": "query_servants", "conditions": {"className": "Saber"}}
-        # RoutingResponse 不会报错（因为 extra="ignore"），但 skill_calls 为空
-        resp = RoutingResponse.model_validate(intent_data)
+    def test_unrelated_data_has_empty_skill_calls(self):
+        """无关数据解析为 RoutingResponse 时 skill_calls 为空。"""
+        data = {"intent": "query_servants", "conditions": {"className": "Saber"}}
+        resp = RoutingResponse.model_validate(data)
         assert resp.skill_calls == []

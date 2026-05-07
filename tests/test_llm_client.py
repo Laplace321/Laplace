@@ -75,44 +75,35 @@ def run(coro):
     return asyncio.run(coro)
 
 
-def test_parse_intent_response_accepts_plain_json():
-    parsed = llm_client.parse_intent_response(VALID_JSON)
+def _custom_validator_intent(content: str | dict) -> dict:
+    """通用校验函数：直接解析 JSON，不做 Pydantic 校验。"""
+    import json as _json
 
-    assert parsed["intent"] == "query_servants"
-    assert parsed["conditions"]["npCharge"]["value"] == 30
-
-
-def test_parse_intent_response_extracts_fenced_json():
-    parsed = llm_client.parse_intent_response(f"```json\n{VALID_JSON}\n```")
-
-    assert parsed["conditions"]["npCharge"]["op"] == "eq"
-
-
-def test_parse_intent_response_extracts_json_with_surrounding_text():
-    parsed = llm_client.parse_intent_response(f"好的，结果如下：\n{VALID_JSON}\n谢谢")
-
-    assert parsed["conditions"]["npCharge"]["value"] == 30
-
-
-def test_parse_intent_response_rejects_invalid_json_and_schema():
-    with pytest.raises(ValueError):
-        llm_client.parse_intent_response("not json")
-
-    with pytest.raises(ValueError):
-        llm_client.parse_intent_response('{"intent":"unknown","conditions":{}}')
+    raw = content if isinstance(content, dict) else _json.loads(llm_client.extract_json_object(content))
+    if "intent" not in raw:
+        raise ValueError("Missing 'intent' field or invalid intent")
+    if raw["intent"] != "query_servants":
+        raise ValueError(f"Invalid intent: {raw['intent']}")
+    return raw
 
 
 def test_chat_completion_uses_structured_response_format():
     FakeAsyncClient.responses = [FakeResponse(content=VALID_JSON)]
 
-    result = run(llm_client.chat_completion("system", "user", model="model-a1"))
+    result = run(
+        llm_client.chat_completion(
+            "system",
+            "user",
+            model="model-a1",
+            response_schema=_custom_schema,
+            response_validator=_custom_validator_intent,
+        )
+    )
 
     assert result["_model"] == "model-a1"
     assert result["_provider"] == "provider_a"
     assert result["_response_format"] == "json_schema"
-    # Responses API 使用 text.format 而非 response_format
     assert FakeAsyncClient.requests[0]["text"]["format"]["type"] == "json_schema"
-    # 验证使用 instructions 和 input 参数
     assert FakeAsyncClient.requests[0]["instructions"] == "system"
     assert FakeAsyncClient.requests[0]["input"] == "user"
 
@@ -127,13 +118,19 @@ def test_chat_completion_downgrades_when_response_format_is_unsupported():
         FakeResponse(content=f"```json\n{VALID_JSON}\n```"),
     ]
 
-    result = run(llm_client.chat_completion("system", "user", model="model-a1"))
+    result = run(
+        llm_client.chat_completion(
+            "system",
+            "user",
+            model="model-a1",
+            response_schema=_custom_schema,
+            response_validator=_custom_validator_intent,
+        )
+    )
 
     assert result["_response_format"] == "text_fallback"
-    # 第一次请求使用 text.format
     assert "text" in FakeAsyncClient.requests[0]
     assert "format" in FakeAsyncClient.requests[0]["text"]
-    # 降级后不使用 text.format
     assert "text" not in FakeAsyncClient.requests[1] or "format" not in FakeAsyncClient.requests[1].get("text", {})
 
 
@@ -144,7 +141,14 @@ def test_chat_completion_fallback_within_same_provider():
         FakeResponse(content=VALID_JSON),
     ]
 
-    result = run(llm_client.chat_completion("system", "user"))
+    result = run(
+        llm_client.chat_completion(
+            "system",
+            "user",
+            response_schema=_custom_schema,
+            response_validator=_custom_validator_intent,
+        )
+    )
 
     assert result["_model"] == "model-a2"
     assert result["_provider"] == "provider_a"
@@ -155,19 +159,22 @@ def test_chat_completion_cross_provider_fallback(monkeypatch):
     """跨提供商降级：provider_a 全部失败 → 自动切换 provider_b。"""
     monkeypatch.setattr(llm_client, "PROVIDERS", [PROVIDER_A, PROVIDER_B])
     FakeAsyncClient.responses = [
-        # provider_a model-a1 失败
         FakeResponse(content='{"intent":"unknown","conditions":{}}'),
-        # provider_a model-a2 失败
         FakeResponse(content='{"intent":"unknown","conditions":{}}'),
-        # provider_b model-b1 成功
         FakeResponse(content=VALID_JSON),
     ]
 
-    result = run(llm_client.chat_completion("system", "user"))
+    result = run(
+        llm_client.chat_completion(
+            "system",
+            "user",
+            response_schema=_custom_schema,
+            response_validator=_custom_validator_intent,
+        )
+    )
 
     assert result["_model"] == "model-b1"
     assert result["_provider"] == "provider_b"
-    # 验证请求发送到了正确的 URL
     assert FakeAsyncClient.posted_urls[0] == "https://a.test/v1/responses"
     assert FakeAsyncClient.posted_urls[2] == "https://b.test/v1/responses"
 
@@ -179,12 +186,26 @@ def test_attempts_log_includes_provider_field():
         FakeResponse(content=VALID_JSON),
     ]
 
-    result = run(llm_client.chat_completion("system", "user"))
+    result = run(
+        llm_client.chat_completion(
+            "system",
+            "user",
+            response_schema=_custom_schema,
+            response_validator=_custom_validator_intent,
+        )
+    )
 
     assert len(result["_attempts"]) == 1
     assert result["_attempts"][0]["provider"] == "provider_a"
     assert result["_attempts"][0]["model"] == "model-a1"
     assert "error" in result["_attempts"][0]
+
+
+def test_chat_completion_requires_schema_for_json_mode():
+    """json_mode=True 时不传 schema/validator 应报 ValueError。"""
+    FakeAsyncClient.responses = [FakeResponse(content=VALID_JSON)]
+    with pytest.raises(ValueError, match="json_mode=True requires"):
+        run(llm_client.chat_completion("system", "user", model="model-a1"))
 
 
 def test_load_providers_backward_compatible(monkeypatch):
@@ -278,7 +299,7 @@ def test_custom_schema_is_sent_to_api():
 
 
 def test_custom_validator_is_used_for_parsing():
-    """自定义 response_validator 应替代默认的 parse_intent_response。"""
+    """自定义 response_validator 替代旧默认的 parse_intent_response。"""
     FakeAsyncClient.responses = [FakeResponse(content=CUSTOM_JSON)]
 
     result = run(
@@ -286,21 +307,9 @@ def test_custom_validator_is_used_for_parsing():
             "system",
             "user",
             model="model-a1",
+            response_schema=_custom_schema,
             response_validator=_custom_validator,
         )
     )
 
-    # 自定义 validator 不会校验 IntentResponse，所以不会报错
     assert result["action"] == "search"
-
-
-def test_default_schema_when_none_provided():
-    """不传 response_schema 时应使用默认的 intent_response_json_schema。"""
-    FakeAsyncClient.responses = [FakeResponse(content=VALID_JSON)]
-
-    result = run(llm_client.chat_completion("system", "user", model="model-a1"))
-
-    # 默认行为不变
-    assert result["intent"] == "query_servants"
-    req = FakeAsyncClient.requests[0]
-    assert req["text"]["format"]["type"] == "json_schema"

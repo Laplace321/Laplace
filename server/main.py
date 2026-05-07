@@ -20,8 +20,8 @@ from pydantic import BaseModel
 from server.config_loader import CachedConfig
 from server.llm_client import chat_completion
 from server.logger import find_trace, log_chat_trace_async, read_traces
-from server.prompts import build_routing_prompt, get_generation_prompt, get_system_prompt
-from server.query_executor import execute_query, load_database
+from server.prompts import build_routing_prompt, get_generation_prompt
+from server.query_executor import load_database
 from server.rate_limiter import RateLimitMiddleware
 from server.schemas import parse_routing_response, routing_response_json_schema
 from server.skills.base import SKILL_REGISTRY, QuerySkill
@@ -158,15 +158,10 @@ app.add_middleware(
 
 
 class ChatRequest(BaseModel):
-    """对话请求。
-
-    mode:
-      - "natural_language"（默认）: 走旧的 IntentResponse + execute_query 路径
-      - "skill": 走新的 Skill-Based Architecture 两阶段路由
-    """
+    """对话请求（Skill-Based Architecture）。"""
 
     message: str
-    mode: str = "natural_language"
+    mode: str = "skill"
     preset_name: str | None = None
     params: dict | list | None = None
     supplement: str | None = None
@@ -385,142 +380,56 @@ async def _handle_skill_mode(
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """处理用户对话请求。根据 mode 分发到旧逻辑或 Skill 架构。"""
+    """处理用户对话请求（Skill-Based Architecture）。"""
     user_message = request.message
     trace_id = uuid.uuid4().hex[:8]
 
-    # ── Skill 模式 ──
-    if request.mode == "skill":
-        # 补充信息拼接到 user_message
-        effective_message = user_message
-        if request.supplement:
-            effective_message = f"{user_message}\n补充条件：{request.supplement}"
+    # 补充信息拼接到 user_message
+    effective_message = user_message
+    if request.supplement:
+        effective_message = f"{user_message}\n补充条件：{request.supplement}"
 
-        # 确定 skill_calls 来源：preset > params > LLM 路由
-        resolved_skill_calls: list[dict] | None = None
-        resolved_response_skill = request.response_skill or "respond_servant_list"
+    # 确定 skill_calls 来源：preset > params > LLM 路由
+    resolved_skill_calls: list[dict] | None = None
+    resolved_response_skill = request.response_skill or "respond_servant_list"
 
-        if request.preset_name:
-            # 从 Preset Registry 展开为 skill_calls
-            preset = PRESET_REGISTRY.get(request.preset_name)
-            if preset is None:
-                return ChatResponse(
-                    reply=f"未知的预设名称：{request.preset_name}",
-                    servants=[],
-                    count=0,
-                    query={"error": "unknown_preset", "preset_name": request.preset_name},
-                    model="error",
-                    traceId=trace_id,
-                )
-            resolved_response_skill = preset.response_skill
-            resolved_skill_calls = []
-            # 用前端 params 覆盖预设模板中的默认参数
-            user_params = request.params or {}
-            for skill_name in preset.query_skills:
-                merged_params = {**preset.param_template.get(skill_name, {})}
-                if skill_name in user_params:
-                    merged_params.update(user_params[skill_name])
-                elif user_params and len(preset.query_skills) == 1:
-                    # 单 Skill 预设：直接用 user_params 作为该 Skill 的参数
-                    merged_params.update(user_params)
-                resolved_skill_calls.append({"skill_name": skill_name, "params": merged_params})
-        elif request.params:
-            # 前端直传 skill_calls（params 格式：[{"skill_name": ..., "params": ...}]）
-            if isinstance(request.params, list):
-                resolved_skill_calls = request.params
-            elif isinstance(request.params, dict):
-                # 单 dict 视为单个 skill_call
-                resolved_skill_calls = [request.params]
+    if request.preset_name:
+        # 从 Preset Registry 展开为 skill_calls
+        preset = PRESET_REGISTRY.get(request.preset_name)
+        if preset is None:
+            return ChatResponse(
+                reply=f"未知的预设名称：{request.preset_name}",
+                servants=[],
+                count=0,
+                query={"error": "unknown_preset", "preset_name": request.preset_name},
+                model="error",
+                traceId=trace_id,
+            )
+        resolved_response_skill = preset.response_skill
+        resolved_skill_calls = []
+        # 用前端 params 覆盖预设模板中的默认参数
+        user_params = request.params or {}
+        for skill_name in preset.query_skills:
+            merged_params = {**preset.param_template.get(skill_name, {})}
+            if skill_name in user_params:
+                merged_params.update(user_params[skill_name])
+            elif user_params and len(preset.query_skills) == 1:
+                # 单 Skill 预设：直接用 user_params 作为该 Skill 的参数
+                merged_params.update(user_params)
+            resolved_skill_calls.append({"skill_name": skill_name, "params": merged_params})
+    elif request.params:
+        # 前端直传 skill_calls（params 格式：[{"skill_name": ..., "params": ...}]）
+        if isinstance(request.params, list):
+            resolved_skill_calls = request.params
+        elif isinstance(request.params, dict):
+            # 单 dict 视为单个 skill_call
+            resolved_skill_calls = [request.params]
 
-        return await _handle_skill_mode(
-            user_message=effective_message,
-            trace_id=trace_id,
-            skill_calls=resolved_skill_calls,  # None 则走 LLM 路由
-            response_skill_name=resolved_response_skill,
-        )
-
-    # ── 旧模式（natural_language，默认） ──
-
-    # 1. 意图解析 (第一阶段)
-    try:
-        parsed = await chat_completion(
-            system_prompt=get_system_prompt(), user_message=user_message, temperature=0.1, json_mode=True
-        )
-    except Exception as e:
-        print(f"[{trace_id}] LLM Parse Error: {e}")
-        await log_chat_trace_async(
-            trace_id, user_message, {}, 0, "无法连接到 LLM 或解析失败，请检查模型配置。", error=str(e)
-        )
-        return ChatResponse(
-            reply="抱歉，我遇到了网络问题或模型暂时不可用，请稍后再试。",
-            servants=[],
-            count=0,
-            query={},
-            model="error",
-            traceId=trace_id,
-        )
-
-    model_used = parsed.pop("_model", "unknown")
-
-    # 2. 检查意图
-    if parsed.get("intent") != "query_servants":
-        reply_text = parsed.get("rawResponse", "抱歉，我目前只能回答 FGO 从者相关的问题。")
-        await log_chat_trace_async(trace_id, user_message, parsed, 0, reply_text)
-        return ChatResponse(reply=reply_text, servants=[], count=0, query=parsed, model=model_used, traceId=trace_id)
-
-    # 3. 执行查询
-    conditions = parsed.get("conditions", {})
-    servants = execute_query(conditions)
-
-    # 4. 构建精简 Context（复用共享函数）
-    total_found = len(servants)
-    context_data, _ = _build_context(servants)
-    context_data["query_conditions"] = conditions
-
-    # 5. 第二阶段：生成自然语言回复 (RAG)
-    generation_prompt = get_generation_prompt(user_message, json.dumps(context_data, ensure_ascii=False))
-
-    try:
-        # LLM 的第二次调用（非严格 JSON，返回纯文本）
-        generation_response = await chat_completion(
-            system_prompt="You are a helpful AI assistant. You MUST strictly follow the provided data and NEVER use your internal knowledge about FGO.",
-            user_message=generation_prompt,
-            temperature=0.1,
-            json_mode=False,
-        )
-        final_reply = generation_response.get("text", "").strip()
-        if not final_reply:
-            raise ValueError("Empty response from LLM")
-    except Exception as e:
-        print(f"[{trace_id}] RAG Generate Error: {e}")
-        # 如果生成失败，降级回旧的逻辑
-        response_template = parsed.get("responseTemplate", "为你找到了以下从者：")
-        final_reply = f"{response_template}（共 {total_found} 位）"
-        if total_found > MAX_CONTEXT_SIZE:
-            final_reply += f"（仅显示前 {MAX_CONTEXT_SIZE} 位详情，更多请查看卡片）"
-
-    # 记录完整链路（含 LLM 调用元数据）
-    context_data["llm_attempts"] = parsed.get("_attempts", [])
-    context_data["llm_model"] = model_used
-    await log_chat_trace_async(
+    return await _handle_skill_mode(
+        user_message=effective_message,
         trace_id=trace_id,
-        user_message=user_message,
-        parsed_intent=conditions,
-        found_count=total_found,
-        final_reply=final_reply,
-        context=context_data,
-    )
-
-    # 限制返回给前端的数量，避免响应过大
-    returned_servants = servants[:MAX_RESULTS]
-
-    return ChatResponse(
-        reply=final_reply,
-        servants=returned_servants,
-        count=total_found,
-        query=conditions,
-        model=model_used,
-        traceId=trace_id,
+        skill_calls=resolved_skill_calls,  # None 则走 LLM 路由
+        response_skill_name=resolved_response_skill,
     )
 
 

@@ -259,6 +259,40 @@ body {
   margin-bottom: 4px;
 }
 
+/* --- Preset Tabs --- */
+.preset-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.preset-tab {
+  background: rgba(74, 125, 255, 0.1);
+  border: 1px solid rgba(74, 125, 255, 0.25);
+  color: var(--accent-blue);
+  padding: 6px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.5px;
+}
+
+.preset-tab:hover {
+  background: rgba(74, 125, 255, 0.2);
+  border-color: var(--accent-blue);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(74, 125, 255, 0.15);
+}
+
+.preset-tab:active {
+  transform: translateY(0);
+}
+
 /* --- Suggestion Chips --- */
 .suggestion-chips {
   display: flex;
