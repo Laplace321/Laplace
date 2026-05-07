@@ -1,9 +1,37 @@
 """Skill: 按技能效果筛选从者。"""
 
+import json
+from pathlib import Path
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from server.query_executor import _match_effect
 from server.skills.base import QuerySkill, register_skill
+
+# ── 中文→英文效果名反查表（从 effect_schema.json 加载）──
+_ZH_TO_EN: dict[str, str] = {}
+
+
+def _ensure_zh_map() -> dict[str, str]:
+    """懒加载中文→英文效果名映射。"""
+    if _ZH_TO_EN:
+        return _ZH_TO_EN
+    schema_path = Path(__file__).parent.parent.parent / "knowledge" / "effect_schema.json"
+    if not schema_path.exists():
+        return _ZH_TO_EN
+    with open(schema_path, encoding="utf-8") as f:
+        data = json.load(f)
+    for effect in data.get("effects", []):
+        name = effect["name"]
+        for alias in effect.get("aliases_zh", []):
+            _ZH_TO_EN[alias] = name
+    return _ZH_TO_EN
+
+
+def _resolve_effect_name(name: str) -> str:
+    """将可能的中文效果名解析为英文 key，已是英文则原样返回。"""
+    zh_map = _ensure_zh_map()
+    return zh_map.get(name, name)
 
 
 class Params(BaseModel):
@@ -31,14 +59,16 @@ class SearchBySkillEffect(QuerySkill):
 
         # 单效果模式
         if effect is not None:
+            effect = _resolve_effect_name(effect)
             return _match_effect(servant, effect, target_type)
 
         # 多效果模式
         if effects is not None and isinstance(effects, list):
+            resolved = [_resolve_effect_name(eff) for eff in effects]
             op = params.get("effects_op", "and").lower()
             if op == "or":
-                return any(_match_effect(servant, eff, target_type) for eff in effects)
+                return any(_match_effect(servant, eff, target_type) for eff in resolved)
             else:
-                return all(_match_effect(servant, eff, target_type) for eff in effects)
+                return all(_match_effect(servant, eff, target_type) for eff in resolved)
 
         return True
