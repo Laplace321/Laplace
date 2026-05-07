@@ -1,9 +1,10 @@
 # ADR-013: Skill 架构与 AI 技术方案讨论
 
 **日期**: 2026-05-06  
-**状态**: 讨论中 (Discussing)  
+**状态**: 已演进至 ADR-018 (Superseded by ADR-018)  
 **参与者**: 用户、AI Agent  
 **相关 Issue**: Phase 5 架构治理、Phase 6 扩展规划  
+**后续文档**: [ADR-018 Skill-Based Architecture 架构决策](../adr/ADR-018-skill-based-architecture.md)  
 
 ---
 

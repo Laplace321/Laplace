@@ -66,7 +66,7 @@ ADR-XXX-主题.md
 
 | 编号 | 主题 | 状态 | 日期 |
 |:----|:----|:----|:----|
-| [ADR-013](./ADR-013-skill-architecture.md) | Skill 架构与 AI 技术方案讨论 | 讨论中 | 2026-05-06 |
+| [ADR-013](./ADR-013-skill-architecture.md) | Skill 架构与 AI 技术方案讨论 | 已演进至 ADR-018 | 2026-05-06 |
 
 ## 工作流程
 
