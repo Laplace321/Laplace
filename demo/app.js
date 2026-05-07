@@ -825,7 +825,11 @@ document.getElementById("history-btn").addEventListener("click", () => {
   openHistoryPanel();
 });
 
-// Init history panel on load
+// Init on load
 document.addEventListener("DOMContentLoaded", () => {
   createHistoryPanel();
+  // Inject welcome message dynamically (with preset tabs)
+  if (chatMessages.querySelectorAll(".message").length === 0) {
+    appendWelcomeMessage();
+  }
 });

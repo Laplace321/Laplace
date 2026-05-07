@@ -7,7 +7,7 @@
   <title>Laplace — FGO 智能助手</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Orbitron:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
   <script src="marked.min.js"></script>
 </head>
 <body>
@@ -45,22 +45,7 @@
   <!-- Chat Area -->
   <main id="chat-container">
     <div class="chat-messages" id="chat-messages">
-      <!-- Welcome Message -->
-      <div class="message assistant-message">
-        <div class="message-avatar">⧫</div>
-        <div class="message-content">
-          <div class="message-bubble">
-            <p>你好，Master！我是 <strong>Laplace</strong>，你的 FGO 数据助手。</p>
-            <p>你可以用自然语言向我提问，例如：</p>
-            <div class="suggestion-chips">
-              <button class="chip" data-query="帮我找一下 30 自充的从者有哪些">30 自充的从者</button>
-              <button class="chip" data-query="大于 50 自充的从者有哪些">50% 以上自充</button>
-              <button class="chip" data-query="五星 Caster 有自充的从者">五星 Caster 自充</button>
-              <button class="chip" data-query="四星以上的 Berserker 有哪些">四星以上狂阶</button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- Welcome message will be injected by app.js -->
     </div>
   </main>
 
@@ -80,6 +65,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
