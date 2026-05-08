@@ -76,6 +76,24 @@ const THINKING_LABELS = {
   querying: "正在检索从者数据...",
 };
 
+// === Skill Display Names (internal name → user-friendly Chinese) ===
+const SKILL_DISPLAY_NAMES = {
+  search_by_np_charge: "宝具充能筛选",
+  search_by_class: "职阶筛选",
+  search_by_rarity: "稀有度筛选",
+  search_by_attribute: "属性筛选",
+  search_by_skill_effect: "技能效果筛选",
+  search_by_np_effect: "宝具效果筛选",
+  search_by_traits: "特性筛选",
+  search_by_cards: "配卡筛选",
+  lookup_servant: "从者查询",
+  compare_servants: "从者对比",
+};
+
+function getSkillDisplayName(skillName) {
+  return SKILL_DISPLAY_NAMES[skillName] || skillName;
+}
+
 // === Send Preset Query (via SSE /api/chat/stream with preset_name) ===
 // Tag Pill mode: userText is the natural language supplement typed after the pill.
 // If empty, uses preset defaults only. Backend handles B1 supplement parsing.
@@ -366,14 +384,14 @@ function handleThinking(data, els) {
   const label = data.message || THINKING_LABELS[data.phase] || data.phase;
   const step = renderThinkingStep(data.phase, label, els.thinkingSteps);
 
-  // If routed (Skill mode), show skill_calls detail
+  // If routed (Skill mode), show skill_calls detail (user-friendly names)
   if (data.phase === "routed" && data.skill_calls) {
     completeThinkingStep(step);
     if (data.skill_calls.length > 0) {
       const detail = document.createElement("div");
       detail.className = "thinking-step-detail";
-      const skillNames = data.skill_calls.map(c => c.skill_name || c.name).join(", ");
-      detail.textContent = `Skills: ${skillNames}`;
+      const skillLabels = data.skill_calls.map(c => getSkillDisplayName(c.skill_name || c.name)).join("、");
+      detail.textContent = skillLabels;
       els.thinkingSteps.appendChild(detail);
     }
   }
@@ -507,14 +525,14 @@ function appendAssistantResponse(data) {
   let thinkingHtml = "";
   const skillCalls = data.query?.skill_calls || [];
   if (skillCalls.length > 0) {
-    const skillNames = skillCalls.map(c => c.skill_name || c.name).join(", ");
+    const skillLabels = skillCalls.map(c => getSkillDisplayName(c.skill_name || c.name)).join("、");
     thinkingHtml = `
       <div class="thinking-steps">
         <div class="thinking-step completed">
           <span class="thinking-step-icon">✓</span>
           <span class="thinking-step-text">意图识别完成</span>
         </div>
-        <div class="thinking-step-detail">Skills: ${escapeHtml(skillNames)}</div>
+        <div class="thinking-step-detail">${escapeHtml(skillLabels)}</div>
         <div class="thinking-step completed">
           <span class="thinking-step-icon">✓</span>
           <span class="thinking-step-text">检索到 ${data.count || 0} 位从者</span>
