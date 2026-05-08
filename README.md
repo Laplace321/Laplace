@@ -196,6 +196,158 @@ Laplace/
 - `chaldea-center/` — 仅在需要更新领域知识时存在，普通运行不需要
 - `extractor/` — 早期 NP 充能筛选器原型，已迁移至 `server/data_loader.py`，保留仅用于向后兼容
 
+## 如何新增 Skill
+
+Skill-Based Architecture 将查询逻辑拆分为独立模块，新增查询维度（如按礼装、按素材）或分析模板只需以下步骤。
+
+### 新增 Query Skill（查询类）
+
+以"按礼装筛选"为例，需要修改 **4 个文件**，新建 **1 个文件**：
+
+#### 1. 创建 Skill 模块
+
+新建 `server/skills/query/search_by_craft_essence.py`：
+
+```python
+"""Skill: 按礼装筛选从者。"""
+
+from pydantic import BaseModel
+from server.skills.base import QuerySkill, register_skill
+
+
+class Params(BaseModel):
+    """参数模型 — Pydantic 自动校验，校验失败会跳过该 Skill。"""
+    ce_name: str  # 礼装名称
+
+
+@register_skill
+class SearchByCraftEssence(QuerySkill):
+    name = "search_by_craft_essence"          # 唯一标识，LLM 路由使用
+    description = "按礼装名称筛选从者"          # LLM 路由时的能力描述
+    domain = "servant"                         # 数据域（目前只有 servant）
+
+    @property
+    def params_schema(self) -> type[BaseModel]:
+        return Params
+
+    def filter(self, servant: dict, params: dict) -> bool:
+        """单从者匹配逻辑。返回 True 表示命中。"""
+        ce_name = params.get("ce_name", "")
+        # 实现你的筛选逻辑...
+        return ce_name.lower() in str(servant.get("recommendCE", "")).lower()
+```
+
+**关键约定**：
+- `@register_skill` 装饰器自动将 Skill 实例注册到全局 `SKILL_REGISTRY`
+- `name` 必须唯一，LLM 路由结果中会引用此名称
+- `description` 会被注入 LLM 路由 Prompt，描述越清晰，路由越准确
+- `params_schema` 返回 Pydantic 模型，`SkillExecutor` 会自动校验参数
+- `filter()` 是核心匹配逻辑，对数据库中每个从者调用一次
+- 如果需要自定义执行逻辑（如不是简单 filter），可以重写 `execute(db, params)` 方法
+
+#### 2. 注册模块导入
+
+在 `server/skills/__init__.py` 的 `_SKILL_MODULES` 列表中追加一行：
+
+```python
+_SKILL_MODULES = [
+    # Query Skills
+    ...
+    "server.skills.query.search_by_craft_essence",  # 新增
+    # Response Skills
+    ...
+]
+```
+
+#### 3. 前端 Skill 中文名映射
+
+在 `demo/app.js` 的 `SKILL_DISPLAY_NAMES` 中追加一行：
+
+```javascript
+const SKILL_DISPLAY_NAMES = {
+  ...
+  search_by_craft_essence: "礼装筛选",  // 新增
+};
+```
+
+#### 4. 回归测试
+
+在 `tests/test_skill_framework.py` 中为新 Skill 补充单元测试。
+
+---
+
+### 新增 Response Skill（分析模板）
+
+以"从者编队推荐"为例：
+
+#### 1. 创建 Response Skill 模块
+
+新建 `server/skills/response/respond_team_recommendation.py`：
+
+```python
+"""Response Skill: 编队推荐分析。"""
+
+from server.skills.base import ResponseSkill, register_skill
+
+
+@register_skill
+class RespondTeamRecommendation(ResponseSkill):
+    name = "respond_team_recommendation"
+    description = "根据筛选结果推荐编队搭配"
+
+    def build_prompt(self, user_message: str, context_json: str) -> str:
+        return (
+            "你是 FGO 编队搭配专家。用户的问题是：\n"
+            f"「{user_message}」\n\n"
+            f"以下是候选从者数据：\n{context_json}\n\n"
+            "请根据从者的技能效果和宝具类型，推荐 1-2 个编队方案。"
+        )
+```
+
+#### 2. 注册模块导入
+
+同样在 `server/skills/__init__.py` 的 `_SKILL_MODULES` 列表中追加。
+
+---
+
+### 新增 Preset（快捷查询）
+
+如果希望新 Skill 也有前端快捷入口，还需修改 **2 个额外文件**：
+
+#### 1. 后端注册 Preset
+
+在 `server/skills/presets.py` 中追加：
+
+```python
+Preset(
+    name="ce_search",
+    display_name="礼装筛选",
+    query_skills=["search_by_craft_essence"],
+    response_skill="respond_servant_list",
+    param_template={
+        "search_by_craft_essence": {"ce_name": "黑圣杯"},  # 默认参数
+    },
+),
+```
+
+#### 2. 前端注册 Preset
+
+在 `demo/app.js` 的 `PRESETS` 数组中追加对应条目。
+
+---
+
+### Checklist 速查
+
+| 步骤 | 文件 | 操作 |
+|:-----|:-----|:-----|
+| **1. 创建 Skill** | `server/skills/query/<name>.py` 或 `response/<name>.py` | 新建，实现 `filter()` 或 `build_prompt()` |
+| **2. 注册导入** | `server/skills/__init__.py` | 追加模块路径到 `_SKILL_MODULES` |
+| **3. 前端中文名** | `demo/app.js` → `SKILL_DISPLAY_NAMES` | 追加 `skill_name: "中文名"` |
+| **4. 单元测试** | `tests/test_skill_framework.py` | 补充 filter/execute 测试 |
+| **5. (可选) Preset** | `server/skills/presets.py` + `demo/app.js` → `PRESETS` | 注册快捷入口 |
+
+> **注意**：无需修改 `server/main.py`、`server/prompts.py` 或路由逻辑。Skill 的 `description` 字段会被自动注入 LLM 路由 Prompt，`@register_skill` 装饰器自动完成注册，`SkillExecutor` 自动识别并执行新 Skill。
+
 ## 合规声明
 
 数据及部分领域逻辑源自开源项目 [Chaldea](https://github.com/chaldea-center/chaldea)，数据来源 [Atlas Academy](https://atlasacademy.io/)。
