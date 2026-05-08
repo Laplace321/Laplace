@@ -99,7 +99,7 @@ Skill Layer — skill.filter(servant, params)
 
 | # | 字段 | 类型 | 单从者体积 | 决策 | 说明 |
 |:--|:-----|:-----|:----------|:-----|:-----|
-| 29 | `skills` | list[3] | **~12.6 KB** | ✅ 保留原始 | 主动技能完整嵌套，视图函数的源数据 |
+| 29 | `skills` | list[3] | **~18.3→~3.9 KB** | ✅ 保留(预消化) | 裁剪顶层/function/buff 元数据，svals 只保留满级 |
 | 30 | `classPassive` | list[3] | **~5.6 KB** | ✅ 保留原始 | 职阶被动（阵营特攻、Arts 补正等） |
 | 31 | `extraPassive` | list[26] | **~49.3 KB** | ❌ 不保留 | 活动限定被动，单从者占 40%+ 体积 |
 | 32 | `appendPassive` | list[5] | **~12.4→~0.5 KB** | ✅ 保留(预消化) | 只保留满级数值+解锁素材，丢弃 svals[0-8] 和 functions 嵌套 |
@@ -108,7 +108,7 @@ Skill Layer — skill.filter(servant, params)
 
 | # | 字段 | 类型 | 单从者体积 | 决策 | 说明 |
 |:--|:-----|:-----|:----------|:-----|:-----|
-| 33 | `noblePhantasms` | list | **~5.9 KB** | ✅ 保留原始 | 宝具完整嵌套（含 functions/svals） |
+| 33 | `noblePhantasms` | list | **~11.8→~8.3 KB** | ✅ 保留(预消化) | 裁剪顶层/buff 元数据，保留全部 OC svals |
 
 ### 8. 素材
 
@@ -211,5 +211,7 @@ Skill Layer — skill.filter(servant, params)
 - **ETL 重构完成**: 2026-05-08，`data_loader.py` 已按打标结果新增物理层字段
 - **`fetch_servants()` 重命名为 `fetch_normal_servants()`**：语义更明确，未来如需非 normal 从者再新增函数
 - **`appendPassive` 预消化**：只保留满级数值 + 解锁素材（12.4 KB → 3.3 KB/从者）
-- **`servants_db.json` 体积**: 59 MB（indent=2），纯数据 26.8 MB
-- **待优化**: skills（18.3 KB/从者）和 noblePhantasms（11.8 KB/从者）保留了完整原始嵌套，含大量查询无关元数据（ruby, detail, icon, funcPopupText 等），后续可考虑预消化
+- **skills 预消化**: 裁剪 skill 顶层（保留 id/num/name/type/coolDown/functions）+ function（保留 funcType/funcTargetType/buffs/svals 满级）+ buff（保留 type/name/vals/tvals），18.3 KB → 3.9 KB/从者（-79%）
+- **noblePhantasms 预消化**: 裁剪 NP 顶层（保留 id/num/name/card/type/rank/npGain/individuality/functions）+ buff（同上），保留全部 OC svals（svals/svals2-5），11.8 KB → 8.3 KB/从者（-30%）
+- **`servants_db.json` 体积**: 42 MB（indent=2），纯数据 18.9 MB（从 59 MB / 26.8 MB 优化至此）
+- **`servants_db.json` 从 git 移除**: 加入 .gitignore，首次运行需执行 `python3 -m server.data_loader`

@@ -58,14 +58,17 @@ pip install -e ".[dev]"
 cp .env.example .env
 # 编辑 .env 填入你的模型 API 密钥
 
-# 5. 启动 FastAPI 服务端
+# 5. 下载从者数据（首次运行必需）
+python3 -m server.data_loader
+
+# 6. 启动 FastAPI 服务端
 python3 -m uvicorn server.main:app --reload
 
-# 6. 打开前端界面
+# 7. 打开前端界面
 # 在浏览器中直接打开 demo/index.html 即可使用
 ```
 
-> **部署 vs 开发**：纯部署只需步骤 1-2-4-5（`requirements.txt` 包含运行所需的全部依赖）。步骤 3 安装的 ruff + pytest 仅用于本地开发和代码检查。
+> **部署 vs 开发**：纯部署只需步骤 1-2-4-5-6（`requirements.txt` 包含运行所需的全部依赖）。步骤 3 安装的 ruff + pytest 仅用于本地开发和代码检查。步骤 5 会从 Atlas Academy API 下载从者数据，生成 `server/data/servants_db.json`（该文件不纳入 git 版本控制）。
 
 ### 知识库与数据同步
 

@@ -143,6 +143,102 @@ def _digest_append_passives(raw_passives: list[dict]) -> list[dict]:
     return result
 
 
+def _digest_skills(raw_skills: list[dict]) -> list[dict]:
+    """预消化技能：只保留查询相关字段，丢弃元数据。
+
+    裁剪规则（用户逐字段确认）：
+    - skill 顶层：保留 id/num/name/type/coolDown/functions
+    - function 内部：保留 funcType/funcTargetType/buffs/svals（仅满级）
+    - buff 内部：保留 type/name/vals/tvals
+    """
+    result = []
+    for sk in raw_skills:
+        funcs = []
+        for fn in sk.get("functions", []):
+            # svals 只保留满级（最后一个元素 = Lv.10）
+            svals = fn.get("svals", [])
+            max_sval = svals[-1] if svals else None
+            # buffs 只保留核心字段
+            digested_buffs = []
+            for b in fn.get("buffs", []):
+                digested_buffs.append(
+                    {
+                        "type": b.get("type", ""),
+                        "name": b.get("name", ""),
+                        "vals": b.get("vals", []),
+                        "tvals": b.get("tvals", []),
+                    }
+                )
+            funcs.append(
+                {
+                    "funcType": fn.get("funcType", ""),
+                    "funcTargetType": fn.get("funcTargetType", ""),
+                    "buffs": digested_buffs,
+                    "svals": max_sval,
+                }
+            )
+        result.append(
+            {
+                "id": sk.get("id"),
+                "num": sk.get("num", 0),
+                "name": sk.get("name", ""),
+                "type": sk.get("type", ""),
+                "coolDown": sk.get("coolDown", []),
+                "functions": funcs,
+            }
+        )
+    return result
+
+
+def _digest_noble_phantasms(raw_nps: list[dict]) -> list[dict]:
+    """预消化宝具：只保留查询相关字段，保留全部 OC 数值。
+
+    裁剪规则（用户逐字段确认）：
+    - NP 顶层：保留 id/num/name/card/type/rank/npGain/individuality/functions
+    - function 内部：保留 funcType/funcTargetType/buffs/svals + svals2-5（OC）
+    - buff 内部：保留 type/name/vals/tvals
+    """
+    result = []
+    for np_data in raw_nps:
+        funcs = []
+        for fn in np_data.get("functions", []):
+            digested_buffs = []
+            for b in fn.get("buffs", []):
+                digested_buffs.append(
+                    {
+                        "type": b.get("type", ""),
+                        "name": b.get("name", ""),
+                        "vals": b.get("vals", []),
+                        "tvals": b.get("tvals", []),
+                    }
+                )
+            digested_fn = {
+                "funcType": fn.get("funcType", ""),
+                "funcTargetType": fn.get("funcTargetType", ""),
+                "buffs": digested_buffs,
+                "svals": fn.get("svals", []),
+            }
+            # 保留 OC svals2-5
+            for key in ["svals2", "svals3", "svals4", "svals5"]:
+                if key in fn:
+                    digested_fn[key] = fn[key]
+            funcs.append(digested_fn)
+        result.append(
+            {
+                "id": np_data.get("id"),
+                "num": np_data.get("num", 0),
+                "name": np_data.get("name", ""),
+                "card": np_data.get("card"),
+                "type": np_data.get("type", ""),
+                "rank": np_data.get("rank", ""),
+                "npGain": np_data.get("npGain", {}),
+                "individuality": np_data.get("individuality", []),
+                "functions": funcs,
+            }
+        )
+    return result
+
+
 def extract_np_charges(servant: dict) -> list[dict]:
     """提取从者所有技能中的 NP 充能效果。
 
@@ -382,11 +478,11 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
             "cards": cards_count,
             "npCard": np_card,
             "npTarget": np_target,
-            # 原始嵌套数据（物理层）
-            "skills": svt.get("skills", []),
+            # 原始嵌套数据（物理层，预消化）
+            "skills": _digest_skills(svt.get("skills", [])),
             "classPassive": svt.get("classPassive", []),
             "appendPassive": _digest_append_passives(svt.get("appendPassive", [])),
-            "noblePhantasms": svt.get("noblePhantasms", []),
+            "noblePhantasms": _digest_noble_phantasms(svt.get("noblePhantasms", [])),
             # 素材
             "ascensionMaterials": svt.get("ascensionMaterials", {}),
             "skillMaterials": svt.get("skillMaterials", {}),
