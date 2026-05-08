@@ -336,6 +336,42 @@ def refine_card_effects(func: dict, matched_effects: set[str]) -> set[str]:
     return refined
 
 
+def refine_sub_state_effects(func: dict, matched_effects: set[str]) -> set[str]:
+    """根据 funcTargetType 精确区分状态解除类效果，防止一对多映射污染。
+
+    subState funcType 在 effect_schema 中映射了三个效果：
+    - subState: 通用状态解除（解除敌方 buff）
+    - subStateNegative: 解除我方负面状态
+    - subStatePositive: 解除敌方正面状态（语义等同于 subState）
+
+    实际区分规则：
+    - 对敌（enemy*）→ 保留 subState，移除 subStateNegative
+    - 对己（self/pt*）→ 保留 subStateNegative，移除 subState/subStatePositive
+    """
+    sub_state_effects = {"subState", "subStatePositive", "subStateNegative"}
+    if not (matched_effects & sub_state_effects):
+        return matched_effects
+
+    target_type = func.get("funcTargetType", "")
+    is_enemy_target = target_type.startswith("enemy")
+
+    refined = set()
+    for eff in matched_effects:
+        if eff in sub_state_effects:
+            if is_enemy_target:
+                # 对敌 → 解除敌方 buff
+                if eff == "subState":
+                    refined.add(eff)
+                # subStatePositive 语义等同 subState，合并
+            else:
+                # 对己方 → 解除我方负面状态
+                if eff == "subStateNegative":
+                    refined.add(eff)
+        else:
+            refined.add(eff)
+    return refined
+
+
 def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[dict]]:
     """
     提取从者所有技能中的全部效果。
@@ -365,6 +401,9 @@ def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[
 
             # 二次精炼：防止卡色污染
             matched_effects = refine_card_effects(func, matched_effects)
+
+            # 二次精炼：防止 subState 一对多映射污染
+            matched_effects = refine_sub_state_effects(func, matched_effects)
 
             for effect_name in matched_effects:
                 all_effects.add(effect_name)
@@ -432,6 +471,9 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
 
                     # 二次精炼：防止卡色污染
                     matched_effects = refine_card_effects(func, matched_effects)
+
+                    # 二次精炼：防止 subState 一对多映射污染
+                    matched_effects = refine_sub_state_effects(func, matched_effects)
 
                     np_effects_set.update(matched_effects)
 
