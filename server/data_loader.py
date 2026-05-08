@@ -91,8 +91,8 @@ def build_effect_matcher(effects: list[dict]) -> dict:
 # ============================================================
 
 
-def fetch_servants() -> list[dict]:
-    """从 Atlas Academy API 拉取全量从者数据。"""
+def fetch_normal_servants() -> list[dict]:
+    """从 Atlas Academy API 拉取可召唤从者数据（type=normal, collectionNo>0）。"""
     print("📡 正在从 Atlas Academy API 拉取从者数据...")
     resp = requests.get(NICE_SERVANT_URL, timeout=120)
     resp.raise_for_status()
@@ -108,6 +108,39 @@ def get_face_url(servant: dict) -> str:
     if faces:
         return faces.get("4") or faces.get("3") or faces.get("2") or faces.get("1", "")
     return ""
+
+
+def _digest_append_passives(raw_passives: list[dict]) -> list[dict]:
+    """预消化追加被动：只保留满级数值和解锁素材，丢弃完整 functions 嵌套。"""
+    result = []
+    for ap in raw_passives:
+        skill = ap.get("skill", {})
+        funcs = skill.get("functions", [])
+        # 提取满级数值（svals 最后一个元素 = Lv.10）
+        max_val = None
+        func_type = ""
+        buff_type = ""
+        if funcs:
+            fn = funcs[0]
+            func_type = fn.get("funcType", "")
+            svals = fn.get("svals", [])
+            if svals:
+                max_val = svals[-1]  # 满级数值
+            buffs = fn.get("buffs", [])
+            if buffs:
+                buff_type = buffs[0].get("type", "")
+        result.append(
+            {
+                "num": ap.get("num"),
+                "skillName": skill.get("name", ""),
+                "skillId": skill.get("id"),
+                "funcType": func_type,
+                "buffType": buff_type,
+                "maxVal": max_val,
+                "unlockMaterials": ap.get("unlockMaterials", []),
+            }
+        )
+    return result
 
 
 def extract_np_charges(servant: dict) -> list[dict]:
@@ -334,6 +367,13 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
             "aliasCN": alias_cn,
             "rarity": svt.get("rarity", 0),
             "className": svt.get("className", "unknown"),
+            "type": svt.get("type", "normal"),
+            "cost": svt.get("cost", 0),
+            "atkMax": svt.get("atkMax", 0),
+            "hpMax": svt.get("hpMax", 0),
+            "starAbsorb": svt.get("starAbsorb", 0),
+            "instantDeathChance": svt.get("instantDeathChance", 0),
+            "hitsDistribution": svt.get("hitsDistribution", {}),
             "faceUrl": get_face_url(svt),
             # Phase 3 新增属性
             "traits": [t["id"] for t in svt.get("traits", [])],
@@ -342,7 +382,17 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
             "cards": cards_count,
             "npCard": np_card,
             "npTarget": np_target,
-            # NP 充能数据（向后兼容）
+            # 原始嵌套数据（物理层）
+            "skills": svt.get("skills", []),
+            "classPassive": svt.get("classPassive", []),
+            "appendPassive": _digest_append_passives(svt.get("appendPassive", [])),
+            "noblePhantasms": svt.get("noblePhantasms", []),
+            # 素材
+            "ascensionMaterials": svt.get("ascensionMaterials", {}),
+            "skillMaterials": svt.get("skillMaterials", {}),
+            "appendSkillMaterials": svt.get("appendSkillMaterials", {}),
+            "costumeMaterials": svt.get("costumeMaterials", {}),
+            # Materialized Views（预计算）
             "npCharges": charges,
             "maxSelfCharge": max_self_charge,
             "maxPtOneCharge": max_pt_one_charge,
@@ -382,7 +432,7 @@ def main():
         print("   ⚠️  无效果知识库，仅提取 NP 充能数据")
     print(f"   ✅ 加载 {len(name_mapping)} 个多语言名字翻译")
 
-    servants = fetch_servants()
+    servants = fetch_normal_servants()
     db = build_database(servants, matcher, name_mapping)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from server.data_loader import extract_np_charges, fetch_servants
+    from server.data_loader import extract_np_charges, fetch_normal_servants
 except ImportError as e:
     print(f"❌ 导入失败: {e}", file=sys.stderr)
     print("请确保在项目根目录运行此脚本", file=sys.stderr)
@@ -41,7 +41,7 @@ def main():
 
     # 1. 从新架构拉取数据（复用 data_loader.py）
     print("\n📡 正在从 Atlas Academy API 拉取从者数据...")
-    servants = fetch_servants()
+    servants = fetch_normal_servants()
 
     # 2. 筛选 30% 自充从者
     print(f"\n🔍 筛选 {TARGET_CHARGE_PERCENT}% 精确自充从者...")
