@@ -466,73 +466,140 @@ async def chat(request: ChatRequest):
 
 
 @app.get("/api/chat/stream")
-async def chat_stream(message: str):
+async def chat_stream(message: str, preset_name: str | None = None):
     """SSE 流式对话端点 — 分阶段推送思考过程和结果。
 
     使用 Skill-Based Architecture：Stage 1 LLM 路由 → SkillExecutor → RAG 生成。
+    支持 preset_name 参数：有值时跳过 LLM 路由，直接展开预设 skill_calls。
     """
 
     async def event_generator():
         trace_id = uuid.uuid4().hex[:8]
         model_used = "unknown"
 
-        # ── 阶段 1: Skill 路由 ──
-        yield _sse_event("thinking", {"phase": "routing", "message": "正在理解你的问题..."})
+        # ── 阶段 1: Skill 路由（或 Preset 展开） ──
+        if preset_name:
+            # Preset 模式：跳过 LLM 路由，直接展开预设
+            yield _sse_event("thinking", {"phase": "routing", "message": "正在解析预设..."})
 
-        skill_descriptions = [
-            {"name": s.name, "description": s.description} for s in SKILL_REGISTRY.values() if isinstance(s, QuerySkill)
-        ]
-        routing_prompt = build_routing_prompt(skill_descriptions)
+            preset = PRESET_REGISTRY.get(preset_name)
+            if preset is None:
+                yield _sse_event("error", {"phase": "routing", "message": f"未知的预设：{preset_name}"})
+                return
 
-        try:
-            routing_result = await chat_completion(
-                system_prompt=routing_prompt,
-                user_message=message,
-                temperature=0.1,
-                json_mode=True,
-                response_schema=routing_response_json_schema,
-                response_validator=parse_routing_response,
+            response_skill_name = preset.response_skill
+            skill_calls = []
+            for skill_name in preset.query_skills:
+                merged_params = {**preset.param_template.get(skill_name, {})}
+                skill_calls.append({"skill_name": skill_name, "params": merged_params})
+
+            model_used = "preset_mode"
+
+            # B1 策略：用户补充文字走 Stage 2 LLM 路由解析额外 Skills 并合并
+            user_text = message.strip()
+            if user_text:
+                try:
+                    skill_descriptions = [
+                        {"name": s.name, "description": s.description}
+                        for s in SKILL_REGISTRY.values()
+                        if isinstance(s, QuerySkill)
+                    ]
+                    routing_prompt = build_routing_prompt(skill_descriptions)
+                    extra_routing = await chat_completion(
+                        system_prompt=routing_prompt,
+                        user_message=user_text,
+                        temperature=0.1,
+                        json_mode=True,
+                        response_schema=routing_response_json_schema,
+                        response_validator=parse_routing_response,
+                    )
+                    extra_routing.pop("_model", None)
+                    extra_routing.pop("_response_format", None)
+                    extra_routing.pop("_provider", None)
+                    extra_routing.pop("_attempts", None)
+                    extra_skills = extra_routing.get("skill_calls", [])
+                    existing_names = {s["skill_name"] for s in skill_calls}
+                    for es in extra_skills:
+                        if es.get("skill_name") not in existing_names:
+                            skill_calls.append(es)
+                            existing_names.add(es["skill_name"])
+                    extra_resp_skill = extra_routing.get("response_skill")
+                    if extra_resp_skill and extra_resp_skill != "respond_servant_list":
+                        response_skill_name = extra_resp_skill
+                    print(f"[{trace_id}] Preset B1 stream: merged {len(extra_skills)} extra skills")
+                except Exception as e:
+                    print(f"[{trace_id}] Preset B1 stream supplement parsing failed (non-blocking): {e}")
+
+            # 推送路由结果
+            yield _sse_event(
+                "thinking",
+                {
+                    "phase": "routed",
+                    "skill_calls": skill_calls,
+                    "response_skill": response_skill_name,
+                },
             )
-        except Exception as e:
-            print(f"[{trace_id}] Skill Routing Error: {e}")
-            await log_chat_trace_async(trace_id, message, {}, 0, "路由失败", error=str(e))
-            yield _sse_event("error", {"phase": "routing", "message": "路由失败，请稍后重试"})
-            return
 
-        model_used = routing_result.pop("_model", "unknown")
-        routing_result.pop("_response_format", None)
-        routing_result.pop("_provider", None)
-        routing_result.pop("_attempts", None)
+        else:
+            # 普通模式：Stage 1 LLM 路由
+            yield _sse_event("thinking", {"phase": "routing", "message": "正在理解你的问题..."})
 
-        skill_calls = routing_result.get("skill_calls", [])
-        response_skill_name = routing_result.get("response_skill", "respond_servant_list")
+            skill_descriptions = [
+                {"name": s.name, "description": s.description}
+                for s in SKILL_REGISTRY.values()
+                if isinstance(s, QuerySkill)
+            ]
+            routing_prompt = build_routing_prompt(skill_descriptions)
 
-        # 推送路由结果
-        yield _sse_event(
-            "thinking",
-            {
-                "phase": "routed",
-                "skill_calls": skill_calls,
-                "response_skill": response_skill_name,
-            },
-        )
+            try:
+                routing_result = await chat_completion(
+                    system_prompt=routing_prompt,
+                    user_message=message,
+                    temperature=0.1,
+                    json_mode=True,
+                    response_schema=routing_response_json_schema,
+                    response_validator=parse_routing_response,
+                )
+            except Exception as e:
+                print(f"[{trace_id}] Skill Routing Error: {e}")
+                await log_chat_trace_async(trace_id, message, {}, 0, "路由失败", error=str(e))
+                yield _sse_event("error", {"phase": "routing", "message": "路由失败，请稍后重试"})
+                return
 
-        # 检查 fallback
-        fallback = routing_result.get("fallback")
-        if fallback is not None:
-            fb_msg = fallback.get("message", "无法理解你的问题，请尝试更具体的描述。")
-            await log_chat_trace_async(trace_id, message, routing_result, 0, fb_msg)
-            yield _sse_event("delta", {"text": fb_msg})
-            yield _sse_event("done", {"model": model_used, "traceId": trace_id})
-            return
+            model_used = routing_result.pop("_model", "unknown")
+            routing_result.pop("_response_format", None)
+            routing_result.pop("_provider", None)
+            routing_result.pop("_attempts", None)
 
-        # 空 skill_calls 且无 fallback
-        if not skill_calls:
-            no_match_msg = "无法从你的问题中识别出查询条件，请尝试更具体的描述。"
-            await log_chat_trace_async(trace_id, message, routing_result, 0, no_match_msg)
-            yield _sse_event("delta", {"text": no_match_msg})
-            yield _sse_event("done", {"model": model_used, "traceId": trace_id})
-            return
+            skill_calls = routing_result.get("skill_calls", [])
+            response_skill_name = routing_result.get("response_skill", "respond_servant_list")
+
+            # 推送路由结果
+            yield _sse_event(
+                "thinking",
+                {
+                    "phase": "routed",
+                    "skill_calls": skill_calls,
+                    "response_skill": response_skill_name,
+                },
+            )
+
+            # 检查 fallback
+            fallback = routing_result.get("fallback")
+            if fallback is not None:
+                fb_msg = fallback.get("message", "无法理解你的问题，请尝试更具体的描述。")
+                await log_chat_trace_async(trace_id, message, routing_result, 0, fb_msg)
+                yield _sse_event("delta", {"text": fb_msg})
+                yield _sse_event("done", {"model": model_used, "traceId": trace_id})
+                return
+
+            # 空 skill_calls 且无 fallback
+            if not skill_calls:
+                no_match_msg = "无法从你的问题中识别出查询条件，请尝试更具体的描述。"
+                await log_chat_trace_async(trace_id, message, routing_result, 0, no_match_msg)
+                yield _sse_event("delta", {"text": no_match_msg})
+                yield _sse_event("done", {"model": model_used, "traceId": trace_id})
+                return
 
         # ── 阶段 2: Skill 执行 ──
         yield _sse_event("thinking", {"phase": "executing", "message": "正在检索从者数据..."})

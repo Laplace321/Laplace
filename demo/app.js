@@ -76,9 +76,10 @@ const THINKING_LABELS = {
   querying: "正在检索从者数据...",
 };
 
-// === Send Preset Query (via POST /api/chat with mode=skill + preset_name) ===
+// === Send Preset Query (via SSE /api/chat/stream with preset_name) ===
 // Tag Pill mode: userText is the natural language supplement typed after the pill.
-// If empty, uses preset defaults only. Backend handles Stage 2 parsing of supplement.
+// If empty, uses preset defaults only. Backend handles B1 supplement parsing.
+// Uses the same SSE streaming pipeline as manual input for consistent thinking steps UX.
 async function sendPresetQuery(presetName, userText) {
   if (isProcessing) return;
 
@@ -95,39 +96,38 @@ async function sendPresetQuery(presetName, userText) {
   chatHistory.push({ role: "user", text: displayMsg });
   saveSession();
 
-  const typingEl = appendTypingIndicator();
+  // Use streaming container (same as manual input) for consistent thinking steps
+  const els = createStreamingContainer();
 
   try {
-    // If user typed nothing, send preset's defaultMessage so backend RAG has intent context
     const effectiveMessage = userText || (preset ? preset.defaultMessage : "") || "";
-    const body = { message: effectiveMessage, mode: "skill", preset_name: presetName };
-
-    const resp = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const url = `${STREAM_API_URL}?message=${encodeURIComponent(effectiveMessage)}&preset_name=${encodeURIComponent(presetName)}`;
+    const resp = await fetch(url);
     if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
-    const data = await resp.json();
 
-    typingEl.remove();
-    appendAssistantResponse(data);
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
 
-    if (data.model && data.model !== "error") {
-      modelName.textContent = data.model;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = parseSSE(buffer);
+      buffer = events.remainder;
+
+      for (const ev of events.parsed) {
+        handleStreamEvent(ev.event, ev.data, els);
+      }
     }
-    if (data.traceId) {
-      lastTraceId = data.traceId;
-      updateDebugPanel();
-    }
 
-    const lastMsg = chatMessages.querySelector(".message.assistant-message:last-child .message-bubble");
-    const html = lastMsg ? lastMsg.innerHTML : "";
-    chatHistory.push({ role: "assistant", html });
-    saveSession();
+    // Finalize: remove cursor if present
+    const cursor = els.replyBody.querySelector(".stream-cursor");
+    if (cursor) cursor.remove();
 
   } catch (err) {
-    typingEl.remove();
+    els.container.remove();
     showToast(`请求失败: ${err.message}`);
   } finally {
     isProcessing = false;
