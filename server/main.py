@@ -143,8 +143,21 @@ def _describe_filters(skill_calls: list[dict]) -> list[str]:
         elif name == "search_by_attribute":
             attr = params.get("attribute", "")
             descriptions.append(f"属性 = {attr}")
+        elif name == "compare_servants":
+            names = params.get("names", [])
+            descriptions.append(f"对比从者「{'」与「'.join(names)}」")
+        elif name == "lookup_servant":
+            query = params.get("name") or params.get("query", "")
+            descriptions.append(f"查询从者「{query}」")
         else:
-            descriptions.append(f"{name}({params})")
+            # 兜底：仅输出 Skill 中文 description，禁止暴露参数结构
+            from server.skills.base import SKILL_REGISTRY
+
+            skill_instance = SKILL_REGISTRY.get(name)
+            if skill_instance:
+                descriptions.append(skill_instance.description)
+            else:
+                descriptions.append(f"筛选条件: {name}")
     return descriptions
 
 
