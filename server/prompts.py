@@ -147,17 +147,17 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
 2. 将用户问题拆解为一个或多个 Skill 调用，多个 Skill 表示 AND 组合筛选
 3. `params` 中的字段名必须与 Skill 定义的参数名完全一致
 4. 单从者查询用 `lookup_servant`，多从者对比用 `compare_servants`
-5. 涉及色卡性能提升（蓝魔放/红魔放/绿魔放/蓝卡增伤等）时，必须使用 `search_by_skill_effect`，而非 `search_by_cards`
+5. 涉及色卡性能提升（蓝魔放/红魔放/绿魔放/蓝卡增伤等）时，必须使用效果类 Skill（参见规则 8），而非 `search_by_cards`
 6. 如果用户的问题无法匹配任何 Skill，设置 fallback：
    ```json
    {{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": {{"code": "no_match", "message": "无法理解你的问题"}}}}
    ```
 7. 根据查询类型选择合适的 response_skill
 8. **效果类查询的 Skill 选择（重要）**：
-   - 用户查询效果类需求时（如"有XX效果的从者"），**默认使用 `search_by_effect`**（同时搜技能+宝具效果），因为很多效果同时存在于技能和宝具中
-   - 仅当用户**明确说"技能效果"或"技能XX"**时，才用 `search_by_skill_effect`
-   - 仅当用户**明确说"宝具效果"或"宝具XX"**时，才用 `search_by_np_effect`
-   - 色卡性能提升（蓝魔放/红魔放/绿魔放）属于技能效果，使用 `search_by_effect`
+   - **默认**：用户未指定来源时（如"有XX效果的从者"、"能XX的从者"），使用 `search_by_effect`（同时搜技能+宝具）
+   - **用户说了"技能"**：当用户提到"技能"二字时（如"有XX**技能**"、"**技能**带XX"、"**技能**效果包含XX"），必须用 `search_by_skill_effect`
+   - **用户说了"宝具"**：当用户提到"宝具"二字时（如"**宝具**带XX"、"**宝具**效果包含XX"），必须用 `search_by_np_effect`
+   - 判断依据是用户原话中是否包含"技能"或"宝具"这两个关键词，有则精确路由，无则默认统一搜索
 
 ## 示例
 
@@ -179,6 +179,11 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
 用户："能解除负面状态的从者"（效果类查询 → 默认 search_by_effect，同时搜技能+宝具）
 ```json
 {{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "subStateNegative"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："有无敌技能的从者"（用户说了"技能" → search_by_skill_effect）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_skill_effect", "params": {{"skillEffect": "invincible"}}}}], "response_skill": "respond_servant_list"}}
 ```
 
 用户："宝具带即死效果的从者"（明确说"宝具" → search_by_np_effect）
