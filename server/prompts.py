@@ -159,6 +159,11 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
 {{"skill_calls": [{{"skill_name": "lookup_servant", "params": {{"name": "梅林"}}}}], "response_skill": "respond_servant_detail"}}
 ```
 
+用户："有蓝魔放的五星从者"（蓝魔放/蓝卡增伤/蓝卡提升 → search_by_skill_effect + upArts）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_skill_effect", "params": {{"skillEffect": "upArts"}}}}, {{"skill_name": "search_by_rarity", "params": {{"op": "eq", "value": 5}}}}], "response_skill": "respond_servant_list"}}
+```
+
 用户："对比村正和武尊"
 ```json
 {{"skill_calls": [{{"skill_name": "compare_servants", "params": {{"names": ["村正", "武尊"]}}}}], "response_skill": "respond_servant_compare"}}
