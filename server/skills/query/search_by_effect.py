@@ -41,7 +41,10 @@ def _check_effect(
         max_value: 效果最大数值（万分比），None 表示不限
     """
     hit_skill = source in ("both", "skill") and _match_effect(servant, effect_name, target_type, min_value, max_value)
-    hit_np = source in ("both", "np") and effect_name in servant.get("npEffects", [])
+    # npEffects 目前是纯效果名集合，不含 targetType/value 维度数据（Phase 8 再扩展）。
+    # 当用户指定了精细条件时，宝具端无法校验，必须跳过，避免误匹配。
+    has_quantitative_filter = target_type is not None or min_value is not None or max_value is not None
+    hit_np = source in ("both", "np") and not has_quantitative_filter and effect_name in servant.get("npEffects", [])
     return hit_skill or hit_np
 
 
