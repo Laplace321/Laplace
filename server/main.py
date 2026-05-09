@@ -123,6 +123,11 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
     total_found = len(servants)
     top_results = []
 
+    # 翻译映射缓存
+    class_map = _get_class_map()
+    np_card_map = _get_np_card_map()
+    np_target_map = _get_np_target_map()
+
     for s in servants[:MAX_CONTEXT_SIZE]:
         raw_np_card = s.get("npCard")
         raw_np_target = s.get("npTarget")
@@ -137,20 +142,35 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
             {
                 "name": s.get("name"),
                 "aliasCN": s.get("aliasCN"),
-                "className": _get_class_map().get(str(raw_class_name).lower(), raw_class_name),
+                "className": class_map.get(str(raw_class_name).lower(), raw_class_name),
                 "rarity": s.get("rarity"),
                 "cards": s.get("cards"),
                 "totalCharge": s.get("totalCharge"),
-                "npCard": _get_np_card_map().get(str(raw_np_card).lower(), raw_np_card),
-                "npTarget": _get_np_target_map().get(str(raw_np_target).lower(), raw_np_target),
+                "npCard": np_card_map.get(str(raw_np_card).lower(), raw_np_card),
+                "npTarget": np_target_map.get(str(raw_np_target).lower(), raw_np_target),
                 "skillEffects": translated_effects,
                 "npEffects": translated_np_effects,
             }
         )
 
+    # 全局统计摘要（基于全部从者，而非仅 top N）
+    from collections import Counter
+
+    stats_summary = {}
+    if total_found > MAX_CONTEXT_SIZE:
+        np_card_dist = Counter(np_card_map.get(str(s.get("npCard", "")).lower(), s.get("npCard")) for s in servants)
+        class_dist = Counter(class_map.get(str(s.get("className", "")).lower(), s.get("className")) for s in servants)
+        rarity_dist = Counter(s.get("rarity") for s in servants)
+        stats_summary = {
+            "npCard_distribution": dict(np_card_dist),
+            "className_distribution": dict(class_dist),
+            "rarity_distribution": {f"{k}星": v for k, v in sorted(rarity_dist.items(), reverse=True)},
+        }
+
     return {
         "total_found": total_found,
         "query_conditions": {},  # 由调用方填充
+        "stats_summary": stats_summary,
         "top_results_details": top_results,
     }, top_results
 
