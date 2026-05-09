@@ -746,13 +746,13 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 },
             )
 
-            # 推送路由结果
+            # 推送路由结果（预消化：中文描述替代原始英文 skill_name）
             yield _sse_event(
                 "thinking",
                 {
                     "phase": "routed",
-                    "skill_calls": skill_calls,
-                    "response_skill": response_skill_name,
+                    "message": "意图识别完成",
+                    "detail": "、".join(_describe_filters(skill_calls)),
                 },
             )
 
@@ -820,13 +820,13 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 },
             )
 
-            # 推送路由结果
+            # 推送路由结果（预消化：中文描述替代原始英文 skill_name）
             yield _sse_event(
                 "thinking",
                 {
                     "phase": "routed",
-                    "skill_calls": skill_calls,
-                    "response_skill": response_skill_name,
+                    "message": "意图识别完成",
+                    "detail": "、".join(_describe_filters(skill_calls)),
                 },
             )
 

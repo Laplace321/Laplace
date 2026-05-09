@@ -78,6 +78,7 @@ const THINKING_LABELS = {
 
 // === Skill Display Names (internal name → user-friendly Chinese) ===
 const SKILL_DISPLAY_NAMES = {
+  search_by_effect: "效果筛选",
   search_by_np_charge: "宝具充能筛选",
   search_by_class: "职阶筛选",
   search_by_rarity: "稀有度筛选",
@@ -384,14 +385,13 @@ function handleThinking(data, els) {
   const label = data.message || THINKING_LABELS[data.phase] || data.phase;
   const step = renderThinkingStep(data.phase, label, els.thinkingSteps);
 
-  // If routed (Skill mode), show skill_calls detail (user-friendly names)
-  if (data.phase === "routed" && data.skill_calls) {
+  // If routed (Skill mode), show pre-digested Chinese detail from backend
+  if (data.phase === "routed") {
     completeThinkingStep(step);
-    if (data.skill_calls.length > 0) {
+    if (data.detail) {
       const detail = document.createElement("div");
       detail.className = "thinking-step-detail";
-      const skillLabels = data.skill_calls.map(c => getSkillDisplayName(c.skill_name || c.name)).join("、");
-      detail.textContent = skillLabels;
+      detail.textContent = data.detail;
       els.thinkingSteps.appendChild(detail);
     }
   }
@@ -521,18 +521,18 @@ function appendAssistantResponse(data) {
   const msg = document.createElement("div");
   msg.className = "message assistant-message";
 
-  // Thinking steps: show skill_calls from query info (preset mode insight)
+  // Thinking steps: show pre-digested Chinese filter descriptions
   let thinkingHtml = "";
-  const skillCalls = data.query?.skill_calls || [];
-  if (skillCalls.length > 0) {
-    const skillLabels = skillCalls.map(c => getSkillDisplayName(c.skill_name || c.name)).join("、");
+  const appliedFilters = data.query?.applied_filters || [];
+  if (appliedFilters.length > 0) {
+    const filterDetail = appliedFilters.join("、");
     thinkingHtml = `
       <div class="thinking-steps">
         <div class="thinking-step completed">
           <span class="thinking-step-icon">✓</span>
           <span class="thinking-step-text">意图识别完成</span>
         </div>
-        <div class="thinking-step-detail">${escapeHtml(skillLabels)}</div>
+        <div class="thinking-step-detail">${escapeHtml(filterDetail)}</div>
         <div class="thinking-step completed">
           <span class="thinking-step-icon">✓</span>
           <span class="thinking-step-text">检索到 ${data.count || 0} 位从者</span>
