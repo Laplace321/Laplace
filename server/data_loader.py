@@ -118,12 +118,13 @@ def _trait_ids(trait_list: list) -> list[int]:
 def apply_validate(func: dict, effect_name: str, matcher: dict) -> bool:
     """通用 validate 执行器：根据声明式规则判断 func 是否匹配指定效果。
 
-    5 种规则类型：
+    6 种规则类型：
     1. buff_ckSelfIndv_contains — buff.ckSelfIndv 包含指定 traitValue
     2. buff_ckOpIndv_contains — buff.ckOpIndv 包含指定 traitValue
     3. buff_ckOpIndv_every_not_in — buff.ckOpIndv 全部不在 traitValues 中
     4. func_vals_contains — func.vals 包含指定 traitValue
     5. buff_type_in_trigger_set — buff.type 属于 triggerBuffTypes 集合
+    6. func_target_type_in — func.funcTargetType 属于 targetTypes 集合
     """
     rule = matcher["validates"].get(effect_name)
     if rule is None:
@@ -158,6 +159,10 @@ def apply_validate(func: dict, effect_name: str, matcher: dict) -> bool:
         if not buffs:
             return False
         return buffs[0].get("type", "") in trigger_types
+
+    if rule_type == "func_target_type_in":
+        allowed = set(rule.get("targetTypes", []))
+        return func.get("funcTargetType", "") in allowed
 
     return True  # 未知规则类型，默认通过
 

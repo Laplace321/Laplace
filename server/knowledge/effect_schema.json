@@ -669,9 +669,8 @@
       ],
       "buffTypes": [],
       "validate": {
-        "type": "func_vals_contains",
-        "trait": "buffPositiveEffect",
-        "traitValue": 3004
+        "type": "func_target_type_in",
+        "targetTypes": ["enemy", "enemyAll"]
       },
       "aliases_zh": [
         "强化解除"
@@ -686,9 +685,8 @@
       ],
       "buffTypes": [],
       "validate": {
-        "type": "func_vals_contains",
-        "trait": "buffNegativeEffect",
-        "traitValue": 3005
+        "type": "func_target_type_in",
+        "targetTypes": ["self", "ptAll", "ptOne", "ptOther"]
       },
       "aliases_zh": [
         "弱化状态解除",
