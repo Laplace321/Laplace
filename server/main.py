@@ -88,20 +88,6 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
         translated_effects = [get_effect_translation(e) for e in raw_effects]
         translated_np_effects = [get_effect_translation(e) for e in raw_np_effects]
 
-        card_buff_status = []
-        if "upArts" in raw_effects:
-            card_buff_status.append("有蓝卡提升")
-        else:
-            card_buff_status.append("无蓝卡提升")
-        if "upQuick" in raw_effects:
-            card_buff_status.append("有绿卡提升")
-        else:
-            card_buff_status.append("无绿卡提升")
-        if "upBuster" in raw_effects:
-            card_buff_status.append("有红卡提升")
-        else:
-            card_buff_status.append("无红卡提升")
-
         top_results.append(
             {
                 "name": s.get("name"),
@@ -114,7 +100,6 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
                 "npTarget": _get_np_target_map().get(str(raw_np_target).lower(), raw_np_target),
                 "skillEffects": translated_effects,
                 "npEffects": translated_np_effects,
-                "__internal_card_buff_check": " | ".join(card_buff_status),
             }
         )
 

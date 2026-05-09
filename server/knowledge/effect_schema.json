@@ -81,7 +81,9 @@
         "damageNpBattlePointPhase"
       ],
       "buffTypes": [],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "宝具特攻"
+      ],
       "description": "宝具附带特攻倍率，对特定特性敌人造成额外伤害"
     },
     {
@@ -92,6 +94,7 @@
         "upAtk"
       ],
       "aliases_zh": [
+        "攻击力提升",
         "加攻"
       ],
       "description": "提升攻击力，增加所有攻击的基础伤害"
@@ -112,7 +115,11 @@
         "traitValue": 4003
       },
       "aliases_zh": [
-        "绿卡提升"
+        "Quick提升",
+        "绿卡提升",
+        "绿卡增伤",
+        "Q卡提升",
+        "Q卡增伤"
       ],
       "description": "提升Quick卡(绿卡)的性能，增加Quick指令卡伤害、NP获取和产星"
     },
@@ -132,7 +139,11 @@
         "traitValue": 4001
       },
       "aliases_zh": [
-        "蓝卡提升"
+        "Arts提升",
+        "蓝卡提升",
+        "蓝卡增伤",
+        "A卡提升",
+        "A卡增伤"
       ],
       "description": "提升Arts卡(蓝卡)的性能，增加Arts指令卡伤害和NP获取"
     },
@@ -152,7 +163,11 @@
         "traitValue": 4002
       },
       "aliases_zh": [
-        "红卡提升"
+        "Buster提升",
+        "红卡提升",
+        "红卡增伤",
+        "B卡提升",
+        "B卡增伤"
       ],
       "description": "提升Buster卡(红卡)的性能，增加Buster指令卡伤害"
     },
@@ -166,6 +181,7 @@
         "upDamageIndividualityActiveonly"
       ],
       "aliases_zh": [
+        "威力提升",
         "特攻伤害"
       ],
       "description": "对特定特性敌人造成额外伤害的特攻效果"
@@ -177,7 +193,9 @@
       "buffTypes": [
         "addDamage"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "伤害附加"
+      ],
       "description": "攻击时附加固定数值的额外伤害"
     },
     {
@@ -188,6 +206,7 @@
         "upCriticaldamage"
       ],
       "aliases_zh": [
+        "暴击威力提升",
         "暴击伤害",
         "爆伤"
       ],
@@ -201,6 +220,7 @@
         "upCriticalpoint"
       ],
       "aliases_zh": [
+        "暴击星掉落提升",
         "产星",
         "出星"
       ],
@@ -214,6 +234,7 @@
         "upStarweight"
       ],
       "aliases_zh": [
+        "暴击星集中度提升",
         "集星"
       ],
       "description": "提升暴击星的集中度，使该从者更容易获得暴击星"
@@ -226,6 +247,7 @@
       ],
       "buffTypes": [],
       "aliases_zh": [
+        "获得暴击星",
         "给星",
         "产星"
       ],
@@ -239,6 +261,7 @@
         "regainStar"
       ],
       "aliases_zh": [
+        "每回合获得暴击星",
         "出星状态"
       ],
       "description": "每回合自动获得一定数量的暴击星"
@@ -251,6 +274,7 @@
         "upNpdamage"
       ],
       "aliases_zh": [
+        "宝具威力提升",
         "宝威",
         "宝伤"
       ],
@@ -271,6 +295,7 @@
       ],
       "buffTypes": [],
       "aliases_zh": [
+        "NP增加",
         "自充",
         "充能",
         "群充"
@@ -285,6 +310,7 @@
         "regainNp"
       ],
       "aliases_zh": [
+        "每回合获得NP",
         "缓充"
       ],
       "description": "每回合自动恢复一定NP量"
@@ -297,6 +323,7 @@
         "upDropnp"
       ],
       "aliases_zh": [
+        "NP获得量提升",
         "黄金律"
       ],
       "description": "提升攻击时的NP获取量"
@@ -320,7 +347,9 @@
       "buffTypes": [
         "breakAvoidance"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "必中"
+      ],
       "description": "攻击必定命中，无视回避状态"
     },
     {
@@ -330,7 +359,9 @@
       "buffTypes": [
         "pierceInvincible"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "无敌贯通"
+      ],
       "description": "攻击无视无敌状态"
     },
     {
@@ -342,7 +373,9 @@
       "buffTypes": [
         "pierceDefence"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "无视防御"
+      ],
       "description": "攻击无视防御力"
     },
     {
@@ -353,6 +386,7 @@
         "upDefence"
       ],
       "aliases_zh": [
+        "防御力提升",
         "加防"
       ],
       "description": "提升防御力，减少受到的伤害"
@@ -365,6 +399,7 @@
         "subSelfdamage"
       ],
       "aliases_zh": [
+        "伤害减免",
         "减伤"
       ],
       "description": "减少受到的固定数值伤害"
@@ -377,7 +412,9 @@
         "avoidance",
         "avoidanceIndividuality"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "闪避"
+      ],
       "description": "闪避/回避，免疫一次攻击伤害"
     },
     {
@@ -387,7 +424,9 @@
       "buffTypes": [
         "invincible"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "无敌"
+      ],
       "description": "无敌，免疫所有伤害，持续一定回合"
     },
     {
@@ -399,6 +438,7 @@
         "gutsRatio"
       ],
       "aliases_zh": [
+        "毅力",
         "战续",
         "根性"
       ],
@@ -412,6 +452,7 @@
         "upHate"
       ],
       "aliases_zh": [
+        "目标集中",
         "集火"
       ],
       "description": "提升目标集中度，吸引敌方攻击(嘲讽)"
@@ -423,7 +464,9 @@
       "buffTypes": [
         "downCriticalRateDamageTaken"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "被暴击发生耐性提升"
+      ],
       "description": "降低被敌方暴击的概率"
     },
     {
@@ -436,6 +479,7 @@
       ],
       "buffTypes": [],
       "aliases_zh": [
+        "HP回复",
         "回血"
       ],
       "description": "立即恢复HP"
@@ -448,7 +492,9 @@
         "upGainHp",
         "upGivegainHp"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "HP回复量提升"
+      ],
       "description": "提升HP恢复效果的回复量"
     },
     {
@@ -459,6 +505,7 @@
         "regainHp"
       ],
       "aliases_zh": [
+        "每回合获得HP",
         "每回合回复"
       ],
       "description": "每回合自动恢复一定HP"
@@ -470,7 +517,9 @@
       "buffTypes": [
         "addMaxhp"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "最大HP增加"
+      ],
       "description": "增加最大HP上限"
     },
     {
@@ -480,7 +529,9 @@
       "buffTypes": [
         "reduceHp"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "HP减少(毒/诅咒/灼烧)"
+      ],
       "description": "造成持续性HP减少(毒/诅咒/灼烧)"
     },
     {
@@ -502,6 +553,7 @@
         ]
       },
       "aliases_zh": [
+        "弱体耐性提升",
         "异常耐性"
       ],
       "description": "提升对弱体(负面)状态的抵抗率"
@@ -525,6 +577,7 @@
         ]
       },
       "aliases_zh": [
+        "弱体无效",
         "异常无效"
       ],
       "description": "完全免疫弱体(负面)状态"
@@ -536,7 +589,9 @@
       "buffTypes": [
         "upGrantstate"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "状态付与成功率提升"
+      ],
       "description": "提升状态付与的成功率"
     },
     {
@@ -551,7 +606,9 @@
         "trait": "buffPositiveEffect",
         "traitValue": 3004
       },
-      "aliases_zh": [],
+      "aliases_zh": [
+        "强化状态付与提升"
+      ],
       "description": "提升强化状态付与的成功率"
     },
     {
@@ -566,7 +623,9 @@
         "trait": "buffNegativeEffect",
         "traitValue": 3005
       },
-      "aliases_zh": [],
+      "aliases_zh": [
+        "弱化状态付与提升"
+      ],
       "description": "提升弱体(负面)状态付与的成功率"
     },
     {
@@ -581,7 +640,9 @@
         "trait": "buffPositiveEffect",
         "traitValue": 3004
       },
-      "aliases_zh": [],
+      "aliases_zh": [
+        "被强化成功率提升"
+      ],
       "description": "提升己方被强化的成功率"
     },
     {
@@ -592,6 +653,7 @@
       ],
       "buffTypes": [],
       "aliases_zh": [
+        "解除状态",
         "强化解除"
       ],
       "description": "解除目标身上的状态"
@@ -608,7 +670,9 @@
         "trait": "buffPositiveEffect",
         "traitValue": 3004
       },
-      "aliases_zh": [],
+      "aliases_zh": [
+        "强化解除"
+      ],
       "description": "解除目标身上的正面(强化)状态"
     },
     {
@@ -624,6 +688,7 @@
         "traitValue": 3005
       },
       "aliases_zh": [
+        "弱化状态解除",
         "弱体解除"
       ],
       "description": "解除己方身上的负面(弱体)状态"
@@ -635,7 +700,9 @@
       "buffTypes": [
         "upToleranceSubstate"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "强化解除耐性提升"
+      ],
       "description": "提升对强化解除效果的抵抗率"
     },
     {
@@ -646,7 +713,9 @@
         "forceInstantDeath"
       ],
       "buffTypes": [],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "即死"
+      ],
       "description": "有概率即死消灭目标"
     },
     {
@@ -656,7 +725,9 @@
       "buffTypes": [
         "upResistInstantdeath"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "即死耐性提升"
+      ],
       "description": "提升对即死效果的抵抗率"
     },
     {
@@ -666,7 +737,9 @@
       "buffTypes": [
         "upGrantInstantdeath"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "即死付与率提升"
+      ],
       "description": "提升即死效果的成功率"
     },
     {
@@ -676,7 +749,9 @@
       "buffTypes": [
         "avoidInstantdeath"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "即死无效"
+      ],
       "description": "完全免疫即死效果"
     },
     {
@@ -687,6 +762,7 @@
       ],
       "buffTypes": [],
       "aliases_zh": [
+        "技能冷却减少",
         "减CD"
       ],
       "description": "缩减技能的冷却回合数"
@@ -699,7 +775,9 @@
         "fieldIndividuality",
         "toFieldChangeField"
       ],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "场地特性"
+      ],
       "description": "变更战场的场地特性"
     },
     {
@@ -710,7 +788,9 @@
         "friendPointUpDuplicate"
       ],
       "buffTypes": [],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "友情点"
+      ],
       "description": "提升友情点的获取量"
     },
     {
@@ -720,7 +800,9 @@
         "expUp"
       ],
       "buffTypes": [],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "御主经验"
+      ],
       "description": "提升御主经验值的获取量"
     },
     {
@@ -730,7 +812,9 @@
         "userEquipExpUp"
       ],
       "buffTypes": [],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "御主礼装经验"
+      ],
       "description": "提升魔术礼装经验值的获取量"
     },
     {
@@ -740,7 +824,9 @@
         "servantFriendshipUp"
       ],
       "buffTypes": [],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "羁绊"
+      ],
       "description": "提升从者羁绊经验的获取量"
     },
     {
@@ -751,7 +837,9 @@
         "qpDropUp"
       ],
       "buffTypes": [],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "QP增加"
+      ],
       "description": "提升QP(游戏货币)的获取量"
     },
     {
@@ -767,7 +855,9 @@
         "buddyPointUp"
       ],
       "buffTypes": [],
-      "aliases_zh": [],
+      "aliases_zh": [
+        "素材掉落数量"
+      ],
       "description": "提升活动素材的掉落数量"
     },
     {
@@ -779,6 +869,7 @@
         "type": "buff_type_in_trigger_set"
       },
       "aliases_zh": [
+        "特定时机发动",
         "条件发动"
       ],
       "description": "在特定条件下自动发动的被动技能效果"

@@ -373,9 +373,9 @@ EFFECT_DESCRIPTIONS: dict[str, str] = {
 # 这些是 FGO 中文社区的惯用简称，不随 Chaldea 更新变化
 PLAYER_SLANG_ZH: dict[str, list[str]] = {
     "upAtk": ["加攻"],
-    "upQuick": ["绿卡提升"],
-    "upArts": ["蓝卡提升"],
-    "upBuster": ["红卡提升"],
+    "upQuick": ["绿卡提升", "绿卡增伤", "Q卡提升", "Q卡增伤"],
+    "upArts": ["蓝卡提升", "蓝卡增伤", "A卡提升", "A卡增伤"],
+    "upBuster": ["红卡提升", "红卡增伤", "B卡提升", "B卡增伤"],
     "upDamage": ["特攻伤害"],
     "upCriticaldamage": ["暴击伤害", "爆伤"],
     "upCriticalpoint": ["产星", "出星"],
