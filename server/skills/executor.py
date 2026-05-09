@@ -61,7 +61,8 @@ class SkillExecutor:
 
             skill = SKILL_REGISTRY.get(skill_name)
             if skill is None or not isinstance(skill, QuerySkill):
-                continue  # 跳过未知或非 QuerySkill
+                print(f"⚠️  LLM 路由了不存在的 Skill: '{skill_name}'，已跳过。已注册: {list(SKILL_REGISTRY.keys())}")
+                continue
 
             # Pydantic 参数校验（容错：校验失败跳过该 Skill）
             if skill.params_schema is not None:

@@ -138,14 +138,16 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
 ```
 
 ## 路由规则
-1. 将用户问题拆解为一个或多个 Skill 调用，多个 Skill 表示 AND 组合筛选
-2. `params` 中的字段名必须与 Skill 定义的参数名完全一致
-3. 单从者查询用 `lookup_servant`，多从者对比用 `compare_servants`
-4. 如果用户的问题无法匹配任何 Skill，设置 fallback：
+1. **skill_name 必须严格从「可用 Skills」列表中选择，禁止编造任何不在列表中的 Skill 名称**
+2. 将用户问题拆解为一个或多个 Skill 调用，多个 Skill 表示 AND 组合筛选
+3. `params` 中的字段名必须与 Skill 定义的参数名完全一致
+4. 单从者查询用 `lookup_servant`，多从者对比用 `compare_servants`
+5. 涉及色卡性能提升（蓝魔放/红魔放/绿魔放/蓝卡增伤等）时，必须使用 `search_by_skill_effect`，而非 `search_by_cards`
+6. 如果用户的问题无法匹配任何 Skill，设置 fallback：
    ```json
    {{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": {{"code": "no_match", "message": "无法理解你的问题"}}}}
    ```
-5. 根据查询类型选择合适的 response_skill
+7. 根据查询类型选择合适的 response_skill
 
 ## 示例
 
