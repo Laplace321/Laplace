@@ -201,7 +201,7 @@ def find_trace(trace_id: str) -> dict | None:
         # 从 generation_output 或 final 提取 reply
         for e in reversed(phased_events):
             if e.get("phase") == "generation_output":
-                result["reply"] = e.get("data", {}).get("reply_preview", "")
+                result["reply"] = e.get("data", {}).get("reply", e.get("data", {}).get("reply_preview", ""))
                 break
         # 从 execution 提取 results_count
         for e in phased_events:
