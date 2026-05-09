@@ -158,6 +158,7 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
    - **用户说了"技能"**：当用户提到"技能"二字时（如"有XX**技能**"、"**技能**带XX"、"**技能**效果包含XX"），必须用 `search_by_skill_effect`
    - **用户说了"宝具"**：当用户提到"宝具"二字时（如"**宝具**带XX"、"**宝具**效果包含XX"），必须用 `search_by_np_effect`
    - 判断依据是用户原话中是否包含"技能"或"宝具"这两个关键词，有则精确路由，无则默认统一搜索
+9. **禁止同 Skill 多次调用表达 OR**：当用户的查询涉及"任意一种"效果时（如"能挡伤害"、"能辅助"），**禁止**对同一个 Skill 发起多次调用。应使用单次调用的 `effects` + `effectsOp: "or"` 参数，或使用虚拟复合效果名（如 `damageBoost`、`damageShield`）。多个 skill_call 之间是 AND 关系，重复调用同一 Skill 会变成"必须同时满足所有条件"，导致结果为空。
 
 ## 示例
 
@@ -194,6 +195,16 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
 用户："对比村正和武尊"
 ```json
 {{"skill_calls": [{{"skill_name": "compare_servants", "params": {{"names": ["村正", "武尊"]}}}}], "response_skill": "respond_servant_compare"}}
+```
+
+用户："能挡伤害的从者"（防御类泛用概念 → 虚拟复合效果 damageShield）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "damageShield"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："有增伤技能的从者"（增伤类泛用概念 → 虚拟复合效果 damageBoost）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_skill_effect", "params": {{"skillEffect": "damageBoost"}}}}], "response_skill": "respond_servant_list"}}
 ```
 """
 
