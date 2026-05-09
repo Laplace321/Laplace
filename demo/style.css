@@ -814,18 +814,18 @@ body {
   color: var(--accent-cyan);
 }
 
-/* --- Send Button Loading Spinner --- */
-#send-btn.loading svg { display: none; }
-#send-btn.loading::after {
-  content: "";
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--text-muted);
-  border-top-color: var(--accent-gold);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
+/* --- Send Button Stop Mode --- */
+#send-btn.stop-mode {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  animation: stop-pulse 1.5s ease-in-out infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+#send-btn.stop-mode:hover {
+  box-shadow: 0 0 16px rgba(231, 76, 60, 0.5);
+}
+@keyframes stop-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
 
 /* --- Skeleton Placeholder --- */
 .skeleton-placeholder { padding: 8px 0; }
@@ -1027,4 +1027,177 @@ body {
   color: var(--text-muted);
   font-size: 13px;
   padding: 32px 16px;
+}
+
+/* --- Help Modal --- */
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 9000;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.help-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.help-modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  width: 90%;
+  max-width: 520px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-card), 0 0 40px rgba(212, 168, 67, 0.08);
+  transform: scale(0.95) translateY(10px);
+  transition: transform 0.25s ease;
+}
+.help-overlay.visible .help-modal {
+  transform: scale(1) translateY(0);
+}
+
+.help-modal-header {
+  padding: 20px 24px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.help-modal-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-gold);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.help-modal-header h3 .help-icon {
+  font-size: 20px;
+}
+.help-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 20px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: color 0.2s, background 0.2s;
+}
+.help-close-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.help-modal-body {
+  padding: 16px 24px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.help-welcome {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
+
+.help-section {
+  margin-bottom: 16px;
+}
+.help-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-gold);
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+.help-section ul {
+  list-style: none;
+  padding: 0;
+}
+.help-section li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 4px 0;
+  padding-left: 16px;
+  position: relative;
+  line-height: 1.6;
+}
+.help-section li::before {
+  content: "·";
+  position: absolute;
+  left: 4px;
+  color: var(--accent-gold-dim);
+  font-weight: bold;
+}
+
+.help-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.help-example-chip {
+  background: rgba(212, 168, 67, 0.08);
+  border: 1px solid rgba(212, 168, 67, 0.2);
+  color: var(--text-gold);
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.help-example-chip:hover {
+  background: rgba(212, 168, 67, 0.15);
+  border-color: rgba(212, 168, 67, 0.4);
+  transform: translateY(-1px);
+}
+
+.help-tips {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.8;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+.help-tips strong {
+  color: var(--text-secondary);
+}
+
+.help-modal-footer {
+  padding: 12px 24px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.help-dismiss-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.help-dismiss-label input[type="checkbox"] {
+  accent-color: var(--accent-gold);
+}
+.help-version {
+  font-size: 10px;
+  color: var(--text-muted);
 }

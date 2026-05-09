@@ -29,6 +29,7 @@ const chatContainer = document.getElementById("chat-container");
 let isProcessing = false;
 let lastTraceId = null;
 let debugVisible = false;
+let currentAbortController = null;
 
 // === Chat History (localStorage) ===
 const STORAGE_KEY = "laplace_chat_history";
@@ -99,12 +100,56 @@ function getSkillDisplayName(skillName) {
 // Tag Pill mode: userText is the natural language supplement typed after the pill.
 // If empty, uses preset defaults only. Backend handles B1 supplement parsing.
 // Uses the same SSE streaming pipeline as manual input for consistent thinking steps UX.
+// === Send Button State Helpers ===
+const SEND_ICON_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <line x1="22" y1="2" x2="11" y2="13"></line>
+  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+</svg>`;
+const STOP_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+  <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+</svg>`;
+
+function setSendButtonToStop() {
+  sendBtn.innerHTML = STOP_ICON_SVG;
+  sendBtn.classList.add("stop-mode");
+  sendBtn.disabled = false;
+  sendBtn.title = "停止生成";
+}
+
+function setSendButtonToSend() {
+  sendBtn.innerHTML = SEND_ICON_SVG;
+  sendBtn.classList.remove("stop-mode");
+  sendBtn.disabled = false;
+  sendBtn.title = "发送";
+}
+
+function stopGeneration() {
+  if (currentAbortController) {
+    currentAbortController.abort();
+    currentAbortController = null;
+  }
+}
+
+function finalizeStreamingContainer(els) {
+  // Remove stream cursor (blinking caret)
+  const cursor = els.replyBody.querySelector(".stream-cursor");
+  if (cursor) cursor.remove();
+
+  // Complete all active thinking steps (stop their animations)
+  els.thinkingSteps.querySelectorAll(".thinking-step.active").forEach(step => {
+    completeThinkingStep(step);
+  });
+
+  // Remove skeleton placeholder if still present
+  const skeleton = els.container.querySelector(".skeleton-placeholder");
+  if (skeleton) skeleton.remove();
+}
+
 async function sendPresetQuery(presetName, userText) {
   if (isProcessing) return;
 
   isProcessing = true;
-  sendBtn.disabled = true;
-  sendBtn.classList.add("loading");
+  setSendButtonToStop();
   chatInput.value = ""; // ensure input is cleared
 
   const preset = PRESETS.find(p => p.name === presetName);
@@ -118,10 +163,11 @@ async function sendPresetQuery(presetName, userText) {
   // Use streaming container (same as manual input) for consistent thinking steps
   const els = createStreamingContainer();
 
+  currentAbortController = new AbortController();
   try {
     const effectiveMessage = userText || (preset ? preset.defaultMessage : "") || "";
     const url = `${STREAM_API_URL}?message=${encodeURIComponent(effectiveMessage)}&preset_name=${encodeURIComponent(presetName)}`;
-    const resp = await fetch(url);
+    const resp = await fetch(url, { signal: currentAbortController.signal });
     if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
 
     const reader = resp.body.getReader();
@@ -146,12 +192,17 @@ async function sendPresetQuery(presetName, userText) {
     if (cursor) cursor.remove();
 
   } catch (err) {
-    els.container.remove();
-    showToast(`请求失败: ${err.message}`);
+    if (err.name === "AbortError") {
+      finalizeStreamingContainer(els);
+      showToast("已停止生成");
+    } else {
+      els.container.remove();
+      showToast(`请求失败: ${err.message}`);
+    }
   } finally {
+    currentAbortController = null;
     isProcessing = false;
-    sendBtn.disabled = false;
-    sendBtn.classList.remove("loading");
+    setSendButtonToSend();
     chatInput.focus();
   }
 }
@@ -225,8 +276,7 @@ async function sendMessage() {
   if (!text) return;
 
   isProcessing = true;
-  sendBtn.disabled = true;
-  sendBtn.classList.add("loading");
+  setSendButtonToStop();
   chatInput.value = "";
 
   appendMessage("user", text);
@@ -236,9 +286,10 @@ async function sendMessage() {
   // Create streaming container (replaces typing indicator)
   const els = createStreamingContainer();
 
+  currentAbortController = new AbortController();
   try {
     const url = `${STREAM_API_URL}?message=${encodeURIComponent(text)}`;
-    const resp = await fetch(url);
+    const resp = await fetch(url, { signal: currentAbortController.signal });
     if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
 
     const reader = resp.body.getReader();
@@ -263,12 +314,17 @@ async function sendMessage() {
     if (cursor) cursor.remove();
 
   } catch (err) {
-    els.container.remove();
-    showToast(`请求失败: ${err.message}`);
+    if (err.name === "AbortError") {
+      finalizeStreamingContainer(els);
+      showToast("已停止生成");
+    } else {
+      els.container.remove();
+      showToast(`请求失败: ${err.message}`);
+    }
   } finally {
+    currentAbortController = null;
     isProcessing = false;
-    sendBtn.disabled = false;
-    sendBtn.classList.remove("loading");
+    setSendButtonToSend();
     chatInput.focus();
   }
 }
@@ -657,7 +713,13 @@ function scrollToBottom() {
 }
 
 // === Event Listeners ===
-sendBtn.addEventListener("click", sendMessage);
+sendBtn.addEventListener("click", () => {
+  if (isProcessing) {
+    stopGeneration();
+  } else {
+    sendMessage();
+  }
+});
 
 chatInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
@@ -909,7 +971,17 @@ function appendWelcomeMessage() {
   chatMessages.appendChild(msg);
 }
 
-// === Clear + History Button Events ===
+// === New Chat + Clear + History Button Events ===
+document.getElementById("new-chat-btn").addEventListener("click", () => {
+  if (chatHistory.length > 0) {
+    saveSession();
+  }
+  chatMessages.innerHTML = "";
+  chatHistory = [];
+  currentSessionId = Date.now().toString(36);
+  appendWelcomeMessage();
+});
+
 document.getElementById("clear-btn").addEventListener("click", () => {
   if (!confirm("确定清空当前对话？")) return;
   chatMessages.innerHTML = "";
@@ -922,12 +994,120 @@ document.getElementById("history-btn").addEventListener("click", () => {
   openHistoryPanel();
 });
 
+document.getElementById("help-btn").addEventListener("click", () => {
+  openHelpModal();
+});
+
+// === Help Modal ===
+const HELP_SHOWN_KEY = "laplace_help_shown";
+
+function createHelpModal() {
+  const overlay = document.createElement("div");
+  overlay.className = "help-overlay";
+  overlay.id = "help-overlay";
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeHelpModal();
+  });
+
+  const modal = document.createElement("div");
+  modal.className = "help-modal";
+  modal.innerHTML = `
+    <div class="help-modal-header">
+      <h3><span class="help-icon">⧫</span> 使用说明</h3>
+      <button class="help-close-btn" id="help-close-btn">&times;</button>
+    </div>
+    <div class="help-modal-body">
+      <div class="help-welcome">
+        Laplace 是一个 FGO 智能数据助手，你可以用日常语言向它提问，它会理解你的意图并从数据库中检索、分析从者信息。就像和一个熟悉 FGO 的朋友聊天一样。
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">我能帮你做什么</div>
+        <ul>
+          <li><strong>条件筛选</strong> — 按职阶、星级、配卡、属性、特性等条件筛选从者</li>
+          <li><strong>效果搜索</strong> — 搜索拥有特定效果的从者（如充能、增伤、无敌、闪避等）</li>
+          <li><strong>从者详情</strong> — 查看某个从者的完整数据和技能信息</li>
+          <li><strong>从者对比</strong> — 把几个从者放在一起比较，分析各自优劣</li>
+          <li><strong>辅助推荐</strong> — 根据需求推荐合适的辅助从者搭配</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">试试这样问</div>
+        <div class="help-examples">
+          <span class="help-example-chip" data-query="30自充以上的五星Caster">30自充五星Caster</span>
+          <span class="help-example-chip" data-query="有增伤技能的从者">有增伤技能的从者</span>
+          <span class="help-example-chip" data-query="能挡伤害的从者">能挡伤害的从者</span>
+          <span class="help-example-chip" data-query="对比梅林和斯卡蒂">对比梅林和斯卡蒂</span>
+          <span class="help-example-chip" data-query="查一下村正">查一下村正</span>
+          <span class="help-example-chip" data-query="宝具带即死效果的从者">宝具带即死的从者</span>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-tips">
+          <strong>小贴士</strong><br>
+          · 用自然语言提问即可，不需要记住任何指令<br>
+          · 可以同时组合多个条件，比如"五星 Caster 有自充"<br>
+          · 点击输入框上方的快捷标签可以快速开始常见查询<br>
+          · 说"技能"或"宝具"可以精确限定搜索范围
+        </div>
+      </div>
+    </div>
+    <div class="help-modal-footer">
+      <label class="help-dismiss-label">
+        <input type="checkbox" id="help-dismiss-check"> 不再自动弹出
+      </label>
+      <span class="help-version">Laplace v1.0</span>
+    </div>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  document.getElementById("help-close-btn").addEventListener("click", closeHelpModal);
+
+  // 示例可点击 → 填入输入框并发送
+  overlay.querySelectorAll(".help-example-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const query = chip.dataset.query;
+      if (query) {
+        chatInput.value = query;
+        closeHelpModal();
+        chatInput.focus();
+      }
+    });
+  });
+}
+
+function openHelpModal() {
+  document.getElementById("help-overlay").classList.add("visible");
+}
+
+function closeHelpModal() {
+  document.getElementById("help-overlay").classList.remove("visible");
+  // 如果勾选了"不再自动弹出"，记录到 localStorage
+  const checkbox = document.getElementById("help-dismiss-check");
+  if (checkbox && checkbox.checked) {
+    localStorage.setItem(HELP_SHOWN_KEY, "1");
+  }
+}
+
+function checkFirstVisitHelp() {
+  if (!localStorage.getItem(HELP_SHOWN_KEY)) {
+    openHelpModal();
+  }
+}
+
 // Init on load
 document.addEventListener("DOMContentLoaded", () => {
   createHistoryPanel();
+  createHelpModal();
   renderPresetBar();
   // Inject welcome message dynamically
   if (chatMessages.querySelectorAll(".message").length === 0) {
     appendWelcomeMessage();
   }
+  // 首次访问自动弹出使用说明
+  checkFirstVisitHelp();
 });
