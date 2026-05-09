@@ -112,8 +112,8 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
     effect_section = ""
     if effect_hints:
         effect_section = f"""
-## 效果语义参考（用于 search_by_skill_effect / search_by_np_effect）
-当用户查询涉及技能效果时，请将自然语言映射到以下效果 key：
+## 效果语义参考（用于 search_by_effect / search_by_skill_effect / search_by_np_effect）
+当用户查询涉及效果时，请将自然语言映射到以下效果 key：
 {effect_hints}
 """
 
@@ -153,6 +153,11 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
    {{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": {{"code": "no_match", "message": "无法理解你的问题"}}}}
    ```
 7. 根据查询类型选择合适的 response_skill
+8. **效果类查询的 Skill 选择（重要）**：
+   - 用户查询效果类需求时（如"有XX效果的从者"），**默认使用 `search_by_effect`**（同时搜技能+宝具效果），因为很多效果同时存在于技能和宝具中
+   - 仅当用户**明确说"技能效果"或"技能XX"**时，才用 `search_by_skill_effect`
+   - 仅当用户**明确说"宝具效果"或"宝具XX"**时，才用 `search_by_np_effect`
+   - 色卡性能提升（蓝魔放/红魔放/绿魔放）属于技能效果，使用 `search_by_effect`
 
 ## 示例
 
@@ -166,9 +171,19 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
 {{"skill_calls": [{{"skill_name": "lookup_servant", "params": {{"name": "梅林"}}}}], "response_skill": "respond_servant_detail"}}
 ```
 
-用户："有蓝魔放的五星从者"（蓝魔放/蓝卡增伤/蓝卡提升 → search_by_skill_effect + upArts）
+用户："有蓝魔放的五星从者"（效果类查询 → 默认 search_by_effect）
 ```json
-{{"skill_calls": [{{"skill_name": "search_by_skill_effect", "params": {{"skillEffect": "upArts"}}}}, {{"skill_name": "search_by_rarity", "params": {{"op": "eq", "value": 5}}}}], "response_skill": "respond_servant_list"}}
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "upArts"}}}}, {{"skill_name": "search_by_rarity", "params": {{"op": "eq", "value": 5}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："能解除负面状态的从者"（效果类查询 → 默认 search_by_effect，同时搜技能+宝具）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "subStateNegative"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："宝具带即死效果的从者"（明确说"宝具" → search_by_np_effect）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_np_effect", "params": {{"npEffect": "instantDeath"}}}}], "response_skill": "respond_servant_list"}}
 ```
 
 用户："对比村正和武尊"

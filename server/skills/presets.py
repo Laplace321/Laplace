@@ -48,10 +48,10 @@ def _register_presets() -> None:
         Preset(
             name="support_recommend",
             display_name="辅助推荐",
-            query_skills=["search_by_skill_effect"],
+            query_skills=["search_by_effect"],
             response_skill="respond_support_analysis",
             param_template={
-                "search_by_skill_effect": {"effects": ["gainNp"], "effects_op": "or"},
+                "search_by_effect": {"effects": ["gainNp"], "effectsOp": "or"},
             },
         ),
     ]
