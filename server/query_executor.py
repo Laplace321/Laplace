@@ -12,6 +12,7 @@ from pathlib import Path
 from server.config_loader import CachedConfig
 
 DATA_PATH = Path(__file__).parent / "data" / "servants_db.json"
+FIXTURE_PATH = Path(__file__).parent.parent / "tests" / "fixtures" / "servants_fixture.json"
 NICKNAMES_PATH = Path(__file__).parent / "config" / "nicknames.json"
 
 # 全局缓存
@@ -33,14 +34,20 @@ def load_nicknames() -> dict[str, str]:
 
 
 def load_database() -> list[dict]:
-    """加载从者数据库（带缓存）。"""
+    """加载从者数据库（带缓存）。
+
+    优先加载真实数据（server/data/servants_db.json），
+    若不存在则 fallback 到测试 fixture 数据（tests/fixtures/servants_fixture.json），
+    确保 CI 环境下测试可正常运行。
+    """
     global _servants_db
     if _servants_db is None:
-        with open(DATA_PATH, encoding="utf-8") as f:
+        data_path = DATA_PATH if DATA_PATH.exists() else FIXTURE_PATH
+        with open(data_path, encoding="utf-8") as f:
             _servants_db = json.load(f)
-        # 统计
         has_effects = sum(1 for s in _servants_db if s.get("skillEffects"))
-        print(f"📦 从者数据库已加载: {len(_servants_db)} 条, {has_effects} 个有效果数据")
+        label = "fixture" if data_path == FIXTURE_PATH else "full"
+        print(f"📦 从者数据库已加载: {len(_servants_db)} 条, {has_effects} 个有效果数据 ({label})")
     return _servants_db
 
 
