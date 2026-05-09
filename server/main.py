@@ -175,16 +175,16 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
 
         top_results.append(
             {
-                "name": s.get("name"),
-                "aliasCN": s.get("aliasCN"),
-                "className": class_map.get(str(raw_class_name).lower(), raw_class_name),
-                "rarity": s.get("rarity"),
-                "cards": s.get("cards"),
-                "totalCharge": s.get("totalCharge"),
-                "npCard": np_card_map.get(str(raw_np_card).lower(), raw_np_card),
-                "npTarget": np_target_map.get(str(raw_np_target).lower(), raw_np_target),
-                "skillEffects": translated_effects,
-                "npEffects": translated_np_effects,
+                "名称": s.get("name"),
+                "中文名": s.get("aliasCN"),
+                "职阶": class_map.get(str(raw_class_name).lower(), raw_class_name),
+                "稀有度": s.get("rarity"),
+                "配卡": s.get("cards"),
+                "总充能": s.get("totalCharge"),
+                "宝具卡色": np_card_map.get(str(raw_np_card).lower(), raw_np_card),
+                "宝具目标": np_target_map.get(str(raw_np_target).lower(), raw_np_target),
+                "技能效果": translated_effects,
+                "宝具效果": translated_np_effects,
             }
         )
 
@@ -197,16 +197,16 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
         class_dist = Counter(class_map.get(str(s.get("className", "")).lower(), s.get("className")) for s in servants)
         rarity_dist = Counter(s.get("rarity") for s in servants)
         stats_summary = {
-            "npCard_distribution": dict(np_card_dist),
-            "className_distribution": dict(class_dist),
-            "rarity_distribution": {f"{k}星": v for k, v in sorted(rarity_dist.items(), reverse=True)},
+            "宝具卡色分布": dict(np_card_dist),
+            "职阶分布": dict(class_dist),
+            "稀有度分布": {f"{k}星": v for k, v in sorted(rarity_dist.items(), reverse=True)},
         }
 
     return {
-        "total_found": total_found,
-        "query_conditions": {},  # 由调用方填充
-        "stats_summary": stats_summary,
-        "top_results_details": top_results,
+        "匹配总数": total_found,
+        "筛选条件": {},  # 由调用方填充
+        "全局统计": stats_summary,
+        "代表从者详情": top_results,
     }, top_results
 
 
@@ -495,9 +495,8 @@ async def _handle_skill_mode(
         # RAG 生成
         context_data, _ = _build_context(servants)
         applied_filters = _describe_filters(skill_calls)
-        context_data["applied_filters"] = applied_filters
-        # query_conditions 使用预消化的中文描述，禁止暴露原始英文参数给 LLM
-        context_data["query_conditions"] = applied_filters
+        context_data["已应用的筛选条件"] = applied_filters
+        context_data["筛选条件"] = applied_filters
         context_json = json.dumps(context_data, ensure_ascii=False)
 
         # ── Trace: context_build ──
@@ -939,9 +938,8 @@ async def chat_stream(message: str, preset_name: str | None = None):
 
         context_data, _ = _build_context(servants)
         applied_filters = _describe_filters(skill_calls)
-        context_data["applied_filters"] = applied_filters
-        # query_conditions 使用预消化的中文描述，禁止暴露原始英文参数给 LLM
-        context_data["query_conditions"] = applied_filters
+        context_data["已应用的筛选条件"] = applied_filters
+        context_data["筛选条件"] = applied_filters
         context_json = json.dumps(context_data, ensure_ascii=False)
 
         # ── Trace: context_build ──
