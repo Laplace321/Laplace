@@ -68,6 +68,50 @@ MAX_CONTEXT_SIZE = 5
 MAX_RESULTS = 50
 
 
+def _describe_filters(skill_calls: list[dict]) -> list[str]:
+    """将 skill_calls 转换为人类可读的筛选条件描述列表。
+
+    例如: ["技能效果包含「Arts提升」", "稀有度 = 5星"]
+    供 LLM 在生成回复时明确知道系统做了什么筛选。
+    """
+    descriptions: list[str] = []
+    for call in skill_calls:
+        name = call.get("skill_name", "")
+        params = call.get("params", {})
+        if name == "search_by_skill_effect":
+            effect = params.get("skillEffect") or params.get("effect", "")
+            translated = get_effect_translation(effect) if effect else effect
+            descriptions.append(f"技能效果包含「{translated}」")
+        elif name == "search_by_np_effect":
+            effect = params.get("npEffect") or params.get("effect", "")
+            translated = get_effect_translation(effect) if effect else effect
+            descriptions.append(f"宝具效果包含「{translated}」")
+        elif name == "search_by_rarity":
+            op = params.get("op", "eq")
+            val = params.get("value", "")
+            op_map = {"eq": "=", "gte": "≥", "lte": "≤", "gt": ">", "lt": "<"}
+            descriptions.append(f"稀有度 {op_map.get(op, op)} {val}星")
+        elif name == "search_by_class":
+            descriptions.append(f"职阶 = {params.get('className', '')}")
+        elif name == "search_by_np_charge":
+            op = params.get("op", "gte")
+            val = params.get("value", "")
+            op_map = {"eq": "=", "gte": "≥", "lte": "≤", "gt": ">", "lt": "<"}
+            descriptions.append(f"NP充能 {op_map.get(op, op)} {val}%")
+        elif name == "search_by_cards":
+            card = params.get("cardType", "")
+            descriptions.append(f"配卡包含「{card}」")
+        elif name == "search_by_traits":
+            trait = params.get("trait", "")
+            descriptions.append(f"特性包含「{trait}」")
+        elif name == "search_by_attribute":
+            attr = params.get("attribute", "")
+            descriptions.append(f"属性 = {attr}")
+        else:
+            descriptions.append(f"{name}({params})")
+    return descriptions
+
+
 def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
     """构建预消化的精简 Context 供 RAG 生成使用。
 
@@ -320,6 +364,7 @@ async def _handle_skill_mode(
         # RAG 生成
         context_data, _ = _build_context(servants)
         context_data["query_conditions"] = {"skill_calls": skill_calls}
+        context_data["applied_filters"] = _describe_filters(skill_calls)
         context_json = json.dumps(context_data, ensure_ascii=False)
 
         # 使用 Response Skill 的 prompt（如果可用）
@@ -625,6 +670,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
 
         context_data, _ = _build_context(servants)
         context_data["query_conditions"] = {"skill_calls": skill_calls}
+        context_data["applied_filters"] = _describe_filters(skill_calls)
         context_json = json.dumps(context_data, ensure_ascii=False)
 
         # 使用 Response Skill 的 prompt（如果可用）
