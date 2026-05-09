@@ -600,12 +600,18 @@ async def chat(request: ChatRequest):
                 extra_routing.pop("_provider", None)
                 extra_routing.pop("_attempts", None)
                 extra_skills = extra_routing.get("skill_calls", [])
-                # 合并：预设 Skills + 额外 Skills（同名去重）
-                existing_names = {s["skill_name"] for s in resolved_skill_calls}
+                # 合并：同名 Skill 补充参数，新 Skill 追加
+                existing_map = {s["skill_name"]: s for s in resolved_skill_calls}
                 for es in extra_skills:
-                    if es.get("skill_name") not in existing_names:
+                    es_name = es.get("skill_name")
+                    if es_name in existing_map:
+                        # 同名 Skill：LLM 解析的参数补充 preset 缺失的字段
+                        for k, v in es.get("params", {}).items():
+                            if k not in existing_map[es_name]["params"]:
+                                existing_map[es_name]["params"][k] = v
+                    else:
                         resolved_skill_calls.append(es)
-                        existing_names.add(es["skill_name"])
+                        existing_map[es_name] = es
                 # 如果额外路由建议了不同的 response_skill，优先使用
                 extra_resp_skill = extra_routing.get("response_skill")
                 if extra_resp_skill and extra_resp_skill != "respond_servant_list":
@@ -684,11 +690,18 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     extra_routing.pop("_provider", None)
                     extra_routing.pop("_attempts", None)
                     extra_skills = extra_routing.get("skill_calls", [])
-                    existing_names = {s["skill_name"] for s in skill_calls}
+                    # 合并：同名 Skill 补充参数，新 Skill 追加
+                    existing_map = {s["skill_name"]: s for s in skill_calls}
                     for es in extra_skills:
-                        if es.get("skill_name") not in existing_names:
+                        es_name = es.get("skill_name")
+                        if es_name in existing_map:
+                            # 同名 Skill：LLM 解析的参数补充 preset 缺失的字段
+                            for k, v in es.get("params", {}).items():
+                                if k not in existing_map[es_name]["params"]:
+                                    existing_map[es_name]["params"][k] = v
+                        else:
                             skill_calls.append(es)
-                            existing_names.add(es["skill_name"])
+                            existing_map[es_name] = es
                     extra_resp_skill = extra_routing.get("response_skill")
                     if extra_resp_skill and extra_resp_skill != "respond_servant_list":
                         response_skill_name = extra_resp_skill
