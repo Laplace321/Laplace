@@ -3,6 +3,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 from server.skills.base import QuerySkill, register_skill
+from server.skills.query.search_by_skill_effect import _resolve_effect_name
 
 
 class Params(BaseModel):
@@ -28,15 +29,17 @@ class SearchByNpEffect(QuerySkill):
 
         # 单效果模式
         if effect is not None:
-            return effect in servant.get("npEffects", [])
+            resolved = _resolve_effect_name(effect)
+            return resolved in servant.get("npEffects", [])
 
         # 多效果模式
         if effects is not None and isinstance(effects, list):
+            resolved = [_resolve_effect_name(eff) for eff in effects]
             servant_np_effects = set(servant.get("npEffects", []))
             op = params.get("effects_op", "and").lower()
             if op == "or":
-                return any(eff in servant_np_effects for eff in effects)
+                return any(eff in servant_np_effects for eff in resolved)
             else:
-                return all(eff in servant_np_effects for eff in effects)
+                return all(eff in servant_np_effects for eff in resolved)
 
         return True

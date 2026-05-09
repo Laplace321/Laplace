@@ -42,15 +42,19 @@ SKILL_LV10_INDEX = 9
 # ============================================================
 
 
-def load_effect_schema() -> list[dict]:
-    """加载 effect_schema.json 知识库。"""
+def load_effect_schema() -> dict:
+    """加载 effect_schema.json 知识库（含 effects, traits, triggerBuffTypes）。"""
     schema_path = KNOWLEDGE_DIR / "effect_schema.json"
     if not schema_path.exists():
         print("⚠️  effect_schema.json 不存在，请先运行 sync_chaldea.py")
-        return []
+        return {"effects": [], "traits": {}, "triggerBuffTypes": []}
     with open(schema_path, encoding="utf-8") as f:
         data = json.load(f)
-    return data.get("effects", [])
+    return {
+        "effects": data.get("effects", []),
+        "traits": data.get("traits", {}),
+        "triggerBuffTypes": data.get("triggerBuffTypes", []),
+    }
 
 
 def load_svt_names_mapping() -> dict:
@@ -63,18 +67,21 @@ def load_svt_names_mapping() -> dict:
     return data.get("svt_names", {})
 
 
-def build_effect_matcher(effects: list[dict]) -> dict:
-    """
-    构建效果匹配索引。
+def build_effect_matcher(schema: dict) -> dict:
+    """构建效果匹配索引（含 validate 规则）。
 
     Returns:
         {
-            "funcType": {"gainNp": ["gainNp"], "gainStar": ["gainStar"], ...},
-            "buffType": {"upAtk": ["upAtk"], "invincible": ["invincible"], ...},
+            "funcType": {"gainNp": ["gainNp"], ...},
+            "buffType": {"upAtk": ["upAtk"], ...},
+            "validates": {"upArts": {"type": "buff_ckSelfIndv_contains", ...}, ...},
+            "triggerBuffTypes": ["delayFunction", "deadFunction", ...],
         }
     """
+    effects = schema.get("effects", [])
     func_index: dict[str, list[str]] = {}
     buff_index: dict[str, list[str]] = {}
+    validates: dict[str, dict] = {}
 
     for effect in effects:
         name = effect["name"]
@@ -82,8 +89,77 @@ def build_effect_matcher(effects: list[dict]) -> dict:
             func_index.setdefault(ft, []).append(name)
         for bt in effect.get("buffTypes", []):
             buff_index.setdefault(bt, []).append(name)
+        if "validate" in effect:
+            validates[name] = effect["validate"]
 
-    return {"funcType": func_index, "buffType": buff_index}
+    return {
+        "funcType": func_index,
+        "buffType": buff_index,
+        "validates": validates,
+        "triggerBuffTypes": schema.get("triggerBuffTypes", []),
+    }
+
+
+def _trait_ids(trait_list: list) -> list[int]:
+    """从 trait 列表中提取纯 int ID。
+
+    Atlas API 返回的 trait 可能是 dict（{"id": 3004, "name": "..."}）或纯 int，
+    预消化后应为纯 int，此函数兼容两种格式。
+    """
+    result = []
+    for t in trait_list:
+        if isinstance(t, dict):
+            result.append(t.get("id", 0))
+        elif isinstance(t, int):
+            result.append(t)
+    return result
+
+
+def apply_validate(func: dict, effect_name: str, matcher: dict) -> bool:
+    """通用 validate 执行器：根据声明式规则判断 func 是否匹配指定效果。
+
+    5 种规则类型：
+    1. buff_ckSelfIndv_contains — buff.ckSelfIndv 包含指定 traitValue
+    2. buff_ckOpIndv_contains — buff.ckOpIndv 包含指定 traitValue
+    3. buff_ckOpIndv_every_not_in — buff.ckOpIndv 全部不在 traitValues 中
+    4. func_vals_contains — func.vals 包含指定 traitValue
+    5. buff_type_in_trigger_set — buff.type 属于 triggerBuffTypes 集合
+    """
+    rule = matcher["validates"].get(effect_name)
+    if rule is None:
+        return True  # 无 validate 规则，粗匹配即通过
+
+    rule_type = rule["type"]
+    buffs = func.get("buffs", [])
+
+    if rule_type == "buff_ckSelfIndv_contains":
+        trait_val = rule.get("traitValue")
+        return any(trait_val in _trait_ids(b.get("ckSelfIndv", [])) for b in buffs)
+
+    if rule_type == "buff_ckOpIndv_contains":
+        trait_val = rule.get("traitValue")
+        if not buffs:
+            return False
+        return trait_val in _trait_ids(buffs[0].get("ckOpIndv", []))
+
+    if rule_type == "buff_ckOpIndv_every_not_in":
+        trait_vals = set(rule.get("traitValues", []))
+        if not buffs:
+            return False
+        ck_op = _trait_ids(buffs[0].get("ckOpIndv", []))
+        return all(t not in trait_vals for t in ck_op)
+
+    if rule_type == "func_vals_contains":
+        trait_val = rule.get("traitValue")
+        return trait_val in _trait_ids(func.get("vals", []))
+
+    if rule_type == "buff_type_in_trigger_set":
+        trigger_types = set(matcher.get("triggerBuffTypes", []))
+        if not buffs:
+            return False
+        return buffs[0].get("type", "") in trigger_types
+
+    return True  # 未知规则类型，默认通过
 
 
 # ============================================================
@@ -161,22 +237,31 @@ def _digest_skills(raw_skills: list[dict]) -> list[dict]:
             # buffs 只保留核心字段
             digested_buffs = []
             for b in fn.get("buffs", []):
-                digested_buffs.append(
-                    {
-                        "type": b.get("type", ""),
-                        "name": b.get("name", ""),
-                        "vals": b.get("vals", []),
-                        "tvals": b.get("tvals", []),
-                    }
-                )
-            funcs.append(
-                {
-                    "funcType": fn.get("funcType", ""),
-                    "funcTargetType": fn.get("funcTargetType", ""),
-                    "buffs": digested_buffs,
-                    "svals": max_sval,
+                digested_buff: dict = {
+                    "type": b.get("type", ""),
+                    "name": b.get("name", ""),
+                    "vals": b.get("vals", []),
+                    "tvals": b.get("tvals", []),
                 }
-            )
+                # validate 规则依赖的 Trait 检查字段
+                if b.get("ckSelfIndv"):
+                    digested_buff["ckSelfIndv"] = [
+                        t.get("id", t) if isinstance(t, dict) else t for t in b["ckSelfIndv"]
+                    ]
+                if b.get("ckOpIndv"):
+                    digested_buff["ckOpIndv"] = [t.get("id", t) if isinstance(t, dict) else t for t in b["ckOpIndv"]]
+                digested_buffs.append(digested_buff)
+            # func 级别的 vals（用于 subState validate）
+            func_vals = fn.get("vals", [])
+            digested_fn: dict = {
+                "funcType": fn.get("funcType", ""),
+                "funcTargetType": fn.get("funcTargetType", ""),
+                "buffs": digested_buffs,
+                "svals": max_sval,
+            }
+            if func_vals:
+                digested_fn["vals"] = [t.get("id", t) if isinstance(t, dict) else t for t in func_vals]
+            funcs.append(digested_fn)
         result.append(
             {
                 "id": sk.get("id"),
@@ -204,20 +289,30 @@ def _digest_noble_phantasms(raw_nps: list[dict]) -> list[dict]:
         for fn in np_data.get("functions", []):
             digested_buffs = []
             for b in fn.get("buffs", []):
-                digested_buffs.append(
-                    {
-                        "type": b.get("type", ""),
-                        "name": b.get("name", ""),
-                        "vals": b.get("vals", []),
-                        "tvals": b.get("tvals", []),
-                    }
-                )
-            digested_fn = {
+                digested_buff: dict = {
+                    "type": b.get("type", ""),
+                    "name": b.get("name", ""),
+                    "vals": b.get("vals", []),
+                    "tvals": b.get("tvals", []),
+                }
+                # validate 规则依赖的 Trait 检查字段
+                if b.get("ckSelfIndv"):
+                    digested_buff["ckSelfIndv"] = [
+                        t.get("id", t) if isinstance(t, dict) else t for t in b["ckSelfIndv"]
+                    ]
+                if b.get("ckOpIndv"):
+                    digested_buff["ckOpIndv"] = [t.get("id", t) if isinstance(t, dict) else t for t in b["ckOpIndv"]]
+                digested_buffs.append(digested_buff)
+            # func 级别的 vals（用于 subState validate）
+            func_vals = fn.get("vals", [])
+            digested_fn: dict = {
                 "funcType": fn.get("funcType", ""),
                 "funcTargetType": fn.get("funcTargetType", ""),
                 "buffs": digested_buffs,
                 "svals": fn.get("svals", []),
             }
+            if func_vals:
+                digested_fn["vals"] = [t.get("id", t) if isinstance(t, dict) else t for t in func_vals]
             # 保留 OC svals2-5
             for key in ["svals2", "svals3", "svals4", "svals5"]:
                 if key in fn:
@@ -295,86 +390,31 @@ def classify_target_type(func_target_type: str) -> str:
     return "other"
 
 
-def refine_card_effects(func: dict, matched_effects: set[str]) -> set[str]:
-    """根据 Buff 名称精确过滤卡色魔放，防止通用枚举导致的污染。"""
-    buffs = func.get("buffs", [])
-    has_generic_buff = any(
-        b.get("type") in ("upCommandall", "upCommandatk", "upCommandstar", "upCommandnp") for b in buffs
-    )
+def _match_func_effects(func: dict, matcher: dict) -> set[str]:
+    """对单个 func 进行粗匹配 + validate 精筛，返回通过的效果名集合。"""
+    func_type = func.get("funcType", "")
 
-    if not has_generic_buff:
-        return matched_effects
+    # 粗匹配：funcType → 候选效果
+    candidates = set(matcher["funcType"].get(func_type, []))
+    # 粗匹配：buffType → 候选效果
+    for buff in func.get("buffs", []):
+        buff_type = buff.get("type", "")
+        candidates.update(matcher["buffType"].get(buff_type, []))
 
-    # 如果当前集合中有卡色效果，则根据 buff name 进行二次判定
-    card_effects = {"upArts", "upQuick", "upBuster"}
-    if not (matched_effects & card_effects):
-        return matched_effects
+    if not candidates:
+        return set()
 
-    refined = set()
-    for eff in matched_effects:
-        if eff in card_effects:
-            for b in buffs:
-                b_name = b.get("name", "").lower()
-                # 显式包含颜色名称才保留
-                if eff == "upArts" and "arts" in b_name:
-                    refined.add(eff)
-                if eff == "upQuick" and "quick" in b_name:
-                    refined.add(eff)
-                if eff == "upBuster" and "buster" in b_name:
-                    refined.add(eff)
-                # 如果是真正的三色提升 (Command Performance Up)
-                if (
-                    "command" in b_name
-                    and ("performance" in b_name or "up" in b_name)
-                    and "arts" not in b_name
-                    and "quick" not in b_name
-                    and "buster" not in b_name
-                ):
-                    refined.add(eff)
-        else:
-            refined.add(eff)
-    return refined
+    # validate 精筛：每个候选效果都必须通过 validate 检查
+    validated: set[str] = set()
+    for effect_name in candidates:
+        if apply_validate(func, effect_name, matcher):
+            validated.add(effect_name)
 
-
-def refine_sub_state_effects(func: dict, matched_effects: set[str]) -> set[str]:
-    """根据 funcTargetType 精确区分状态解除类效果，防止一对多映射污染。
-
-    subState funcType 在 effect_schema 中映射了三个效果：
-    - subState: 通用状态解除（解除敌方 buff）
-    - subStateNegative: 解除我方负面状态
-    - subStatePositive: 解除敌方正面状态（语义等同于 subState）
-
-    实际区分规则：
-    - 对敌（enemy*）→ 保留 subState，移除 subStateNegative
-    - 对己（self/pt*）→ 保留 subStateNegative，移除 subState/subStatePositive
-    """
-    sub_state_effects = {"subState", "subStatePositive", "subStateNegative"}
-    if not (matched_effects & sub_state_effects):
-        return matched_effects
-
-    target_type = func.get("funcTargetType", "")
-    is_enemy_target = target_type.startswith("enemy")
-
-    refined = set()
-    for eff in matched_effects:
-        if eff in sub_state_effects:
-            if is_enemy_target:
-                # 对敌 → 解除敌方 buff
-                if eff == "subState":
-                    refined.add(eff)
-                # subStatePositive 语义等同 subState，合并
-            else:
-                # 对己方 → 解除我方负面状态
-                if eff == "subStateNegative":
-                    refined.add(eff)
-        else:
-            refined.add(eff)
-    return refined
+    return validated
 
 
 def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[dict]]:
-    """
-    提取从者所有技能中的全部效果。
+    """提取从者所有技能中的全部效果（使用 validate 执行器替代手写 refine）。
 
     Returns:
         (效果集合, 技能详情列表)
@@ -391,19 +431,7 @@ def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[
             func_type = func.get("funcType", "")
             target_type = func.get("funcTargetType", "")
 
-            # 通过 funcType 匹配效果
-            matched_effects = set(matcher["funcType"].get(func_type, []))
-
-            # 通过 buffType 匹配效果（addState 系列函数）
-            for buff in func.get("buffs", []):
-                buff_type = buff.get("type", "")
-                matched_effects.update(matcher["buffType"].get(buff_type, []))
-
-            # 二次精炼：防止卡色污染
-            matched_effects = refine_card_effects(func, matched_effects)
-
-            # 二次精炼：防止 subState 一对多映射污染
-            matched_effects = refine_sub_state_effects(func, matched_effects)
+            matched_effects = _match_func_effects(func, matcher)
 
             for effect_name in matched_effects:
                 all_effects.add(effect_name)
@@ -463,19 +491,8 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
                 for func in np.get("functions", []):
                     ftype = func.get("funcType", "")
 
-                    # 提取宝具特效 (复用技能提取逻辑)
-                    matched_effects = set(matcher["funcType"].get(ftype, []))
-                    for buff in func.get("buffs", []):
-                        buff_type = buff.get("type", "")
-                        matched_effects.update(matcher["buffType"].get(buff_type, []))
-
-                    # 二次精炼：防止卡色污染
-                    matched_effects = refine_card_effects(func, matched_effects)
-
-                    # 二次精炼：防止 subState 一对多映射污染
-                    matched_effects = refine_sub_state_effects(func, matched_effects)
-
-                    np_effects_set.update(matched_effects)
+                    # 提取宝具特效（使用 validate 执行器）
+                    np_effects_set.update(_match_func_effects(func, matcher))
 
                     if "damage" in ftype.lower():
                         target = func.get("funcTargetType", "")
@@ -560,13 +577,15 @@ def main():
 
     # 加载效果知识库
     print("\n📚 加载知识库...")
-    effects = load_effect_schema()
+    schema = load_effect_schema()
     name_mapping = load_svt_names_mapping()
+    effects = schema["effects"]
     if effects:
-        matcher = build_effect_matcher(effects)
-        print(f"   ✅ 加载 {len(effects)} 个效果分类")
+        matcher = build_effect_matcher(schema)
+        validate_count = len(matcher.get("validates", {}))
+        print(f"   ✅ 加载 {len(effects)} 个效果分类 ({validate_count} 个含 validate 规则)")
     else:
-        matcher = {"funcType": {}, "buffType": {}}
+        matcher = {"funcType": {}, "buffType": {}, "validates": {}, "triggerBuffTypes": []}
         print("   ⚠️  无效果知识库，仅提取 NP 充能数据")
     print(f"   ✅ 加载 {len(name_mapping)} 个多语言名字翻译")
 

@@ -7,6 +7,45 @@ Skill-Based Architecture 的 Prompt 定义：
 - Stage 2 参数精填 Prompt（build_params_prompt）
 """
 
+import json
+from pathlib import Path
+
+_effect_hints_cache: str | None = None
+
+
+def _load_effect_hints() -> str:
+    """从 effect_schema.json 加载效果语义描述，生成 Prompt 注入段。
+
+    格式：effectName: 中文名 — 语义描述
+    仅包含有 description 的效果，按 category 分组。
+    """
+    global _effect_hints_cache
+    if _effect_hints_cache is not None:
+        return _effect_hints_cache
+
+    schema_path = Path(__file__).parent / "knowledge" / "effect_schema.json"
+    if not schema_path.exists():
+        _effect_hints_cache = ""
+        return ""
+
+    with open(schema_path, encoding="utf-8") as f:
+        data = json.load(f)
+
+    lines: list[str] = []
+    for effect in data.get("effects", []):
+        desc = effect.get("description", "")
+        aliases = effect.get("aliases_zh", [])
+        if not desc:
+            continue
+        zh_name = aliases[0] if aliases else effect["name"]
+        lines.append(f"- `{effect['name']}`: {zh_name} — {desc}")
+
+    if lines:
+        _effect_hints_cache = "\n".join(lines)
+    else:
+        _effect_hints_cache = ""
+    return _effect_hints_cache
+
 
 def get_generation_prompt(user_query: str, context_json: str) -> str:
     """
@@ -59,11 +98,21 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
     """
     skills_section = "\n".join(f"- `{s['name']}`: {s['description']}" for s in skill_descriptions)
 
+    # 动态加载效果语义描述
+    effect_hints = _load_effect_hints()
+    effect_section = ""
+    if effect_hints:
+        effect_section = f"""
+## 效果语义参考（用于 search_by_skill_effect / search_by_np_effect）
+当用户查询涉及技能效果时，请将自然语言映射到以下效果 key：
+{effect_hints}
+"""
+
     return f"""你是 Laplace 路由器。根据用户的自然语言问题，选择需要执行的 Skill 组合。
 
 ## 可用 Skills
 {skills_section}
-
+{effect_section}
 ## 可用 Response Skills
 - `respond_servant_list`: 以列表形式展示筛选到的从者（默认）
 - `respond_servant_detail`: 展示单个从者的详细信息

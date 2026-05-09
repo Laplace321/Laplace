@@ -50,3 +50,4 @@ server/logs/
 
 # Generated data (run `python3 -m server.data_loader` to regenerate)
 server/data/servants_db.json
+.qoder/

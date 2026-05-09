@@ -91,20 +91,138 @@ def parse_dart_enum(file_path: Path, enum_name: str) -> list[dict]:
 
 
 # ============================================================
+# 1b. Trait 常量提取（供 validate 规则使用）
+# ============================================================
+
+# validate 逻辑依赖的 Trait 常量名列表
+VALIDATE_TRAIT_NAMES = {
+    "cardArts",
+    "cardBuster",
+    "cardQuick",
+    "buffPositiveEffect",
+    "buffNegativeEffect",
+    "buffIncreaseDamage",
+}
+
+
+def extract_validate_traits(common_dart: Path) -> dict[str, int]:
+    """从 common.dart 的 Trait 枚举中提取 validate 依赖的常量值。"""
+    entries = parse_dart_enum(common_dart, "Trait")
+    traits = {}
+    for entry in entries:
+        if entry["name"] in VALIDATE_TRAIT_NAMES:
+            traits[entry["name"]] = entry["value"]
+    missing = VALIDATE_TRAIT_NAMES - set(traits.keys())
+    if missing:
+        print(f"  ⚠️  未找到 Trait 常量: {missing}")
+    return traits
+
+
+# ============================================================
+# 1c. kBuffValueTriggerTypes 提取（供 triggerFunc validate 使用）
+# ============================================================
+
+
+def extract_trigger_buff_types(buff_dart: Path) -> list[str]:
+    """从 buff.dart 提取 kBuffValueTriggerTypes 包含的 BuffType 列表。"""
+    content = buff_dart.read_text(encoding="utf-8")
+    # 找到 kBuffValueTriggerTypes 的定义块
+    start_match = re.search(r"kBuffValueTriggerTypes\s*=\s*\(\)\s*\{", content)
+    if not start_match:
+        print("  ⚠️  未找到 kBuffValueTriggerTypes 定义")
+        return []
+
+    # 提取所有 BuffType.xxx 引用
+    # 从定义开始到闭合的 }();
+    start = start_match.start()
+    depth = 0
+    end = start
+    for i in range(start, len(content)):
+        if content[i] == "{":
+            depth += 1
+        elif content[i] == "}":
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+    block = content[start:end]
+    buff_types = re.findall(r"BuffType\.(\w+)", block)
+    # 去重
+    return sorted(set(buff_types))
+
+
+# ============================================================
 # 2. SkillEffect 分类解析器
 # ============================================================
 
 
-def parse_effect_schema(file_path: Path) -> list[dict]:
-    """
-    从 effect.dart 提取 SkillEffect 静态字段定义。
+def _extract_block(content: str, start: int) -> str:
+    """从 start 位置开始，提取到匹配的闭合括号 ); 的完整代码块。"""
+    depth = 0
+    for i in range(start, len(content)):
+        if content[i] == "(":
+            depth += 1
+        elif content[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return content[start : i + 1]
+    return content[start:]
 
-    解析模式：
-        static SkillEffect upAtk = SkillEffect('upAtk', buffTypes: [BuffType.upAtk]);
-        static SkillEffect gainNp = SkillEffect('gainNp', funcTypes: [FuncType.gainNp, ...]);
-        static SkillEffect avoidance = SkillEffect('avoidance', buffTypes: [BuffType.avoidance, BuffType.avoidanceIndividuality]);
-        static SkillEffect._buff('name', BuffType.xxx)
-        static SkillEffect._func('name', FuncType.xxx)
+
+def _parse_validate_rule(block: str) -> dict | None:
+    """从 SkillEffect 构造块中解析 validate lambda，转换为声明式 JSON 规则。
+
+    支持 5 种模式：
+    1. buff.ckSelfIndv.contains(Trait.xxx.value) → buff_ckSelfIndv_contains
+    2. buff.ckOpIndv.contains(Trait.xxx.value) → buff_ckOpIndv_contains
+    3. buff.ckOpIndv.every(... ![...].contains(trait)) → buff_ckOpIndv_every_not_in
+    4. func.vals.contains(Trait.xxx.value) → func_vals_contains
+    5. kBuffValueTriggerTypes.containsKey(func.buffs.first.type) → buff_type_in_trigger_set
+    """
+    if "validate:" not in block:
+        return None
+
+    # 提取 validate: 后面的 lambda 代码
+    val_match = re.search(r"validate:\s*\(func\)\s*=>(.*?)(?:,\s*\)|$)", block, re.DOTALL)
+    if not val_match:
+        return None
+    val_body = val_match.group(1).strip()
+
+    # 模式 5: kBuffValueTriggerTypes.containsKey
+    if "kBuffValueTriggerTypes.containsKey" in val_body:
+        return {"type": "buff_type_in_trigger_set"}
+
+    # 模式 4: func.vals.contains(Trait.xxx.value)
+    m = re.search(r"func\.vals\.contains\(Trait\.(\w+)\.value\)", val_body)
+    if m:
+        return {"type": "func_vals_contains", "trait": m.group(1)}
+
+    # 模式 3: buff.ckOpIndv.every(... ![Trait.x, Trait.y].contains(trait))
+    if "ckOpIndv.every" in val_body and "!" in val_body:
+        traits = re.findall(r"Trait\.(\w+)(?:\.value)?", val_body)
+        if traits:
+            return {"type": "buff_ckOpIndv_every_not_in", "traits": traits}
+
+    # 模式 2: buff.ckOpIndv.contains(Trait.xxx.value)
+    m = re.search(r"ckOpIndv\.contains\(Trait\.(\w+)\.value\)", val_body)
+    if m:
+        return {"type": "buff_ckOpIndv_contains", "trait": m.group(1)}
+
+    # 模式 1: buff.ckSelfIndv.contains(Trait.xxx.value)
+    m = re.search(r"ckSelfIndv\.contains\(Trait\.(\w+)\.value\)", val_body)
+    if m:
+        return {"type": "buff_ckSelfIndv_contains", "trait": m.group(1)}
+
+    return None
+
+
+def parse_effect_schema(file_path: Path) -> list[dict]:
+    """从 effect.dart 提取 SkillEffect 静态字段定义（含 validate 规则）。
+
+    统一解析所有三种构造模式：
+        SkillEffect._buff('name', BuffType.xxx, validate: ...)
+        SkillEffect._func('name', FuncType.xxx, validate: ...)
+        SkillEffect('name', funcTypes: [...], buffTypes: [...], validate: ...)
     """
     content = file_path.read_text(encoding="utf-8")
 
@@ -124,162 +242,249 @@ def parse_effect_schema(file_path: Path) -> list[dict]:
                 categories[m] = cat_label
 
     effects = []
+    seen_names: set[str] = set()
 
-    # 模式 1: SkillEffect._buff('name', BuffType.xxx)
+    # 统一匹配所有 static SkillEffect xxx = SkillEffect... 定义
     for m in re.finditer(
-        r"static\s+SkillEffect\s+(\w+)\s*=\s*SkillEffect\._buff\(\s*"
-        r"['\"](\w+)['\"],\s*BuffType\.(\w+)",
-        content,
-    ):
-        effects.append(
-            {
-                "name": m.group(2),
-                "category": categories.get(m.group(1), "unknown"),
-                "funcTypes": [],
-                "buffTypes": [m.group(3)],
-            }
-        )
-
-    # 模式 2: SkillEffect._func('name', FuncType.xxx)
-    for m in re.finditer(
-        r"static\s+SkillEffect\s+(\w+)\s*=\s*SkillEffect\._func\(\s*"
-        r"['\"](\w+)['\"],\s*FuncType\.(\w+)",
-        content,
-    ):
-        effects.append(
-            {
-                "name": m.group(2),
-                "category": categories.get(m.group(1), "unknown"),
-                "funcTypes": [m.group(3)],
-                "buffTypes": [],
-            }
-        )
-
-    # 模式 3: SkillEffect('name', funcTypes: [...], buffTypes: [...])
-    # 需要更灵活的正则——找到完整的构造函数调用
-    for m in re.finditer(
-        r"static\s+SkillEffect\s+(\w+)\s*=\s*SkillEffect\(\s*\n?\s*"
-        r"['\"](\w+)['\"]",
+        r"static\s+SkillEffect\s+(\w+)\s*=\s*SkillEffect",
         content,
     ):
         var_name = m.group(1)
-        effect_name = m.group(2)
+        block = _extract_block(content, m.start())
 
-        # 从匹配点开始，找到闭合的 );
-        start = m.start()
-        # 向后搜索到 );
-        depth = 0
-        end = start
-        for i in range(start, len(content)):
-            if content[i] == "(":
-                depth += 1
-            elif content[i] == ")":
-                depth -= 1
-                if depth == 0:
-                    end = i + 1
-                    break
-
-        block = content[start:end]
-
-        # 已被 _buff/_func 模式处理的跳过
-        if "._buff(" in block or "._func(" in block:
+        # 跳过被注释掉的定义
+        line_start = content.rfind("\n", 0, m.start()) + 1
+        line_prefix = content[line_start : m.start()].strip()
+        if line_prefix.startswith("//"):
             continue
 
-        # 提取 funcTypes
-        func_types = []
-        ft_match = re.search(r"funcTypes:\s*\[(.*?)\]", block, re.DOTALL)
-        if ft_match:
-            func_types = re.findall(r"FuncType\.(\w+)", ft_match.group(1))
-
-        # 提取 buffTypes
-        buff_types = []
-        bt_match = re.search(r"buffTypes:\s*\[(.*?)\]", block, re.DOTALL)
-        if bt_match:
-            buff_types = re.findall(r"BuffType\.(\w+)", bt_match.group(1))
-
-        # 去重检查
-        if any(e["name"] == effect_name for e in effects):
+        # 提取 effectType（第一个字符串参数）
+        name_match = re.search(r"['\"](\w+)['\"]", block)
+        if not name_match:
             continue
+        effect_name = name_match.group(1)
 
-        effects.append(
-            {
-                "name": effect_name,
-                "category": categories.get(var_name, "unknown"),
-                "funcTypes": func_types,
-                "buffTypes": buff_types,
-            }
-        )
+        # 去重
+        if effect_name in seen_names:
+            continue
+        seen_names.add(effect_name)
 
-    # 添加中文别名
-    _add_chinese_aliases(effects)
+        # 判断构造模式并提取 funcTypes/buffTypes
+        func_types: list[str] = []
+        buff_types: list[str] = []
+
+        if "._buff(" in block:
+            # SkillEffect._buff('name', BuffType.xxx, ...)
+            bt_match = re.search(r"BuffType\.(\w+)", block)
+            if bt_match:
+                buff_types = [bt_match.group(1)]
+        elif "._func(" in block:
+            # SkillEffect._func('name', FuncType.xxx, ...)
+            ft_match = re.search(r"FuncType\.(\w+)", block)
+            if ft_match:
+                func_types = [ft_match.group(1)]
+        else:
+            # SkillEffect('name', funcTypes: [...], buffTypes: [...], ...)
+            ft_match = re.search(r"funcTypes:\s*\[(.*?)\]", block, re.DOTALL)
+            if ft_match:
+                func_types = re.findall(r"FuncType\.(\w+)", ft_match.group(1))
+            bt_match = re.search(r"buffTypes:\s*\[(.*?)\]", block, re.DOTALL)
+            if bt_match:
+                buff_types = re.findall(r"BuffType\.(\w+)", bt_match.group(1))
+
+        # 构建效果条目
+        entry: dict = {
+            "name": effect_name,
+            "category": categories.get(var_name, "unknown"),
+            "funcTypes": func_types,
+            "buffTypes": buff_types,
+        }
+
+        # 解析 validate 规则
+        validate_rule = _parse_validate_rule(block)
+        if validate_rule is not None:
+            entry["validate"] = validate_rule
+
+        effects.append(entry)
 
     return effects
 
 
-# 效果名 → 中文别名映射（手动维护）
-EFFECT_ALIASES_ZH = {
-    "upAtk": ["攻击力提升", "加攻"],
-    "upQuick": ["Quick性能提升", "绿卡提升"],
-    "upArts": ["Arts性能提升", "蓝卡提升"],
-    "upBuster": ["Buster性能提升", "红卡提升"],
-    "upDamage": ["特攻", "特攻伤害"],
-    "addDamage": ["附加伤害"],
-    "upCriticaldamage": ["暴击威力提升", "暴击伤害", "爆伤"],
-    "upCriticalpoint": ["获得暴击星", "产星", "出星"],
-    "upStarweight": ["暴击星集中度提升", "集星"],
-    "gainStar": ["获得暴击星", "给星", "产星"],
-    "regainStar": ["每回合获得暴击星", "出星状态"],
-    "damageNpSP": ["特攻宝具"],
-    "upNpdamage": ["宝具威力提升", "宝威", "宝伤"],
-    "gainNp": ["NP增加", "自充", "充能", "群充", "NP获取"],
-    "regainNp": ["每回合NP增加", "NP回复", "缓充"],
-    "upDropnp": ["NP获取量提升", "黄金律"],
-    "upChagetd": ["充能阶段提升", "OC提升"],
-    "breakAvoidance": ["必中"],
-    "pierceInvincible": ["无敌贯通"],
-    "pierceDefence": ["无视防御"],
-    "upDefence": ["防御力提升", "加防"],
-    "subSelfdamage": ["被伤害减免", "减伤"],
-    "avoidance": ["回避"],
-    "invincible": ["无敌"],
-    "guts": ["毅力", "战续", "根性"],
-    "upHate": ["嘲讽", "集火"],
-    "downCriticalRateDamageTaken": ["被暴击率降低"],
-    "gainHp": ["HP回复", "回血"],
-    "upGainHp": ["回复量提升"],
-    "regainHp": ["HP再生", "每回合回复"],
-    "addMaxhp": ["最大HP提升"],
-    "reduceHp": ["HP减少"],
-    "upTolerance": ["弱体耐性提升", "异常耐性"],
-    "avoidStateNegative": ["弱体无效", "异常无效"],
-    "upGrantstate": ["状态付与率提升"],
-    "upGrantstatePositive": ["强化成功率提升"],
-    "upGrantstateNegative": ["弱体成功率提升"],
-    "upReceivePositiveEffect": ["被强化成功率提升"],
-    "subState": ["状态解除", "强化解除"],
-    "subStatePositive": ["正面状态解除"],
-    "subStateNegative": ["负面状态解除", "弱体解除"],
-    "upToleranceSubstate": ["强化解除耐性"],
-    "instantDeath": ["即死"],
-    "upResistInstantdeath": ["即死耐性提升"],
-    "upGrantInstantdeath": ["即死成功率提升"],
-    "avoidInstantdeath": ["即死无效"],
-    "shortenSkill": ["技能CD缩减", "减CD"],
-    "fieldIndividuality": ["场地特性变更"],
-    "servantFriendshipUp": ["羁绊获取量提升"],
-    "qpUp": ["QP获取量提升"],
-    "expUp": ["经验值获取量提升"],
-    "userEquipExpUp": ["魔术礼装经验值提升"],
-    "friendPointUp": ["友情点获取量提升"],
-    "eventDropUp": ["活动掉落提升"],
-    "triggerFunc": ["触发型技能", "条件发动"],
+# 效果语义描述（供 LLM 理解自然语言查询时做语义匹配）
+EFFECT_DESCRIPTIONS: dict[str, str] = {
+    "damageNpSP": "宝具附带特攻倍率，对特定特性敌人造成额外伤害",
+    "upAtk": "提升攻击力，增加所有攻击的基础伤害",
+    "upQuick": "提升Quick卡(绿卡)的性能，增加Quick指令卡伤害、NP获取和产星",
+    "upArts": "提升Arts卡(蓝卡)的性能，增加Arts指令卡伤害和NP获取",
+    "upBuster": "提升Buster卡(红卡)的性能，增加Buster指令卡伤害",
+    "upDamage": "对特定特性敌人造成额外伤害的特攻效果",
+    "addDamage": "攻击时附加固定数值的额外伤害",
+    "upCriticaldamage": "提升暴击时的伤害倍率",
+    "upCriticalpoint": "提升暴击星的掉落率，增加产星能力",
+    "upStarweight": "提升暴击星的集中度，使该从者更容易获得暴击星",
+    "gainStar": "立即获得一定数量的暴击星",
+    "regainStar": "每回合自动获得一定数量的暴击星",
+    "upNpdamage": "提升宝具的伤害倍率",
+    "gainNp": "立即增加NP量，可用于自充或给队友充能",
+    "regainNp": "每回合自动恢复一定NP量",
+    "upDropnp": "提升攻击时的NP获取量",
+    "upChagetd": "提升宝具的Overcharge阶段",
+    "breakAvoidance": "攻击必定命中，无视回避状态",
+    "pierceInvincible": "攻击无视无敌状态",
+    "pierceDefence": "攻击无视防御力",
+    "upDefence": "提升防御力，减少受到的伤害",
+    "subSelfdamage": "减少受到的固定数值伤害",
+    "avoidance": "闪避/回避，免疫一次攻击伤害",
+    "invincible": "无敌，免疫所有伤害，持续一定回合",
+    "guts": "毅力/战续，HP归零时以一定HP复活",
+    "upHate": "提升目标集中度，吸引敌方攻击(嘲讽)",
+    "downCriticalRateDamageTaken": "降低被敌方暴击的概率",
+    "gainHp": "立即恢复HP",
+    "upGainHp": "提升HP恢复效果的回复量",
+    "regainHp": "每回合自动恢复一定HP",
+    "addMaxhp": "增加最大HP上限",
+    "reduceHp": "造成持续性HP减少(毒/诅咒/灼烧)",
+    "upTolerance": "提升对弱体(负面)状态的抵抗率",
+    "avoidStateNegative": "完全免疫弱体(负面)状态",
+    "upGrantstate": "提升状态付与的成功率",
+    "upGrantstatePositive": "提升强化状态付与的成功率",
+    "upGrantstateNegative": "提升弱体(负面)状态付与的成功率",
+    "upReceivePositiveEffect": "提升己方被强化的成功率",
+    "subState": "解除目标身上的状态",
+    "subStatePositive": "解除目标身上的正面(强化)状态",
+    "subStateNegative": "解除己方身上的负面(弱体)状态",
+    "upToleranceSubstate": "提升对强化解除效果的抵抗率",
+    "instantDeath": "有概率即死消灭目标",
+    "upResistInstantdeath": "提升对即死效果的抵抗率",
+    "upGrantInstantdeath": "提升即死效果的成功率",
+    "avoidInstantdeath": "完全免疫即死效果",
+    "shortenSkill": "缩减技能的冷却回合数",
+    "fieldIndividuality": "变更战场的场地特性",
+    "friendPointUp": "提升友情点的获取量",
+    "expUp": "提升御主经验值的获取量",
+    "userEquipExpUp": "提升魔术礼装经验值的获取量",
+    "servantFriendshipUp": "提升从者羁绊经验的获取量",
+    "qpUp": "提升QP(游戏货币)的获取量",
+    "eventDropUp": "提升活动素材的掉落数量",
+    "triggerFunc": "在特定条件下自动发动的被动技能效果",
+}
+
+# 玩家常用俗称（Chaldea 不提供，需手动维护）
+# 这些是 FGO 中文社区的惯用简称，不随 Chaldea 更新变化
+PLAYER_SLANG_ZH: dict[str, list[str]] = {
+    "upAtk": ["加攻"],
+    "upQuick": ["绿卡提升"],
+    "upArts": ["蓝卡提升"],
+    "upBuster": ["红卡提升"],
+    "upDamage": ["特攻伤害"],
+    "upCriticaldamage": ["暴击伤害", "爆伤"],
+    "upCriticalpoint": ["产星", "出星"],
+    "upStarweight": ["集星"],
+    "gainStar": ["给星", "产星"],
+    "regainStar": ["出星状态"],
+    "upNpdamage": ["宝威", "宝伤"],
+    "gainNp": ["自充", "充能", "群充"],
+    "regainNp": ["缓充"],
+    "upDropnp": ["黄金律"],
+    "upChagetd": ["OC提升"],
+    "upDefence": ["加防"],
+    "subSelfdamage": ["减伤"],
+    "guts": ["战续", "根性"],
+    "upHate": ["集火"],
+    "gainHp": ["回血"],
+    "regainHp": ["每回合回复"],
+    "upTolerance": ["异常耐性"],
+    "avoidStateNegative": ["异常无效"],
+    "subState": ["强化解除"],
+    "subStateNegative": ["弱体解除"],
+    "shortenSkill": ["减CD"],
+    "triggerFunc": ["条件发动"],
 }
 
 
-def _add_chinese_aliases(effects: list[dict]) -> None:
-    """为效果列表添加中文别名。"""
+def download_enum_translations() -> dict[str, dict[str, str]]:
+    """从 Chaldea Data 下载 enums.json 中的翻译映射。
+
+    Returns:
+        {"effect_type": {...}, "buff_type": {...}, "func_type": {...}}
+    """
+    url = "https://raw.githubusercontent.com/chaldea-center/chaldea-data/main/mappings/enums.json"
+    print("   ⬇️ 下载 enums.json（effectType/buffType/funcType 翻译）...")
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15) as response:
+            data = json.loads(response.read().decode("utf-8"))
+            return {
+                "effect_type": data.get("effect_type", {}),
+                "buff_type": data.get("buff_type", {}),
+                "func_type": data.get("func_type", {}),
+            }
+    except Exception as e:
+        print(f"   ⚠️ 下载 enums.json 失败: {e}")
+        return {"effect_type": {}, "buff_type": {}, "func_type": {}}
+
+
+def _resolve_effect_translation(
+    effect: dict,
+    enum_translations: dict[str, dict[str, str]],
+) -> list[str]:
+    """根据 Chaldea transl getter 逻辑，为单个效果解析中文翻译。
+
+    优先级：
+    1. effect_type[effectName] — Chaldea 自定义翻译（16 个带 validate 的效果）
+    2. buff_type[firstBuffType] — BuffType 翻译（大多数效果）
+    3. func_type[firstFuncType] — FuncType 翻译
+    4. fallback 空列表
+    """
+    name = effect["name"]
+    aliases: list[str] = []
+
+    # 优先级 1: effect_type 翻译
+    et = enum_translations.get("effect_type", {})
+    if name in et:
+        cn = et[name].get("CN")
+        if cn:
+            aliases.append(cn)
+
+    # 优先级 2: buff_type 翻译（如果 effect_type 没有）
+    if not aliases:
+        bt_map = enum_translations.get("buff_type", {})
+        buff_types = effect.get("buffTypes", [])
+        if buff_types and buff_types[0] in bt_map:
+            cn = bt_map[buff_types[0]].get("CN")
+            if cn:
+                aliases.append(cn)
+
+    # 优先级 3: func_type 翻译
+    if not aliases:
+        ft_map = enum_translations.get("func_type", {})
+        func_types = effect.get("funcTypes", [])
+        if func_types and func_types[0] in ft_map:
+            cn = ft_map[func_types[0]].get("CN")
+            if cn:
+                aliases.append(cn)
+
+    # 追加玩家俗称
+    slang = PLAYER_SLANG_ZH.get(name, [])
+    for s in slang:
+        if s not in aliases:
+            aliases.append(s)
+
+    return aliases
+
+
+def _add_chinese_aliases(
+    effects: list[dict],
+    enum_translations: dict[str, dict[str, str]] | None = None,
+) -> None:
+    """为效果列表添加中文别名和语义描述。"""
+    if enum_translations is None:
+        enum_translations = {"effect_type": {}, "buff_type": {}, "func_type": {}}
     for effect in effects:
-        effect["aliases_zh"] = EFFECT_ALIASES_ZH.get(effect["name"], [])
+        effect["aliases_zh"] = _resolve_effect_translation(effect, enum_translations)
+        desc = EFFECT_DESCRIPTIONS.get(effect["name"])
+        if desc:
+            effect["description"] = desc
 
 
 # ============================================================
@@ -378,11 +583,15 @@ def main():
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+    # 参考文件输出到 docs/reference/（非 runtime 依赖，仅供开发参考）
+    ref_dir = PROJECT_ROOT / "docs" / "reference"
+    ref_dir.mkdir(parents=True, exist_ok=True)
+
     # --- Step 1: FuncType 枚举 ---
     print("\n📋 Step 1: 解析 FuncType 枚举...")
     func_types = parse_dart_enum(FUNC_DART, "FuncType")
     _write_json(
-        OUTPUT_DIR / "func_types.json",
+        ref_dir / "func_types.json",
         {
             "enumName": "FuncType",
             "source": "func.dart",
@@ -390,13 +599,13 @@ def main():
             "values": func_types,
         },
     )
-    print(f"   ✅ 提取 {len(func_types)} 个 FuncType")
+    print(f"   ✅ 提取 {len(func_types)} 个 FuncType → docs/reference/")
 
     # --- Step 2: FuncTargetType 枚举 ---
     print("\n📋 Step 1b: 解析 FuncTargetType 枚举...")
     func_target_types = parse_dart_enum(FUNC_DART, "FuncTargetType")
     _write_json(
-        OUTPUT_DIR / "func_target_types.json",
+        ref_dir / "func_target_types.json",
         {
             "enumName": "FuncTargetType",
             "source": "func.dart",
@@ -404,13 +613,13 @@ def main():
             "values": func_target_types,
         },
     )
-    print(f"   ✅ 提取 {len(func_target_types)} 个 FuncTargetType")
+    print(f"   ✅ 提取 {len(func_target_types)} 个 FuncTargetType → docs/reference/")
 
     # --- Step 3: BuffType 枚举 ---
     print("\n📋 Step 2: 解析 BuffType 枚举...")
     buff_types = parse_dart_enum(BUFF_DART, "BuffType")
     _write_json(
-        OUTPUT_DIR / "buff_types.json",
+        ref_dir / "buff_types.json",
         {
             "enumName": "BuffType",
             "source": "buff.dart",
@@ -418,21 +627,60 @@ def main():
             "values": buff_types,
         },
     )
-    print(f"   ✅ 提取 {len(buff_types)} 个 BuffType")
+    print(f"   ✅ 提取 {len(buff_types)} 个 BuffType → docs/reference/")
 
-    # --- Step 4: SkillEffect 分类 ---
+    # --- Step 4: SkillEffect 分类 + validate 规则 + traits ---
     print("\n📋 Step 3: 解析 SkillEffect 效果分类...")
     effects = parse_effect_schema(EFFECT_DART)
+
+    # 提取 validate 依赖的 Trait 常量值
+    print("\n📋 Step 3b: 提取 validate 依赖的 Trait 常量...")
+    validate_traits = extract_validate_traits(COMMON_DART)
+    print(f"   ✅ 提取 {len(validate_traits)} 个 Trait 常量: {validate_traits}")
+
+    # 提取 kBuffValueTriggerTypes 包含的 BuffType 列表
+    print("\n📋 Step 3c: 提取 kBuffValueTriggerTypes...")
+    trigger_buff_types = extract_trigger_buff_types(BUFF_DART)
+    print(f"   ✅ 提取 {len(trigger_buff_types)} 个 trigger BuffType")
+
+    # 将 validate 规则中的 trait 名解析为具体数值
+    for effect in effects:
+        if "validate" not in effect:
+            continue
+        rule = effect["validate"]
+        if "trait" in rule:
+            trait_name = rule["trait"]
+            if trait_name in validate_traits:
+                rule["traitValue"] = validate_traits[trait_name]
+        elif "traits" in rule:
+            rule["traitValues"] = [validate_traits[t] for t in rule["traits"] if t in validate_traits]
+
+    validate_count = sum(1 for e in effects if "validate" in e)
+
+    # 下载翻译数据并添加中文别名
+    print("\n📋 Step 3d: 下载效果翻译数据...")
+    enum_translations = download_enum_translations()
+    et_count = len(enum_translations.get("effect_type", {}))
+    bt_count = len(enum_translations.get("buff_type", {}))
+    ft_count = len(enum_translations.get("func_type", {}))
+    print(f"   ✅ 翻译数据: effect_type={et_count}, buff_type={bt_count}, func_type={ft_count}")
+
+    _add_chinese_aliases(effects, enum_translations)
+    aliased_count = sum(1 for e in effects if e.get("aliases_zh"))
+    print(f"   ✅ {aliased_count}/{len(effects)} 个效果有中文别名")
+
     _write_json(
         OUTPUT_DIR / "effect_schema.json",
         {
             "source": "effect.dart",
             "count": len(effects),
             "categories": ["attack", "defence", "debuff", "others"],
+            "traits": validate_traits,
+            "triggerBuffTypes": trigger_buff_types,
             "effects": effects,
         },
     )
-    print(f"   ✅ 提取 {len(effects)} 个效果分类")
+    print(f"   ✅ 提取 {len(effects)} 个效果分类 ({validate_count} 个含 validate 规则)")
     for cat in ["attack", "defence", "debuff", "others"]:
         cat_count = sum(1 for e in effects if e["category"] == cat)
         print(f"      {cat}: {cat_count} 个")

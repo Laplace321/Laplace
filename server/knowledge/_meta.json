@@ -1,7 +1,7 @@
 {
-  "syncedAt": "2026-05-05T02:02:32.797469+00:00",
-  "chaldeaCommit": "f0210b603ee6",
-  "chaldeaPath": "/Users/laplacetong/Laplace/chaldea-center/chaldea",
+  "syncedAt": "2026-05-09T07:31:05.264235+00:00",
+  "chaldeaCommit": "b3a096eb830d",
+  "chaldeaPath": "/Users/laplace/Laplace/chaldea-center/chaldea",
   "files": {
     "func_types.json": 130,
     "func_target_types.json": 35,

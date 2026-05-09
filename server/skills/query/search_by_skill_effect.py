@@ -29,9 +29,21 @@ def _ensure_zh_map() -> dict[str, str]:
 
 
 def _resolve_effect_name(name: str) -> str:
-    """将可能的中文效果名解析为英文 key，已是英文则原样返回。"""
+    """将可能的中文效果名解析为英文 key，已是英文则原样返回。
+
+    匹配策略：
+    1. 精确匹配中文别名表
+    2. 子串模糊 fallback（如 "攻击提升" 子串匹配 "攻击力提升"）
+    """
     zh_map = _ensure_zh_map()
-    return zh_map.get(name, name)
+    # 精确匹配
+    if name in zh_map:
+        return zh_map[name]
+    # 子串模糊 fallback：name 是某个别名的子串，或某个别名是 name 的子串
+    for alias, en_name in zh_map.items():
+        if name in alias or alias in name:
+            return en_name
+    return name
 
 
 class Params(BaseModel):

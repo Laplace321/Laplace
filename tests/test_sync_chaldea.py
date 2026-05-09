@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from server.sync_chaldea import parse_dart_enum, parse_effect_schema
+from server.sync_chaldea import _add_chinese_aliases, parse_dart_enum, parse_effect_schema
 
 # 已生成的知识库路径
 KNOWLEDGE_DIR = Path(__file__).parent.parent / "server" / "knowledge"
@@ -52,7 +52,17 @@ class SkillEffect {
         encoding="utf-8",
     )
 
-    effects = {effect["name"]: effect for effect in parse_effect_schema(dart_file)}
+    effects_list = parse_effect_schema(dart_file)
+    # 模拟 main() 中的翻译添加流程
+    _add_chinese_aliases(
+        effects_list,
+        {
+            "effect_type": {},
+            "buff_type": {"invincible": {"CN": "无敌"}},
+            "func_type": {},
+        },
+    )
+    effects = {e["name"]: e for e in effects_list}
 
     assert effects["upAtk"]["category"] == "attack"
     assert effects["upAtk"]["buffTypes"] == ["upAtk"]
@@ -68,8 +78,9 @@ class SkillEffect {
 # ============================================================
 
 EFFECT_SCHEMA_PATH = KNOWLEDGE_DIR / "effect_schema.json"
-FUNC_TYPES_PATH = KNOWLEDGE_DIR / "func_types.json"
-BUFF_TYPES_PATH = KNOWLEDGE_DIR / "buff_types.json"
+REFERENCE_DIR = Path(__file__).parent.parent / "docs" / "reference"
+FUNC_TYPES_PATH = REFERENCE_DIR / "func_types.json"
+BUFF_TYPES_PATH = REFERENCE_DIR / "buff_types.json"
 
 # 下限阈值：基于 2026-05-06 实际提取数量设定，允许未来增长但不允许大幅减少
 MIN_SKILL_EFFECTS = 50  # 当前 55

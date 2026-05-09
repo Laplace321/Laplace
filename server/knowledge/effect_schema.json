@@ -7,402 +7,65 @@
     "debuff",
     "others"
   ],
+  "traits": {
+    "buffPositiveEffect": 3004,
+    "buffNegativeEffect": 3005,
+    "buffIncreaseDamage": 3006,
+    "cardArts": 4001,
+    "cardBuster": 4002,
+    "cardQuick": 4003
+  },
+  "triggerBuffTypes": [
+    "attackAfterFunction",
+    "attackAfterFunctionMainOnly",
+    "attackBeforeFunction",
+    "attackBeforeFunctionMainOnly",
+    "attackPhaseStartFunction",
+    "battlestartFunction",
+    "comboEndFunction",
+    "comboStartFunction",
+    "commandattackAfterFunction",
+    "commandattackAfterFunctionMainOnly",
+    "commandattackBeforeFunction",
+    "commandattackBeforeFunctionMainOnly",
+    "commandcodeattackAfterFunction",
+    "commandcodeattackAfterFunctionMainOnly",
+    "commandcodeattackBeforeFunction",
+    "commandcodeattackBeforeFunctionMainOnly",
+    "confirmCommandFunction",
+    "continueFunction",
+    "counterFunction",
+    "damageFunction",
+    "deadFunction",
+    "deadattackFunction",
+    "delayFunction",
+    "entryFunction",
+    "fieldIndividualityChangedFunction",
+    "functionedFunction",
+    "gutsBeforeFunction",
+    "gutsFunction",
+    "multiDeadFunction",
+    "multiGutsBeforeFunction",
+    "multiGutsFunction",
+    "npattackPrevBuff",
+    "otherTreasureDevicePreBeforeFunction",
+    "reflectionFunction",
+    "selfturnendFunction",
+    "selfturnstartFunction",
+    "skillAfterFunction",
+    "skillAfterFunctionMainOnly",
+    "skillBeforeFunction",
+    "skillTargetedBeforeFunction",
+    "stepInAfterFunction",
+    "substituteInstantDeath",
+    "treasureDeviceAfterFunction",
+    "treasureDeviceAfterFunctionMainOnly",
+    "treasureDeviceBeforeFunction",
+    "treasureDevicePostAfterFunction",
+    "wavestartAnimationBeforeFunction",
+    "wavestartFunction"
+  ],
   "effects": [
-    {
-      "name": "addDamage",
-      "category": "attack",
-      "funcTypes": [],
-      "buffTypes": [
-        "addDamage"
-      ],
-      "aliases_zh": [
-        "附加伤害"
-      ]
-    },
-    {
-      "name": "upCriticaldamage",
-      "category": "attack",
-      "funcTypes": [],
-      "buffTypes": [
-        "upCriticaldamage"
-      ],
-      "aliases_zh": [
-        "暴击威力提升",
-        "暴击伤害",
-        "爆伤"
-      ]
-    },
-    {
-      "name": "upCriticalpoint",
-      "category": "attack",
-      "funcTypes": [],
-      "buffTypes": [
-        "upCriticalpoint"
-      ],
-      "aliases_zh": [
-        "获得暴击星",
-        "产星",
-        "出星"
-      ]
-    },
-    {
-      "name": "upStarweight",
-      "category": "attack",
-      "funcTypes": [],
-      "buffTypes": [
-        "upStarweight"
-      ],
-      "aliases_zh": [
-        "暴击星集中度提升",
-        "集星"
-      ]
-    },
-    {
-      "name": "regainStar",
-      "category": "attack",
-      "funcTypes": [],
-      "buffTypes": [
-        "regainStar"
-      ],
-      "aliases_zh": [
-        "每回合获得暴击星",
-        "出星状态"
-      ]
-    },
-    {
-      "name": "upNpdamage",
-      "category": "attack",
-      "funcTypes": [],
-      "buffTypes": [
-        "upNpdamage"
-      ],
-      "aliases_zh": [
-        "宝具威力提升",
-        "宝威",
-        "宝伤"
-      ]
-    },
-    {
-      "name": "regainNp",
-      "category": "attack",
-      "funcTypes": [],
-      "buffTypes": [
-        "regainNp"
-      ],
-      "aliases_zh": [
-        "每回合NP增加",
-        "NP回复",
-        "缓充"
-      ]
-    },
-    {
-      "name": "upDropnp",
-      "category": "attack",
-      "funcTypes": [],
-      "buffTypes": [
-        "upDropnp"
-      ],
-      "aliases_zh": [
-        "NP获取量提升",
-        "黄金律"
-      ]
-    },
-    {
-      "name": "upChagetd",
-      "category": "attack",
-      "funcTypes": [],
-      "buffTypes": [
-        "upChagetd"
-      ],
-      "aliases_zh": [
-        "充能阶段提升",
-        "OC提升"
-      ]
-    },
-    {
-      "name": "breakAvoidance",
-      "category": "attack",
-      "funcTypes": [],
-      "buffTypes": [
-        "breakAvoidance"
-      ],
-      "aliases_zh": [
-        "必中"
-      ]
-    },
-    {
-      "name": "pierceInvincible",
-      "category": "attack",
-      "funcTypes": [],
-      "buffTypes": [
-        "pierceInvincible"
-      ],
-      "aliases_zh": [
-        "无敌贯通"
-      ]
-    },
-    {
-      "name": "upDefence",
-      "category": "defence",
-      "funcTypes": [],
-      "buffTypes": [
-        "upDefence"
-      ],
-      "aliases_zh": [
-        "防御力提升",
-        "加防"
-      ]
-    },
-    {
-      "name": "subSelfdamage",
-      "category": "defence",
-      "funcTypes": [],
-      "buffTypes": [
-        "subSelfdamage"
-      ],
-      "aliases_zh": [
-        "被伤害减免",
-        "减伤"
-      ]
-    },
-    {
-      "name": "invincible",
-      "category": "defence",
-      "funcTypes": [],
-      "buffTypes": [
-        "invincible"
-      ],
-      "aliases_zh": [
-        "无敌"
-      ]
-    },
-    {
-      "name": "upHate",
-      "category": "defence",
-      "funcTypes": [],
-      "buffTypes": [
-        "upHate"
-      ],
-      "aliases_zh": [
-        "嘲讽",
-        "集火"
-      ]
-    },
-    {
-      "name": "downCriticalRateDamageTaken",
-      "category": "defence",
-      "funcTypes": [],
-      "buffTypes": [
-        "downCriticalRateDamageTaken"
-      ],
-      "aliases_zh": [
-        "被暴击率降低"
-      ]
-    },
-    {
-      "name": "regainHp",
-      "category": "defence",
-      "funcTypes": [],
-      "buffTypes": [
-        "regainHp"
-      ],
-      "aliases_zh": [
-        "HP再生",
-        "每回合回复"
-      ]
-    },
-    {
-      "name": "addMaxhp",
-      "category": "defence",
-      "funcTypes": [],
-      "buffTypes": [
-        "addMaxhp"
-      ],
-      "aliases_zh": [
-        "最大HP提升"
-      ]
-    },
-    {
-      "name": "reduceHp",
-      "category": "debuff",
-      "funcTypes": [],
-      "buffTypes": [
-        "reduceHp"
-      ],
-      "aliases_zh": [
-        "HP减少"
-      ]
-    },
-    {
-      "name": "upGrantstate",
-      "category": "debuff",
-      "funcTypes": [],
-      "buffTypes": [
-        "upGrantstate"
-      ],
-      "aliases_zh": [
-        "状态付与率提升"
-      ]
-    },
-    {
-      "name": "upGrantstatePositive",
-      "category": "debuff",
-      "funcTypes": [],
-      "buffTypes": [
-        "upGrantstate"
-      ],
-      "aliases_zh": [
-        "强化成功率提升"
-      ]
-    },
-    {
-      "name": "upGrantstateNegative",
-      "category": "debuff",
-      "funcTypes": [],
-      "buffTypes": [
-        "upGrantstate"
-      ],
-      "aliases_zh": [
-        "弱体成功率提升"
-      ]
-    },
-    {
-      "name": "upToleranceSubstate",
-      "category": "debuff",
-      "funcTypes": [],
-      "buffTypes": [
-        "upToleranceSubstate"
-      ],
-      "aliases_zh": [
-        "强化解除耐性"
-      ]
-    },
-    {
-      "name": "upResistInstantdeath",
-      "category": "debuff",
-      "funcTypes": [],
-      "buffTypes": [
-        "upResistInstantdeath"
-      ],
-      "aliases_zh": [
-        "即死耐性提升"
-      ]
-    },
-    {
-      "name": "upGrantInstantdeath",
-      "category": "debuff",
-      "funcTypes": [],
-      "buffTypes": [
-        "upGrantInstantdeath"
-      ],
-      "aliases_zh": [
-        "即死成功率提升"
-      ]
-    },
-    {
-      "name": "avoidInstantdeath",
-      "category": "debuff",
-      "funcTypes": [],
-      "buffTypes": [
-        "avoidInstantdeath"
-      ],
-      "aliases_zh": [
-        "即死无效"
-      ]
-    },
-    {
-      "name": "gainStar",
-      "category": "attack",
-      "funcTypes": [
-        "gainStar"
-      ],
-      "buffTypes": [],
-      "aliases_zh": [
-        "获得暴击星",
-        "给星",
-        "产星"
-      ]
-    },
-    {
-      "name": "subState",
-      "category": "debuff",
-      "funcTypes": [
-        "subState"
-      ],
-      "buffTypes": [],
-      "aliases_zh": [
-        "状态解除",
-        "强化解除"
-      ]
-    },
-    {
-      "name": "subStatePositive",
-      "category": "debuff",
-      "funcTypes": [
-        "subState"
-      ],
-      "buffTypes": [],
-      "aliases_zh": [
-        "正面状态解除"
-      ]
-    },
-    {
-      "name": "subStateNegative",
-      "category": "debuff",
-      "funcTypes": [
-        "subState"
-      ],
-      "buffTypes": [],
-      "aliases_zh": [
-        "负面状态解除",
-        "弱体解除"
-      ]
-    },
-    {
-      "name": "shortenSkill",
-      "category": "others",
-      "funcTypes": [
-        "shortenSkill"
-      ],
-      "buffTypes": [],
-      "aliases_zh": [
-        "技能CD缩减",
-        "减CD"
-      ]
-    },
-    {
-      "name": "expUp",
-      "category": "others",
-      "funcTypes": [
-        "expUp"
-      ],
-      "buffTypes": [],
-      "aliases_zh": [
-        "经验值获取量提升"
-      ]
-    },
-    {
-      "name": "userEquipExpUp",
-      "category": "others",
-      "funcTypes": [
-        "userEquipExpUp"
-      ],
-      "buffTypes": [],
-      "aliases_zh": [
-        "魔术礼装经验值提升"
-      ]
-    },
-    {
-      "name": "servantFriendshipUp",
-      "category": "others",
-      "funcTypes": [
-        "servantFriendshipUp"
-      ],
-      "buffTypes": [],
-      "aliases_zh": [
-        "羁绊获取量提升"
-      ]
-    },
     {
       "name": "damageNpSP",
       "category": "attack",
@@ -418,9 +81,8 @@
         "damageNpBattlePointPhase"
       ],
       "buffTypes": [],
-      "aliases_zh": [
-        "特攻宝具"
-      ]
+      "aliases_zh": [],
+      "description": "宝具附带特攻倍率，对特定特性敌人造成额外伤害"
     },
     {
       "name": "upAtk",
@@ -430,9 +92,9 @@
         "upAtk"
       ],
       "aliases_zh": [
-        "攻击力提升",
         "加攻"
-      ]
+      ],
+      "description": "提升攻击力，增加所有攻击的基础伤害"
     },
     {
       "name": "upQuick",
@@ -444,10 +106,15 @@
         "upCommandstar",
         "upCommandnp"
       ],
+      "validate": {
+        "type": "buff_ckSelfIndv_contains",
+        "trait": "cardQuick",
+        "traitValue": 4003
+      },
       "aliases_zh": [
-        "Quick性能提升",
         "绿卡提升"
-      ]
+      ],
+      "description": "提升Quick卡(绿卡)的性能，增加Quick指令卡伤害、NP获取和产星"
     },
     {
       "name": "upArts",
@@ -459,10 +126,15 @@
         "upCommandstar",
         "upCommandnp"
       ],
+      "validate": {
+        "type": "buff_ckSelfIndv_contains",
+        "trait": "cardArts",
+        "traitValue": 4001
+      },
       "aliases_zh": [
-        "Arts性能提升",
         "蓝卡提升"
-      ]
+      ],
+      "description": "提升Arts卡(蓝卡)的性能，增加Arts指令卡伤害和NP获取"
     },
     {
       "name": "upBuster",
@@ -474,10 +146,15 @@
         "upCommandstar",
         "upCommandnp"
       ],
+      "validate": {
+        "type": "buff_ckSelfIndv_contains",
+        "trait": "cardBuster",
+        "traitValue": 4002
+      },
       "aliases_zh": [
-        "Buster性能提升",
         "红卡提升"
-      ]
+      ],
+      "description": "提升Buster卡(红卡)的性能，增加Buster指令卡伤害"
     },
     {
       "name": "upDamage",
@@ -489,9 +166,95 @@
         "upDamageIndividualityActiveonly"
       ],
       "aliases_zh": [
-        "特攻",
         "特攻伤害"
-      ]
+      ],
+      "description": "对特定特性敌人造成额外伤害的特攻效果"
+    },
+    {
+      "name": "addDamage",
+      "category": "attack",
+      "funcTypes": [],
+      "buffTypes": [
+        "addDamage"
+      ],
+      "aliases_zh": [],
+      "description": "攻击时附加固定数值的额外伤害"
+    },
+    {
+      "name": "upCriticaldamage",
+      "category": "attack",
+      "funcTypes": [],
+      "buffTypes": [
+        "upCriticaldamage"
+      ],
+      "aliases_zh": [
+        "暴击伤害",
+        "爆伤"
+      ],
+      "description": "提升暴击时的伤害倍率"
+    },
+    {
+      "name": "upCriticalpoint",
+      "category": "attack",
+      "funcTypes": [],
+      "buffTypes": [
+        "upCriticalpoint"
+      ],
+      "aliases_zh": [
+        "产星",
+        "出星"
+      ],
+      "description": "提升暴击星的掉落率，增加产星能力"
+    },
+    {
+      "name": "upStarweight",
+      "category": "attack",
+      "funcTypes": [],
+      "buffTypes": [
+        "upStarweight"
+      ],
+      "aliases_zh": [
+        "集星"
+      ],
+      "description": "提升暴击星的集中度，使该从者更容易获得暴击星"
+    },
+    {
+      "name": "gainStar",
+      "category": "attack",
+      "funcTypes": [
+        "gainStar"
+      ],
+      "buffTypes": [],
+      "aliases_zh": [
+        "给星",
+        "产星"
+      ],
+      "description": "立即获得一定数量的暴击星"
+    },
+    {
+      "name": "regainStar",
+      "category": "attack",
+      "funcTypes": [],
+      "buffTypes": [
+        "regainStar"
+      ],
+      "aliases_zh": [
+        "出星状态"
+      ],
+      "description": "每回合自动获得一定数量的暴击星"
+    },
+    {
+      "name": "upNpdamage",
+      "category": "attack",
+      "funcTypes": [],
+      "buffTypes": [
+        "upNpdamage"
+      ],
+      "aliases_zh": [
+        "宝威",
+        "宝伤"
+      ],
+      "description": "提升宝具的伤害倍率"
     },
     {
       "name": "gainNp",
@@ -508,12 +271,67 @@
       ],
       "buffTypes": [],
       "aliases_zh": [
-        "NP增加",
         "自充",
         "充能",
-        "群充",
-        "NP获取"
-      ]
+        "群充"
+      ],
+      "description": "立即增加NP量，可用于自充或给队友充能"
+    },
+    {
+      "name": "regainNp",
+      "category": "attack",
+      "funcTypes": [],
+      "buffTypes": [
+        "regainNp"
+      ],
+      "aliases_zh": [
+        "缓充"
+      ],
+      "description": "每回合自动恢复一定NP量"
+    },
+    {
+      "name": "upDropnp",
+      "category": "attack",
+      "funcTypes": [],
+      "buffTypes": [
+        "upDropnp"
+      ],
+      "aliases_zh": [
+        "黄金律"
+      ],
+      "description": "提升攻击时的NP获取量"
+    },
+    {
+      "name": "upChagetd",
+      "category": "attack",
+      "funcTypes": [],
+      "buffTypes": [
+        "upChagetd"
+      ],
+      "aliases_zh": [
+        "OC提升"
+      ],
+      "description": "提升宝具的Overcharge阶段"
+    },
+    {
+      "name": "breakAvoidance",
+      "category": "attack",
+      "funcTypes": [],
+      "buffTypes": [
+        "breakAvoidance"
+      ],
+      "aliases_zh": [],
+      "description": "攻击必定命中，无视回避状态"
+    },
+    {
+      "name": "pierceInvincible",
+      "category": "attack",
+      "funcTypes": [],
+      "buffTypes": [
+        "pierceInvincible"
+      ],
+      "aliases_zh": [],
+      "description": "攻击无视无敌状态"
     },
     {
       "name": "pierceDefence",
@@ -524,9 +342,32 @@
       "buffTypes": [
         "pierceDefence"
       ],
+      "aliases_zh": [],
+      "description": "攻击无视防御力"
+    },
+    {
+      "name": "upDefence",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": [
+        "upDefence"
+      ],
       "aliases_zh": [
-        "无视防御"
-      ]
+        "加防"
+      ],
+      "description": "提升防御力，减少受到的伤害"
+    },
+    {
+      "name": "subSelfdamage",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": [
+        "subSelfdamage"
+      ],
+      "aliases_zh": [
+        "减伤"
+      ],
+      "description": "减少受到的固定数值伤害"
     },
     {
       "name": "avoidance",
@@ -536,9 +377,18 @@
         "avoidance",
         "avoidanceIndividuality"
       ],
-      "aliases_zh": [
-        "回避"
-      ]
+      "aliases_zh": [],
+      "description": "闪避/回避，免疫一次攻击伤害"
+    },
+    {
+      "name": "invincible",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": [
+        "invincible"
+      ],
+      "aliases_zh": [],
+      "description": "无敌，免疫所有伤害，持续一定回合"
     },
     {
       "name": "guts",
@@ -549,10 +399,32 @@
         "gutsRatio"
       ],
       "aliases_zh": [
-        "毅力",
         "战续",
         "根性"
-      ]
+      ],
+      "description": "毅力/战续，HP归零时以一定HP复活"
+    },
+    {
+      "name": "upHate",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": [
+        "upHate"
+      ],
+      "aliases_zh": [
+        "集火"
+      ],
+      "description": "提升目标集中度，吸引敌方攻击(嘲讽)"
+    },
+    {
+      "name": "downCriticalRateDamageTaken",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": [
+        "downCriticalRateDamageTaken"
+      ],
+      "aliases_zh": [],
+      "description": "降低被敌方暴击的概率"
     },
     {
       "name": "gainHp",
@@ -564,9 +436,9 @@
       ],
       "buffTypes": [],
       "aliases_zh": [
-        "HP回复",
         "回血"
-      ]
+      ],
+      "description": "立即恢复HP"
     },
     {
       "name": "upGainHp",
@@ -576,9 +448,40 @@
         "upGainHp",
         "upGivegainHp"
       ],
+      "aliases_zh": [],
+      "description": "提升HP恢复效果的回复量"
+    },
+    {
+      "name": "regainHp",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": [
+        "regainHp"
+      ],
       "aliases_zh": [
-        "回复量提升"
-      ]
+        "每回合回复"
+      ],
+      "description": "每回合自动恢复一定HP"
+    },
+    {
+      "name": "addMaxhp",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": [
+        "addMaxhp"
+      ],
+      "aliases_zh": [],
+      "description": "增加最大HP上限"
+    },
+    {
+      "name": "reduceHp",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": [
+        "reduceHp"
+      ],
+      "aliases_zh": [],
+      "description": "造成持续性HP减少(毒/诅咒/灼烧)"
     },
     {
       "name": "upTolerance",
@@ -587,10 +490,21 @@
       "buffTypes": [
         "upTolerance"
       ],
+      "validate": {
+        "type": "buff_ckOpIndv_every_not_in",
+        "traits": [
+          "buffPositiveEffect",
+          "buffIncreaseDamage"
+        ],
+        "traitValues": [
+          3004,
+          3006
+        ]
+      },
       "aliases_zh": [
-        "弱体耐性提升",
         "异常耐性"
-      ]
+      ],
+      "description": "提升对弱体(负面)状态的抵抗率"
     },
     {
       "name": "avoidStateNegative",
@@ -599,10 +513,61 @@
       "buffTypes": [
         "avoidState"
       ],
+      "validate": {
+        "type": "buff_ckOpIndv_every_not_in",
+        "traits": [
+          "buffPositiveEffect",
+          "buffIncreaseDamage"
+        ],
+        "traitValues": [
+          3004,
+          3006
+        ]
+      },
       "aliases_zh": [
-        "弱体无效",
         "异常无效"
-      ]
+      ],
+      "description": "完全免疫弱体(负面)状态"
+    },
+    {
+      "name": "upGrantstate",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": [
+        "upGrantstate"
+      ],
+      "aliases_zh": [],
+      "description": "提升状态付与的成功率"
+    },
+    {
+      "name": "upGrantstatePositive",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": [
+        "upGrantstate"
+      ],
+      "validate": {
+        "type": "buff_ckSelfIndv_contains",
+        "trait": "buffPositiveEffect",
+        "traitValue": 3004
+      },
+      "aliases_zh": [],
+      "description": "提升强化状态付与的成功率"
+    },
+    {
+      "name": "upGrantstateNegative",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": [
+        "upGrantstate"
+      ],
+      "validate": {
+        "type": "buff_ckSelfIndv_contains",
+        "trait": "buffNegativeEffect",
+        "traitValue": 3005
+      },
+      "aliases_zh": [],
+      "description": "提升弱体(负面)状态付与的成功率"
     },
     {
       "name": "upReceivePositiveEffect",
@@ -611,9 +576,67 @@
       "buffTypes": [
         "downTolerance"
       ],
+      "validate": {
+        "type": "buff_ckOpIndv_contains",
+        "trait": "buffPositiveEffect",
+        "traitValue": 3004
+      },
+      "aliases_zh": [],
+      "description": "提升己方被强化的成功率"
+    },
+    {
+      "name": "subState",
+      "category": "debuff",
+      "funcTypes": [
+        "subState"
+      ],
+      "buffTypes": [],
       "aliases_zh": [
-        "被强化成功率提升"
-      ]
+        "强化解除"
+      ],
+      "description": "解除目标身上的状态"
+    },
+    {
+      "name": "subStatePositive",
+      "category": "debuff",
+      "funcTypes": [
+        "subState"
+      ],
+      "buffTypes": [],
+      "validate": {
+        "type": "func_vals_contains",
+        "trait": "buffPositiveEffect",
+        "traitValue": 3004
+      },
+      "aliases_zh": [],
+      "description": "解除目标身上的正面(强化)状态"
+    },
+    {
+      "name": "subStateNegative",
+      "category": "debuff",
+      "funcTypes": [
+        "subState"
+      ],
+      "buffTypes": [],
+      "validate": {
+        "type": "func_vals_contains",
+        "trait": "buffNegativeEffect",
+        "traitValue": 3005
+      },
+      "aliases_zh": [
+        "弱体解除"
+      ],
+      "description": "解除己方身上的负面(弱体)状态"
+    },
+    {
+      "name": "upToleranceSubstate",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": [
+        "upToleranceSubstate"
+      ],
+      "aliases_zh": [],
+      "description": "提升对强化解除效果的抵抗率"
     },
     {
       "name": "instantDeath",
@@ -623,9 +646,50 @@
         "forceInstantDeath"
       ],
       "buffTypes": [],
+      "aliases_zh": [],
+      "description": "有概率即死消灭目标"
+    },
+    {
+      "name": "upResistInstantdeath",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": [
+        "upResistInstantdeath"
+      ],
+      "aliases_zh": [],
+      "description": "提升对即死效果的抵抗率"
+    },
+    {
+      "name": "upGrantInstantdeath",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": [
+        "upGrantInstantdeath"
+      ],
+      "aliases_zh": [],
+      "description": "提升即死效果的成功率"
+    },
+    {
+      "name": "avoidInstantdeath",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": [
+        "avoidInstantdeath"
+      ],
+      "aliases_zh": [],
+      "description": "完全免疫即死效果"
+    },
+    {
+      "name": "shortenSkill",
+      "category": "others",
+      "funcTypes": [
+        "shortenSkill"
+      ],
+      "buffTypes": [],
       "aliases_zh": [
-        "即死"
-      ]
+        "减CD"
+      ],
+      "description": "缩减技能的冷却回合数"
     },
     {
       "name": "fieldIndividuality",
@@ -635,9 +699,8 @@
         "fieldIndividuality",
         "toFieldChangeField"
       ],
-      "aliases_zh": [
-        "场地特性变更"
-      ]
+      "aliases_zh": [],
+      "description": "变更战场的场地特性"
     },
     {
       "name": "friendPointUp",
@@ -647,9 +710,38 @@
         "friendPointUpDuplicate"
       ],
       "buffTypes": [],
-      "aliases_zh": [
-        "友情点获取量提升"
-      ]
+      "aliases_zh": [],
+      "description": "提升友情点的获取量"
+    },
+    {
+      "name": "expUp",
+      "category": "others",
+      "funcTypes": [
+        "expUp"
+      ],
+      "buffTypes": [],
+      "aliases_zh": [],
+      "description": "提升御主经验值的获取量"
+    },
+    {
+      "name": "userEquipExpUp",
+      "category": "others",
+      "funcTypes": [
+        "userEquipExpUp"
+      ],
+      "buffTypes": [],
+      "aliases_zh": [],
+      "description": "提升魔术礼装经验值的获取量"
+    },
+    {
+      "name": "servantFriendshipUp",
+      "category": "others",
+      "funcTypes": [
+        "servantFriendshipUp"
+      ],
+      "buffTypes": [],
+      "aliases_zh": [],
+      "description": "提升从者羁绊经验的获取量"
     },
     {
       "name": "qpUp",
@@ -659,9 +751,8 @@
         "qpDropUp"
       ],
       "buffTypes": [],
-      "aliases_zh": [
-        "QP获取量提升"
-      ]
+      "aliases_zh": [],
+      "description": "提升QP(游戏货币)的获取量"
     },
     {
       "name": "eventDropUp",
@@ -676,19 +767,21 @@
         "buddyPointUp"
       ],
       "buffTypes": [],
-      "aliases_zh": [
-        "活动掉落提升"
-      ]
+      "aliases_zh": [],
+      "description": "提升活动素材的掉落数量"
     },
     {
       "name": "triggerFunc",
       "category": "others",
       "funcTypes": [],
       "buffTypes": [],
+      "validate": {
+        "type": "buff_type_in_trigger_set"
+      },
       "aliases_zh": [
-        "触发型技能",
         "条件发动"
-      ]
+      ],
+      "description": "在特定条件下自动发动的被动技能效果"
     }
   ]
 }

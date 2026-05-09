@@ -140,24 +140,30 @@
 - **执行**：
   1. 优先启用 OpenAI 兼容的 `response_format/json_schema` 模式。
   2. 必须包含 Pydantic 校验环节，严禁直接使用 `json.loads()` 的原始输出进入业务逻辑。
-  3. 任何查询维度的增删必须同步更新 `server/schemas.py`。
-- **目的**：确保 Query Executor 接收的数据绝对合法，消除解析幻觉和格式漂移。
+  3. 任何路由契约的变更必须同步更新 `server/schemas.py`（`RoutingResponse` / `SkillCall`）。
+  4. 新增查询维度通过新建 Skill 模块实现，Skill 的 `params_schema` 定义参数契约，无需修改全局 Schema。
+- **目的**：确保 SkillExecutor 接收的数据绝对合法，消除解析幻觉和格式漂移。
 
-### 5. Filter Registry 可扩展模式
-- **准则**：Query Executor 的过滤逻辑必须采用注册表模式（Filter Registry / Strategy Pattern），禁止在 `_match_servant` 中堆积 if-else。
+### 5. Skill-Based Architecture 可扩展模式
+- **准则**：所有查询逻辑必须以独立 Skill 模块实现，通过 `@register_skill` 装饰器注册到 `SKILL_REGISTRY`，禁止在任何单体函数中堆积 if-else。
 - **执行**：
-  1. 每个过滤维度（npCharge、className、traits 等）独立为 10-20 行函数。
-  2. 使用 `@register_filter("field_name")` 装饰器注册到 `FILTER_REGISTRY`。
-  3. `_match_servant` 仅负责遍历注册表执行过滤，保持 < 15 行。
-  4. 新增查询维度时，只需添加新过滤器函数，无需修改主匹配逻辑。
-- **目的**：控制圈复杂度 < 10，降低未来新增礼装、关卡、素材等查询维度时的维护成本。
+  1. 每个查询维度（npCharge、className、traits 等）独立为一个 `QuerySkill` 子类文件，放在 `server/skills/query/` 下。
+  2. 使用 `@register_skill` 装饰器自动注册到 `SKILL_REGISTRY`。
+  3. `SkillExecutor` 负责按 domain 分组 AND 合并执行，保持核心调度逻辑精简。
+  4. 新增查询维度时，只需新建 Skill 文件 + 在 `server/skills/__init__.py` 追加导入，无需修改路由、执行器或 Prompt 逻辑。
+  5. 每个 Skill 可选提供 Pydantic `params_schema`，校验失败自动跳过并降级。
+- **目的**：控制单模块复杂度，降低未来新增礼装、关卡、素材等查询维度时的维护成本。
 
 ### 6. 知识与配置分离原则
 - **准则**：稳定领域知识与可运营配置必须物理隔离。
 - **执行**：
-  1. `server/knowledge/` — 存放 Chaldea 派生知识（FuncType、BuffType、SkillEffect 映射），由 `sync_chaldea.py` 生成，版本追踪。
+  1. `server/knowledge/` — 存放 `sync_chaldea.py` 从 Chaldea Dart 源码提取的领域知识，禁止手工编辑。
+     - 主要是 build-time 消费（由 `data_loader.py` 生成 Materialized View）
+     - 允许 runtime 读取，但仅限「查询输入映射」场景（如中文→英文效果名反查）
+     - 无代码消费的纯参考文件应移到 `docs/reference/`
   2. `server/config/` — 存放可运营配置（昵称、术语映射、展示规则、Prompt 片段），支持热更新。
   3. 严禁在 `main.py`、`prompts.py` 中硬编码翻译字典（如 `CLASS_MAP`），必须从 `config/` 加载。
+  4. **烘焙 vs 查表判定**：筛选字段烘焙到 MV，映射翻译 runtime 查表。详见 ADR-019。
 - **目的**：知识更新与配置维护解耦，支持运营团队独立修改配置而不触碰代码。
 
 ### 7. Chaldea 依赖边界
