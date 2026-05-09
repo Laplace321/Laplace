@@ -18,6 +18,8 @@ class Params(BaseModel):
         description="搜索来源: skill(仅技能) / np(仅宝具) / both(默认，同时搜)",
     )
     target_type: str | None = Field(default=None, alias="targetType", description="目标类型: self/party/enemy")
+    min_value: int | None = Field(default=None, alias="minValue", description="效果最小数值（百分比，如50表示≥50%）")
+    max_value: int | None = Field(default=None, alias="maxValue", description="效果最大数值（百分比）")
 
 
 def _check_effect(
@@ -25,16 +27,20 @@ def _check_effect(
     effect_name: str,
     source: str,
     target_type: str | None,
+    min_value: int | None = None,
+    max_value: int | None = None,
 ) -> bool:
-    """检查从者是否拥有特定效果（支持按来源筛选）。
+    """检查从者是否拥有特定效果（支持按来源、目标类型和数值筛选）。
 
     Args:
         servant: 从者数据
         effect_name: 效果名（英文 key）
         source: 搜索来源 - skill / np / both
         target_type: 目标类型筛选，None 表示不限
+        min_value: 效果最小数值（万分比），None 表示不限
+        max_value: 效果最大数值（万分比），None 表示不限
     """
-    hit_skill = source in ("both", "skill") and _match_effect(servant, effect_name, target_type)
+    hit_skill = source in ("both", "skill") and _match_effect(servant, effect_name, target_type, min_value, max_value)
     hit_np = source in ("both", "np") and effect_name in servant.get("npEffects", [])
     return hit_skill or hit_np
 
@@ -54,21 +60,26 @@ class SearchByEffect(QuerySkill):
         effects = params.get("effects")
         source = params.get("source", "both")
         target_type = params.get("target_type")
+        # 百分比 → 万分比转换（LLM 传 50 表示 50%，内部用 5000）
+        raw_min = params.get("min_value")
+        raw_max = params.get("max_value")
+        min_value = raw_min * 100 if raw_min is not None else None
+        max_value = raw_max * 100 if raw_max is not None else None
 
         # 单效果模式（支持复合效果自动展开为 OR）
         if effect is not None:
             expanded = _expand_effect(effect)
             if len(expanded) > 1:
-                return any(_check_effect(servant, eff, source, target_type) for eff in expanded)
-            return _check_effect(servant, expanded[0], source, target_type)
+                return any(_check_effect(servant, eff, source, target_type, min_value, max_value) for eff in expanded)
+            return _check_effect(servant, expanded[0], source, target_type, min_value, max_value)
 
         # 多效果模式
         if effects is not None and isinstance(effects, list):
             resolved = [_resolve_effect_name(eff) for eff in effects]
             op = params.get("effects_op", "and").lower()
             if op == "or":
-                return any(_check_effect(servant, eff, source, target_type) for eff in resolved)
+                return any(_check_effect(servant, eff, source, target_type, min_value, max_value) for eff in resolved)
             else:
-                return all(_check_effect(servant, eff, source, target_type) for eff in resolved)
+                return all(_check_effect(servant, eff, source, target_type, min_value, max_value) for eff in resolved)
 
         return True

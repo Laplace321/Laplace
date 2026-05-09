@@ -69,6 +69,8 @@ class Params(BaseModel):
     effects: list[str] | None = Field(default=None, alias="skillEffects", description="多效果列表")
     effects_op: str = Field(default="and", alias="skillEffectsOp", description="多效果组合: and/or")
     target_type: str | None = Field(default=None, alias="targetType", description="目标类型: self/party/enemy")
+    min_value: int | None = Field(default=None, alias="minValue", description="效果最小数值（百分比，如50表示≥50%）")
+    max_value: int | None = Field(default=None, alias="maxValue", description="效果最大数值（百分比）")
 
 
 @register_skill
@@ -85,21 +87,26 @@ class SearchBySkillEffect(QuerySkill):
         effect = params.get("effect")
         effects = params.get("effects")
         target_type = params.get("target_type")
+        # 百分比 → 万分比转换（LLM 传 50 表示 50%，内部用 5000）
+        raw_min = params.get("min_value")
+        raw_max = params.get("max_value")
+        min_value = raw_min * 100 if raw_min is not None else None
+        max_value = raw_max * 100 if raw_max is not None else None
 
         # 单效果模式（支持复合效果自动展开为 OR）
         if effect is not None:
             expanded = _expand_effect(effect)
             if len(expanded) > 1:
-                return any(_match_effect(servant, eff, target_type) for eff in expanded)
-            return _match_effect(servant, expanded[0], target_type)
+                return any(_match_effect(servant, eff, target_type, min_value, max_value) for eff in expanded)
+            return _match_effect(servant, expanded[0], target_type, min_value, max_value)
 
         # 多效果模式
         if effects is not None and isinstance(effects, list):
             resolved = [_resolve_effect_name(eff) for eff in effects]
             op = params.get("effects_op", "and").lower()
             if op == "or":
-                return any(_match_effect(servant, eff, target_type) for eff in resolved)
+                return any(_match_effect(servant, eff, target_type, min_value, max_value) for eff in resolved)
             else:
-                return all(_match_effect(servant, eff, target_type) for eff in resolved)
+                return all(_match_effect(servant, eff, target_type, min_value, max_value) for eff in resolved)
 
         return True

@@ -159,6 +159,10 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
    - **用户说了"宝具"**：当用户提到"宝具"二字时（如"**宝具**带XX"、"**宝具**效果包含XX"），必须用 `search_by_np_effect`
    - 判断依据是用户原话中是否包含"技能"或"宝具"这两个关键词，有则精确路由，无则默认统一搜索
 9. **禁止同 Skill 多次调用表达 OR**：当用户的查询涉及"任意一种"效果时（如"能挡伤害"、"能辅助"），**禁止**对同一个 Skill 发起多次调用。应使用单次调用的 `effects` + `effectsOp: "or"` 参数，或使用虚拟复合效果名（如 `damageBoost`、`damageShield`）。多个 skill_call 之间是 AND 关系，重复调用同一 Skill 会变成"必须同时满足所有条件"，导致结果为空。
+10. **效果的目标类型和数值条件**：效果类 Skill（`search_by_effect` / `search_by_skill_effect`）支持可选的 `targetType` 和 `minValue` 参数：
+    - `targetType`：效果施加目标。`"self"` = 自身、`"party"` = 队友/全队、`"enemy"` = 敌方。用户说"给队友"/"全队"/"辅助"时传 `"party"`，说"自身"时传 `"self"`
+    - `minValue`：效果最小数值（百分比）。用户说"超过50%"/"大于30%"时传对应数值。如 `"minValue": 50` 表示 ≥50%
+    - 用户未提及目标或数值时**不要传**这些参数
 
 ## 示例
 
@@ -205,6 +209,16 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
 用户："有增伤技能的从者"（增伤类泛用概念 → 虚拟复合效果 damageBoost）
 ```json
 {{"skill_calls": [{{"skill_name": "search_by_skill_effect", "params": {{"skillEffect": "damageBoost"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："给队友加红魔放超过50%的从者"（效果 + 目标类型 + 数值条件）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "upBuster", "targetType": "party", "minValue": 50}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："有给全队加攻超过30%的从者"（全队 = party）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "upAtk", "targetType": "party", "minValue": 30}}}}], "response_skill": "respond_servant_list"}}
 ```
 """
 

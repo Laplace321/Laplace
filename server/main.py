@@ -69,6 +69,29 @@ MAX_CONTEXT_SIZE = 5
 MAX_RESULTS = 50
 
 
+def _effect_qualifier(params: dict) -> str:
+    """根据效果参数生成中文前缀修饰语（目标类型+数值条件）。"""
+    parts: list[str] = []
+    target_type = params.get("targetType") or params.get("target_type")
+    if target_type == "party":
+        parts.append("给队友的")
+    elif target_type == "self":
+        parts.append("自身的")
+    elif target_type == "enemy":
+        parts.append("对敌方的")
+
+    min_val = params.get("minValue") or params.get("min_value")
+    max_val = params.get("maxValue") or params.get("max_value")
+    if min_val is not None and max_val is not None:
+        parts.append(f"{min_val}%~{max_val}%")
+    elif min_val is not None:
+        parts.append(f"≥{min_val}%")
+    elif max_val is not None:
+        parts.append(f"≤{max_val}%")
+
+    return "".join(parts)
+
+
 def _describe_filters(skill_calls: list[dict]) -> list[str]:
     """将 skill_calls 转换为人类可读的筛选条件描述列表。
 
@@ -83,16 +106,18 @@ def _describe_filters(skill_calls: list[dict]) -> list[str]:
             effect = params.get("effect", "")
             translated = get_effect_translation(effect) if effect else effect
             source = params.get("source", "both")
+            qualifier = _effect_qualifier(params)
             if source == "skill":
-                descriptions.append(f"技能效果包含「{translated}」")
+                descriptions.append(f"技能效果包含「{qualifier}{translated}」")
             elif source == "np":
-                descriptions.append(f"宝具效果包含「{translated}」")
+                descriptions.append(f"宝具效果包含「{qualifier}{translated}」")
             else:
-                descriptions.append(f"效果包含「{translated}」（技能或宝具）")
+                descriptions.append(f"效果包含「{qualifier}{translated}」（技能或宝具）")
         elif name == "search_by_skill_effect":
             effect = params.get("skillEffect") or params.get("effect", "")
             translated = get_effect_translation(effect) if effect else effect
-            descriptions.append(f"技能效果包含「{translated}」")
+            qualifier = _effect_qualifier(params)
+            descriptions.append(f"技能效果包含「{qualifier}{translated}」")
         elif name == "search_by_np_effect":
             effect = params.get("npEffect") or params.get("effect", "")
             translated = get_effect_translation(effect) if effect else effect

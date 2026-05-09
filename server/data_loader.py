@@ -438,6 +438,14 @@ def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[
 
             matched_effects = _match_func_effects(func, matcher)
 
+            raw_svals = func.get("svals", [])
+            max_sval = (
+                raw_svals[-1]
+                if isinstance(raw_svals, list) and raw_svals
+                else raw_svals
+                if isinstance(raw_svals, dict)
+                else {}
+            )
             for effect_name in matched_effects:
                 all_effects.add(effect_name)
                 skill_effects.append(
@@ -445,6 +453,9 @@ def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[
                         "type": effect_name,
                         "funcType": func_type,
                         "targetType": classify_target_type(target_type),
+                        "valueMax": max_sval.get("Value", 0),
+                        "turn": max_sval.get("Turn", 0),
+                        "count": max_sval.get("Count", 0),
                     }
                 )
 
