@@ -38,7 +38,12 @@ def _load_effect_hints() -> str:
         if not desc:
             continue
         zh_name = aliases[0] if aliases else effect["name"]
-        lines.append(f"- `{effect['name']}`: {zh_name} — {desc}")
+        # 将全部俗称展示给 LLM，用 / 分隔，确保路由层能识别玩家用语
+        if len(aliases) > 1:
+            aka = " / ".join(aliases)
+            lines.append(f"- `{effect['name']}`: {aka} — {desc}")
+        else:
+            lines.append(f"- `{effect['name']}`: {zh_name} — {desc}")
 
     if lines:
         _effect_hints_cache = "\n".join(lines)
