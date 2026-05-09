@@ -199,7 +199,8 @@
 - **准则**：**[绝对纪律]** 用户在前端页面上能看到的任何文本，包括 SSE thinking steps、错误提示、卡片数据、LLM 生成回复，**严禁**出现面向开发者的技术术语。
 - **执行**：
   1. **SSE 事件预消化**：后端向前端推送的所有 SSE 事件，必须使用中文用户语言，禁止暴露原始的 `skill_name`（如 `search_by_effect`）、英文参数名（如 `subStatePositive`）、内部函数名等。使用 `_describe_filters()` 等翻译函数在推送前完成中文化。
-  2. **LLM Context 预消化**：传给 LLM 的 `context_data` 中的 `applied_filters`、`query_conditions` 等字段，必须使用预消化的中文描述，禁止包含原始英文 Skill 名或参数值。
+  2. **LLM Context 全中文化**：传给 LLM 的 `context_data` 中所有 JSON key 和 value 必须全部使用中文。英文 key（如 `skillEffects`、`top_results_details`）会被 LLM 当作词汇引用到回复中，导致技术术语泄露。禁止包含原始英文 Skill 名或参数值。
+  5. **禁止暴露系统内部机制**：LLM 的回复**严禁**向用户解释数据截断、展示限制、内部规则等系统实现细节。例如不得说"详情仅展示5位"、"未在JSON中呈现"、"依规则不推测"。Generation Prompt 必须包含对应强约束。
   3. **前端映射兜底**：前端 `SKILL_DISPLAY_NAMES` 等映射表必须覆盖所有已注册的 Skill。新增 Skill 时必须同步更新前端映射，但后端预消化是第一道防线，前端映射仅作兜底。
   4. **新增 Skill 检查清单**：每次新增 Skill 模块时，必须检查以下位置是否需要同步更新：
      - `server/main.py` → `_describe_filters()` 新增中文描述分支
