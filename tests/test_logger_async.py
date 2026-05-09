@@ -25,11 +25,18 @@ def _patch_log_file():
 # ── 导入被测模块（必须在 patch fixture 之后，否则 LOG_FILE 无法被替换） ──
 from server.logger import (  # noqa: E402
     _build_trace_data,
-    _write_trace_sync,
+    _write_event_sync,
+    find_trace,
+    find_trace_events,
     log_chat_trace,
     log_chat_trace_async,
+    log_trace_event,
+    log_trace_event_sync,
     read_traces,
 )
+
+# 向后兼容别名
+_write_trace_sync = _write_event_sync
 
 # 使用 anyio 后端运行异步测试
 pytestmark = pytest.mark.anyio
@@ -123,3 +130,120 @@ class TestReadTracesCompat:
         # 倒序：最新在前
         assert traces[0]["traceId"] == "r2"
         assert traces[1]["traceId"] == "r1"
+
+
+# ============================================================
+# 多阶段事件日志（新模式）测试
+# ============================================================
+
+
+class TestLogTraceEventBasic:
+    """验证单阶段事件写入和读取。"""
+
+    def test_sync_event_write(self):
+        log_trace_event_sync("ev1", "routing_input", {"query": "hello", "skill_count": 5})
+        lines = _tmp_log.read_text().strip().split("\n")
+        assert len(lines) == 1
+        entry = json.loads(lines[0])
+        assert entry["traceId"] == "ev1"
+        assert entry["phase"] == "routing_input"
+        assert entry["data"]["query"] == "hello"
+        assert entry["data"]["skill_count"] == 5
+        assert "timestamp" in entry
+        assert "error" not in entry
+
+    def test_event_with_error(self):
+        log_trace_event_sync("ev2", "final", {"result": "error"}, error="timeout")
+        entry = json.loads(_tmp_log.read_text().strip())
+        assert entry["level"] == "ERROR"
+        assert entry["error"] == "timeout"
+        assert entry["phase"] == "final"
+
+    async def test_async_event_write(self):
+        await log_trace_event("ev3", "execution", {"total_found": 10})
+        lines = _tmp_log.read_text().strip().split("\n")
+        assert len(lines) == 1
+        entry = json.loads(lines[0])
+        assert entry["traceId"] == "ev3"
+        assert entry["phase"] == "execution"
+
+
+class TestFindTraceEventsAggregation:
+    """验证多阶段事件按 traceId 聚合。"""
+
+    def test_aggregation(self):
+        # 写入同一 traceId 的多个阶段事件
+        log_trace_event_sync("agg1", "routing_input", {"query": "test"})
+        log_trace_event_sync("agg1", "routing_output", {"skill_calls": []})
+        log_trace_event_sync("agg1", "execution", {"total_found": 3})
+        log_trace_event_sync("other", "routing_input", {"query": "noise"})
+        log_trace_event_sync("agg1", "final", {"total_time_ms": 100})
+
+        events = find_trace_events("agg1")
+        assert len(events) == 4
+        phases = [e["phase"] for e in events]
+        assert phases == ["routing_input", "routing_output", "execution", "final"]
+
+    def test_no_match(self):
+        log_trace_event_sync("x1", "routing_input", {})
+        events = find_trace_events("nonexistent")
+        assert events == []
+
+
+class TestTraceEventOrdering:
+    """验证事件按时间顺序返回。"""
+
+    def test_ordering(self):
+        phases = ["routing_input", "routing_output", "execution", "context_build", "generation_output", "final"]
+        for phase in phases:
+            log_trace_event_sync("ord1", phase, {"step": phase})
+
+        events = find_trace_events("ord1")
+        assert len(events) == 6
+        returned_phases = [e["phase"] for e in events]
+        assert returned_phases == phases
+
+
+class TestBackwardCompatibility:
+    """验证旧模式 log_chat_trace / find_trace 仍正常工作。"""
+
+    def test_old_mode_write_and_find(self):
+        log_chat_trace("bc1", "old query", {"intent": "test"}, 5, "old reply")
+        result = find_trace("bc1")
+        assert result is not None
+        assert result["traceId"] == "bc1"
+        assert result.get("query") == "old query"
+
+    def test_new_mode_find_trace_aggregated(self):
+        """find_trace 对多阶段事件返回聚合视图。"""
+        log_trace_event_sync("bc2", "routing_input", {"query": "new query"})
+        log_trace_event_sync("bc2", "routing_output", {"skill_calls": [{"skill_name": "s1"}]})
+        log_trace_event_sync("bc2", "execution", {"total_found": 10})
+        log_trace_event_sync("bc2", "generation_output", {"reply_preview": "Found 10"})
+        log_trace_event_sync("bc2", "final", {"total_time_ms": 200})
+
+        result = find_trace("bc2")
+        assert result is not None
+        assert result["traceId"] == "bc2"
+        assert "phases" in result
+        assert len(result["phases"]) == 5
+        assert result["query"] == "new query"
+        assert result["results_count"] == 10
+
+    def test_mixed_old_and_new(self):
+        """混合新旧模式数据，find_trace 正确区分。"""
+        # 旧模式
+        log_chat_trace("mix1", "old", {}, 1, "reply")
+        # 新模式
+        log_trace_event_sync("mix2", "routing_input", {"query": "new"})
+        log_trace_event_sync("mix2", "final", {"total_time_ms": 50})
+
+        old_result = find_trace("mix1")
+        assert old_result is not None
+        assert "phases" not in old_result  # 旧模式无 phases
+        assert old_result["query"] == "old"
+
+        new_result = find_trace("mix2")
+        assert new_result is not None
+        assert "phases" in new_result
+        assert len(new_result["phases"]) == 2

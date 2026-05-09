@@ -7,6 +7,8 @@ Laplace — Skill Executor
 
 from __future__ import annotations
 
+import time
+
 from pydantic import ValidationError
 
 from server.query_executor import load_database
@@ -14,7 +16,7 @@ from server.skills.base import SKILL_REGISTRY, QuerySkill, ResponseSkill
 
 
 class ExecutionResult:
-    """Skill 执行结果。"""
+    """Skill 执行结果（含诊断信息）。"""
 
     def __init__(
         self,
@@ -23,12 +25,18 @@ class ExecutionResult:
         response_skill: ResponseSkill | None = None,
         fallback_message: str | None = None,
         is_fallback: bool = False,
+        accepted_skills: list[dict] | None = None,
+        rejected_skills: list[dict] | None = None,
+        execution_time_ms: float = 0.0,
     ):
         self.servants = servants
         self.total_found = total_found
         self.response_skill = response_skill
         self.fallback_message = fallback_message
         self.is_fallback = is_fallback
+        self.accepted_skills = accepted_skills or []
+        self.rejected_skills = rejected_skills or []
+        self.execution_time_ms = execution_time_ms
 
 
 class SkillExecutor:
@@ -46,8 +54,9 @@ class SkillExecutor:
             response_skill_name: 使用的 Response Skill 名称
 
         Returns:
-            ExecutionResult
+            ExecutionResult（含 accepted_skills / rejected_skills 诊断信息）
         """
+        start_time = time.monotonic()
         db = load_database()
 
         # 查找 Response Skill
@@ -55,13 +64,22 @@ class SkillExecutor:
 
         # 校验并收集 Query Skills
         query_skills: list[tuple[QuerySkill, dict]] = []
+        accepted: list[dict] = []
+        rejected: list[dict] = []
+
         for call in skill_calls:
             skill_name = call.get("skill_name", "")
             params = call.get("params", {})
 
             skill = SKILL_REGISTRY.get(skill_name)
             if skill is None or not isinstance(skill, QuerySkill):
-                print(f"⚠️  LLM 路由了不存在的 Skill: '{skill_name}'，已跳过。已注册: {list(SKILL_REGISTRY.keys())}")
+                rejected.append(
+                    {
+                        "skill_name": skill_name,
+                        "reason": "not_found",
+                        "detail": f"不在 SKILL_REGISTRY 中（已注册: {list(SKILL_REGISTRY.keys())}）",
+                    }
+                )
                 continue
 
             # Pydantic 参数校验（容错：校验失败跳过该 Skill）
@@ -70,10 +88,19 @@ class SkillExecutor:
                     validated = skill.params_schema(**params)
                     params = validated.model_dump(by_alias=False)
                 except (ValidationError, TypeError) as e:
-                    print(f"⚠️  Skill {skill_name} 参数校验失败，已跳过: {e}")
+                    rejected.append(
+                        {
+                            "skill_name": skill_name,
+                            "reason": "validation_error",
+                            "detail": str(e),
+                        }
+                    )
                     continue
 
             query_skills.append((skill, params))
+            accepted.append({"skill_name": skill_name, "params": params})
+
+        elapsed_ms = (time.monotonic() - start_time) * 1000
 
         if not query_skills:
             return ExecutionResult(
@@ -82,6 +109,9 @@ class SkillExecutor:
                 response_skill=response_skill,
                 fallback_message="没有有效的查询条件，请尝试更具体的描述。",
                 is_fallback=True,
+                accepted_skills=accepted,
+                rejected_skills=rejected,
+                execution_time_ms=elapsed_ms,
             )
 
         # 按 domain 分组，同 domain AND 合并（一次数据扫描）
@@ -91,6 +121,7 @@ class SkillExecutor:
         results.sort(key=lambda x: (-x.get("rarity", 0), x.get("collectionNo", 0)))
 
         total_found = len(results)
+        elapsed_ms = (time.monotonic() - start_time) * 1000
 
         # 执行阶段兜底：结果为空
         if total_found == 0:
@@ -100,12 +131,18 @@ class SkillExecutor:
                 response_skill=response_skill,
                 fallback_message="未找到匹配的从者，你可以尝试调整查询条件。",
                 is_fallback=True,
+                accepted_skills=accepted,
+                rejected_skills=rejected,
+                execution_time_ms=elapsed_ms,
             )
 
         return ExecutionResult(
             servants=results,
             total_found=total_found,
             response_skill=response_skill,
+            accepted_skills=accepted,
+            rejected_skills=rejected,
+            execution_time_ms=elapsed_ms,
         )
 
     def _execute_and_merge(

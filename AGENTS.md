@@ -29,6 +29,7 @@
 2. **Push 前必须通过三步本地验证**：
 > **[非常重要]** 每次 `git commit` 前，必须依次执行以下三步验证，全部通过后才能 commit + push：
 > ```bash
+> source .venv/bin/activate                   # 先激活虚拟环境！
 > ruff check server/ tests/ extractor/       # lint 检查
 > ruff format --check server/ tests/          # 格式检查
 > python -m pytest                            # 回归测试
@@ -109,14 +110,25 @@
 
 ## 核心工作流规范 (Mandatory Operations)
 
+### 0. 虚拟环境激活 (Virtual Environment Activation)
+- **准则**：**[最高优先级]** 执行任何 Python 相关命令前，**必须**先激活项目虚拟环境，无一例外。
+- **执行**：
+  1. 在每次终端会话或执行 Python 脚本前，先运行：
+     ```bash
+     source /Users/laplace/Laplace/.venv/bin/activate
+     ```
+  2. 适用范围包括但不限于：`python3`、`pip`、`pytest`、`ruff`、`uvicorn`、任何 `python -m` 命令。
+  3. 如果不确定当前终端是否已激活，可通过 `which python3` 验证路径是否指向 `.venv/bin/python3`。
+- **目的**：避免使用系统 Python 导致依赖缺失、版本不匹配等问题。项目所有依赖均安装在 `.venv` 中。
+
 ### 1. 服务自动重载与状态校验
 - **准则**：任何涉及 `server/` 目录下 Python 代码、Prompt 模板或配置文件（JSON）的修改，**必须**由 AI 主动执行服务重启，禁止要求用户手动重启。
 - **执行**：
-  1. 使用 `pkill -f uvicorn` 或类似命令清理旧进程。
-  2. 使用 `python3 -m uvicorn server.main:app` 重新启动服务。
-  3. 检查进程状态确保服务已就绪。
-- **目的**：保证测试反馈的一致性，避免因缓存或未重载代码导致的“修复无效”假象。
-
+  1. 确认虚拟环境已激活（参见上方第 0 条）。
+  2. 使用 `pkill -f uvicorn` 或类似命令清理旧进程。
+  3. 使用 `python3 -m uvicorn server.main:app` 重新启动服务。
+  4. 检查进程状态确保服务已就绪。
+- **目的**：保证测试反馈的一致性，避免因缓存或未重载代码导致的"修复无效"假象。
 ## 架构约束与长期维护标准
 
 为了保证项目的长期健壮性，后续开发必须严格遵守以下架构准则：

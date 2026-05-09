@@ -7,6 +7,7 @@ Laplace — FastAPI Server
 
 import json
 import os
+import time
 import uuid
 from pathlib import Path
 
@@ -19,7 +20,7 @@ from pydantic import BaseModel
 # 预消化翻译字典（从 config/translations.json 加载，支持热更新）
 from server.config_loader import CachedConfig
 from server.llm_client import chat_completion
-from server.logger import find_trace, log_chat_trace_async, read_traces
+from server.logger import find_trace, log_trace_event, read_traces
 from server.prompts import build_routing_prompt, get_generation_prompt
 from server.query_executor import load_database
 from server.rate_limiter import RateLimitMiddleware
@@ -282,6 +283,7 @@ async def _handle_skill_mode(
     接收已确定的 skill_calls（来自 LLM 路由或前端直传），
     执行 SkillExecutor 并生成 RAG 回复。
     """
+    request_start = time.monotonic()
     executor = SkillExecutor()
     model_used = "skill_mode"
 
@@ -291,6 +293,18 @@ async def _handle_skill_mode(
             {"name": s.name, "description": s.description} for s in SKILL_REGISTRY.values() if isinstance(s, QuerySkill)
         ]
         routing_prompt = build_routing_prompt(skill_descriptions)
+
+        # ── Trace: routing_input ──
+        await log_trace_event(
+            trace_id,
+            "routing_input",
+            {
+                "query": user_message,
+                "routing_prompt_length": len(routing_prompt),
+                "skill_count": len(skill_descriptions),
+            },
+        )
+
         try:
             routing_result = await chat_completion(
                 system_prompt=routing_prompt,
@@ -307,11 +321,30 @@ async def _handle_skill_mode(
             skill_calls = routing_result.get("skill_calls", [])
             response_skill_name = routing_result.get("response_skill", response_skill_name)
 
+            # ── Trace: routing_output ──
+            await log_trace_event(
+                trace_id,
+                "routing_output",
+                {
+                    "skill_calls": skill_calls,
+                    "response_skill": response_skill_name,
+                    "fallback": routing_result.get("fallback"),
+                    "model": model_used,
+                },
+            )
+
             # 检查 fallback
             fallback = routing_result.get("fallback")
             if fallback is not None:
                 fb_msg = fallback.get("message", "无法理解你的问题，请尝试更具体的描述。")
-                await log_chat_trace_async(trace_id, user_message, routing_result, 0, fb_msg)
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": (time.monotonic() - request_start) * 1000,
+                        "result": "fallback",
+                    },
+                )
                 return ChatResponse(
                     reply=fb_msg,
                     servants=[],
@@ -324,12 +357,13 @@ async def _handle_skill_mode(
             # 空 skill_calls 且无 fallback — LLM 未能识别意图
             if not skill_calls:
                 no_match_msg = "无法从你的问题中识别出查询条件，请尝试更具体的描述。"
-                await log_chat_trace_async(
+                await log_trace_event(
                     trace_id,
-                    user_message,
-                    routing_result,
-                    0,
-                    no_match_msg,
+                    "final",
+                    {
+                        "total_time_ms": (time.monotonic() - request_start) * 1000,
+                        "result": "no_match",
+                    },
                 )
                 return ChatResponse(
                     reply=no_match_msg,
@@ -340,8 +374,15 @@ async def _handle_skill_mode(
                     traceId=trace_id,
                 )
         except Exception as e:
-            print(f"[{trace_id}] Skill Routing Error: {e}")
-            await log_chat_trace_async(trace_id, user_message, {}, 0, "路由失败", error=str(e))
+            await log_trace_event(
+                trace_id,
+                "final",
+                {
+                    "total_time_ms": (time.monotonic() - request_start) * 1000,
+                    "result": "routing_error",
+                },
+                error=str(e),
+            )
             return ChatResponse(
                 reply="抱歉，Skill 路由遇到问题，请稍后重试。",
                 servants=[],
@@ -357,6 +398,19 @@ async def _handle_skill_mode(
     total_found = result.total_found
     returned_servants = servants[:MAX_RESULTS]
 
+    # ── Trace: execution ──
+    await log_trace_event(
+        trace_id,
+        "execution",
+        {
+            "accepted_skills": result.accepted_skills,
+            "rejected_skills": result.rejected_skills,
+            "total_found": total_found,
+            "execution_time_ms": round(result.execution_time_ms, 2),
+            "is_fallback": result.is_fallback,
+        },
+    )
+
     # Fallback 处理
     if result.is_fallback:
         final_reply = result.fallback_message or "未找到匹配的从者。"
@@ -367,11 +421,32 @@ async def _handle_skill_mode(
         context_data["applied_filters"] = _describe_filters(skill_calls)
         context_json = json.dumps(context_data, ensure_ascii=False)
 
+        # ── Trace: context_build ──
+        await log_trace_event(
+            trace_id,
+            "context_build",
+            {
+                "applied_filters": context_data["applied_filters"],
+                "top_results_count": len(context_data.get("top_results_details", [])),
+                "context_json_length": len(context_json),
+            },
+        )
+
         # 使用 Response Skill 的 prompt（如果可用）
         if result.response_skill is not None:
             gen_prompt = result.response_skill.build_prompt(user_message, context_json)
         else:
             gen_prompt = get_generation_prompt(user_message, context_json)
+
+        # ── Trace: generation_input ──
+        await log_trace_event(
+            trace_id,
+            "generation_input",
+            {
+                "generation_prompt_length": len(gen_prompt),
+                "context_json_length": len(context_json),
+            },
+        )
 
         try:
             gen_response = await chat_completion(
@@ -387,15 +462,36 @@ async def _handle_skill_mode(
             if not final_reply:
                 raise ValueError("Empty response from LLM")
         except Exception as e:
-            print(f"[{trace_id}] Skill RAG Error: {e}")
             final_reply = f"为你找到了 {total_found} 位从者。"
+            await log_trace_event(
+                trace_id,
+                "generation_output",
+                {
+                    "reply_length": len(final_reply),
+                    "reply_preview": final_reply[:100],
+                },
+                error=str(e),
+            )
+        else:
+            # ── Trace: generation_output (success) ──
+            await log_trace_event(
+                trace_id,
+                "generation_output",
+                {
+                    "reply_length": len(final_reply),
+                    "reply_preview": final_reply[:100],
+                },
+            )
 
-    await log_chat_trace_async(
-        trace_id=trace_id,
-        user_message=user_message,
-        parsed_intent={"mode": "skill", "skill_calls": skill_calls},
-        found_count=total_found,
-        final_reply=final_reply,
+    # ── Trace: final ──
+    await log_trace_event(
+        trace_id,
+        "final",
+        {
+            "total_time_ms": round((time.monotonic() - request_start) * 1000, 2),
+            "total_found": total_found,
+            "result": "success" if not result.is_fallback else "fallback",
+        },
     )
 
     return ChatResponse(
@@ -476,10 +572,10 @@ async def chat(request: ChatRequest):
                 extra_resp_skill = extra_routing.get("response_skill")
                 if extra_resp_skill and extra_resp_skill != "respond_servant_list":
                     resolved_response_skill = extra_resp_skill
-                print(f"[{trace_id}] Preset B1: merged {len(extra_skills)} extra skills from supplement")
-            except Exception as e:
-                # 补充解析失败不影响预设查询
-                print(f"[{trace_id}] Preset B1 supplement parsing failed (non-blocking): {e}")
+                # B1 合并日志将通过 trace event 记录（在 _handle_skill_mode 中）
+            except Exception:
+                # 补充解析失败不影响预设查询（静默，trace 中可见）
+                pass
     elif request.params:
         # 前端直传 skill_calls（params 格式：[{"skill_name": ..., "params": ...}]）
         if isinstance(request.params, list):
@@ -506,6 +602,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
 
     async def event_generator():
         trace_id = uuid.uuid4().hex[:8]
+        stream_start = time.monotonic()
         model_used = "unknown"
 
         # ── 阶段 1: Skill 路由（或 Preset 展开） ──
@@ -557,9 +654,10 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     extra_resp_skill = extra_routing.get("response_skill")
                     if extra_resp_skill and extra_resp_skill != "respond_servant_list":
                         response_skill_name = extra_resp_skill
-                    print(f"[{trace_id}] Preset B1 stream: merged {len(extra_skills)} extra skills")
-                except Exception as e:
-                    print(f"[{trace_id}] Preset B1 stream supplement parsing failed (non-blocking): {e}")
+                    # B1 合并日志将通过后续 trace event 记录
+                except Exception:
+                    # 补充解析失败不影响预设查询（静默，trace 中可见）
+                    pass
 
             # 推送路由结果
             yield _sse_event(
@@ -582,6 +680,17 @@ async def chat_stream(message: str, preset_name: str | None = None):
             ]
             routing_prompt = build_routing_prompt(skill_descriptions)
 
+            # ── Trace: routing_input ──
+            await log_trace_event(
+                trace_id,
+                "routing_input",
+                {
+                    "query": message,
+                    "routing_prompt_length": len(routing_prompt),
+                    "skill_count": len(skill_descriptions),
+                },
+            )
+
             try:
                 routing_result = await chat_completion(
                     system_prompt=routing_prompt,
@@ -592,8 +701,15 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     response_validator=parse_routing_response,
                 )
             except Exception as e:
-                print(f"[{trace_id}] Skill Routing Error: {e}")
-                await log_chat_trace_async(trace_id, message, {}, 0, "路由失败", error=str(e))
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                        "result": "routing_error",
+                    },
+                    error=str(e),
+                )
                 yield _sse_event("error", {"phase": "routing", "message": "路由失败，请稍后重试"})
                 return
 
@@ -604,6 +720,18 @@ async def chat_stream(message: str, preset_name: str | None = None):
 
             skill_calls = routing_result.get("skill_calls", [])
             response_skill_name = routing_result.get("response_skill", "respond_servant_list")
+
+            # ── Trace: routing_output ──
+            await log_trace_event(
+                trace_id,
+                "routing_output",
+                {
+                    "skill_calls": skill_calls,
+                    "response_skill": response_skill_name,
+                    "fallback": routing_result.get("fallback"),
+                    "model": model_used,
+                },
+            )
 
             # 推送路由结果
             yield _sse_event(
@@ -619,7 +747,14 @@ async def chat_stream(message: str, preset_name: str | None = None):
             fallback = routing_result.get("fallback")
             if fallback is not None:
                 fb_msg = fallback.get("message", "无法理解你的问题，请尝试更具体的描述。")
-                await log_chat_trace_async(trace_id, message, routing_result, 0, fb_msg)
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                        "result": "fallback",
+                    },
+                )
                 yield _sse_event("delta", {"text": fb_msg})
                 yield _sse_event("done", {"model": model_used, "traceId": trace_id})
                 return
@@ -627,7 +762,14 @@ async def chat_stream(message: str, preset_name: str | None = None):
             # 空 skill_calls 且无 fallback
             if not skill_calls:
                 no_match_msg = "无法从你的问题中识别出查询条件，请尝试更具体的描述。"
-                await log_chat_trace_async(trace_id, message, routing_result, 0, no_match_msg)
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                        "result": "no_match",
+                    },
+                )
                 yield _sse_event("delta", {"text": no_match_msg})
                 yield _sse_event("done", {"model": model_used, "traceId": trace_id})
                 return
@@ -641,15 +783,30 @@ async def chat_stream(message: str, preset_name: str | None = None):
         total_found = result.total_found
         returned_servants = servants[:MAX_RESULTS]
 
+        # ── Trace: execution ──
+        await log_trace_event(
+            trace_id,
+            "execution",
+            {
+                "accepted_skills": result.accepted_skills,
+                "rejected_skills": result.rejected_skills,
+                "total_found": total_found,
+                "execution_time_ms": round(result.execution_time_ms, 2),
+                "is_fallback": result.is_fallback,
+            },
+        )
+
         # 执行阶段 fallback（结果为空）
         if result.is_fallback:
             fb_reply = result.fallback_message or "未找到匹配的从者。"
-            await log_chat_trace_async(
+            await log_trace_event(
                 trace_id,
-                message,
-                {"mode": "skill", "skill_calls": skill_calls},
-                0,
-                fb_reply,
+                "final",
+                {
+                    "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                    "total_found": 0,
+                    "result": "execution_fallback",
+                },
             )
             yield _sse_event("delta", {"text": fb_reply})
             yield _sse_event("done", {"model": model_used, "traceId": trace_id})
@@ -673,11 +830,32 @@ async def chat_stream(message: str, preset_name: str | None = None):
         context_data["applied_filters"] = _describe_filters(skill_calls)
         context_json = json.dumps(context_data, ensure_ascii=False)
 
+        # ── Trace: context_build ──
+        await log_trace_event(
+            trace_id,
+            "context_build",
+            {
+                "applied_filters": context_data["applied_filters"],
+                "top_results_count": len(context_data.get("top_results_details", [])),
+                "context_json_length": len(context_json),
+            },
+        )
+
         # 使用 Response Skill 的 prompt（如果可用）
         if result.response_skill is not None:
             gen_prompt = result.response_skill.build_prompt(message, context_json)
         else:
             gen_prompt = get_generation_prompt(message, context_json)
+
+        # ── Trace: generation_input ──
+        await log_trace_event(
+            trace_id,
+            "generation_input",
+            {
+                "generation_prompt_length": len(gen_prompt),
+                "context_json_length": len(context_json),
+            },
+        )
 
         try:
             generation_response = await chat_completion(
@@ -693,19 +871,39 @@ async def chat_stream(message: str, preset_name: str | None = None):
             if not final_reply:
                 raise ValueError("Empty response from LLM")
         except Exception as e:
-            print(f"[{trace_id}] Skill RAG Error: {e}")
             final_reply = f"为你找到了 {total_found} 位从者。"
+            await log_trace_event(
+                trace_id,
+                "generation_output",
+                {
+                    "reply_length": len(final_reply),
+                    "reply_preview": final_reply[:100],
+                },
+                error=str(e),
+            )
+        else:
+            # ── Trace: generation_output (success) ──
+            await log_trace_event(
+                trace_id,
+                "generation_output",
+                {
+                    "reply_length": len(final_reply),
+                    "reply_preview": final_reply[:100],
+                },
+            )
 
         # 推送生成的文本
         yield _sse_event("delta", {"text": final_reply})
 
-        # 记录完整链路
-        await log_chat_trace_async(
-            trace_id=trace_id,
-            user_message=message,
-            parsed_intent={"mode": "skill", "skill_calls": skill_calls},
-            found_count=total_found,
-            final_reply=final_reply,
+        # ── Trace: final ──
+        await log_trace_event(
+            trace_id,
+            "final",
+            {
+                "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
+                "total_found": total_found,
+                "result": "success",
+            },
         )
 
         # ── 完成 ──
