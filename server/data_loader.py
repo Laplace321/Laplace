@@ -500,18 +500,43 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
         np_card = "unknown"
         np_target = "unknown"
         np_effects_set = set()
+        np_details: list[dict] = []
         for np in svt.get("noblePhantasms", []):
             if np.get("card"):
                 np_card = card_map.get(str(np["card"]), "unknown")
                 # 解析宝具目标与附带特效
+                np_effect_entries: list[dict] = []
                 for func in np.get("functions", []):
                     ftype = func.get("funcType", "")
+                    func_target = func.get("funcTargetType", "")
 
                     # 提取宝具特效（使用 validate 执行器）
-                    np_effects_set.update(_match_func_effects(func, matcher))
+                    matched_np_effects = _match_func_effects(func, matcher)
+                    np_effects_set.update(matched_np_effects)
+
+                    # 烘焙宝具效果详情（OC1 Lv1 = svals[0]）
+                    raw_svals = func.get("svals", [])
+                    lv1_sval = (
+                        raw_svals[0]
+                        if isinstance(raw_svals, list) and raw_svals
+                        else raw_svals
+                        if isinstance(raw_svals, dict)
+                        else {}
+                    )
+                    for eff_name in matched_np_effects:
+                        np_effect_entries.append(
+                            {
+                                "type": eff_name,
+                                "funcType": ftype,
+                                "targetType": classify_target_type(func_target),
+                                "valueLv1": lv1_sval.get("Value", 0),
+                                "turn": lv1_sval.get("Turn", 0),
+                                "count": lv1_sval.get("Count", 0),
+                            }
+                        )
 
                     if "damage" in ftype.lower():
-                        target = func.get("funcTargetType", "")
+                        target = func_target
                         if target == "enemyAll":
                             np_target = "all"
                         elif target == "enemy":
@@ -522,6 +547,14 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
                 # 如果是纯辅助宝具（没有伤害函数）
                 if np_target == "unknown":
                     np_target = "support"
+
+                if np_effect_entries:
+                    np_details.append(
+                        {
+                            "npName": np.get("name", ""),
+                            "effects": np_effect_entries,
+                        }
+                    )
                 break
 
         # 获取原名与中文翻译
@@ -573,6 +606,7 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
             "skillEffects": sorted(list(skill_effects)),
             "npEffects": sorted(list(np_effects_set)),
             "skillDetails": skill_details,
+            "npDetails": np_details,
         }
         db.append(entry)
         if skill_effects:

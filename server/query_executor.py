@@ -58,14 +58,14 @@ def _match_effect(
     min_value: int | None = None,
     max_value: int | None = None,
 ) -> bool:
-    """检查从者是否拥有特定效果（支持目标类型和数值条件筛选）。
+    """检查从者的技能是否拥有特定效果（支持目标类型和数值条件筛选）。
 
     Args:
         servant: 从者数据
         effect_name: 效果名（如 "invincible"）
         target_type: 目标类型筛选（如 "party"），None 表示不限
-        min_value: 效果最小数值（万分比），None 表示不限
-        max_value: 效果最大数值（万分比），None 表示不限
+        min_value: 效果最小数值（千分比‰），None 表示不限
+        max_value: 效果最大数值（千分比‰），None 表示不限
     """
     # 快速路径：先检查 skillEffects 集合
     servant_effects = servant.get("skillEffects", [])
@@ -81,6 +81,45 @@ def _match_effect(
                 if target_type is not None and eff.get("targetType") != target_type:
                     continue
                 value = eff.get("valueMax", 0)
+                if min_value is not None and value < min_value:
+                    continue
+                if max_value is not None and value > max_value:
+                    continue
+                return True
+        return False
+
+    return True
+
+
+def _match_np_effect(
+    servant: dict,
+    effect_name: str,
+    target_type: str | None = None,
+    min_value: int | None = None,
+    max_value: int | None = None,
+) -> bool:
+    """检查从者的宝具是否拥有特定效果（OC1 Lv1 数值，支持目标类型和数值条件筛选）。
+
+    Args:
+        servant: 从者数据
+        effect_name: 效果名（如 "upBuster"）
+        target_type: 目标类型筛选（如 "party"），None 表示不限
+        min_value: 效果最小数值（千分比‰），None 表示不限
+        max_value: 效果最大数值（千分比‰），None 表示不限
+    """
+    # 快速路径：先检查 npEffects 集合
+    if effect_name not in servant.get("npEffects", []):
+        return False
+
+    # 如果有精细条件，遍历 npDetails 做三维过滤
+    if target_type is not None or min_value is not None or max_value is not None:
+        for np_detail in servant.get("npDetails", []):
+            for eff in np_detail.get("effects", []):
+                if eff.get("type") != effect_name:
+                    continue
+                if target_type is not None and eff.get("targetType") != target_type:
+                    continue
+                value = eff.get("valueLv1", 0)
                 if min_value is not None and value < min_value:
                     continue
                 if max_value is not None and value > max_value:

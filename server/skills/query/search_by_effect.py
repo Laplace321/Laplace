@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from server.query_executor import _match_effect
+from server.query_executor import _match_effect, _match_np_effect
 from server.skills.base import QuerySkill, register_skill
 from server.skills.query.search_by_skill_effect import _expand_effect, _resolve_effect_name
 
@@ -37,14 +37,11 @@ def _check_effect(
         effect_name: 效果名（英文 key）
         source: 搜索来源 - skill / np / both
         target_type: 目标类型筛选，None 表示不限
-        min_value: 效果最小数值（万分比），None 表示不限
-        max_value: 效果最大数值（万分比），None 表示不限
+        min_value: 效果最小数值（千分比‰），None 表示不限
+        max_value: 效果最大数值（千分比‰），None 表示不限
     """
     hit_skill = source in ("both", "skill") and _match_effect(servant, effect_name, target_type, min_value, max_value)
-    # npEffects 目前是纯效果名集合，不含 targetType/value 维度数据（Phase 8 再扩展）。
-    # 当用户指定了精细条件时，宝具端无法校验，必须跳过，避免误匹配。
-    has_quantitative_filter = target_type is not None or min_value is not None or max_value is not None
-    hit_np = source in ("both", "np") and not has_quantitative_filter and effect_name in servant.get("npEffects", [])
+    hit_np = source in ("both", "np") and _match_np_effect(servant, effect_name, target_type, min_value, max_value)
     return hit_skill or hit_np
 
 
@@ -63,11 +60,11 @@ class SearchByEffect(QuerySkill):
         effects = params.get("effects")
         source = params.get("source", "both")
         target_type = params.get("target_type")
-        # 百分比 → 万分比转换（LLM 传 50 表示 50%，内部用 5000）
+        # 百分比 → 千分比转换（LLM 传 50 表示 50%，内部用 500‰）
         raw_min = params.get("min_value")
         raw_max = params.get("max_value")
-        min_value = raw_min * 100 if raw_min is not None else None
-        max_value = raw_max * 100 if raw_max is not None else None
+        min_value = raw_min * 10 if raw_min is not None else None
+        max_value = raw_max * 10 if raw_max is not None else None
 
         # 单效果模式（支持复合效果自动展开为 OR）
         if effect is not None:

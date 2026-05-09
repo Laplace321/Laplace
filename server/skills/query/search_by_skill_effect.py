@@ -87,11 +87,11 @@ class SearchBySkillEffect(QuerySkill):
         effect = params.get("effect")
         effects = params.get("effects")
         target_type = params.get("target_type")
-        # 百分比 → 万分比转换（LLM 传 50 表示 50%，内部用 5000）
+        # 百分比 → 千分比转换（LLM 传 50 表示 50%，内部用 500‰）
         raw_min = params.get("min_value")
         raw_max = params.get("max_value")
-        min_value = raw_min * 100 if raw_min is not None else None
-        max_value = raw_max * 100 if raw_max is not None else None
+        min_value = raw_min * 10 if raw_min is not None else None
+        max_value = raw_max * 10 if raw_max is not None else None
 
         # 单效果模式（支持复合效果自动展开为 OR）
         if effect is not None:
