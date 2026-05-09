@@ -444,12 +444,17 @@ async def _handle_skill_mode(
         context_json = json.dumps(context_data, ensure_ascii=False)
 
         # ── Trace: context_build ──
+        top_details = context_data.get("top_results_details", [])
         await log_trace_event(
             trace_id,
             "context_build",
             {
                 "applied_filters": context_data["applied_filters"],
-                "top_results_count": len(context_data.get("top_results_details", [])),
+                "top_results_count": len(top_details),
+                "top_results_summary": [
+                    {"name": t.get("name"), "npCard": t.get("npCard"), "className": t.get("className")}
+                    for t in top_details
+                ],
                 "context_json_length": len(context_json),
             },
         )
@@ -877,12 +882,17 @@ async def chat_stream(message: str, preset_name: str | None = None):
         context_json = json.dumps(context_data, ensure_ascii=False)
 
         # ── Trace: context_build ──
+        top_details = context_data.get("top_results_details", [])
         await log_trace_event(
             trace_id,
             "context_build",
             {
                 "applied_filters": context_data["applied_filters"],
-                "top_results_count": len(context_data.get("top_results_details", [])),
+                "top_results_count": len(top_details),
+                "top_results_summary": [
+                    {"name": t.get("name"), "npCard": t.get("npCard"), "className": t.get("className")}
+                    for t in top_details
+                ],
                 "context_json_length": len(context_json),
             },
         )
