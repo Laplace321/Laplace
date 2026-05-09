@@ -79,7 +79,17 @@ def _describe_filters(skill_calls: list[dict]) -> list[str]:
     for call in skill_calls:
         name = call.get("skill_name", "")
         params = call.get("params", {})
-        if name == "search_by_skill_effect":
+        if name == "search_by_effect":
+            effect = params.get("effect", "")
+            translated = get_effect_translation(effect) if effect else effect
+            source = params.get("source", "both")
+            if source == "skill":
+                descriptions.append(f"技能效果包含「{translated}」")
+            elif source == "np":
+                descriptions.append(f"宝具效果包含「{translated}」")
+            else:
+                descriptions.append(f"效果包含「{translated}」（技能或宝具）")
+        elif name == "search_by_skill_effect":
             effect = params.get("skillEffect") or params.get("effect", "")
             translated = get_effect_translation(effect) if effect else effect
             descriptions.append(f"技能效果包含「{translated}」")
@@ -459,8 +469,10 @@ async def _handle_skill_mode(
     else:
         # RAG 生成
         context_data, _ = _build_context(servants)
-        context_data["query_conditions"] = {"skill_calls": skill_calls}
-        context_data["applied_filters"] = _describe_filters(skill_calls)
+        applied_filters = _describe_filters(skill_calls)
+        context_data["applied_filters"] = applied_filters
+        # query_conditions 使用预消化的中文描述，禁止暴露原始英文参数给 LLM
+        context_data["query_conditions"] = applied_filters
         context_json = json.dumps(context_data, ensure_ascii=False)
 
         # ── Trace: context_build ──
@@ -468,7 +480,7 @@ async def _handle_skill_mode(
             trace_id,
             "context_build",
             {
-                "applied_filters": context_data["applied_filters"],
+                "applied_filters": applied_filters,
                 "context_data": context_data,
             },
         )
@@ -901,8 +913,10 @@ async def chat_stream(message: str, preset_name: str | None = None):
         yield _sse_event("thinking", {"phase": "generating", "message": "正在生成分析..."})
 
         context_data, _ = _build_context(servants)
-        context_data["query_conditions"] = {"skill_calls": skill_calls}
-        context_data["applied_filters"] = _describe_filters(skill_calls)
+        applied_filters = _describe_filters(skill_calls)
+        context_data["applied_filters"] = applied_filters
+        # query_conditions 使用预消化的中文描述，禁止暴露原始英文参数给 LLM
+        context_data["query_conditions"] = applied_filters
         context_json = json.dumps(context_data, ensure_ascii=False)
 
         # ── Trace: context_build ──
@@ -910,7 +924,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
             trace_id,
             "context_build",
             {
-                "applied_filters": context_data["applied_filters"],
+                "applied_filters": applied_filters,
                 "context_data": context_data,
             },
         )
