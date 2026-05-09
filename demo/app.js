@@ -194,7 +194,6 @@ async function sendPresetQuery(presetName, userText) {
   } catch (err) {
     if (err.name === "AbortError") {
       finalizeStreamingContainer(els);
-      showToast("已停止生成");
     } else {
       els.container.remove();
       showToast(`请求失败: ${err.message}`);
@@ -316,7 +315,6 @@ async function sendMessage() {
   } catch (err) {
     if (err.name === "AbortError") {
       finalizeStreamingContainer(els);
-      showToast("已停止生成");
     } else {
       els.container.remove();
       showToast(`请求失败: ${err.message}`);
