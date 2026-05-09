@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from server.query_executor import _match_effect
 from server.skills.base import QuerySkill, register_skill
-from server.skills.query.search_by_skill_effect import _resolve_effect_name
+from server.skills.query.search_by_skill_effect import _expand_effect, _resolve_effect_name
 
 
 class Params(BaseModel):
@@ -55,10 +55,12 @@ class SearchByEffect(QuerySkill):
         source = params.get("source", "both")
         target_type = params.get("target_type")
 
-        # 单效果模式
+        # 单效果模式（支持复合效果自动展开为 OR）
         if effect is not None:
-            resolved = _resolve_effect_name(effect)
-            return _check_effect(servant, resolved, source, target_type)
+            expanded = _expand_effect(effect)
+            if len(expanded) > 1:
+                return any(_check_effect(servant, eff, source, target_type) for eff in expanded)
+            return _check_effect(servant, expanded[0], source, target_type)
 
         # 多效果模式
         if effects is not None and isinstance(effects, list):

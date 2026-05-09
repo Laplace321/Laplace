@@ -10,10 +10,12 @@ from server.skills.base import QuerySkill, register_skill
 
 # ── 中文→英文效果名反查表（从 effect_schema.json 加载）──
 _ZH_TO_EN: dict[str, str] = {}
+# ── 复合效果展开表：composite_name → [子效果列表] ──
+_COMPOSITE_MAP: dict[str, list[str]] = {}
 
 
 def _ensure_zh_map() -> dict[str, str]:
-    """懒加载中文→英文效果名映射。"""
+    """懒加载中文→英文效果名映射，同时构建复合效果展开表。"""
     if _ZH_TO_EN:
         return _ZH_TO_EN
     schema_path = Path(__file__).parent.parent.parent / "knowledge" / "effect_schema.json"
@@ -23,6 +25,9 @@ def _ensure_zh_map() -> dict[str, str]:
         data = json.load(f)
     for effect in data.get("effects", []):
         name = effect["name"]
+        # 记录复合效果展开关系
+        if effect.get("composite"):
+            _COMPOSITE_MAP[name] = effect.get("includes", [])
         for alias in effect.get("aliases_zh", []):
             _ZH_TO_EN[alias] = name
     return _ZH_TO_EN
@@ -44,6 +49,18 @@ def _resolve_effect_name(name: str) -> str:
         if name in alias or alias in name:
             return en_name
     return name
+
+
+def _expand_effect(name: str) -> list[str]:
+    """如果是复合效果则展开为子效果列表，否则返回单元素列表。
+
+    支持中文/英文输入，先 resolve 再查复合表。
+    """
+    _ensure_zh_map()
+    resolved = _resolve_effect_name(name)
+    if resolved in _COMPOSITE_MAP:
+        return _COMPOSITE_MAP[resolved]
+    return [resolved]
 
 
 class Params(BaseModel):
@@ -69,10 +86,12 @@ class SearchBySkillEffect(QuerySkill):
         effects = params.get("effects")
         target_type = params.get("target_type")
 
-        # 单效果模式
+        # 单效果模式（支持复合效果自动展开为 OR）
         if effect is not None:
-            effect = _resolve_effect_name(effect)
-            return _match_effect(servant, effect, target_type)
+            expanded = _expand_effect(effect)
+            if len(expanded) > 1:
+                return any(_match_effect(servant, eff, target_type) for eff in expanded)
+            return _match_effect(servant, expanded[0], target_type)
 
         # 多效果模式
         if effects is not None and isinstance(effects, list):
