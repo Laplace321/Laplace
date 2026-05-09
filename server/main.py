@@ -287,6 +287,28 @@ async def _handle_skill_mode(
     executor = SkillExecutor()
     model_used = "skill_mode"
 
+    # 如果已有 skill_calls（preset 或前端直传），记录 routing 事件
+    if skill_calls is not None:
+        await log_trace_event(
+            trace_id,
+            "routing_input",
+            {
+                "query": user_message,
+                "source": "direct",
+                "skill_count": len(skill_calls),
+            },
+        )
+        await log_trace_event(
+            trace_id,
+            "routing_output",
+            {
+                "skill_calls": skill_calls,
+                "response_skill": response_skill_name,
+                "fallback": None,
+                "model": model_used,
+            },
+        )
+
     # 如果没有传入 skill_calls，通过 LLM 路由获取
     if skill_calls is None:
         skill_descriptions = [
@@ -658,6 +680,30 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 except Exception:
                     # 补充解析失败不影响预设查询（静默，trace 中可见）
                     pass
+
+            # ── Trace: routing_input (preset) ──
+            await log_trace_event(
+                trace_id,
+                "routing_input",
+                {
+                    "query": message,
+                    "source": "preset",
+                    "preset_name": preset_name,
+                    "skill_count": len(skill_calls),
+                },
+            )
+
+            # ── Trace: routing_output (preset) ──
+            await log_trace_event(
+                trace_id,
+                "routing_output",
+                {
+                    "skill_calls": skill_calls,
+                    "response_skill": response_skill_name,
+                    "fallback": None,
+                    "model": model_used,
+                },
+            )
 
             # 推送路由结果
             yield _sse_event(
