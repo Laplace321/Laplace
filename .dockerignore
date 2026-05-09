@@ -1,0 +1,40 @@
+# Git
+.git/
+.gitignore
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+
+# Chaldea source (not needed at runtime)
+chaldea-center/
+
+# IDE & OS
+.vscode/
+.idea/
+.aone_copilot/
+.qoder/
+.DS_Store
+*.swp
+
+# Docs (not needed in image)
+docs/
+CodingReviewReport/
+*.md
+!server/requirements.txt
+
+# Environment (injected at runtime via --env-file)
+.env
+.env.*
+
+# Logs (mounted as volume)
+server/logs/
+
+# Dev tools
+extractor/
+tests/
+pyproject.toml
