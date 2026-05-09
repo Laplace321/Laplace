@@ -108,6 +108,7 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
                 "aliasCN": s.get("aliasCN"),
                 "className": _get_class_map().get(str(raw_class_name).lower(), raw_class_name),
                 "rarity": s.get("rarity"),
+                "cards": s.get("cards"),
                 "totalCharge": s.get("totalCharge"),
                 "npCard": _get_np_card_map().get(str(raw_np_card).lower(), raw_np_card),
                 "npTarget": _get_np_target_map().get(str(raw_np_target).lower(), raw_np_target),

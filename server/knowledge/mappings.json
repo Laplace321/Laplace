@@ -1,4 +1,6530 @@
 {
-  "svt_names": {},
-  "traits": {}
+  "svt_names": {
+    "C.I.E.L": {
+      "JP": null,
+      "CN": "C.I.E.L",
+      "TW": "C.I.E.L",
+      "NA": "C.I.E.L",
+      "KR": null
+    },
+    "Sイシュタル": {
+      "JP": null,
+      "CN": "S伊什塔尔",
+      "TW": "S伊絲塔",
+      "NA": "S. Ishtar",
+      "KR": "S이슈타르"
+    },
+    "“山の翁”": {
+      "JP": null,
+      "CN": "“山中老人”",
+      "TW": "“山之翁”",
+      "NA": "\"First Hassan\"",
+      "KR": "“산의 노인”"
+    },
+    "ひびき＆千鍵": {
+      "JP": null,
+      "CN": "响＆千键",
+      "TW": "響＆千鍵",
+      "NA": "Hibiki & Chikagi",
+      "KR": "히비키&치카기"
+    },
+    "アイドルXオルタ": {
+      "JP": null,
+      "CN": "偶像X·Alter",
+      "TW": "偶像X．Alter",
+      "NA": "Mysterious Idol X (Alter)",
+      "KR": "아이돌 X 얼터"
+    },
+    "アイリ": {
+      "JP": null,
+      "CN": "爱丽",
+      "TW": "愛麗",
+      "NA": "Iri",
+      "KR": "아이리"
+    },
+    "アイリスフィール〔天の衣〕": {
+      "JP": null,
+      "CN": "爱丽丝菲尔〔天之衣〕",
+      "TW": "愛麗絲菲爾〔天之衣〕",
+      "NA": "Irisviel (Holy Grail)",
+      "KR": "아이리스필(하늘의 옷)"
+    },
+    "アキレウス": {
+      "JP": null,
+      "CN": "阿喀琉斯",
+      "TW": "阿基里斯",
+      "NA": "Achilles",
+      "KR": "아킬레우스"
+    },
+    "アサシン・パライソ": {
+      "JP": null,
+      "CN": "Assassin Paraiso",
+      "TW": "Assassin Paraiso",
+      "NA": "Assassin of Paraíso",
+      "KR": "어쌔신 파라이소"
+    },
+    "アシュタレト": {
+      "JP": null,
+      "CN": "阿斯塔蒂",
+      "TW": "阿斯塔蒂",
+      "NA": "Ashtart",
+      "KR": "아슈타레트"
+    },
+    "アシュタレト・オリジン": {
+      "JP": null,
+      "CN": "阿斯塔蒂・起源",
+      "TW": "阿斯塔蒂・起源",
+      "NA": "Ashtart Origin",
+      "KR": "아슈타레트・오리진"
+    },
+    "アシュヴァッターマン": {
+      "JP": null,
+      "CN": "马嘶",
+      "TW": "馬嘶",
+      "NA": "Aśvatthāman",
+      "KR": "아슈바타만"
+    },
+    "アショカ王": {
+      "JP": null,
+      "CN": "阿育王",
+      "TW": "阿育王",
+      "NA": "King Ashoka",
+      "KR": null
+    },
+    "アスクレピオス": {
+      "JP": null,
+      "CN": "阿斯克勒庇俄斯",
+      "TW": "阿斯克勒庇俄斯",
+      "NA": "Asclepius",
+      "KR": "아스클레피오스"
+    },
+    "アステリオス": {
+      "JP": null,
+      "CN": "阿斯忒里俄斯",
+      "TW": "阿斯忒里翁",
+      "NA": "Asterios",
+      "KR": "아스테리오스"
+    },
+    "アストライア": {
+      "JP": null,
+      "CN": "阿斯特赖亚",
+      "TW": "阿斯特蕾亞",
+      "NA": "Astraea",
+      "KR": "아스트라이아"
+    },
+    "アストルフォ": {
+      "JP": null,
+      "CN": "阿斯托尔福",
+      "TW": "阿斯托爾福",
+      "NA": "Astolfo",
+      "KR": "아스톨포"
+    },
+    "アタランテ": {
+      "JP": null,
+      "CN": "阿塔兰忒",
+      "TW": "阿塔蘭塔",
+      "NA": "Atalante",
+      "KR": "아탈란테"
+    },
+    "アタランテ〔オルタ〕": {
+      "JP": null,
+      "CN": "阿塔兰忒〔Alter〕",
+      "TW": "阿塔蘭塔〔Alter〕",
+      "NA": "Atalante (Alter)",
+      "KR": "아탈란테(얼터)"
+    },
+    "アタランテ・オルタ": {
+      "JP": null,
+      "CN": "阿塔兰忒·Alter",
+      "TW": "阿塔蘭塔〔Alter〕",
+      "NA": "Atalante Alter",
+      "KR": "아탈란테(얼터)"
+    },
+    "アナスタシア": {
+      "JP": null,
+      "CN": "阿纳斯塔西娅",
+      "TW": "安娜塔西亞",
+      "NA": "Anastasia",
+      "KR": "아나스타샤"
+    },
+    "アナスタシア＆ヴィイ": {
+      "JP": null,
+      "CN": "阿纳斯塔西娅＆维",
+      "TW": "安娜塔西亞＆Viy",
+      "NA": "Anastasia & Viy",
+      "KR": "아나스타샤&비이"
+    },
+    "アビゲイル": {
+      "JP": null,
+      "CN": "阿比盖尔",
+      "TW": "艾比蓋兒",
+      "NA": "Abigail Williams",
+      "KR": "애비게일"
+    },
+    "アビゲイル・ウィリアムズ": {
+      "JP": null,
+      "CN": "阿比盖尔·威廉姆斯",
+      "TW": "艾比蓋兒．威廉斯",
+      "NA": "Abigail Williams",
+      "KR": "애비게일 윌리엄스"
+    },
+    "アビゲイル・ウィリアムズ〔サンタ〕": {
+      "JP": null,
+      "CN": "阿比盖尔·威廉姆斯〔圣诞〕",
+      "TW": "艾比蓋兒．威廉斯〔聖誕〕",
+      "NA": "Abigail Williams (Santa)",
+      "KR": null
+    },
+    "アビゲイル・ウィリアムズ〔夏〕": {
+      "JP": null,
+      "CN": "阿比盖尔·威廉姆斯〔夏〕",
+      "TW": "艾比蓋兒．威廉斯〔夏〕",
+      "NA": "Abigail Williams (Summer)",
+      "KR": "애비게일 윌리엄스(여름)"
+    },
+    "アマデウス": {
+      "JP": null,
+      "CN": "阿马德乌斯",
+      "TW": "阿瑪迪斯",
+      "NA": "Amadeus",
+      "KR": "아마데우스"
+    },
+    "アムール": {
+      "JP": null,
+      "CN": "阿摩耳",
+      "TW": "埃莫",
+      "NA": "Amor",
+      "KR": "아무르"
+    },
+    "アムール〔カレン〕": {
+      "JP": null,
+      "CN": "阿摩耳〔卡莲〕",
+      "TW": "埃莫〔卡蓮〕",
+      "NA": "Amor (Caren)",
+      "KR": "아무르[카렌]"
+    },
+    "アルクェイド・ブリュンスタッド": {
+      "JP": null,
+      "CN": "爱尔奎特·布伦史塔德",
+      "TW": "愛爾奎特．布倫史塔德",
+      "NA": "Arcueid Brunestud",
+      "KR": "알퀘이드 브륜스터드"
+    },
+    "アルジュナ": {
+      "JP": null,
+      "CN": "阿周那",
+      "TW": "阿周那",
+      "NA": "Arjuna",
+      "KR": "아르주나"
+    },
+    "アルジュナ〔オルタ〕": {
+      "JP": null,
+      "CN": "阿周那〔Alter〕",
+      "TW": "阿周那〔Alter〕",
+      "NA": "Arjuna (Alter)",
+      "KR": "아르주나(얼터)"
+    },
+    "アルジュナ・オルタ": {
+      "JP": null,
+      "CN": "阿周那·Alter",
+      "TW": "阿周那〔Alter〕",
+      "NA": "Arjuna (Alter)",
+      "KR": "아르주나(얼터)"
+    },
+    "アルテラ": {
+      "JP": null,
+      "CN": "阿蒂拉",
+      "TW": "阿蒂拉",
+      "NA": "Altera",
+      "KR": "알테라"
+    },
+    "アルテラ・サンタ": {
+      "JP": null,
+      "CN": "阿蒂拉·Santa",
+      "TW": "阿蒂拉．Santa",
+      "NA": "Attila The San(ta)",
+      "KR": "알테라 더 산[타]"
+    },
+    "アルテラ・ザ・サン〔タ〕": {
+      "JP": null,
+      "CN": "阿蒂拉·the·San〔ta〕",
+      "TW": "阿蒂拉．the．San〔ta〕",
+      "NA": "Attila the San(ta)",
+      "KR": "알테라 더 산[타]"
+    },
+    "アルトリア": {
+      "JP": null,
+      "CN": "阿尔托莉雅",
+      "TW": "阿爾托莉亞",
+      "NA": "Altria",
+      "KR": "알트리아"
+    },
+    "アルトリア・キャスター": {
+      "JP": null,
+      "CN": "阿尔托莉雅·卡斯特",
+      "TW": "阿爾托莉亞．Caster",
+      "NA": "Altria Caster",
+      "KR": "알트리아 캐스터"
+    },
+    "アルトリア・ペンドラゴン": {
+      "JP": null,
+      "CN": "阿尔托莉雅·潘德拉贡",
+      "TW": "阿爾托莉亞．潘德拉剛",
+      "NA": "Altria Pendragon",
+      "KR": "알트리아 펜드래곤"
+    },
+    "アルトリア・ペンドラゴン〔オルタ〕": {
+      "JP": null,
+      "CN": "阿尔托莉雅·潘德拉贡〔Alter〕",
+      "TW": "阿爾托莉亞．潘德拉剛〔Alter〕",
+      "NA": "Altria Pendragon (Alter)",
+      "KR": "알트리아 펜드래곤(얼터)"
+    },
+    "アルトリア・ペンドラゴン〔サンタオルタ〕": {
+      "JP": null,
+      "CN": "阿尔托莉雅·潘德拉贡〔圣诞Alter〕",
+      "TW": "阿爾托莉亞．潘德拉剛〔聖誕Alter〕",
+      "NA": "Altria Pendragon (Santa Alter)",
+      "KR": "알트리아 펜드래곤(산타 얼터)"
+    },
+    "アルトリア・ペンドラゴン〔リリィ〕": {
+      "JP": null,
+      "CN": "阿尔托莉雅·潘德拉贡〔Lily〕",
+      "TW": "阿爾托莉亞．潘德拉剛〔Lily〕",
+      "NA": "Altria Pendragon (Lily)",
+      "KR": "알트리아 펜드래곤(릴리)"
+    },
+    "アレキサンダー": {
+      "JP": null,
+      "CN": "亚历山大",
+      "TW": "亞歷山大",
+      "NA": "Alexander",
+      "KR": "알렉산더"
+    },
+    "アレッサンドロ・ディ・カリオストロ": {
+      "JP": null,
+      "CN": "亚历山德罗·迪·卡利奥斯特罗",
+      "TW": "亞歷山德羅．迪．卡廖斯特羅",
+      "NA": "Alessandro di Cagliostro",
+      "KR": "알레산드로 디 칼리오스트로"
+    },
+    "アンキ・エレシュキガル": {
+      "JP": null,
+      "CN": "安基埃列什基伽勒",
+      "TW": "太空埃列什基伽勒",
+      "NA": "Anki Ereshkigal",
+      "KR": "안키・에레쉬키갈"
+    },
+    "アンデルセン": {
+      "JP": null,
+      "CN": "安徒生",
+      "TW": "安徒生",
+      "NA": "Andersen",
+      "KR": "안데르센"
+    },
+    "アントニオ・サリエリ": {
+      "JP": null,
+      "CN": "安东尼奥·萨列里",
+      "TW": "安東尼奧．薩里耶利",
+      "NA": "Antonio Salieri",
+      "KR": "안토니오 살리에리"
+    },
+    "アンドロメダ": {
+      "JP": null,
+      "CN": "安德洛墨达",
+      "TW": "安朵美達",
+      "NA": "Andromeda",
+      "KR": "안드로메다"
+    },
+    "アンリマユ": {
+      "JP": null,
+      "CN": "安哥拉曼纽",
+      "TW": "安格拉曼紐",
+      "NA": "Aŋra Mainiiu",
+      "KR": "앙리 마유"
+    },
+    "アン・ボニー": {
+      "JP": null,
+      "CN": "安妮·伯妮",
+      "TW": "安妮．伯妮",
+      "NA": "Anne Bonny",
+      "KR": "앤 보니"
+    },
+    "アン・ボニー＆メアリー・リード": {
+      "JP": null,
+      "CN": "安妮·伯妮＆玛莉·瑞德",
+      "TW": "安妮．伯妮 & 瑪莉．瑞德",
+      "NA": "Anne Bonny & Mary Read",
+      "KR": "앤 보니&메리 리드"
+    },
+    "アン＆メアリー": {
+      "JP": null,
+      "CN": "玛莉",
+      "TW": "瑪莉",
+      "NA": "Mary",
+      "KR": "메리"
+    },
+    "アヴィケブロン": {
+      "JP": null,
+      "CN": "阿维斯布隆",
+      "TW": "阿維斯布隆",
+      "NA": "Avicebron",
+      "KR": "아비케브론"
+    },
+    "アーキタイプ：アース": {
+      "JP": null,
+      "CN": "Archetype：Earth",
+      "TW": "Archetype：Earth",
+      "NA": "Archetype: EARTH",
+      "KR": "아키타입 : 어스"
+    },
+    "アーサー": {
+      "JP": null,
+      "CN": "亚瑟",
+      "TW": "亞瑟",
+      "NA": "Arthur",
+      "KR": "아서"
+    },
+    "アーサー・ペンドラゴン〔プロトタイプ〕": {
+      "JP": null,
+      "CN": "亚瑟·潘德拉贡〔Prototype〕",
+      "TW": "亞瑟．潘德拉剛〔Prototype〕",
+      "NA": "Arthur Pendragon (Prototype)",
+      "KR": "아서 펜드래곤(프로토타입)"
+    },
+    "アーチャー・インフェルノ": {
+      "JP": null,
+      "CN": "Archer Inferno",
+      "TW": "Archer Inferno",
+      "NA": "Archer of Inferno",
+      "KR": "아처 인페르노"
+    },
+    "アーラシュ": {
+      "JP": null,
+      "CN": "阿拉什",
+      "TW": "阿拉什",
+      "NA": "Arash",
+      "KR": "아라쉬"
+    },
+    "イアソン": {
+      "JP": null,
+      "CN": "伊阿宋",
+      "TW": "伊阿宋",
+      "NA": "Jason",
+      "KR": "이아손"
+    },
+    "イシュタル": {
+      "JP": null,
+      "CN": "伊什塔尔",
+      "TW": "伊絲塔",
+      "NA": "Ishtar",
+      "KR": "이슈타르"
+    },
+    "イシュタル・アシュタレト": {
+      "JP": null,
+      "CN": "伊什塔尔・阿斯塔蒂",
+      "TW": "伊絲塔・阿斯塔蒂",
+      "NA": "Ishtar Ashtart",
+      "KR": "이슈타르・아슈타레트"
+    },
+    "イスカンダル": {
+      "JP": null,
+      "CN": "伊斯坎达尔",
+      "TW": "伊斯坎達爾",
+      "NA": "Iskandar",
+      "KR": "이스칸다르"
+    },
+    "イリヤ": {
+      "JP": null,
+      "CN": "伊莉雅",
+      "TW": "伊莉雅",
+      "NA": "Illya",
+      "KR": "이리야"
+    },
+    "イリヤスフィール・フォン・アインツベルン": {
+      "JP": null,
+      "CN": "伊莉雅丝菲尔·冯·爱因兹贝伦",
+      "TW": "伊莉雅絲菲爾．馮．愛因茲貝倫",
+      "NA": "Illyasviel von Einzbern",
+      "KR": "이리야스필 폰 아인츠베른"
+    },
+    "イルス": {
+      "JP": null,
+      "CN": "洁尔诗",
+      "TW": "潔爾詩",
+      "NA": "Irs",
+      "KR": "이르스"
+    },
+    "インドラ": {
+      "JP": null,
+      "CN": "因陀罗",
+      "TW": "因陀羅",
+      "NA": "Indra",
+      "KR": null
+    },
+    "イヴァン雷帝": {
+      "JP": null,
+      "CN": "伊凡雷帝",
+      "TW": "伊凡雷帝",
+      "NA": "Ivan the Terrible",
+      "KR": "이반 뇌제"
+    },
+    "ウィツィロポチトリ": {
+      "JP": null,
+      "CN": "维齐洛波奇特利",
+      "TW": "維齊洛波奇特利",
+      "NA": "Huītzilōpōchtli",
+      "KR": "위칠로포치틀리"
+    },
+    "ウィリアム・シェイクスピア": {
+      "JP": null,
+      "CN": "威廉·莎士比亚",
+      "TW": "威廉．莎士比亞",
+      "NA": "William Shakespeare",
+      "KR": "윌리엄 셰익스피어"
+    },
+    "ウィリアム・テル": {
+      "JP": null,
+      "CN": "威廉·退尔",
+      "TW": "威廉．泰爾",
+      "NA": "William Tell",
+      "KR": "윌리엄 텔"
+    },
+    "エイリーク": {
+      "JP": null,
+      "CN": "埃里克",
+      "TW": "埃里克",
+      "NA": "Eric",
+      "KR": "에릭"
+    },
+    "エイリーク・ブラッドアクス": {
+      "JP": null,
+      "CN": "血斧埃里克",
+      "TW": "血斧埃里克",
+      "NA": "Eric Bloodaxe",
+      "KR": "에릭 블러드액스"
+    },
+    "エウリュアレ": {
+      "JP": null,
+      "CN": "尤瑞艾莉",
+      "TW": "尤瑞艾莉",
+      "NA": "Euryale",
+      "KR": "에우리알레"
+    },
+    "エウロペ": {
+      "JP": null,
+      "CN": "欧罗巴",
+      "TW": "歐羅巴",
+      "NA": "Europa",
+      "KR": "에우로페"
+    },
+    "エドワード・ティーチ": {
+      "JP": null,
+      "CN": "爱德华·蒂奇",
+      "TW": "愛德華．蒂奇",
+      "NA": "Edward Teach",
+      "KR": "에드워드 티치"
+    },
+    "エミヤ": {
+      "JP": null,
+      "CN": "卫宫",
+      "TW": "Emiya",
+      "NA": "Emiya",
+      "KR": "에미야"
+    },
+    "エミヤ〔アサシン〕": {
+      "JP": null,
+      "CN": "卫宫〔Assassin〕",
+      "TW": "Emiya〔Assassin〕",
+      "NA": "Emiya (Assassin)",
+      "KR": "에미야(어쌔신)"
+    },
+    "エミヤ〔オルタ〕": {
+      "JP": null,
+      "CN": "卫宫〔Alter〕",
+      "TW": "Emiya〔Alter〕",
+      "NA": "Emiya (Alter)",
+      "KR": "에미야(얼터)"
+    },
+    "エミヤオルタ": {
+      "JP": null,
+      "CN": "卫宫Alter",
+      "TW": "Emiya．Alter",
+      "NA": "Emiya Alter",
+      "KR": "에미야 얼터"
+    },
+    "エリザベート": {
+      "JP": null,
+      "CN": "伊丽莎白",
+      "TW": "伊莉莎白",
+      "NA": "Elisabeth",
+      "KR": "엘리자베트"
+    },
+    "エリザベート・バートリー": {
+      "JP": null,
+      "CN": "伊丽莎白·巴托里",
+      "TW": "伊莉莎白．巴托里",
+      "NA": "Elisabeth Báthory",
+      "KR": "엘리자베트 바토리"
+    },
+    "エリザベート・バートリー〔シンデレラ〕": {
+      "JP": null,
+      "CN": "伊丽莎白·巴托里〔灰姑娘〕",
+      "TW": "伊莉莎白．巴托里〔Cinderella〕",
+      "NA": "Elisabeth Báthory (Cinderella)",
+      "KR": "엘리자베트 바토리(신데렐라)"
+    },
+    "エリザベート・バートリー〔ハロウィン〕": {
+      "JP": null,
+      "CN": "伊丽莎白·巴托里〔万圣节〕",
+      "TW": "伊莉莎白．巴托里〔萬聖節〕",
+      "NA": "Elisabeth Báthory (Halloween)",
+      "KR": "엘리자베트 바토리(할로윈)"
+    },
+    "エリザベート・バートリー〔ブレイブ〕": {
+      "JP": null,
+      "CN": "伊丽莎白·巴托里〔勇者〕",
+      "TW": "伊莉莎白．巴托里〔Brave〕",
+      "NA": "Elisabeth Báthory (Brave)",
+      "KR": "엘리자베트 바토리(브레이브)"
+    },
+    "エルキドゥ": {
+      "JP": null,
+      "CN": "恩奇都",
+      "TW": "恩奇都",
+      "NA": "Enkidu",
+      "KR": "엘키두"
+    },
+    "エルドラドのバーサーカー": {
+      "JP": null,
+      "CN": "黄金国的Berserker",
+      "TW": "黃金國的Berserker",
+      "NA": "Berserker of El Dorado",
+      "KR": "엘도라도의 버서커"
+    },
+    "エルン": {
+      "JP": null,
+      "CN": "奥露恩",
+      "TW": "奧露恩",
+      "NA": "Rún",
+      "KR": "엘룬"
+    },
+    "エレシュキガル": {
+      "JP": null,
+      "CN": "埃列什基伽勒",
+      "TW": "埃列什基伽勒",
+      "NA": "Ereshkigal",
+      "KR": "에레쉬키갈"
+    },
+    "エレナ・ブラヴァツキー": {
+      "JP": null,
+      "CN": "海伦娜·布拉瓦茨基",
+      "TW": "海倫娜．布拉瓦茨基",
+      "NA": "Helena Blavatsky",
+      "KR": "엘레나 블라바츠키"
+    },
+    "オキタ・Ｊ・ソウジ": {
+      "JP": null,
+      "CN": "冲田·J·总司",
+      "TW": "沖田．J．總司",
+      "NA": "Okita J. Souji",
+      "KR": "오키타・J・소지"
+    },
+    "オケアノスのキャスター": {
+      "JP": null,
+      "CN": "俄刻阿诺斯的Caster",
+      "TW": "俄刻阿諾斯的Caster",
+      "NA": "Caster of Okeanos",
+      "KR": "오케아노스의 캐스터"
+    },
+    "オジマンディアス": {
+      "JP": null,
+      "CN": "奥斯曼狄斯",
+      "TW": "奧茲曼迪亞斯",
+      "NA": "Ozymandias",
+      "KR": "오지만디아스"
+    },
+    "オデュッセウス": {
+      "JP": null,
+      "CN": "奥德修斯",
+      "TW": "奧德修斯",
+      "NA": "Odysseus",
+      "KR": "오디세우스"
+    },
+    "オベロン": {
+      "JP": null,
+      "CN": "奥伯龙",
+      "TW": "奧伯隆",
+      "NA": "Oberon",
+      "KR": "오베론"
+    },
+    "オリオン": {
+      "JP": null,
+      "CN": "俄里翁",
+      "TW": "俄里翁",
+      "NA": "Orion",
+      "KR": "오리온"
+    },
+    "オルガマリー・アニムスフィア": {
+      "JP": null,
+      "CN": "奥尔加玛丽·阿尼姆斯菲亚",
+      "TW": "奧爾加瑪麗．阿尼姆斯菲亞",
+      "NA": "Olga Marie Animusphere",
+      "KR": null
+    },
+    "オルトリンデ": {
+      "JP": null,
+      "CN": "奥特琳德",
+      "TW": "奧特琳德",
+      "NA": "Ortlinde",
+      "KR": "오르트린데"
+    },
+    "カイニス": {
+      "JP": null,
+      "CN": "凯妮斯",
+      "TW": "凱妮絲",
+      "NA": "Caenis",
+      "KR": "카이니스"
+    },
+    "カエサル": {
+      "JP": null,
+      "CN": "恺撒",
+      "TW": "凱撒",
+      "NA": "Caesar",
+      "KR": "카이사르"
+    },
+    "カズラドロップ": {
+      "JP": null,
+      "CN": "Kazuradrop",
+      "TW": "Kazuradrop",
+      "NA": "Kazuradrop",
+      "KR": null
+    },
+    "カラミティ・ジェーン": {
+      "JP": null,
+      "CN": "灾星简",
+      "TW": "災星簡",
+      "NA": "Calamity Jane",
+      "KR": "캘러미티 제인"
+    },
+    "カリオストロ伯爵": {
+      "JP": null,
+      "CN": "卡利奥斯特罗伯爵",
+      "TW": "卡廖斯特羅伯爵",
+      "NA": "Count Cagliostro",
+      "KR": "칼리오스트로 백작"
+    },
+    "カリギュラ": {
+      "JP": null,
+      "CN": "卡利古拉",
+      "TW": "卡利古拉",
+      "NA": "Caligula",
+      "KR": "칼리굴라"
+    },
+    "カルナ": {
+      "JP": null,
+      "CN": "迦尔纳",
+      "TW": "迦爾納",
+      "NA": "Karna",
+      "KR": "카르나"
+    },
+    "カルナ〔サンタ〕": {
+      "JP": null,
+      "CN": "迦尔纳〔圣诞〕",
+      "TW": "迦爾納〔Santa〕",
+      "NA": "Karna (Santa)",
+      "KR": "카르나[산타]"
+    },
+    "カレン": {
+      "JP": null,
+      "CN": "卡莲",
+      "TW": "卡蓮",
+      "NA": "Caren",
+      "KR": "카렌"
+    },
+    "カーマ": {
+      "JP": null,
+      "CN": "迦摩",
+      "TW": "迦摩",
+      "NA": "Kama",
+      "KR": "카마"
+    },
+    "カーマ／マーラ": {
+      "JP": null,
+      "CN": "迦摩／魔罗",
+      "TW": "迦摩／魔羅",
+      "NA": "Kama/Mara",
+      "KR": "카마/마라"
+    },
+    "カーミラ": {
+      "JP": null,
+      "CN": "卡米拉",
+      "TW": "卡米拉",
+      "NA": "Carmilla",
+      "KR": "카밀라"
+    },
+    "カーリー": {
+      "JP": null,
+      "CN": "迦梨",
+      "TW": "迦梨",
+      "NA": "Kālī",
+      "KR": "칼리"
+    },
+    "ガイウス・ユリウス・カエサル": {
+      "JP": null,
+      "CN": "盖乌斯·尤利乌斯·恺撒",
+      "TW": "蓋烏斯．尤利烏斯．凱撒",
+      "NA": "Gaius Julius Caesar",
+      "KR": "가이우스 율리우스 카이사르"
+    },
+    "ガウェイン": {
+      "JP": null,
+      "CN": "高文",
+      "TW": "高文",
+      "NA": "Gawain",
+      "KR": "가웨인"
+    },
+    "ガネーシャ": {
+      "JP": null,
+      "CN": "伽内什",
+      "TW": "迦尼薩",
+      "NA": "Ganesha",
+      "KR": "가네샤"
+    },
+    "ガラテア": {
+      "JP": null,
+      "CN": "伽拉忒亚",
+      "TW": "伽拉忒亞",
+      "NA": "Galatea",
+      "KR": "갈라테아"
+    },
+    "ガレス": {
+      "JP": null,
+      "CN": "加雷斯",
+      "TW": "加雷斯",
+      "NA": "Gareth",
+      "KR": "가레스"
+    },
+    "キルケー": {
+      "JP": null,
+      "CN": "喀耳刻",
+      "TW": "喀耳刻",
+      "NA": "Circe",
+      "KR": "키르케"
+    },
+    "キングプロテア": {
+      "JP": null,
+      "CN": "Kingprotea",
+      "TW": "Kingprotea",
+      "NA": "Kingprotea",
+      "KR": "킹프로테아"
+    },
+    "ギルガメッシュ": {
+      "JP": null,
+      "CN": "吉尔伽美什",
+      "TW": "吉爾伽美什",
+      "NA": "Gilgamesh",
+      "KR": "길가메시"
+    },
+    "ククルカン": {
+      "JP": null,
+      "CN": "库库尔坎",
+      "TW": "庫庫爾坎",
+      "NA": "Kukulcan",
+      "KR": "쿠쿨칸"
+    },
+    "クリストファー・コロンブス": {
+      "JP": null,
+      "CN": "克里斯托弗·哥伦布",
+      "TW": "克里斯多福．哥倫布",
+      "NA": "Christopher Columbus",
+      "KR": "크리스토퍼 콜럼버스"
+    },
+    "クリームヒルト": {
+      "JP": null,
+      "CN": "克里姆希尔德",
+      "TW": "克琳希德",
+      "NA": "Kriemhild",
+      "KR": "크림힐트"
+    },
+    "クレオパトラ": {
+      "JP": null,
+      "CN": "克娄巴特拉",
+      "TW": "克麗奧佩脫拉",
+      "NA": "Cleopatra",
+      "KR": "클레오파트라"
+    },
+    "クロエ": {
+      "JP": null,
+      "CN": "克洛伊",
+      "TW": "克洛伊",
+      "NA": "Chloe",
+      "KR": "클로에"
+    },
+    "クロエ・フォン・アインツベルン": {
+      "JP": null,
+      "CN": "克洛伊·冯·爱因兹贝伦",
+      "TW": "克洛伊．馮．愛因茲貝倫",
+      "NA": "Chloe von Einzbern",
+      "KR": "클로에 폰 아인츠베른"
+    },
+    "クー・フーリン": {
+      "JP": null,
+      "CN": "库·丘林",
+      "TW": "庫．夫林",
+      "NA": "Cú Chulainn",
+      "KR": "쿠 훌린"
+    },
+    "クー・フーリン〔オルタ〕": {
+      "JP": null,
+      "CN": "库·丘林〔Alter〕",
+      "TW": "庫．夫林〔Alter〕",
+      "NA": "Cú Chulainn (Alter)",
+      "KR": "쿠 훌린(얼터)"
+    },
+    "クー・フーリン〔プロトタイプ〕": {
+      "JP": null,
+      "CN": "库·丘林〔Prototype〕",
+      "TW": "庫．夫林〔Prototype〕",
+      "NA": "Cú Chulainn (Prototype)",
+      "KR": "쿠 훌린(프로토타입)"
+    },
+    "クー・フーリン・オルタ": {
+      "JP": null,
+      "CN": "库·丘林·Alter",
+      "TW": "庫．夫林〔Alter〕",
+      "NA": "Cú Chulainn Alter",
+      "KR": "쿠 훌린(얼터)"
+    },
+    "グレイ": {
+      "JP": null,
+      "CN": "格蕾",
+      "TW": "格蕾",
+      "NA": "Gray",
+      "KR": "그레이"
+    },
+    "グレゴリー・ラスプーチン": {
+      "JP": null,
+      "CN": "格里戈里·拉斯普京",
+      "TW": "格里戈里．拉斯普丁",
+      "NA": "Grigori Rasputin",
+      "KR": "그레고리 라스푸틴"
+    },
+    "ケイローン": {
+      "JP": null,
+      "CN": "喀戎",
+      "TW": "凱隆",
+      "NA": "Chiron",
+      "KR": "케이론"
+    },
+    "ケット・クー・ミコケル": {
+      "JP": null,
+      "CN": "凯特·库·米可科尔",
+      "TW": "凱特．庫．米可科爾",
+      "NA": "Cait Cú MikoCer",
+      "KR": "캐트 쿠 미코케르"
+    },
+    "ケツァル・コアトル": {
+      "JP": null,
+      "CN": "魁札尔·科亚特尔",
+      "TW": "魁札爾．科亞特爾",
+      "NA": "Quetzalcoatl",
+      "KR": "케찰코아틀"
+    },
+    "ケツァル・コアトル〔サンバ／サンタ〕": {
+      "JP": null,
+      "CN": "魁札尔·科亚特尔〔桑巴／圣诞〕",
+      "TW": "魁札爾．科亞特爾〔森巴／聖誕〕",
+      "NA": "Quetzalcoatl (Samba/Santa)",
+      "KR": "케찰코아틀(삼바/산타)"
+    },
+    "ケツァル・コアトル・サンバ": {
+      "JP": null,
+      "CN": "魁札尔·科亚特尔·桑巴",
+      "TW": "魁札爾．科亞特爾．森巴",
+      "NA": "Quetzalcoatl (Samba/Santa)",
+      "KR": "케찰코아틀 삼바"
+    },
+    "ゲオルギウス": {
+      "JP": null,
+      "CN": "乔尔乔斯",
+      "TW": "聖喬治",
+      "NA": "Georgios",
+      "KR": "게오르기우스"
+    },
+    "ゲーティア": {
+      "JP": null,
+      "CN": "盖提亚",
+      "TW": "蓋堤亞",
+      "NA": "Goetia",
+      "KR": "게티아"
+    },
+    "コロンブス": {
+      "JP": null,
+      "CN": "哥伦布",
+      "TW": "哥倫布",
+      "NA": "Columbus",
+      "KR": "콜럼버스"
+    },
+    "コンスタンティノス11世": {
+      "JP": null,
+      "CN": "君士坦丁十一世",
+      "TW": "君士坦丁十一世",
+      "NA": "Kōnstantînos XI",
+      "KR": "콘스탄티누스 11세"
+    },
+    "ゴッドカレン": {
+      "JP": null,
+      "CN": "神卡莲",
+      "TW": "神之卡蓮",
+      "NA": "God Caren",
+      "KR": "갓 카렌"
+    },
+    "ゴッホ": {
+      "JP": null,
+      "CN": "梵高",
+      "TW": "梵谷",
+      "NA": "Van Gogh",
+      "KR": "고흐"
+    },
+    "ゴルゴーン": {
+      "JP": null,
+      "CN": "戈耳工",
+      "TW": "戈爾貢",
+      "NA": "Gorgon",
+      "KR": "고르곤"
+    },
+    "ゴールデンＢＢ": {
+      "JP": null,
+      "CN": "黄金ＢＢ",
+      "TW": "黃金BB",
+      "NA": "Golden BB",
+      "KR": null
+    },
+    "サリエリ": {
+      "JP": null,
+      "CN": "萨列里",
+      "TW": "薩里耶利",
+      "NA": "Salieri",
+      "KR": "살리에리"
+    },
+    "サロメ": {
+      "JP": null,
+      "CN": "莎乐美",
+      "TW": "莎樂美",
+      "NA": "Salome",
+      "KR": "살로메"
+    },
+    "サンソン": {
+      "JP": null,
+      "CN": "桑松",
+      "TW": "桑松",
+      "NA": "Sanson",
+      "KR": "상송"
+    },
+    "サンタオルタ": {
+      "JP": null,
+      "CN": "圣诞Alter",
+      "TW": "聖誕Alter",
+      "NA": "Santa Alter",
+      "KR": "산타 얼터"
+    },
+    "サンタカルナ": {
+      "JP": null,
+      "CN": "迦尔纳·圣诞",
+      "TW": "迦爾納．Santa",
+      "NA": "Santa Karna",
+      "KR": "산타 카르나"
+    },
+    "サンタズムーン": {
+      "JP": null,
+      "CN": "Santasmoon",
+      "TW": "聖誕月姬",
+      "NA": "Santa's Moon",
+      "KR": null
+    },
+    "シェイクスピア": {
+      "JP": null,
+      "CN": "莎士比亚",
+      "TW": "莎士比亞",
+      "NA": "Shakespeare",
+      "KR": "셰익스피어"
+    },
+    "シェヘラザード": {
+      "JP": null,
+      "CN": "山鲁佐德",
+      "TW": "雪赫拉莎德",
+      "NA": "Scheherazade",
+      "KR": "셰에라자드"
+    },
+    "シエル": {
+      "JP": null,
+      "CN": "希耶尔",
+      "TW": "希耶爾",
+      "NA": "Ciel",
+      "KR": "시엘"
+    },
+    "シグルド": {
+      "JP": null,
+      "CN": "齐格鲁德",
+      "TW": "齊格魯德",
+      "NA": "Sigurd",
+      "KR": "시구르드"
+    },
+    "シトナイ": {
+      "JP": null,
+      "CN": "志度内",
+      "TW": "志度內",
+      "NA": "Sitonai",
+      "KR": "시토나이"
+    },
+    "シバの女王": {
+      "JP": null,
+      "CN": "示巴女王",
+      "TW": "示巴女王",
+      "NA": "Queen of Sheba",
+      "KR": "시바의 여왕"
+    },
+    "シャルルマーニュ": {
+      "JP": null,
+      "CN": "查理曼",
+      "TW": "查理曼",
+      "NA": "Charlemagne",
+      "KR": "샤를마뉴"
+    },
+    "シャルル＝アンリ・サンソン": {
+      "JP": null,
+      "CN": "夏尔·亨利·桑松",
+      "TW": "夏爾．亨利．桑松",
+      "NA": "Charles-Henri Sanson",
+      "KR": "샤를=앙리 상송"
+    },
+    "シャルロット・コルデー": {
+      "JP": null,
+      "CN": "夏洛特·科黛",
+      "TW": "夏洛特．科黛",
+      "NA": "Charlotte Corday",
+      "KR": "샤를로트 코르데"
+    },
+    "シャーロック・ホームズ": {
+      "JP": null,
+      "CN": "夏洛克·福尔摩斯",
+      "TW": "夏洛克．福爾摩斯",
+      "NA": "Sherlock Holmes",
+      "KR": "셜록 홈즈"
+    },
+    "シュヴァリエ・デオン": {
+      "JP": null,
+      "CN": "骑士迪昂",
+      "TW": "騎士德翁",
+      "NA": "Chevalier d'Eon",
+      "KR": "슈발리에 데옹"
+    },
+    "シリウス": {
+      "JP": null,
+      "CN": "天狼星",
+      "TW": "天狼星",
+      "NA": "Sirius",
+      "KR": "시리우스"
+    },
+    "ジェロニモ": {
+      "JP": null,
+      "CN": "杰罗尼莫",
+      "TW": "傑羅尼莫",
+      "NA": "Geronimo",
+      "KR": "제로니모"
+    },
+    "ジェームズ・モリアーティ": {
+      "JP": null,
+      "CN": "詹姆斯·莫里亚蒂",
+      "TW": "詹姆斯．莫里亞蒂",
+      "NA": "James Moriarty",
+      "KR": "제임스 모리어티"
+    },
+    "ジキル": {
+      "JP": null,
+      "CN": "杰基尔",
+      "TW": "傑基爾",
+      "NA": "Jekyll",
+      "KR": "지킬"
+    },
+    "ジナコ＝カリギリ": {
+      "JP": null,
+      "CN": "吉娜可·加里吉利",
+      "TW": "吉娜可=加里吉利",
+      "NA": "Jinako Carigiri",
+      "KR": "지나코=카리기리"
+    },
+    "ジャガーマン": {
+      "JP": null,
+      "CN": "豹人",
+      "TW": "豹人",
+      "NA": "Jaguar Warrior",
+      "KR": "재규어맨"
+    },
+    "ジャック": {
+      "JP": null,
+      "CN": "杰克",
+      "TW": "傑克",
+      "NA": "Jack",
+      "KR": "잭"
+    },
+    "ジャック・ザ・リッパー": {
+      "JP": null,
+      "CN": "开膛手杰克",
+      "TW": "開膛手傑克",
+      "NA": "Jack the Ripper",
+      "KR": "잭 더 리퍼"
+    },
+    "ジャック・ド・モレー": {
+      "JP": null,
+      "CN": "雅克·德·莫莱",
+      "TW": "雅克．德．莫萊",
+      "NA": "Jacques de Molay",
+      "KR": "자크 드 몰레"
+    },
+    "ジャンヌ": {
+      "JP": null,
+      "CN": "贞德",
+      "TW": "貞德",
+      "NA": "Jeanne",
+      "KR": "잔느"
+    },
+    "ジャンヌオルタサンタリリィ": {
+      "JP": null,
+      "CN": "贞德·Alter·Santa·Lily",
+      "TW": "貞德．Alter．Santa．Lily",
+      "NA": "Jeanne Alter Santa Lily",
+      "KR": "잔느 얼터 산타 릴리"
+    },
+    "ジャンヌ・オルタ": {
+      "JP": null,
+      "CN": "贞德·Alter",
+      "TW": "貞德．Alter",
+      "NA": "Jeanne Alter",
+      "KR": "잔느 얼터"
+    },
+    "ジャンヌ・ダルク": {
+      "JP": null,
+      "CN": "贞德",
+      "TW": "貞德",
+      "NA": "Jeanne d'Arc",
+      "KR": "잔 다르크"
+    },
+    "ジャンヌ・ダルク〔オルタ〕": {
+      "JP": null,
+      "CN": "贞德〔Alter〕",
+      "TW": "貞德〔Alter〕",
+      "NA": "Jeanne d'Arc (Alter)",
+      "KR": "잔 다르크(얼터)"
+    },
+    "ジャンヌ・ダルク・オルタ・サンタ・リリィ": {
+      "JP": null,
+      "CN": "贞德·Alter·Santa·Lily",
+      "TW": "貞德．Alter．Santa．Lily",
+      "NA": "Jeanne d'Arc Alter Santa Lily",
+      "KR": "잔 다르크 얼터 산타 릴리"
+    },
+    "ジュネス・クレーン": {
+      "JP": null,
+      "CN": "热内斯·克莱恩",
+      "TW": "熱內斯・克蘭",
+      "NA": "Jeunesse Crane",
+      "KR": null
+    },
+    "ジョン・ラックランド": {
+      "JP": null,
+      "CN": "无地王约翰",
+      "TW": null,
+      "NA": "John Lackland",
+      "KR": null
+    },
+    "ジル": {
+      "JP": null,
+      "CN": "吉尔",
+      "TW": "吉爾",
+      "NA": "Gilles",
+      "KR": "질"
+    },
+    "ジル・ド・レェ": {
+      "JP": null,
+      "CN": "吉尔·德·雷",
+      "TW": "吉爾．德．萊斯",
+      "NA": "Gilles de Rais",
+      "KR": "질 드 레"
+    },
+    "ジーク": {
+      "JP": null,
+      "CN": "齐格",
+      "TW": "齊格",
+      "NA": "Sieg",
+      "KR": "지크"
+    },
+    "ジークフリート": {
+      "JP": null,
+      "CN": "齐格飞",
+      "TW": "齊格飛",
+      "NA": "Siegfried",
+      "KR": "지크프리트"
+    },
+    "スカサハ": {
+      "JP": null,
+      "CN": "斯卡哈",
+      "TW": "斯卡薩哈",
+      "NA": "Scáthach",
+      "KR": "스카사하"
+    },
+    "スカサハ＝スカディ": {
+      "JP": null,
+      "CN": "斯卡哈·斯卡蒂",
+      "TW": "斯卡薩哈=斯卡蒂",
+      "NA": "Scáthach-Skadi",
+      "KR": "스카사하=스카디"
+    },
+    "スターシエル": {
+      "JP": null,
+      "CN": "星之希耶尔",
+      "TW": "星之希耶爾",
+      "NA": "Star Ciel",
+      "KR": "스타 시엘"
+    },
+    "ステンノ": {
+      "JP": null,
+      "CN": "斯忒诺",
+      "TW": "絲忒諾",
+      "NA": "Stheno",
+      "KR": "스테노"
+    },
+    "スパルタクス": {
+      "JP": null,
+      "CN": "斯巴达克斯",
+      "TW": "斯巴達克斯",
+      "NA": "Spartacus",
+      "KR": "스파르타쿠스"
+    },
+    "スペース・イシュタル": {
+      "JP": null,
+      "CN": "太空伊什塔尔",
+      "TW": "太空伊絲塔",
+      "NA": "Space Ishtar",
+      "KR": "스페이스 이슈타르"
+    },
+    "スペース・エレシュキガル": {
+      "JP": null,
+      "CN": "太空埃列什基伽勒",
+      "TW": "太空埃列什基伽勒",
+      "NA": "Space Ereshkigal",
+      "KR": "스페이스 에레쉬키갈"
+    },
+    "スペース・ファンタズムーンＶ": {
+      "JP": null,
+      "CN": "Space PhantasmoonＶ",
+      "TW": "Space Phantasmoon Ⅴ",
+      "NA": "Space Phantasmoon V",
+      "KR": null
+    },
+    "スルーズ": {
+      "JP": null,
+      "CN": "斯露德",
+      "TW": "斯露德",
+      "NA": "Thrúd",
+      "KR": "스루드"
+    },
+    "スーパーバニヤン": {
+      "JP": null,
+      "CN": "超级班扬",
+      "TW": "超級班揚",
+      "NA": "Super Bunyan",
+      "KR": "슈퍼 버니언"
+    },
+    "スーパー青子": {
+      "JP": null,
+      "CN": "超级青子",
+      "TW": "超級青子",
+      "NA": "Super Aoko",
+      "KR": "슈퍼 아오코"
+    },
+    "セイバーオルタ": {
+      "JP": null,
+      "CN": "Saber·Alter",
+      "TW": "Saber．Alter",
+      "NA": "Saber Alter",
+      "KR": "세이버 얼터"
+    },
+    "セイバー・リリィ": {
+      "JP": null,
+      "CN": "Saber·Lily",
+      "TW": "Saber．Lily",
+      "NA": "Saber Lily",
+      "KR": "세이버 릴리"
+    },
+    "セタンタ": {
+      "JP": null,
+      "CN": "瑟坦特",
+      "TW": "瑟坦特",
+      "NA": "Sétanta",
+      "KR": "세탄타"
+    },
+    "セミラミス": {
+      "JP": null,
+      "CN": "塞弥拉弥斯",
+      "TW": "塞彌拉彌斯",
+      "NA": "Semiramis",
+      "KR": "세미라미스"
+    },
+    "ゼノビア": {
+      "JP": null,
+      "CN": "芝诺比阿",
+      "TW": "潔諾比亞",
+      "NA": "Zenobia",
+      "KR": "제노비아"
+    },
+    "ソドムズビースト／ドラコー": {
+      "JP": null,
+      "CN": "所多玛之兽／德拉科",
+      "TW": "所多瑪之獸／德拉科",
+      "NA": "Sodom's Beast/Draco",
+      "KR": "소돔즈 비스트/드라코"
+    },
+    "ソロモン": {
+      "JP": null,
+      "CN": "所罗门",
+      "TW": "所羅門",
+      "NA": "Solomon",
+      "KR": "솔로몬"
+    },
+    "ソロモン王": {
+      "JP": null,
+      "CN": "所罗门王",
+      "TW": "所羅門王",
+      "NA": "King Solomon",
+      "KR": "솔로몬 왕"
+    },
+    "タマモちゃんサマー": {
+      "JP": null,
+      "CN": "夏日小玉藻",
+      "TW": "夏日玉藻醬",
+      "NA": "Tamamo Summer",
+      "KR": "타마모짱 서머"
+    },
+    "タマモキャット": {
+      "JP": null,
+      "CN": "玉藻猫",
+      "TW": "玉藻貓",
+      "NA": "Tamamo Cat",
+      "KR": "타마모캣"
+    },
+    "ダビデ": {
+      "JP": null,
+      "CN": "大卫",
+      "TW": "大衛",
+      "NA": "David",
+      "KR": "다윗"
+    },
+    "ダレイオス三世": {
+      "JP": null,
+      "CN": "大流士三世",
+      "TW": "大流士三世",
+      "NA": "Darius III",
+      "KR": "다리우스 3세"
+    },
+    "ダンテ・アリギエーリ": {
+      "JP": null,
+      "CN": "但丁·阿利吉耶里",
+      "TW": "但丁・阿利吉耶里",
+      "NA": "Dante Alighieri",
+      "KR": null
+    },
+    "ダ・ヴィンチ": {
+      "JP": null,
+      "CN": "达·芬奇",
+      "TW": "達．文西",
+      "NA": "Da Vinci",
+      "KR": "다 빈치"
+    },
+    "チャールズ・バベッジ": {
+      "JP": null,
+      "CN": "查尔斯·巴贝奇",
+      "TW": "查爾斯．巴貝奇",
+      "NA": "Charles Babbage",
+      "KR": "찰스 배비지"
+    },
+    "ツタンカーメン": {
+      "JP": null,
+      "CN": "图坦卡蒙",
+      "TW": "圖坦卡門",
+      "NA": "Tutankhamun",
+      "KR": null
+    },
+    "ティアマト": {
+      "JP": null,
+      "CN": "提亚马特",
+      "TW": "迪亞馬特",
+      "NA": "Tiamat",
+      "KR": "티아마트"
+    },
+    "ティーチ": {
+      "JP": null,
+      "CN": "蒂奇",
+      "TW": "蒂奇",
+      "NA": "Teach",
+      "KR": "티치"
+    },
+    "テスカトリポカ": {
+      "JP": null,
+      "CN": "特斯卡特利波卡",
+      "TW": "特斯卡特利波卡",
+      "NA": "Tezcatlipoca",
+      "KR": "테스카틀리포카"
+    },
+    "テセウス": {
+      "JP": null,
+      "CN": "忒修斯",
+      "TW": "忒修斯",
+      "NA": "Thēseus",
+      "KR": "테세우스"
+    },
+    "テノチティトラン": {
+      "JP": null,
+      "CN": "特诺奇蒂特兰",
+      "TW": "特諾奇提特蘭",
+      "NA": "Tenochtitlan",
+      "KR": "테노치티틀란"
+    },
+    "テュフォン・エフェメロス": {
+      "JP": null,
+      "CN": "堤丰·厄斐墨洛斯",
+      "TW": "Typhon Ephemeros",
+      "NA": "Typhon Ephemeros",
+      "KR": "티폰・에페메로스"
+    },
+    "ディオスクロイ": {
+      "JP": null,
+      "CN": "狄俄斯库里",
+      "TW": "狄奧斯庫洛伊",
+      "NA": "Dioscuri",
+      "KR": "디오스쿠로이"
+    },
+    "ディルムッド": {
+      "JP": null,
+      "CN": "迪尔姆德",
+      "TW": "迪爾姆德",
+      "NA": "Diarmuid",
+      "KR": "디어뮈드"
+    },
+    "ディルムッド・オディナ": {
+      "JP": null,
+      "CN": "迪尔姆德·奥迪那",
+      "TW": "迪爾姆德．奧德利暗",
+      "NA": "Diarmuid Ua Duibhne",
+      "KR": "디어뮈드 오 디나"
+    },
+    "デオン": {
+      "JP": null,
+      "CN": "迪昂",
+      "TW": "德翁",
+      "NA": "d'Eon",
+      "KR": "데옹"
+    },
+    "デビルカレン": {
+      "JP": null,
+      "CN": "恶魔卡莲",
+      "TW": "惡魔卡蓮",
+      "NA": "Devil Caren",
+      "KR": "데블 카렌"
+    },
+    "デメテル": {
+      "JP": null,
+      "CN": "得墨忒耳",
+      "TW": "狄蜜特",
+      "NA": "Demeter",
+      "KR": "데메테르"
+    },
+    "デメテル・エリニュス": {
+      "JP": null,
+      "CN": "得墨忒耳·厄里倪厄斯",
+      "TW": null,
+      "NA": "Demeter Erinyes",
+      "KR": null
+    },
+    "トネリコ": {
+      "JP": null,
+      "CN": "梣",
+      "TW": "托內莉可",
+      "NA": "Aesc",
+      "KR": null
+    },
+    "トラロック": {
+      "JP": null,
+      "CN": "特拉洛克",
+      "TW": "特拉洛克",
+      "NA": "Tlāloc",
+      "KR": "틀랄록"
+    },
+    "トリスタン": {
+      "JP": null,
+      "CN": "崔斯坦",
+      "TW": "崔斯坦",
+      "NA": "Tristan",
+      "KR": "트리스탄"
+    },
+    "トーマス・エジソン": {
+      "JP": null,
+      "CN": "托马斯·爱迪生",
+      "TW": "湯瑪斯．愛迪生",
+      "NA": "Thomas Edison",
+      "KR": "토머스 에디슨"
+    },
+    "ドゥリーヨダナ": {
+      "JP": null,
+      "CN": "难敌",
+      "TW": "難敵",
+      "NA": "Duryodhana",
+      "KR": "두료다나"
+    },
+    "ドゥルガー": {
+      "JP": null,
+      "CN": "杜尔伽",
+      "TW": "杜爾迦",
+      "NA": "Durgā",
+      "KR": "두르가"
+    },
+    "ドブルイニャ・ニキチッチ": {
+      "JP": null,
+      "CN": "多布雷尼亚·尼基季奇",
+      "TW": "多布雷尼亞．尼基季奇",
+      "NA": "Dobrynya Nikitich",
+      "KR": "도브리냐 니키티치"
+    },
+    "ドラコー": {
+      "JP": null,
+      "CN": "德拉科",
+      "TW": "德拉科",
+      "NA": "Draco",
+      "KR": "드라코"
+    },
+    "ドレイク": {
+      "JP": null,
+      "CN": "德雷克",
+      "TW": "德雷克",
+      "NA": "Drake",
+      "KR": "드레이크"
+    },
+    "ドン・キホーテ": {
+      "JP": null,
+      "CN": "堂·吉诃德",
+      "TW": "唐吉訶德",
+      "NA": "Don Quixote",
+      "KR": "돈키호테"
+    },
+    "ナイチンゲール": {
+      "JP": null,
+      "CN": "南丁格尔",
+      "TW": "南丁格爾",
+      "NA": "Florence Nightingale",
+      "KR": "나이팅게일"
+    },
+    "ナイチンゲール〔サンタ〕": {
+      "JP": null,
+      "CN": "南丁格尔〔圣诞〕",
+      "TW": "南丁格爾〔Santa〕",
+      "NA": "Florence Nightingale (Santa)",
+      "KR": "나이팅게일[산타]"
+    },
+    "ナイチンゲール・サンタ": {
+      "JP": null,
+      "CN": "南丁格尔·圣诞",
+      "TW": "南丁格爾．Santa",
+      "NA": "Florence Nightingale (Santa)",
+      "KR": "나이팅게일 산타"
+    },
+    "ナポレオン": {
+      "JP": null,
+      "CN": "拿破仑",
+      "TW": "拿破崙",
+      "NA": "Napoleon",
+      "KR": "나폴레옹"
+    },
+    "ナーサリー・ライム": {
+      "JP": null,
+      "CN": "童谣",
+      "TW": "童謠",
+      "NA": "Nursery Rhyme",
+      "KR": "너서리 라임"
+    },
+    "ニキチッチ": {
+      "JP": null,
+      "CN": "尼基季奇",
+      "TW": "尼基季奇",
+      "NA": "Dobrynya Nikitich",
+      "KR": "니키티치"
+    },
+    "ニコラ・テスラ": {
+      "JP": null,
+      "CN": "尼古拉·特斯拉",
+      "TW": "尼古拉．特斯拉",
+      "NA": "Nikola Tesla",
+      "KR": "니콜라 테슬라"
+    },
+    "ニトクリス": {
+      "JP": null,
+      "CN": "尼托克丽丝",
+      "TW": "尼托克里絲",
+      "NA": "Nitocris",
+      "KR": "니토크리스"
+    },
+    "ニトクリス〔オルタ〕": {
+      "JP": null,
+      "CN": "尼托克丽丝〔Alter〕",
+      "TW": "尼托克里絲〔Alter〕",
+      "NA": "Nitocris (Alter)",
+      "KR": "니토크리스(얼터)"
+    },
+    "ニトクリス・オルタ": {
+      "JP": null,
+      "CN": "尼托克丽丝·Alter",
+      "TW": "尼托克里絲．Alter",
+      "NA": "Nitocris (Alter)",
+      "KR": "니토크리스(얼터)"
+    },
+    "ネモ": {
+      "JP": null,
+      "CN": "尼莫",
+      "TW": "尼莫",
+      "NA": "Nemo",
+      "KR": "네모"
+    },
+    "ネモ〔サンタ〕": {
+      "JP": null,
+      "CN": "尼莫〔圣诞〕",
+      "TW": "尼莫〔Santa〕",
+      "NA": "Nemo (Santa)",
+      "KR": "네모[산타]"
+    },
+    "ネモサンタ": {
+      "JP": null,
+      "CN": "尼莫圣诞",
+      "TW": "尼莫聖誕",
+      "NA": "Nemo Santa",
+      "KR": "네모 산타"
+    },
+    "ネモ／ノア": {
+      "JP": null,
+      "CN": "尼莫／诺亚",
+      "TW": "尼莫/諾亞",
+      "NA": "Nemo/Noah",
+      "KR": null
+    },
+    "ネロ": {
+      "JP": null,
+      "CN": "尼禄",
+      "TW": "尼祿",
+      "NA": "Nero",
+      "KR": "네로"
+    },
+    "ネロ・クラウディウス": {
+      "JP": null,
+      "CN": "尼禄·克劳狄乌斯",
+      "TW": "尼祿．克勞狄烏斯",
+      "NA": "Nero Claudius",
+      "KR": "네로 클라우디우스"
+    },
+    "ネロ・クラウディウス〔ブライド〕": {
+      "JP": null,
+      "CN": "尼禄·克劳狄乌斯〔新娘〕",
+      "TW": "尼祿．克勞狄烏斯〔Bride〕",
+      "NA": "Nero Claudius (Bride)",
+      "KR": "네로 클라우디우스(브라이드)"
+    },
+    "ネロ・ブライド": {
+      "JP": null,
+      "CN": "尼禄·新娘",
+      "TW": "尼祿．Bride",
+      "NA": "Nero Bride",
+      "KR": "네로 브라이드"
+    },
+    "ノクナレア・ヤラアーンドゥ": {
+      "JP": null,
+      "CN": "诺克娜蕾·雅兰杜",
+      "TW": "諾克娜蕾雅．雅蘭杜",
+      "NA": "Cnoc na Riabh Yaraändoo",
+      "KR": "노크나레아・야라안두"
+    },
+    "ハイド": {
+      "JP": null,
+      "CN": "海德",
+      "TW": "海德",
+      "NA": "Hyde",
+      "KR": "하이드"
+    },
+    "ハサン": {
+      "JP": null,
+      "CN": "哈桑",
+      "TW": "哈桑",
+      "NA": "Cursed Arm",
+      "KR": "하산"
+    },
+    "ハベトロット": {
+      "JP": null,
+      "CN": "哈贝特洛特",
+      "TW": "哈貝特洛特",
+      "NA": "Habetrot",
+      "KR": "하베트롯"
+    },
+    "ハンス・クリスチャン・アンデルセン": {
+      "JP": null,
+      "CN": "汉斯·克里斯蒂安·安徒生",
+      "TW": "漢斯．克里斯蒂安．安徒生",
+      "NA": "Hans Christian Andersen",
+      "KR": "한스 크리스티안 안데르센"
+    },
+    "バゼット": {
+      "JP": null,
+      "CN": "巴泽特",
+      "TW": "芭潔特",
+      "NA": "Bazett",
+      "KR": "바제트"
+    },
+    "バニヤン": {
+      "JP": null,
+      "CN": "保罗·班扬",
+      "TW": "保羅．班揚",
+      "NA": "Bunyan",
+      "KR": "버니언"
+    },
+    "バベッジ": {
+      "JP": null,
+      "CN": "巴贝奇",
+      "TW": "巴貝奇",
+      "NA": "Babbage",
+      "KR": "배비지"
+    },
+    "バーゲスト": {
+      "JP": null,
+      "CN": "巴格斯特",
+      "TW": "巴格斯特",
+      "NA": "Barghest",
+      "KR": "바게스트"
+    },
+    "バーソロミュー": {
+      "JP": null,
+      "CN": "巴沙洛缪",
+      "TW": "巴索羅繆",
+      "NA": "Bartholomew Roberts",
+      "KR": "바솔로뮤"
+    },
+    "バーソロミュー・ロバーツ": {
+      "JP": null,
+      "CN": "巴沙洛缪·罗伯茨",
+      "TW": "巴索羅繆．羅伯茨",
+      "NA": "Bartholomew Roberts",
+      "KR": "바솔로뮤 로버츠"
+    },
+    "バーヴァン・シー": {
+      "JP": null,
+      "CN": "芭万·希",
+      "TW": "芭班．希",
+      "NA": "Baobhan Sith",
+      "KR": "바반 시"
+    },
+    "パッションリップ": {
+      "JP": null,
+      "CN": "Passionlip",
+      "TW": "Passionlip",
+      "NA": "Passionlip",
+      "KR": "패션립"
+    },
+    "パラケルスス": {
+      "JP": null,
+      "CN": "帕拉塞尔苏斯",
+      "TW": "帕拉塞爾斯",
+      "NA": "Paracelsus",
+      "KR": "파라켈수스"
+    },
+    "パリス": {
+      "JP": null,
+      "CN": "帕里斯",
+      "TW": "帕里斯",
+      "NA": "Paris",
+      "KR": "파리스"
+    },
+    "パーシヴァル": {
+      "JP": null,
+      "CN": "珀西瓦尔",
+      "TW": "帕西瓦爾",
+      "NA": "Percival",
+      "KR": "퍼시벌"
+    },
+    "パールヴァティー": {
+      "JP": null,
+      "CN": "帕尔瓦蒂",
+      "TW": "帕爾瓦蒂",
+      "NA": "Pārvatī",
+      "KR": "파르바티"
+    },
+    "ヒッポリュテ": {
+      "JP": null,
+      "CN": "希波吕忒",
+      "TW": null,
+      "NA": "Hippolyte",
+      "KR": null
+    },
+    "ヒルド": {
+      "JP": null,
+      "CN": "希露德",
+      "TW": "希露德",
+      "NA": "Hildr",
+      "KR": "힐드"
+    },
+    "ヒロインX": {
+      "JP": null,
+      "CN": "女主角X",
+      "TW": "女主角X",
+      "NA": "Heroine X",
+      "KR": "히로인 X"
+    },
+    "ヒロインXX": {
+      "JP": null,
+      "CN": "女主角XX",
+      "TW": "女主角XX",
+      "NA": "Heroine XX",
+      "KR": "히로인 XX"
+    },
+    "ヒロインXX・オルタ": {
+      "JP": null,
+      "CN": "谜之女主角XX·Alter",
+      "TW": "女主角XX・Alter",
+      "NA": "Heroine XX (Alter)",
+      "KR": "히로인 XX 얼터"
+    },
+    "ヒロインXオルタ": {
+      "JP": null,
+      "CN": "女主角X Alter",
+      "TW": "女主角X Alter",
+      "NA": "Heroine X Alter",
+      "KR": "히로인 X 얼터"
+    },
+    "ビショーネ": {
+      "JP": null,
+      "CN": "比肖内",
+      "TW": "比修內",
+      "NA": "Biscione",
+      "KR": null
+    },
+    "ビショーネ〔ウロボロスシフト〕": {
+      "JP": null,
+      "CN": "比肖内〔乌洛波洛斯转变〕",
+      "TW": "比修內〔烏洛波羅斯轉變〕",
+      "NA": "Biscione (Ouroboros Shift)",
+      "KR": null
+    },
+    "ビリー": {
+      "JP": null,
+      "CN": "比利",
+      "TW": "比利",
+      "NA": "Billy",
+      "KR": "빌리"
+    },
+    "ビリー・ザ・キッド": {
+      "JP": null,
+      "CN": "比利小子",
+      "TW": "比利小子",
+      "NA": "Billy the Kid",
+      "KR": "빌리 더 키드"
+    },
+    "ビーストⅢ／L": {
+      "JP": null,
+      "CN": "BeastⅢ／L",
+      "TW": "BeastⅢ／L",
+      "NA": "Beast III/L",
+      "KR": "비스트Ⅲ/L"
+    },
+    "ビーストⅢ／Ｒ": {
+      "JP": null,
+      "CN": "BeastⅢ／R",
+      "TW": "BeastⅢ／R",
+      "NA": "Beast III/R",
+      "KR": "비스트Ⅲ/R"
+    },
+    "ビーストⅣ": {
+      "JP": null,
+      "CN": "Beast Ⅳ",
+      "TW": "Beast Ⅳ",
+      "NA": "Beast IV",
+      "KR": "비스트Ⅳ"
+    },
+    "ビーマ": {
+      "JP": null,
+      "CN": "怖军",
+      "TW": "怖軍",
+      "NA": "Bhīma",
+      "KR": "비마"
+    },
+    "ファンタズムーン": {
+      "JP": null,
+      "CN": "Phantasmoon",
+      "TW": "Phantasmoon",
+      "NA": "Phantasmoon",
+      "KR": null
+    },
+    "ファントム": {
+      "JP": null,
+      "CN": "魅影",
+      "TW": "魅影",
+      "NA": "Phantom",
+      "KR": "팬텀"
+    },
+    "ファントム・オブ・ジ・オペラ": {
+      "JP": null,
+      "CN": "剧院魅影",
+      "TW": "歌劇魅影",
+      "NA": "Phantom of the Opera",
+      "KR": "팬텀 오브 디 오페라"
+    },
+    "フィン": {
+      "JP": null,
+      "CN": "芬恩",
+      "TW": "芬恩",
+      "NA": "Fionn",
+      "KR": "핀"
+    },
+    "フィン・マックール": {
+      "JP": null,
+      "CN": "芬恩·麦克库尔",
+      "TW": "芬恩．麥克庫爾",
+      "NA": "Fionn mac Cumhaill",
+      "KR": "핀 막 쿨"
+    },
+    "フェルグス": {
+      "JP": null,
+      "CN": "弗格斯",
+      "TW": "弗格斯",
+      "NA": "Fergus",
+      "KR": "퍼거스"
+    },
+    "フェルグス・マック・ロイ": {
+      "JP": null,
+      "CN": "弗格斯·马克·罗伊",
+      "TW": "弗格斯．馬克．羅伊",
+      "NA": "Fergus mac Róich",
+      "KR": "퍼거스 막 로이"
+    },
+    "フラン": {
+      "JP": null,
+      "CN": "弗兰",
+      "TW": "弗蘭",
+      "NA": "Fran",
+      "KR": "프랑"
+    },
+    "フランケンシュタイン": {
+      "JP": null,
+      "CN": "弗兰肯斯坦",
+      "TW": "弗蘭肯斯坦",
+      "NA": "Frankenstein",
+      "KR": "프랑켄슈타인"
+    },
+    "フランシス・ドレイク": {
+      "JP": null,
+      "CN": "弗朗西斯·德雷克",
+      "TW": "弗朗西斯．德雷克",
+      "NA": "Francis Drake",
+      "KR": "프랜시스 드레이크"
+    },
+    "フランソワ": {
+      "JP": null,
+      "CN": "弗朗索瓦",
+      "TW": null,
+      "NA": "François",
+      "KR": null
+    },
+    "フランソワ・プレラーティ": {
+      "JP": null,
+      "CN": "弗朗索瓦·普勒拉蒂",
+      "TW": null,
+      "NA": "François Prélat",
+      "KR": null
+    },
+    "フランチェスカ": {
+      "JP": null,
+      "CN": "弗兰切斯卡",
+      "TW": null,
+      "NA": "Francesca",
+      "KR": null
+    },
+    "フランチェスカ・プレラーティ": {
+      "JP": null,
+      "CN": "弗兰切斯卡·普勒拉蒂",
+      "TW": null,
+      "NA": "Francesca Prélat",
+      "KR": null
+    },
+    "フローラ": {
+      "JP": null,
+      "CN": "芙萝拉",
+      "TW": null,
+      "NA": "Flora",
+      "KR": null
+    },
+    "ブラダマンテ": {
+      "JP": null,
+      "CN": "布拉达曼特",
+      "TW": "布拉達曼特",
+      "NA": "Bradamante",
+      "KR": "브라다만테"
+    },
+    "ブラヴァツキー": {
+      "JP": null,
+      "CN": "布拉瓦茨基",
+      "TW": "布拉瓦茨基",
+      "NA": "Blavatsky",
+      "KR": "블라바츠키"
+    },
+    "ブリトマート": {
+      "JP": null,
+      "CN": "布里托玛特",
+      "TW": "布里托瑪特",
+      "NA": "Britomart",
+      "KR": "브리토마트"
+    },
+    "ブリュンヒルデ": {
+      "JP": null,
+      "CN": "布伦希尔德",
+      "TW": "布倫希爾德",
+      "NA": "Brynhild",
+      "KR": "브륀힐드"
+    },
+    "ブーディカ": {
+      "JP": null,
+      "CN": "布狄卡",
+      "TW": "布狄卡",
+      "NA": "Boudica",
+      "KR": "부디카"
+    },
+    "プトレマイオス": {
+      "JP": null,
+      "CN": "托勒密",
+      "TW": "托勒密",
+      "NA": "Ptolemaîos",
+      "KR": "프톨레마이오스"
+    },
+    "ヘクトール": {
+      "JP": null,
+      "CN": "赫克托耳",
+      "TW": "赫克特",
+      "NA": "Hektor",
+      "KR": "헥토르"
+    },
+    "ヘシアン・ロボ": {
+      "JP": null,
+      "CN": "黑森·罗伯",
+      "TW": "海森．羅伯",
+      "NA": "Hessian Lobo",
+      "KR": "헤센・로보"
+    },
+    "ヘファイスティオン": {
+      "JP": null,
+      "CN": "赫费斯提翁",
+      "TW": "赫費斯提翁",
+      "NA": "Hephaistíon",
+      "KR": "헤파이스티온"
+    },
+    "ヘブンズホール": {
+      "JP": null,
+      "CN": "天堂之孔",
+      "TW": "魔性菩薩",
+      "NA": "Heaven's Hole",
+      "KR": "헤븐즈 홀"
+    },
+    "ヘラクレス": {
+      "JP": null,
+      "CN": "赫拉克勒斯",
+      "TW": "赫拉克勒斯",
+      "NA": "Heracles",
+      "KR": "헤라클레스"
+    },
+    "ヘンリー・ジキル＆ハイド": {
+      "JP": null,
+      "CN": "亨利·杰基尔＆海德",
+      "TW": "亨利．傑基爾＆海德",
+      "NA": "Henry Jekyll & Hyde",
+      "KR": "헨리 지킬&하이드"
+    },
+    "ベオウルフ": {
+      "JP": null,
+      "CN": "贝奥武夫",
+      "TW": "貝奧武夫",
+      "NA": "Beowulf",
+      "KR": "베오울프"
+    },
+    "ベディヴィエール": {
+      "JP": null,
+      "CN": "贝德维尔",
+      "TW": "貝德維爾",
+      "NA": "Bedivere",
+      "KR": "베디비어"
+    },
+    "ペンテシレイア": {
+      "JP": null,
+      "CN": "彭忒西勒亚",
+      "TW": "彭忒西勒亞",
+      "NA": "Penthesilea",
+      "KR": "펜테실레이아"
+    },
+    "ボイジャー": {
+      "JP": null,
+      "CN": "旅行者",
+      "TW": "航海家",
+      "NA": "Voyager",
+      "KR": "보이저"
+    },
+    "ポール・バニヤン": {
+      "JP": null,
+      "CN": "保罗·班扬",
+      "TW": "保羅．班揚",
+      "NA": "Paul Bunyan",
+      "KR": "폴 버니언"
+    },
+    "マシュ": {
+      "JP": null,
+      "CN": "玛修",
+      "TW": "瑪修",
+      "NA": "Mash",
+      "KR": "마슈"
+    },
+    "マシュ・キリエライト": {
+      "JP": null,
+      "CN": "玛修·基列莱特",
+      "TW": "瑪修．基利艾拉特",
+      "NA": "Mash Kyrielight",
+      "KR": "마슈 키리에라이트"
+    },
+    "マタ・ハリ": {
+      "JP": null,
+      "CN": "玛塔·哈丽",
+      "TW": "瑪塔．哈里",
+      "NA": "Mata Hari",
+      "KR": "마타 하리"
+    },
+    "マナナン・マク・リール": {
+      "JP": null,
+      "CN": "马纳南·麦克·利尔",
+      "TW": "馬納南．麥克．利爾",
+      "NA": "Manannan mac Lir",
+      "KR": "마나난 막 리르"
+    },
+    "マナナン・マク・リール〔バゼット〕": {
+      "JP": null,
+      "CN": "马纳南·麦克·利尔〔巴泽特〕",
+      "TW": "馬納南．麥克．利爾〔芭潔特〕",
+      "NA": "Manannan mac Lir (Bazett)",
+      "KR": "마나난 막 리르[바제트]"
+    },
+    "マリス・カルデアス": {
+      "JP": null,
+      "CN": "马里斯·迦勒底亚斯",
+      "TW": null,
+      "NA": "Maris Chaldeas",
+      "KR": null
+    },
+    "マリー・アントワネット": {
+      "JP": null,
+      "CN": "玛丽·安托瓦内特",
+      "TW": "瑪莉．安東尼",
+      "NA": "Marie Antoinette",
+      "KR": "마리 앙투아네트"
+    },
+    "マリー・アントワネット〔オルタ〕": {
+      "JP": null,
+      "CN": "玛丽·安托瓦内特〔Alter〕",
+      "TW": "瑪莉．安東尼〔Alter〕",
+      "NA": "Marie Antoinette (Alter)",
+      "KR": "마리 앙투아네트(얼터)"
+    },
+    "マリー・アントワネット・オルタ": {
+      "JP": null,
+      "CN": "玛丽·安托瓦内特·Alter",
+      "TW": "瑪莉．安東尼．Alter",
+      "NA": "Marie Antoinette (Alter)",
+      "KR": "마리 앙투아네트(얼터)"
+    },
+    "マルタ": {
+      "JP": null,
+      "CN": "玛尔达",
+      "TW": "瑪爾大",
+      "NA": "Martha",
+      "KR": "마르타"
+    },
+    "マルタ〔サンタ〕": {
+      "JP": null,
+      "CN": "玛尔达〔圣诞〕",
+      "TW": "瑪爾大〔Santa〕",
+      "NA": "Martha (Santa)",
+      "KR": "마르타[산타]"
+    },
+    "マルタ・サンタ": {
+      "JP": null,
+      "CN": "玛尔达·圣诞",
+      "TW": "瑪爾大〔Santa〕",
+      "NA": "Martha Santa",
+      "KR": "마르타 산타"
+    },
+    "マンドリカルド": {
+      "JP": null,
+      "CN": "曼迪卡尔多",
+      "TW": "曼迪卡爾多",
+      "NA": "Mandricardo",
+      "KR": "만드리카르도"
+    },
+    "マーリン": {
+      "JP": null,
+      "CN": "梅林",
+      "TW": "梅林",
+      "NA": "Merlin",
+      "KR": "멀린"
+    },
+    "ミス・クレーン": {
+      "JP": null,
+      "CN": "克莱恩小姐",
+      "TW": "Ms.克蘭",
+      "NA": "Miss Crane",
+      "KR": "미스 크레인"
+    },
+    "ミドラーシュのキャスター": {
+      "JP": null,
+      "CN": "米德拉什的Caster",
+      "TW": "米德拉什的Caster",
+      "NA": "Caster of Midrash",
+      "KR": "미드라시의 캐스터"
+    },
+    "ムリアン": {
+      "JP": null,
+      "CN": "缪瑞恩",
+      "TW": "姆莉安",
+      "NA": "Muryan",
+      "KR": null
+    },
+    "メアリー": {
+      "JP": null,
+      "CN": "玛莉",
+      "TW": "瑪莉",
+      "NA": "Mary",
+      "KR": "메리"
+    },
+    "メアリー・アニング": {
+      "JP": null,
+      "CN": "玛丽·安宁",
+      "TW": "瑪麗．安寧",
+      "NA": "Mary Anning",
+      "KR": "메리 애닝"
+    },
+    "メイド・オルタ": {
+      "JP": null,
+      "CN": "女仆·Alter",
+      "TW": "女僕．Alter",
+      "NA": "Maid Alter",
+      "KR": "메이드 얼터"
+    },
+    "メイヴ": {
+      "JP": null,
+      "CN": "梅芙",
+      "TW": "梅芙",
+      "NA": "Medb",
+      "KR": "메이브"
+    },
+    "メカエリチャン": {
+      "JP": null,
+      "CN": "机械伊丽亲",
+      "TW": "機械伊莉醬",
+      "NA": "Mecha Eli-chan",
+      "KR": "메카에리짱"
+    },
+    "メカエリチャンⅡ号機": {
+      "JP": null,
+      "CN": "机械伊丽亲Ⅱ号机",
+      "TW": "機械伊莉醬Ⅱ號機",
+      "NA": "Mecha Eli-chan Mk.II",
+      "KR": "메카에리짱 Ⅱ호기"
+    },
+    "メタトロン・ジャンヌ": {
+      "JP": null,
+      "CN": "梅塔特隆·贞德",
+      "TW": "梅塔特隆・貞德",
+      "NA": "Metatron Jeanne",
+      "KR": null
+    },
+    "メディア": {
+      "JP": null,
+      "CN": "美狄亚",
+      "TW": "美狄亞",
+      "NA": "Medea",
+      "KR": "메데이아"
+    },
+    "メディア〔リリィ〕": {
+      "JP": null,
+      "CN": "美狄亚〔Lily〕",
+      "TW": "美狄亞〔Lily〕",
+      "NA": "Medea (Lily)",
+      "KR": "메데이아(릴리)"
+    },
+    "メディア・リリィ": {
+      "JP": null,
+      "CN": "美狄亚·Lily",
+      "TW": "美狄亞〔Lily〕",
+      "NA": "Medea Lily",
+      "KR": "메데이아 릴리"
+    },
+    "メドゥーサ": {
+      "JP": null,
+      "CN": "美杜莎",
+      "TW": "美杜莎",
+      "NA": "Medusa",
+      "KR": "메두사"
+    },
+    "メフィストフェレス": {
+      "JP": null,
+      "CN": "梅菲斯托费勒斯",
+      "TW": "梅菲斯托費勒斯",
+      "NA": "Mephistopheles",
+      "KR": "메피스토펠레스"
+    },
+    "メリュジーヌ": {
+      "JP": null,
+      "CN": "梅柳齐娜",
+      "TW": "美露莘",
+      "NA": "Mélusine",
+      "KR": "멜뤼진"
+    },
+    "メリュジーヌ・オンディーヌ": {
+      "JP": null,
+      "CN": "梅柳齐娜·翁蒂娜",
+      "TW": "美露莘．溫蒂妮",
+      "NA": "Mélusine Ondine",
+      "KR": "멜뤼진・옹딘"
+    },
+    "メルトリリス": {
+      "JP": null,
+      "CN": "Meltryllis",
+      "TW": "Meltryllis",
+      "NA": "Meltryllis",
+      "KR": "멜트릴리스"
+    },
+    "モリアーティ": {
+      "JP": null,
+      "CN": "莫里亚蒂",
+      "TW": "莫里亞蒂",
+      "NA": "Moriarty",
+      "KR": "모리어티"
+    },
+    "モルガン": {
+      "JP": null,
+      "CN": "摩根",
+      "TW": "摩根",
+      "NA": "Morgan",
+      "KR": "모르간"
+    },
+    "モードレッド": {
+      "JP": null,
+      "CN": "莫德雷德",
+      "TW": "莫德雷德",
+      "NA": "Mordred",
+      "KR": "모드레드"
+    },
+    "ヤマトタケル": {
+      "JP": null,
+      "CN": "大和武尊",
+      "TW": "日本武尊",
+      "NA": "Yamato Takeru",
+      "KR": "야마토타케루"
+    },
+    "ヨハンナ": {
+      "JP": null,
+      "CN": "若安",
+      "TW": "瓊安",
+      "NA": "Johanna",
+      "KR": "요한나"
+    },
+    "ラクシュミー・バーイー": {
+      "JP": null,
+      "CN": "拉克什米·芭伊",
+      "TW": "拉克西米．芭伊",
+      "NA": "Lakshmi Bai",
+      "KR": "락슈미 바이"
+    },
+    "ラスプーチン": {
+      "JP": null,
+      "CN": "拉斯普京",
+      "TW": "拉斯普丁",
+      "NA": "Rasputin",
+      "KR": "라스푸틴"
+    },
+    "ラムダリリス": {
+      "JP": null,
+      "CN": "Lambdaryllis",
+      "TW": "Lambdaryllis",
+      "NA": "Lambdaryllis",
+      "KR": "람다릴리스"
+    },
+    "ランスロット": {
+      "JP": null,
+      "CN": "兰斯洛特",
+      "TW": "蘭斯洛特",
+      "NA": "Lancelot",
+      "KR": "랜슬롯"
+    },
+    "ラーマ": {
+      "JP": null,
+      "CN": "罗摩",
+      "TW": "羅摩",
+      "NA": "Rama",
+      "KR": "라마"
+    },
+    "ラーヴァ／ティアマト": {
+      "JP": null,
+      "CN": "幼体／提亚马特",
+      "TW": "幼體／迪亞馬特",
+      "NA": "Larva/Tiamat",
+      "KR": "라바/티아마트"
+    },
+    "リチャードⅠ世": {
+      "JP": null,
+      "CN": "理查一世",
+      "TW": "理查Ⅰ世",
+      "NA": "Richard I",
+      "KR": "리처드 1세"
+    },
+    "リリス": {
+      "JP": null,
+      "CN": "莉莉丝",
+      "TW": "莉莉絲",
+      "NA": "Lilith",
+      "KR": null
+    },
+    "リンド": {
+      "JP": null,
+      "CN": "琳德",
+      "TW": "琳達",
+      "NA": "Rindr",
+      "KR": "린드"
+    },
+    "レオナルド・ダ・ヴィンチ": {
+      "JP": null,
+      "CN": "莱昂纳多·达·芬奇",
+      "TW": "李奧納多．達．文西",
+      "NA": "Leonardo da Vinci",
+      "KR": "레오나르도 다 빈치"
+    },
+    "レオニダス": {
+      "JP": null,
+      "CN": "列奥尼达",
+      "TW": "列奧尼達",
+      "NA": "Leonidas",
+      "KR": "레오니다스"
+    },
+    "レオニダス一世": {
+      "JP": null,
+      "CN": "列奥尼达一世",
+      "TW": "列奧尼達一世",
+      "NA": "Leonidas I",
+      "KR": "레오니다스 1세"
+    },
+    "レジスタンスのライダー": {
+      "JP": null,
+      "CN": "反抗军的Rider",
+      "TW": "反抗軍的Rider",
+      "NA": "Rider of the Resistance",
+      "KR": "레지스탕스의 라이더"
+    },
+    "レディ・アヴァロン": {
+      "JP": null,
+      "CN": "阿瓦隆女士",
+      "TW": "Lady阿瓦隆",
+      "NA": "Lady Avalon",
+      "KR": "레이디 아발론"
+    },
+    "ロウヒ": {
+      "JP": null,
+      "CN": "娄希",
+      "TW": "婁希",
+      "NA": "Louhi",
+      "KR": null
+    },
+    "ロクスタ": {
+      "JP": null,
+      "CN": "洛库斯塔",
+      "TW": "洛庫斯塔",
+      "NA": "Locusta",
+      "KR": "로쿠스타"
+    },
+    "ロビンフッド": {
+      "JP": null,
+      "CN": "罗宾汉",
+      "TW": "羅賓漢",
+      "NA": "Robin Hood",
+      "KR": "로빈 후드"
+    },
+    "ロムルス": {
+      "JP": null,
+      "CN": "罗穆路斯",
+      "TW": "羅慕路斯",
+      "NA": "Romulus",
+      "KR": "로물루스"
+    },
+    "ロムルス＝クィリヌス": {
+      "JP": null,
+      "CN": "罗穆路斯·奎里努斯",
+      "TW": "羅慕路斯=奎里努斯",
+      "NA": "Romulus=Quirinus",
+      "KR": "로물루스=퀴리누스"
+    },
+    "ロード・ログレス": {
+      "JP": null,
+      "CN": "领主洛格雷斯",
+      "TW": null,
+      "NA": "Lord Logres",
+      "KR": null
+    },
+    "ローラン": {
+      "JP": null,
+      "CN": "罗兰",
+      "TW": "羅蘭",
+      "NA": "Roland",
+      "KR": "롤랑"
+    },
+    "ワルキューレ": {
+      "JP": null,
+      "CN": "瓦尔基里",
+      "TW": "瓦爾基麗",
+      "NA": "Valkyrie",
+      "KR": "발키리"
+    },
+    "ワンジナ": {
+      "JP": null,
+      "CN": "旺吉娜",
+      "TW": "旺吉娜",
+      "NA": "Wandjina",
+      "KR": "완지나"
+    },
+    "ヴァン・ゴッホ": {
+      "JP": null,
+      "CN": "梵高",
+      "TW": "梵谷",
+      "NA": "Van Gogh",
+      "KR": "반 고흐"
+    },
+    "ヴァン・ゴッホ〔マイナー〕": {
+      "JP": null,
+      "CN": "梵高〔矿工〕",
+      "TW": "梵谷〔礦工〕",
+      "NA": "Van Gogh (Miner)",
+      "KR": null
+    },
+    "ヴァン・ホーエンハイム・パラケルスス": {
+      "JP": null,
+      "CN": "冯·霍恩海姆·帕拉塞尔苏斯",
+      "TW": "馮．霍恩海姆．帕拉塞爾斯",
+      "NA": "Paracelsus von Hohenheim",
+      "KR": "반 호엔하임 파라켈수스"
+    },
+    "ヴォルフガング・アマデウス・モーツァルト": {
+      "JP": null,
+      "CN": "沃尔夫冈·阿马德乌斯·莫扎特",
+      "TW": "沃夫岡．阿瑪迪斯．莫札特",
+      "NA": "Wolfgang Amadeus Mozart",
+      "KR": "볼프강 아마데우스 모차르트"
+    },
+    "ヴラド三世": {
+      "JP": null,
+      "CN": "弗拉德三世",
+      "TW": "弗拉德三世",
+      "NA": "Vlad III",
+      "KR": "블라드 3세"
+    },
+    "ヴラド三世〔EXTRA〕": {
+      "JP": null,
+      "CN": "弗拉德三世〔EXTRA〕",
+      "TW": "弗拉德三世〔EXTRA〕",
+      "NA": "Vlad III (EXTRA)",
+      "KR": "블라드 3세(EXTRA)"
+    },
+    "ヴリトラ": {
+      "JP": null,
+      "CN": "弗栗多",
+      "TW": "弗栗多",
+      "NA": "Vritra",
+      "KR": "브리트라"
+    },
+    "上杉謙信": {
+      "JP": null,
+      "CN": "上杉谦信",
+      "TW": "上杉謙信",
+      "NA": "Uesugi Kenshin",
+      "KR": "우에스기 켄신"
+    },
+    "不夜城のアサシン": {
+      "JP": null,
+      "CN": "不夜城的Assassin",
+      "TW": "不夜城的Assassin",
+      "NA": "Assassin of the Nightless City",
+      "KR": "불야성의 어쌔신"
+    },
+    "不夜城のキャスター": {
+      "JP": null,
+      "CN": "不夜城的Caster",
+      "TW": "不夜城的Caster",
+      "NA": "Caster of the Nightless City",
+      "KR": "불야성의 캐스터"
+    },
+    "丑御前": {
+      "JP": null,
+      "CN": "丑御前",
+      "TW": "丑御前",
+      "NA": "Ushi Gozen",
+      "KR": "우시고젠"
+    },
+    "両儀式": {
+      "JP": null,
+      "CN": "两仪式",
+      "TW": "兩儀式",
+      "NA": "Ryougi Shiki",
+      "KR": "료기 시키"
+    },
+    "久遠寺有珠": {
+      "JP": null,
+      "CN": "久远寺有珠",
+      "TW": "久遠寺有珠",
+      "NA": "Kuonji Alice",
+      "KR": "쿠온지 아리스"
+    },
+    "九紋竜エリザ": {
+      "JP": null,
+      "CN": "九纹龙伊丽莎",
+      "TW": "九紋龍伊莉莎",
+      "NA": "Elisa the Nine-Tattooed Dragon",
+      "KR": "구문룡 엘리자"
+    },
+    "伊吹童子": {
+      "JP": null,
+      "CN": "伊吹童子",
+      "TW": "伊吹童子",
+      "NA": "Ibuki-Douji",
+      "KR": "이부키도지"
+    },
+    "佐々木小次郎": {
+      "JP": null,
+      "CN": "佐佐木小次郎",
+      "TW": "佐佐木小次郎",
+      "NA": "Sasaki Kojirou",
+      "KR": "사사키 코지로"
+    },
+    "俵藤太": {
+      "JP": null,
+      "CN": "俵藤太",
+      "TW": "俵藤太",
+      "NA": "Tawara Touta",
+      "KR": "타와라 토타"
+    },
+    "光のコヤンスカヤ": {
+      "JP": null,
+      "CN": "光之高扬斯卡娅",
+      "TW": "光之高揚斯卡婭",
+      "NA": "Koyanskaya of Light",
+      "KR": "빛의 코얀스카야"
+    },
+    "出雲阿国": {
+      "JP": null,
+      "CN": "出云阿国",
+      "TW": "出雲阿國",
+      "NA": "Izumo-no-Okuni",
+      "KR": "이즈모노 오쿠니"
+    },
+    "刑部姫": {
+      "JP": null,
+      "CN": "刑部姬",
+      "TW": "刑部姬",
+      "NA": "Osakabehime",
+      "KR": "오사카베히메"
+    },
+    "加藤段蔵": {
+      "JP": null,
+      "CN": "加藤段藏",
+      "TW": "加藤段藏",
+      "NA": "Katou \"Black Kite\" Danzo",
+      "KR": "카토 단조"
+    },
+    "千利休": {
+      "JP": null,
+      "CN": "千利休",
+      "TW": "千利休",
+      "NA": "Sen-no-Rikyu",
+      "KR": "센노 리큐"
+    },
+    "千子村正": {
+      "JP": null,
+      "CN": "千子村正",
+      "TW": "千子村正",
+      "NA": "Senji Muramasa",
+      "KR": "센지 무라마사"
+    },
+    "卑弥呼": {
+      "JP": null,
+      "CN": "卑弥呼",
+      "TW": "卑彌呼",
+      "NA": "Himiko",
+      "KR": "히미코"
+    },
+    "原田左之助": {
+      "JP": null,
+      "CN": "原田左之助",
+      "TW": null,
+      "NA": "Harada Sanosuke",
+      "KR": null
+    },
+    "司馬懿": {
+      "JP": null,
+      "CN": "莱妮丝",
+      "TW": "司馬懿〔萊涅絲〕",
+      "NA": "Sima Yi",
+      "KR": "사마의"
+    },
+    "司馬懿〔ライネス〕": {
+      "JP": null,
+      "CN": "司马懿〔莱妮丝〕",
+      "TW": "司馬懿〔萊涅絲〕",
+      "NA": "Sima Yi (Reines)",
+      "KR": "사마의(라이네스)"
+    },
+    "呂布": {
+      "JP": null,
+      "CN": "吕布",
+      "TW": "呂布奉先",
+      "NA": "Lu Bu",
+      "KR": "여포"
+    },
+    "呂布奉先": {
+      "JP": null,
+      "CN": "吕布奉先",
+      "TW": "呂布奉先",
+      "NA": "Lu Bu Fengxian",
+      "KR": "여포 봉선"
+    },
+    "呪腕のハサン": {
+      "JP": null,
+      "CN": "咒腕哈桑",
+      "TW": "咒腕的哈桑",
+      "NA": "Hassan of the Cursed Arm",
+      "KR": "주완의 하산"
+    },
+    "呼延灼": {
+      "JP": null,
+      "CN": "呼延灼",
+      "TW": "呼延灼",
+      "NA": "Huyan Zhuo",
+      "KR": "호연작"
+    },
+    "哪吒": {
+      "JP": null,
+      "CN": "哪吒",
+      "TW": "哪吒",
+      "NA": "Nezha",
+      "KR": "나타"
+    },
+    "土方歳三": {
+      "JP": null,
+      "CN": "土方岁三",
+      "TW": "土方歲三",
+      "NA": "Hijikata Toshizo",
+      "KR": "히지카타 토시조"
+    },
+    "坂本龍馬": {
+      "JP": null,
+      "CN": "坂本龙马",
+      "TW": "坂本龍馬",
+      "NA": "Sakamoto Ryouma",
+      "KR": "사카모토 료마"
+    },
+    "坂田金時": {
+      "JP": null,
+      "CN": "坂田金时",
+      "TW": "坂田金時",
+      "NA": "Sakata Kintoki",
+      "KR": "사카타 킨토키"
+    },
+    "壱与": {
+      "JP": null,
+      "CN": "壹与",
+      "TW": "臺與",
+      "NA": "Iyo",
+      "KR": "이요"
+    },
+    "大いなる石像神": {
+      "JP": null,
+      "CN": "伟大的石像神",
+      "TW": "偉大的石像神",
+      "NA": "Great Stone Statue God",
+      "KR": "위대한 석상신"
+    },
+    "大黒天": {
+      "JP": null,
+      "CN": "大黑天",
+      "TW": "大黑天",
+      "NA": "Daikokuten",
+      "KR": "대흑천"
+    },
+    "天草四郎": {
+      "JP": null,
+      "CN": "天草四郎",
+      "TW": "天草四郎",
+      "NA": "Amakusa Shirou",
+      "KR": "아마쿠사 시로"
+    },
+    "太公望": {
+      "JP": null,
+      "CN": "太公望",
+      "TW": "太公望",
+      "NA": "Taigong Wang",
+      "KR": "태공망"
+    },
+    "太歳星君": {
+      "JP": null,
+      "CN": "太岁星君",
+      "TW": "太歲星君",
+      "NA": "Taisui Xingjun",
+      "KR": "태세성군"
+    },
+    "女教皇ヨハンナ": {
+      "JP": null,
+      "CN": "女教皇若安",
+      "TW": "女教皇瓊安",
+      "NA": "Pope Johanna",
+      "KR": "여교황 요한나"
+    },
+    "女王メイヴ": {
+      "JP": null,
+      "CN": "女王梅芙",
+      "TW": "女王梅芙",
+      "NA": "Queen Medb",
+      "KR": "여왕 메이브"
+    },
+    "妖精騎士ガウェイン": {
+      "JP": null,
+      "CN": "妖精骑士高文",
+      "TW": "妖精騎士高文",
+      "NA": "Tam Lin Gawain",
+      "KR": "요정기사 가웨인"
+    },
+    "妖精騎士トリスタン": {
+      "JP": null,
+      "CN": "妖精骑士崔斯坦",
+      "TW": "妖精騎士崔斯坦",
+      "NA": "Tam Lin Tristan",
+      "KR": "요정기사 트리스탄"
+    },
+    "妖精騎士バーゲスト": {
+      "JP": null,
+      "CN": "妖精骑士巴格斯特",
+      "TW": "妖精騎士巴格斯特",
+      "NA": "Tam Lin Barghest",
+      "KR": "요정기사 바게스트"
+    },
+    "妖精騎士ランスロット": {
+      "JP": null,
+      "CN": "妖精骑士兰斯洛特",
+      "TW": "妖精騎士蘭斯洛特",
+      "NA": "Tam Lin Lancelot",
+      "KR": "요정기사 랜슬롯"
+    },
+    "始皇帝": {
+      "JP": null,
+      "CN": "始皇帝",
+      "TW": "始皇帝",
+      "NA": "Qin Shi Huang",
+      "KR": "시황제"
+    },
+    "子ギル": {
+      "JP": null,
+      "CN": "幼吉尔",
+      "TW": "子吉爾",
+      "NA": "Gilgamesh (Child)",
+      "KR": "꼬마 길"
+    },
+    "宇津見エリセ": {
+      "JP": null,
+      "CN": "宇津见绘里濑",
+      "TW": "宇津見繪里世",
+      "NA": "Utsumi Erice",
+      "KR": "우츠미 에리세"
+    },
+    "宝蔵院胤舜": {
+      "JP": null,
+      "CN": "宝藏院胤舜",
+      "TW": "寶藏院胤舜",
+      "NA": "Houzouin Inshun",
+      "KR": "호조인 인슈운"
+    },
+    "宮本伊織": {
+      "JP": null,
+      "CN": "宫本伊织",
+      "TW": "宮本伊織",
+      "NA": "Miyamoto Iori",
+      "KR": "미야모토 이오리"
+    },
+    "宮本武蔵": {
+      "JP": null,
+      "CN": "宫本武藏",
+      "TW": "宮本武藏",
+      "NA": "Miyamoto Musashi",
+      "KR": "미야모토 무사시"
+    },
+    "小次郎": {
+      "JP": null,
+      "CN": "小次郎",
+      "TW": "小次郎",
+      "NA": "Kojirou",
+      "KR": "코지로"
+    },
+    "小野小町": {
+      "JP": null,
+      "CN": "小野小町",
+      "TW": "小野小町",
+      "NA": "Ono no Komachi",
+      "KR": null
+    },
+    "山南敬助": {
+      "JP": null,
+      "CN": "山南敬助",
+      "TW": "山南敬助",
+      "NA": "Yamanami Keisuke",
+      "KR": "야마나미 케이스케"
+    },
+    "岡田以蔵": {
+      "JP": null,
+      "CN": "冈田以藏",
+      "TW": "岡田以藏",
+      "NA": "Okada Izo",
+      "KR": "오카다 이조"
+    },
+    "岸波白野": {
+      "JP": null,
+      "CN": "岸波白野",
+      "TW": "岸波白野",
+      "NA": "Kishinami Hakuno",
+      "KR": "키시나미 하쿠노"
+    },
+    "巌窟王": {
+      "JP": null,
+      "CN": "岩窟王",
+      "TW": "巖窟王",
+      "NA": "Edmond Dantès",
+      "KR": "암굴왕"
+    },
+    "巌窟王　モンテ・クリスト": {
+      "JP": null,
+      "CN": "岩窟王　基督山",
+      "TW": "巖窟王　基督山",
+      "NA": "Monte Cristo",
+      "KR": "암굴왕 몽테크리스토"
+    },
+    "巌窟王モンテ・クリスト": {
+      "JP": null,
+      "CN": "岩窟王基督山",
+      "TW": "巖窟王基督山",
+      "NA": "Monte Cristo",
+      "KR": "암굴왕 몽테크리스토"
+    },
+    "巴御前": {
+      "JP": null,
+      "CN": "巴御前",
+      "TW": "巴御前",
+      "NA": "Tomoe Gozen",
+      "KR": "토모에고젠"
+    },
+    "平景清": {
+      "JP": null,
+      "CN": "平景清",
+      "TW": "平景清",
+      "NA": "Taira-no-Kagekiyo",
+      "KR": "타이라노 카게키요"
+    },
+    "弁慶": {
+      "JP": null,
+      "CN": "弁庆",
+      "TW": "弁慶",
+      "NA": "Benkei",
+      "KR": "벤케이"
+    },
+    "張角": {
+      "JP": null,
+      "CN": "张角",
+      "TW": "張角",
+      "NA": "Zhang Jue",
+      "KR": "장각"
+    },
+    "徐福": {
+      "JP": null,
+      "CN": "徐福",
+      "TW": "徐福",
+      "NA": "Xu Fu",
+      "KR": "서복"
+    },
+    "徴姉妹": {
+      "JP": null,
+      "CN": "征氏姐妹",
+      "TW": "徵氏姐妹",
+      "NA": "Hai Bà Trưng",
+      "KR": "쯩 자매"
+    },
+    "救世主トネリコ": {
+      "JP": null,
+      "CN": "救世主梣",
+      "TW": "救世主托內莉可",
+      "NA": "Aesc the Savior",
+      "KR": "구세주 토네리코"
+    },
+    "教えて！シエル先生": {
+      "JP": null,
+      "CN": "教教我吧！希耶尔老师",
+      "TW": "請教教我！希耶爾老師",
+      "NA": "Teach Me! Miss Ciel",
+      "KR": "가르쳐 줘! 시엘 선생님"
+    },
+    "斎藤一": {
+      "JP": null,
+      "CN": "斋藤一",
+      "TW": "齋藤一",
+      "NA": "Saito Hajime",
+      "KR": "사이토 하지메"
+    },
+    "新宿のアサシン": {
+      "JP": null,
+      "CN": "新宿的Assassin",
+      "TW": "新宿的Assassin",
+      "NA": "Assassin of Shinjuku",
+      "KR": "신주쿠의 어쌔신"
+    },
+    "新宿のアヴェンジャー": {
+      "JP": null,
+      "CN": "新宿的Avenger",
+      "TW": "新宿的Avenger",
+      "NA": "Avenger of Shinjuku",
+      "KR": "신주쿠의 어벤저"
+    },
+    "新宿のアーチャー": {
+      "JP": null,
+      "CN": "新宿的Archer",
+      "TW": "新宿的Archer",
+      "NA": "Archer of Shinjuku",
+      "KR": "신주쿠의 아처"
+    },
+    "曲亭馬琴": {
+      "JP": null,
+      "CN": "曲亭马琴",
+      "TW": "曲亭馬琴",
+      "NA": "Kyokutei Bakin",
+      "KR": "쿄쿠테이 바킨"
+    },
+    "朔月美遊": {
+      "JP": null,
+      "CN": "朔月美游",
+      "TW": "朔月美遊",
+      "NA": "Miyu Sakatsuki",
+      "KR": null
+    },
+    "望月千代女": {
+      "JP": null,
+      "CN": "望月千代女",
+      "TW": "望月千代女",
+      "NA": "Mochizuki Chiyome",
+      "KR": "모치즈키 치요메"
+    },
+    "杉谷善住坊": {
+      "JP": null,
+      "CN": "杉谷善住坊",
+      "TW": "杉谷善住坊",
+      "NA": "Sugitani Zenjubou",
+      "KR": "스기타니 젠쥬보"
+    },
+    "李書文": {
+      "JP": null,
+      "CN": "李书文",
+      "TW": "李書文",
+      "NA": "Li Shuwen",
+      "KR": "이서문"
+    },
+    "果心居士": {
+      "JP": null,
+      "CN": "果心居士",
+      "TW": "果心居士",
+      "NA": "Kashin Koji",
+      "KR": "카신 거사"
+    },
+    "柳生但馬守": {
+      "JP": null,
+      "CN": "柳生但马守",
+      "TW": "柳生但馬守",
+      "NA": "Yagyu Tajima-no-kami",
+      "KR": "야규 무네노리"
+    },
+    "柳生但馬守宗矩": {
+      "JP": null,
+      "CN": "柳生但马守宗矩",
+      "TW": "柳生但馬守宗矩",
+      "NA": "Yagyu Tajima-no-kami Munenori",
+      "KR": "야규 타지마노카미 무네노리"
+    },
+    "森長可": {
+      "JP": null,
+      "CN": "森长可",
+      "TW": "森長可",
+      "NA": "Mori Nagayoshi",
+      "KR": "모리 나가요시"
+    },
+    "楊貴妃": {
+      "JP": null,
+      "CN": "杨贵妃",
+      "TW": "楊貴妃",
+      "NA": "Yang Guifei",
+      "KR": "양귀비"
+    },
+    "武則天": {
+      "JP": null,
+      "CN": "武则天",
+      "TW": "武則天",
+      "NA": "Wu Zetian",
+      "KR": "무측천"
+    },
+    "武田信玄": {
+      "JP": null,
+      "CN": "武田信玄",
+      "TW": "武田信玄",
+      "NA": "Takeda Shingen",
+      "KR": "타케다 신겐"
+    },
+    "武田晴信": {
+      "JP": null,
+      "CN": "武田晴信",
+      "TW": "武田晴信",
+      "NA": "Takeda Harunobu",
+      "KR": "타케다 하루노부"
+    },
+    "武蔵坊弁慶": {
+      "JP": null,
+      "CN": "武藏坊弁庆",
+      "TW": "武藏坊弁慶",
+      "NA": "Musashibou Benkei",
+      "KR": "무사시보 벤케이"
+    },
+    "殺生院キアラ": {
+      "JP": null,
+      "CN": "杀生院祈荒",
+      "TW": "殺生院祈荒",
+      "NA": "Sessyoin Kiara",
+      "KR": "셋쇼인 키아라"
+    },
+    "水妃モルガン": {
+      "JP": null,
+      "CN": "水妃摩根",
+      "TW": "水妃摩根",
+      "NA": "Morgan, Lady of the Water",
+      "KR": "수비 모르간"
+    },
+    "永倉新八": {
+      "JP": null,
+      "CN": "永仓新八",
+      "TW": "永倉新八",
+      "NA": "Nagakura Shinpachi",
+      "KR": "나가쿠라 신파치"
+    },
+    "沖田総司": {
+      "JP": null,
+      "CN": "冲田总司",
+      "TW": "沖田總司",
+      "NA": "Okita Souji",
+      "KR": "오키타 소지"
+    },
+    "沖田総司〔オルタ〕": {
+      "JP": null,
+      "CN": "冲田总司〔Alter〕",
+      "TW": "沖田總司〔Alter〕",
+      "NA": "Okita Souji (Alter)",
+      "KR": "오키타 소지(얼터)"
+    },
+    "河上彦斎": {
+      "JP": null,
+      "CN": "河上彦斋",
+      "TW": null,
+      "NA": "Kawakami Gensai",
+      "KR": null
+    },
+    "浅上藤乃": {
+      "JP": null,
+      "CN": "浅上藤乃",
+      "TW": "淺上藤乃",
+      "NA": "Asagami Fujino",
+      "KR": "아사가미 후지노"
+    },
+    "清姫": {
+      "JP": null,
+      "CN": "清姬",
+      "TW": "清姬",
+      "NA": "Kiyohime",
+      "KR": "키요히메"
+    },
+    "清少納言": {
+      "JP": null,
+      "CN": "清少纳言",
+      "TW": "清少納言",
+      "NA": "Sei Shounagon",
+      "KR": "세이 쇼나곤"
+    },
+    "渡辺綱": {
+      "JP": null,
+      "CN": "渡边纲",
+      "TW": "渡邊綱",
+      "NA": "Watanabe-no-Tsuna",
+      "KR": "와타나베노 츠나"
+    },
+    "源為朝": {
+      "JP": null,
+      "CN": "源为朝",
+      "TW": "源為朝",
+      "NA": "Minamoto-no-Tametomo",
+      "KR": "미나모토노 타메토모"
+    },
+    "源頼光": {
+      "JP": null,
+      "CN": "源赖光",
+      "TW": "源賴光",
+      "NA": "Minamoto-no-Raikou",
+      "KR": "미나모토노 라이코"
+    },
+    "源頼光／丑御前": {
+      "JP": null,
+      "CN": "源赖光／丑御前",
+      "TW": "源賴光／丑御前",
+      "NA": "Minamoto-no-Raikou/Ushi Gozen",
+      "KR": "미나모토노 라이코/우시고젠"
+    },
+    "煉獄オルタ": {
+      "JP": null,
+      "CN": "炼狱Alter",
+      "TW": "煉獄Alter",
+      "NA": "Rengoku Alter",
+      "KR": "연옥 얼터"
+    },
+    "燕青": {
+      "JP": null,
+      "CN": "燕青",
+      "TW": "燕青",
+      "NA": "Yan Qing",
+      "KR": "연청"
+    },
+    "牛若丸": {
+      "JP": null,
+      "CN": "牛若丸",
+      "TW": "牛若丸",
+      "NA": "Ushiwakamaru",
+      "KR": "우시와카마루"
+    },
+    "獅子心王": {
+      "JP": null,
+      "CN": "狮心王",
+      "TW": "獅心王",
+      "NA": "Richard the Lionheart",
+      "KR": "사자심왕"
+    },
+    "獅子心王リチャード": {
+      "JP": null,
+      "CN": "狮心王理查",
+      "TW": "獅心王理查",
+      "NA": "Richard the Lionheart",
+      "KR": "사자심왕 리처드"
+    },
+    "玄奘三蔵": {
+      "JP": null,
+      "CN": "玄奘三藏",
+      "TW": "玄奘三藏",
+      "NA": "Xuanzang Sanzang",
+      "KR": "현장 삼장"
+    },
+    "玉兎": {
+      "JP": null,
+      "CN": "玉兔",
+      "TW": "玉兔",
+      "NA": "Jade Rabbit",
+      "KR": null
+    },
+    "玉兎輝夜": {
+      "JP": null,
+      "CN": "玉兔辉夜",
+      "TW": "玉兔輝夜",
+      "NA": "Jade Rabbit Kaguya",
+      "KR": null
+    },
+    "玉藻の前": {
+      "JP": null,
+      "CN": "玉藻前",
+      "TW": "玉藻前",
+      "NA": "Tamamo-no-Mae",
+      "KR": "타마모노마에"
+    },
+    "由井正雪": {
+      "JP": null,
+      "CN": "由井正雪",
+      "TW": "由井正雪",
+      "NA": "Yui Shousetsu",
+      "KR": "유이 쇼세츠"
+    },
+    "百貌のハサン": {
+      "JP": null,
+      "CN": "百貌哈桑",
+      "TW": "百貌的哈桑",
+      "NA": "Hassan of the Hundred Personas",
+      "KR": "백모의 하산"
+    },
+    "秦良玉": {
+      "JP": null,
+      "CN": "秦良玉",
+      "TW": "秦良玉",
+      "NA": "Qin Liangyu",
+      "KR": "진양옥"
+    },
+    "紅閻魔": {
+      "JP": null,
+      "CN": "红阎魔",
+      "TW": "紅閻魔",
+      "NA": "Beni-Enma",
+      "KR": "베니엔마"
+    },
+    "紫式部": {
+      "JP": null,
+      "CN": "紫式部",
+      "TW": "紫式部",
+      "NA": "Murasaki Shikibu",
+      "KR": "무라사키 시키부"
+    },
+    "終わりのエリザベート": {
+      "JP": null,
+      "CN": "终结之伊丽莎白",
+      "TW": null,
+      "NA": "Elisabeth of the End",
+      "KR": null
+    },
+    "織田信勝": {
+      "JP": null,
+      "CN": "织田信胜",
+      "TW": "織田信勝",
+      "NA": "Oda Nobukatsu",
+      "KR": "오다 노부카츠"
+    },
+    "織田信長": {
+      "JP": null,
+      "CN": "织田信长",
+      "TW": "織田信長",
+      "NA": "Oda Nobunaga",
+      "KR": "오다 노부나가"
+    },
+    "織田吉法師": {
+      "JP": null,
+      "CN": "织田吉法师",
+      "TW": "織田吉法師",
+      "NA": "Oda Kippoushi",
+      "KR": "오다 킷포시"
+    },
+    "美遊": {
+      "JP": null,
+      "CN": "美游",
+      "TW": "美遊",
+      "NA": "Miyu",
+      "KR": "미유"
+    },
+    "美遊・エーデルフェルト": {
+      "JP": null,
+      "CN": "美游·艾德费尔特",
+      "TW": "美遊．艾蒂菲爾特",
+      "NA": "Miyu Edelfelt",
+      "KR": "미유 에델펠트"
+    },
+    "耀星のハサン": {
+      "JP": null,
+      "CN": "耀星哈桑",
+      "TW": "耀星的哈桑",
+      "NA": "Hassan of the Shining Star",
+      "KR": "요성의 하산"
+    },
+    "花咲翁": {
+      "JP": null,
+      "CN": "花咲翁",
+      "TW": null,
+      "NA": "Hanasaka no Okina",
+      "KR": null
+    },
+    "茨木童子": {
+      "JP": null,
+      "CN": "茨木童子",
+      "TW": "茨木童子",
+      "NA": "Ibaraki-Douji",
+      "KR": "이바라키도지"
+    },
+    "茶々": {
+      "JP": null,
+      "CN": "茶茶",
+      "TW": "茶茶",
+      "NA": "Chacha",
+      "KR": "차차"
+    },
+    "荊軻": {
+      "JP": null,
+      "CN": "荆轲",
+      "TW": "荊軻",
+      "NA": "Jing Ke",
+      "KR": "형가"
+    },
+    "葛飾北斎": {
+      "JP": null,
+      "CN": "葛饰北斋",
+      "TW": "葛飾北齋",
+      "NA": "Katsushika Hokusai",
+      "KR": "카츠시카 호쿠사이"
+    },
+    "蒼崎青子": {
+      "JP": null,
+      "CN": "苍崎青子",
+      "TW": "蒼崎青子",
+      "NA": "Aozaki Aoko",
+      "KR": "아오자키 아오코"
+    },
+    "藤堂平助": {
+      "JP": null,
+      "CN": "藤堂平助",
+      "TW": null,
+      "NA": "Tōdō Heisuke",
+      "KR": null
+    },
+    "蘆屋道満": {
+      "JP": null,
+      "CN": "芦屋道满",
+      "TW": "蘆屋道滿",
+      "NA": "Ashiya Douman",
+      "KR": "아시야 도만"
+    },
+    "蘭丸X": {
+      "JP": null,
+      "CN": "兰丸X",
+      "TW": "蘭丸X",
+      "NA": "Ranmaru X",
+      "KR": "란마루 X"
+    },
+    "蘭陵王": {
+      "JP": null,
+      "CN": "兰陵王",
+      "TW": "蘭陵王",
+      "NA": "Prince of Lan Ling",
+      "KR": "난릉왕"
+    },
+    "虞美人": {
+      "JP": null,
+      "CN": "虞美人",
+      "TW": "虞美人",
+      "NA": "Yu Mei-ren",
+      "KR": "우미인"
+    },
+    "蛇女房": {
+      "JP": null,
+      "CN": "蛇女房",
+      "TW": null,
+      "NA": "Hebi Nyōbō",
+      "KR": null
+    },
+    "言峰神父": {
+      "JP": null,
+      "CN": "言峰神父",
+      "TW": "言峰神父",
+      "NA": "Father Kotomine",
+      "KR": "코토미네 신부"
+    },
+    "言峰綺礼": {
+      "JP": null,
+      "CN": "言峰绮礼",
+      "TW": "言峰綺禮",
+      "NA": "Kotomine Kirei",
+      "KR": "코토미네 키레이"
+    },
+    "諸葛孔明": {
+      "JP": null,
+      "CN": "诸葛孔明",
+      "TW": "諸葛孔明",
+      "NA": "Zhuge Liang",
+      "KR": "제갈공명"
+    },
+    "諸葛孔明〔エルメロイⅡ世〕": {
+      "JP": null,
+      "CN": "诸葛孔明〔埃尔梅罗Ⅱ世〕",
+      "TW": "諸葛孔明〔埃爾梅羅Ⅱ世〕",
+      "NA": "Zhuge Liang (Lord El-Melloi II)",
+      "KR": "제갈공명(엘멜로이 2세)"
+    },
+    "謎のアイドルX〔オルタ〕": {
+      "JP": null,
+      "CN": "谜之偶像X〔Alter〕",
+      "TW": "謎之偶像X〔Alter〕",
+      "NA": "Mysterious Idol X (Alter)",
+      "KR": "수수께끼의 아이돌 X(얼터)"
+    },
+    "謎のアルターエゴ・Λ": {
+      "JP": null,
+      "CN": "谜之Alterego·Λ",
+      "TW": "謎之Alterego．Λ",
+      "NA": "Mysterious Alter Ego Λ",
+      "KR": "수수께끼의 얼터에고・Λ"
+    },
+    "謎のヒロインX": {
+      "JP": null,
+      "CN": "谜之女主角X",
+      "TW": "謎之女主角X",
+      "NA": "Mysterious Heroine X",
+      "KR": "수수께끼의 히로인 X"
+    },
+    "謎のヒロインXX": {
+      "JP": null,
+      "CN": "谜之女主角XX",
+      "TW": "謎之女主角XX",
+      "NA": "Mysterious Heroine XX",
+      "KR": "수수께끼의 히로인 XX"
+    },
+    "謎のヒロインXX〔オルタ〕": {
+      "JP": null,
+      "CN": "谜之女主角XX〔Alter〕",
+      "TW": "謎之女主角XX〔Alter〕",
+      "NA": "Mysterious Heroine XX (Alter)",
+      "KR": "수수께끼의 히로인 XX(얼터)"
+    },
+    "謎のヒロインX〔オルタ〕": {
+      "JP": null,
+      "CN": "谜之女主角X〔Alter〕",
+      "TW": "謎之女主角X〔Alter〕",
+      "NA": "Mysterious Heroine X (Alter)",
+      "KR": "수수께끼의 히로인 X(얼터)"
+    },
+    "謎の代行者C.I.E.L": {
+      "JP": null,
+      "CN": "谜之代行者C.I.E.L",
+      "TW": "謎之代行者C.I.E.L",
+      "NA": "Mysterious Executor C.I.E.L",
+      "KR": "수수께끼의 대행자 C.I.E.L"
+    },
+    "謎の蘭丸X": {
+      "JP": null,
+      "CN": "谜之兰丸X",
+      "TW": "謎之蘭丸X",
+      "NA": "Mysterious Ranmaru X",
+      "KR": "수수께끼의 란마루 X"
+    },
+    "赤兎馬": {
+      "JP": null,
+      "CN": "赤兔马",
+      "TW": "赤兔馬",
+      "NA": "Red Hare",
+      "KR": "적토마"
+    },
+    "超人オリオン": {
+      "JP": null,
+      "CN": "超人俄里翁",
+      "TW": "超人俄里翁",
+      "NA": "Super Orion",
+      "KR": "초인 오리온"
+    },
+    "近藤勇": {
+      "JP": null,
+      "CN": "近藤勇",
+      "TW": null,
+      "NA": "Kondo Isami",
+      "KR": null
+    },
+    "酒呑童子": {
+      "JP": null,
+      "CN": "酒吞童子",
+      "TW": "酒吞童子",
+      "NA": "Shuten-Douji",
+      "KR": "슈텐도지"
+    },
+    "鈴鹿御前": {
+      "JP": null,
+      "CN": "铃鹿御前",
+      "TW": "鈴鹿御前",
+      "NA": "Suzuka Gozen",
+      "KR": "스즈카고젠"
+    },
+    "鈴鹿御前〔サマバケ〕": {
+      "JP": null,
+      "CN": "铃鹿御前〔暑假〕",
+      "TW": "鈴鹿御前〔暑假〕",
+      "NA": "Suzuka Gozen (Vacay)",
+      "KR": "스즈카고젠[서머베케]"
+    },
+    "長尾景虎": {
+      "JP": null,
+      "CN": "长尾景虎",
+      "TW": "長尾景虎",
+      "NA": "Nagao Kagetora",
+      "KR": "나가오 카게토라"
+    },
+    "闇のコヤンスカヤ": {
+      "JP": null,
+      "CN": "暗之高扬斯卡娅",
+      "TW": "暗之高揚斯卡婭",
+      "NA": "Koyanskaya of Dark",
+      "KR": "어둠의 코얀스카야"
+    },
+    "阿曇磯良": {
+      "JP": null,
+      "CN": "阿昙矶良",
+      "TW": "阿曇磯良",
+      "NA": "Azumi-no-Isora",
+      "KR": "아즈미노 이소라"
+    },
+    "陳宮": {
+      "JP": null,
+      "CN": "陈宫",
+      "TW": "陳宮",
+      "NA": "Chen Gong",
+      "KR": "진궁"
+    },
+    "雑賀孫一": {
+      "JP": null,
+      "CN": "杂贺孙一",
+      "TW": "雜賀孫一",
+      "NA": "Saika Magoichi",
+      "KR": "사이카 마고이치"
+    },
+    "雨の魔女トネリコ": {
+      "JP": null,
+      "CN": "雨之魔女梣",
+      "TW": "雨之魔女托內莉可",
+      "NA": "Aesc the Rain Witch",
+      "KR": "비의 마녀 토네리코"
+    },
+    "静希草十郎": {
+      "JP": null,
+      "CN": "静希草十郎",
+      "TW": "靜希草十郎",
+      "NA": "Sizuki Soujyuro",
+      "KR": "시즈키 소쥬로"
+    },
+    "静謐のハサン": {
+      "JP": null,
+      "CN": "静谧哈桑",
+      "TW": "靜謐的哈桑",
+      "NA": "Hassan of the Serenity",
+      "KR": "정밀의 하산"
+    },
+    "項羽": {
+      "JP": null,
+      "CN": "项羽",
+      "TW": "項羽",
+      "NA": "Xiang Yu",
+      "KR": "항우"
+    },
+    "風魔小太郎": {
+      "JP": null,
+      "CN": "风魔小太郎",
+      "TW": "風魔小太郎",
+      "NA": "Fuuma \"Evil-wind\" Kotarou",
+      "KR": "후마 코타로"
+    },
+    "駒姫": {
+      "JP": null,
+      "CN": "驹姬",
+      "TW": "駒姬",
+      "NA": "Komahime",
+      "KR": "코마히메"
+    },
+    "高杉晋作": {
+      "JP": null,
+      "CN": "高杉晋作",
+      "TW": "高杉晉作",
+      "NA": "Takasugi Shinsaku",
+      "KR": "타카스기 신사쿠"
+    },
+    "鬼一法眼": {
+      "JP": null,
+      "CN": "鬼一法眼",
+      "TW": "鬼一法眼",
+      "NA": "Kiichi Hogen",
+      "KR": "키이치 호겐"
+    },
+    "鬼女紅葉": {
+      "JP": null,
+      "CN": "鬼女红叶",
+      "TW": "鬼女紅葉",
+      "NA": "Kijyo Koyo",
+      "KR": "귀녀 코요"
+    },
+    "魔王信長": {
+      "JP": null,
+      "CN": "魔王信长",
+      "TW": "魔王信長",
+      "NA": "Demon King Nobunaga",
+      "KR": "마왕 노부나가"
+    },
+    "魔神王ゲーティア": {
+      "JP": null,
+      "CN": "魔神王盖提亚",
+      "TW": "魔神王蓋堤亞",
+      "NA": "Goetia",
+      "KR": "마신왕 게티아"
+    },
+    "魔セイバー": {
+      "JP": null,
+      "CN": "魔剑士",
+      "TW": "魔Saber",
+      "NA": "Majin Saber",
+      "KR": "마신 세이버"
+    },
+    "魔・沖田総司": {
+      "JP": null,
+      "CN": "魔·冲田总司",
+      "TW": "魔．沖田總司",
+      "NA": "Okita Souji (Alter)",
+      "KR": "마신・오키타 소지"
+    },
+    "黄飛虎": {
+      "JP": null,
+      "CN": "黄飞虎",
+      "TW": "黃飛虎",
+      "NA": "Huang Feihu",
+      "KR": "황비호"
+    },
+    "黒姫": {
+      "JP": null,
+      "CN": "黑姬",
+      "TW": "黑姬",
+      "NA": "Kurohime",
+      "KR": null
+    },
+    "ＢＢ": {
+      "JP": null,
+      "CN": "BB",
+      "TW": "BB",
+      "NA": "BB",
+      "KR": "BB"
+    },
+    "ＢＢコスモ": {
+      "JP": null,
+      "CN": "ＢＢ宇宙",
+      "TW": "BB宇宙",
+      "NA": "BB Cosmos",
+      "KR": "BB 코스모"
+    },
+    "ＢＢドバイ": {
+      "JP": null,
+      "CN": "ＢＢ迪拜",
+      "TW": "BB杜拜",
+      "NA": "BB Dubai",
+      "KR": "BB 두바이"
+    },
+    "Ｅ－アクアマリー": {
+      "JP": null,
+      "CN": "Ｅ－水玛丽",
+      "TW": "Ｅ−水瑪麗",
+      "NA": "E-Aqua Marie",
+      "KR": "E-아쿠아마리"
+    },
+    "Ｅ－グランマリー": {
+      "JP": null,
+      "CN": "Ｅ－宏玛丽",
+      "TW": "E-宏偉瑪麗",
+      "NA": "E-Grand Marie",
+      "KR": null
+    },
+    "Ｅ－ステラマリー": {
+      "JP": null,
+      "CN": "E－星玛丽",
+      "TW": "E-星瑪麗",
+      "NA": "E-Stellar Marie",
+      "KR": null
+    },
+    "Ｅ－フレアマリー": {
+      "JP": null,
+      "CN": "Ｅ－火玛丽",
+      "TW": "Ｅ−火瑪麗",
+      "NA": "E-Flare Marie",
+      "KR": "E-플레어마리"
+    },
+    "Ｓ・ファンタズムーン": {
+      "JP": null,
+      "CN": "S·Phantasmoon",
+      "TW": "S Phantasmoon",
+      "NA": "S Phantasmoon",
+      "KR": null
+    },
+    "Ｕ－オルガマリー": {
+      "JP": null,
+      "CN": "U－奥尔加玛丽",
+      "TW": "U－奧爾嘉瑪麗",
+      "NA": "U-Olga Marie",
+      "KR": "U-올가마리"
+    },
+    "ＵＤＫ－バーゲスト": {
+      "JP": null,
+      "CN": "ＵＤＫ－巴格斯特",
+      "TW": "ＵＤＫ－巴格斯特",
+      "NA": "UDK-Barghest",
+      "KR": "UDK-바게스트"
+    }
+  },
+  "traits": {
+    "1": {
+      "JP": "性別:男性",
+      "CN": "性别:男性",
+      "TW": "性別:男性",
+      "NA": "Gender:Male",
+      "KR": "성별:남성"
+    },
+    "2": {
+      "JP": "性別:女性",
+      "CN": "性别:女性",
+      "TW": "性別:女性",
+      "NA": "Gender:Female",
+      "KR": "성별:여성"
+    },
+    "3": {
+      "JP": "性別:不明",
+      "CN": "性别:不明",
+      "TW": "性別:不明",
+      "NA": "Gender:Unknown",
+      "KR": "성별:불명"
+    },
+    "100": {
+      "JP": "クラス:セイバー",
+      "CN": "职阶:Saber",
+      "TW": "職階:Saber",
+      "NA": "Class:Saber",
+      "KR": "클래스:세이버"
+    },
+    "101": {
+      "JP": "クラス:ランサー",
+      "CN": "职阶:Lancer",
+      "TW": "職階:Lancer",
+      "NA": "Class:Lancer",
+      "KR": "클래스:랜서"
+    },
+    "102": {
+      "JP": "クラス:アーチャー",
+      "CN": "职阶:Archer",
+      "TW": "職階:Archer",
+      "NA": "Class:Archer",
+      "KR": "클래스:아처"
+    },
+    "103": {
+      "JP": "クラス:ライダー",
+      "CN": "职阶:Rider",
+      "TW": "職階:Rider",
+      "NA": "Class:Rider",
+      "KR": "클래스:라이더"
+    },
+    "104": {
+      "JP": "クラス:キャスター",
+      "CN": "职阶:Caster",
+      "TW": "職階:Caster",
+      "NA": "Class:Caster",
+      "KR": "클래스:캐스터"
+    },
+    "105": {
+      "JP": "クラス:アサシン",
+      "CN": "职阶:Assassin",
+      "TW": "職階:Assassin",
+      "NA": "Class:Assassin",
+      "KR": "클래스:어쌔신"
+    },
+    "106": {
+      "JP": "クラス:バーサーカー",
+      "CN": "职阶:Berserker",
+      "TW": "職階:Berserker",
+      "NA": "Class:Berserker",
+      "KR": "클래스:버서커"
+    },
+    "107": {
+      "JP": "クラス:シールダー",
+      "CN": "职阶:Shielder",
+      "TW": "職階:Shielder",
+      "NA": "Class:Shielder",
+      "KR": "클래스:실더"
+    },
+    "108": {
+      "JP": "クラス:ルーラー",
+      "CN": "职阶:Ruler",
+      "TW": "職階:Ruler",
+      "NA": "Class:Ruler",
+      "KR": "클래스:룰러"
+    },
+    "109": {
+      "JP": "クラス:アルターエゴ",
+      "CN": "职阶:Alterego",
+      "TW": "職階:Alterego",
+      "NA": "Class:Alterego",
+      "KR": "클래스:얼터에고"
+    },
+    "110": {
+      "JP": "クラス:アヴェンジャー",
+      "CN": "职阶:Avenger",
+      "TW": "職階:Avenger",
+      "NA": "Class:Avenger",
+      "KR": "클래스:어벤저"
+    },
+    "111": {
+      "JP": "クラス:魔神柱",
+      "CN": "职阶:魔神柱",
+      "TW": "職階:魔神柱",
+      "NA": "Class:DemonGodPillar",
+      "KR": "클래스:마신주"
+    },
+    "112": {
+      "JP": "クラス:グランドキャスター(ソロモン)",
+      "CN": "职阶:Grand Caster(所罗门)",
+      "TW": "職階:Grand Caster(所羅門)",
+      "NA": "Class:GrandCaster(Solomon)",
+      "KR": "클래스:그랜드 캐스터(솔로몬)"
+    },
+    "113": {
+      "JP": "クラス:ビーストI",
+      "CN": "职阶:Beast I",
+      "TW": "職階:Beast I",
+      "NA": "Class:BeastI",
+      "KR": "클래스:비스트I"
+    },
+    "114": {
+      "JP": "クラス:ビーストII",
+      "CN": "职阶:Beast II",
+      "TW": "職階:Beast II",
+      "NA": "Class:BeastII",
+      "KR": "클래스:비스트II"
+    },
+    "115": {
+      "JP": "クラス:ムーンキャンサー",
+      "CN": "职阶:MoonCancer",
+      "TW": "職階:MoonCancer",
+      "NA": "Class:MoonCancer",
+      "KR": "클래스:문캔서"
+    },
+    "116": {
+      "JP": "クラス:ビーストⅢ/R",
+      "CN": "职阶:Beast Ⅲ/R",
+      "TW": "職階:Beast Ⅲ/R",
+      "NA": "Class:Beast Ⅲ/R",
+      "KR": "클래스:비스트III/R"
+    },
+    "117": {
+      "JP": "クラス:フォーリナー",
+      "CN": "职阶:Foreigner",
+      "TW": "職階:Foreigner",
+      "NA": "Class:Foreigner",
+      "KR": "클래스:포리너"
+    },
+    "118": {
+      "JP": "クラス:ビーストⅢ/L",
+      "CN": "职阶:Beast Ⅲ/L",
+      "TW": "職階:Beast Ⅲ/L",
+      "NA": "Class:Beast Ⅲ/L",
+      "KR": "클래스:비스트III/L"
+    },
+    "119": {
+      "JP": "クラス:ビーストUNKNOWN",
+      "CN": "职阶:BeastUnknown",
+      "TW": "職階:BeastUnknown",
+      "NA": "Class:BeastUnknown",
+      "KR": null
+    },
+    "120": {
+      "JP": "クラス:プリテンダー",
+      "CN": "职阶:Pretender",
+      "TW": "職階:Pretender",
+      "NA": "Class:Pretender",
+      "KR": "클래스:프리텐더"
+    },
+    "121": {
+      "JP": "クラス:ビーストⅣ",
+      "CN": "职阶:Beast Ⅳ",
+      "TW": "職階:Beast Ⅳ",
+      "NA": "Class:Beast Ⅳ",
+      "KR": "클래스:비스트IV"
+    },
+    "122": {
+      "JP": "クラス:ビーストI?",
+      "CN": "职阶:Beast I?",
+      "TW": "職階:Beast I?",
+      "NA": "Class:BeastI?",
+      "KR": "클래스:비스트I?"
+    },
+    "123": {
+      "JP": "クラス:Ｕ－オルガマリー",
+      "CN": "职阶:U-奥尔加玛丽",
+      "TW": "職階:U-奧爾嘉瑪麗",
+      "NA": "Class:U-OlgaMarie",
+      "KR": "클래스:U-올가마리"
+    },
+    "124": {
+      "JP": "クラス:ビースト/ドラコー",
+      "CN": "职阶:Beast/德拉科",
+      "TW": "職階:Beast/德拉科",
+      "NA": "Class:Beast/Draco",
+      "KR": "클래스:비스트/드라코"
+    },
+    "125": {
+      "JP": "クラス:ビーストⅥ",
+      "CN": "职阶:Beast Ⅵ",
+      "TW": "職階:Beast Ⅵ",
+      "NA": "Class:Beast Ⅵ",
+      "KR": "클래스:비스트 Ⅵ"
+    },
+    "126": {
+      "JP": "クラス:ビーストⅥ (魔獣赫)",
+      "CN": "职阶:Beast Ⅵ (魔兽赫)",
+      "TW": "職階:Beast Ⅵ (魔獸赫)",
+      "NA": "Class:Beast Ⅵ (Demon Beast Incarnadines)",
+      "KR": null
+    },
+    "127": {
+      "JP": "クラス:Ｅ－フレアマリー",
+      "CN": "职阶:E－火玛丽",
+      "TW": "職階:E－火瑪麗",
+      "NA": "Class: E-Flare Marie",
+      "KR": null
+    },
+    "128": {
+      "JP": "クラス:Ｅ－アクアマリー",
+      "CN": "职阶:E－水玛丽",
+      "TW": "職階:E－水瑪麗",
+      "NA": "Class: E-Aqua Marie",
+      "KR": null
+    },
+    "129": {
+      "JP": "クラス:ビースト/エレシュキガル",
+      "CN": "职阶:Beast/埃列什基伽勒",
+      "TW": "職階:Beast/埃列什基伽勒",
+      "NA": "Class:Beast/Ereshkigal",
+      "KR": null
+    },
+    "130": {
+      "JP": "クラス:Ｅ－グランマリー",
+      "CN": "职阶:E－宏伟玛丽",
+      "TW": "職階:E－宏偉瑪麗",
+      "NA": "Class: E-Grand Grand",
+      "KR": null
+    },
+    "131": {
+      "JP": "クラス:Ｅ－ステラマリー",
+      "CN": "职阶:E－星玛丽",
+      "TW": "職階:E－星瑪麗",
+      "NA": "Class: E-Stellar Marie",
+      "KR": null
+    },
+    "132": {
+      "JP": "クラス:アンビースト/オルガマリー",
+      "CN": "职阶:UnBeast/奥尔加玛丽",
+      "TW": "職階:UnBeast/奧爾嘉瑪麗",
+      "NA": "Class:UnBeast/OlgaMarie",
+      "KR": null
+    },
+    "133": {
+      "JP": null,
+      "CN": null,
+      "TW": null,
+      "NA": "Class:GrandUnBeast/U-OlgaMarie AlienGod",
+      "KR": null
+    },
+    "134": {
+      "JP": null,
+      "CN": null,
+      "TW": null,
+      "NA": "Class:AquaFragment",
+      "KR": null
+    },
+    "135": {
+      "JP": "クラス:ビースト",
+      "CN": "职阶:Beast",
+      "TW": "職階:Beast",
+      "NA": "Class:Beast",
+      "KR": null
+    },
+    "136": {
+      "JP": "クラス:ビーストⅦ",
+      "CN": "职阶:Beast Ⅶ",
+      "TW": "職階:Beast Ⅶ",
+      "NA": "Class:Beast Ⅶ",
+      "KR": null
+    },
+    "180": {
+      "JP": "クラス:グランドセイバー",
+      "CN": "职阶:Grand Saber",
+      "TW": "職階:Grand Saber",
+      "NA": "Class:Grand Saber",
+      "KR": null
+    },
+    "181": {
+      "JP": "クラス:グランドランサー",
+      "CN": "职阶:Grand Lancer",
+      "TW": "職階:Grand Lancer",
+      "NA": "Class:Grand Lancer",
+      "KR": null
+    },
+    "182": {
+      "JP": "クラス:グランドアーチャー",
+      "CN": "职阶:Grand Archer",
+      "TW": "職階:Grand Archer",
+      "NA": "Class:Grand Archer",
+      "KR": null
+    },
+    "183": {
+      "JP": "クラス:グランドライダー",
+      "CN": "职阶:Grand Rider",
+      "TW": "職階:Grand Rider",
+      "NA": "Class:Grand Rider",
+      "KR": null
+    },
+    "184": {
+      "JP": "クラス:グランドキャスター",
+      "CN": "职阶:Grand Caster",
+      "TW": "職階:Grand Caster",
+      "NA": "Class:Grand Caster",
+      "KR": null
+    },
+    "185": {
+      "JP": "クラス:グランドアサシン",
+      "CN": "职阶:Grand Assassin",
+      "TW": "職階:Grand Assassin",
+      "NA": "Class:Grand Assassin",
+      "KR": null
+    },
+    "186": {
+      "JP": "クラス:グランドバーサーカー",
+      "CN": "职阶:Grand Berserker",
+      "TW": "職階:Grand Berserker",
+      "NA": "Class:Grand Berserker",
+      "KR": null
+    },
+    "187": {
+      "JP": "クラス:グランドシールダー",
+      "CN": "职阶:Grand Shielder",
+      "TW": "職階:Grand Shielder",
+      "NA": "Class:Grand Shielder",
+      "KR": null
+    },
+    "188": {
+      "JP": "クラス:グランドルーラー",
+      "CN": "职阶:Grand Ruler",
+      "TW": "職階:Grand Ruler",
+      "NA": "Class:Grand Ruler",
+      "KR": null
+    },
+    "189": {
+      "JP": "クラス:グランドアルターエゴ",
+      "CN": "职阶:Grand Alterego",
+      "TW": "職階:Grand Alterego",
+      "NA": "Class:Grand Alterego",
+      "KR": null
+    },
+    "190": {
+      "JP": "クラス:グランドアヴェンジャー",
+      "CN": "职阶:Grand Avenger",
+      "TW": "職階:Grand Avenger",
+      "NA": "Class:Grand Avenger",
+      "KR": null
+    },
+    "191": {
+      "JP": "クラス:グランドムーンキャンサー",
+      "CN": "职阶:Grand MoonCancer",
+      "TW": "職階:Grand MoonCancer",
+      "NA": "Class:Grand MoonCancer",
+      "KR": null
+    },
+    "192": {
+      "JP": "クラス:グランドフォーリナー",
+      "CN": "职阶:Grand Foreigner",
+      "TW": "職階:Grand Foreigner",
+      "NA": "Class:Grand Foreigner",
+      "KR": null
+    },
+    "193": {
+      "JP": "クラス:グランドプリテンダー",
+      "CN": "职阶:Grand Pretender",
+      "TW": "職階:Grand Pretender",
+      "NA": "Class:Grand Pretender",
+      "KR": null
+    },
+    "194": {
+      "JP": "クラス:グランドアンビースト",
+      "CN": "职阶:Grand UnBeast",
+      "TW": "職階:Grand UnBeast",
+      "NA": "Class:Grand UnBeast",
+      "KR": null
+    },
+    "200": {
+      "JP": "副属性:天",
+      "CN": "副属性:天",
+      "TW": "副屬性:天",
+      "NA": "Sub Attribute:Sky",
+      "KR": null
+    },
+    "201": {
+      "JP": "副属性:地",
+      "CN": "副属性:地",
+      "TW": "副屬性:地",
+      "NA": "Sub Attribute:Earth",
+      "KR": null
+    },
+    "202": {
+      "JP": "副属性:人",
+      "CN": "副属性:人",
+      "TW": "副屬性:人",
+      "NA": "Sub Attribute:Human",
+      "KR": null
+    },
+    "203": {
+      "JP": "副属性:星",
+      "CN": "副属性:星",
+      "TW": "副屬性:星",
+      "NA": "Sub Attribute:Star",
+      "KR": null
+    },
+    "204": {
+      "JP": "副属性:獣",
+      "CN": "副属性:兽",
+      "TW": "副屬性:獸",
+      "NA": "Sub Attribute:Beast",
+      "KR": null
+    },
+    "300": {
+      "JP": "属性:秩序",
+      "CN": "属性:秩序",
+      "TW": "屬性:秩序",
+      "NA": "Alignment:Lawful",
+      "KR": "속성:질서"
+    },
+    "301": {
+      "JP": "属性:混沌",
+      "CN": "属性:混沌",
+      "TW": "屬性:混沌",
+      "NA": "Alignment:Chaotic",
+      "KR": "속성:혼돈"
+    },
+    "302": {
+      "JP": "属性:中立",
+      "CN": "属性:中立",
+      "TW": "屬性:中立",
+      "NA": "Alignment:Neutral",
+      "KR": "속성:중립"
+    },
+    "303": {
+      "JP": "属性:善",
+      "CN": "属性:善",
+      "TW": "屬性:善",
+      "NA": "Alignment:Good",
+      "KR": "속성:선"
+    },
+    "304": {
+      "JP": "属性:恶",
+      "CN": "属性:恶",
+      "TW": "屬性:惡",
+      "NA": "Alignment:Evil",
+      "KR": "속성:악"
+    },
+    "305": {
+      "JP": "属性:中庸",
+      "CN": "属性:中庸",
+      "TW": "屬性:中庸",
+      "NA": "Alignment:Balanced",
+      "KR": "속성:중용"
+    },
+    "306": {
+      "JP": "属性:狂",
+      "CN": "属性:狂",
+      "TW": "屬性:狂",
+      "NA": "Alignment:Madness",
+      "KR": "속성:광"
+    },
+    "308": {
+      "JP": "属性:夏",
+      "CN": "属性:夏",
+      "TW": "屬性:夏",
+      "NA": "Alignment:Summer",
+      "KR": "속성:여름"
+    },
+    "309": {
+      "JP": "属性:獣",
+      "CN": "属性:兽",
+      "TW": "屬性:獸",
+      "NA": "Alignment:Beast",
+      "KR": null
+    },
+    "400": {
+      "JP": "★0",
+      "CN": "★0",
+      "TW": "★0",
+      "NA": "★0",
+      "KR": "★0"
+    },
+    "401": {
+      "JP": "★1",
+      "CN": "★1",
+      "TW": "★1",
+      "NA": "★1",
+      "KR": "★1"
+    },
+    "402": {
+      "JP": "★2",
+      "CN": "★2",
+      "TW": "★2",
+      "NA": "★2",
+      "KR": "★2"
+    },
+    "403": {
+      "JP": "★3",
+      "CN": "★3",
+      "TW": "★3",
+      "NA": "★3",
+      "KR": "★3"
+    },
+    "404": {
+      "JP": "★4",
+      "CN": "★4",
+      "TW": "★4",
+      "NA": "★4",
+      "KR": "★4"
+    },
+    "405": {
+      "JP": "★5",
+      "CN": "★5",
+      "TW": "★5",
+      "NA": "★5",
+      "KR": "★5"
+    },
+    "1000": {
+      "JP": "サーヴァント",
+      "CN": "从者",
+      "TW": "從者",
+      "NA": "Servant",
+      "KR": "서번트"
+    },
+    "1001": {
+      "JP": "人間",
+      "CN": "人类",
+      "TW": "人類",
+      "NA": "Human",
+      "KR": "인간"
+    },
+    "1002": {
+      "JP": "死霊",
+      "CN": "死灵",
+      "TW": "死靈",
+      "NA": "Undead",
+      "KR": "사령"
+    },
+    "1003": {
+      "JP": "artificialDemon",
+      "CN": null,
+      "TW": null,
+      "NA": "artificialDemon",
+      "KR": null
+    },
+    "1004": {
+      "JP": "魔獣",
+      "CN": "魔兽",
+      "TW": "魔獸",
+      "NA": "Demon Beast",
+      "KR": "마수"
+    },
+    "1005": {
+      "JP": "神魔",
+      "CN": "神魔",
+      "TW": "神魔",
+      "NA": "Shinma",
+      "KR": null
+    },
+    "1100": {
+      "JP": "兵士",
+      "CN": "士兵",
+      "TW": "士兵",
+      "NA": "Soldier",
+      "KR": "병사"
+    },
+    "1101": {
+      "JP": "amazoness",
+      "CN": "亚马逊人",
+      "TW": "亞馬遜人",
+      "NA": "amazoness",
+      "KR": null
+    },
+    "1102": {
+      "JP": "骸骨",
+      "CN": "骸骨",
+      "TW": "骸骨",
+      "NA": "Skeleton",
+      "KR": "해골"
+    },
+    "1103": {
+      "JP": "ゾンビ",
+      "CN": "僵尸",
+      "TW": "殭屍",
+      "NA": "Zombie",
+      "KR": "좀비"
+    },
+    "1104": {
+      "JP": "ゴースト",
+      "CN": "鬼魂",
+      "TW": "鬼魂",
+      "NA": "Ghost",
+      "KR": "고스트"
+    },
+    "1105": {
+      "JP": "オートマタ",
+      "CN": "自动人偶",
+      "TW": "自動人偶",
+      "NA": "Automata",
+      "KR": "오토마타"
+    },
+    "1106": {
+      "JP": "ゴーレム",
+      "CN": "魔偶",
+      "TW": "魔偶",
+      "NA": "Golem",
+      "KR": "골렘"
+    },
+    "1107": {
+      "JP": "スペルブック",
+      "CN": "咒语书",
+      "TW": "咒語書",
+      "NA": "Spell Book",
+      "KR": "스펠북"
+    },
+    "1108": {
+      "JP": "ホムンクルス",
+      "CN": "人工生命体",
+      "TW": "人工生命體",
+      "NA": "Homunculus",
+      "KR": "호문쿨루스"
+    },
+    "1110": {
+      "JP": "蛇",
+      "CN": "蛇",
+      "TW": "蛇",
+      "NA": "Serpent",
+      "KR": null
+    },
+    "1111": {
+      "JP": "ケンタウロス",
+      "CN": "半人马",
+      "TW": "半人馬",
+      "NA": "Centaur",
+      "KR": "켄타우로스"
+    },
+    "1112": {
+      "JP": null,
+      "CN": "狼人",
+      "TW": "狼人",
+      "NA": "Were Beast",
+      "KR": null
+    },
+    "1113": {
+      "JP": "キメラ",
+      "CN": "奇美拉",
+      "TW": "奇美拉",
+      "NA": "Chimera",
+      "KR": "키메라"
+    },
+    "1117": {
+      "JP": "ワイバーン",
+      "CN": "双足飞龙",
+      "TW": "雙足飛龍",
+      "NA": "Wyvern",
+      "KR": "와이번"
+    },
+    "1118": {
+      "JP": "dragonType",
+      "CN": "巨龙",
+      "TW": "dragonType",
+      "NA": "dragonType",
+      "KR": "용종"
+    },
+    "1119": {
+      "JP": "悪魔",
+      "CN": "恶魔",
+      "TW": "惡魔",
+      "NA": "Demon",
+      "KR": "악마"
+    },
+    "1120": {
+      "JP": "handOrDoor",
+      "CN": "手或门",
+      "TW": "手或門",
+      "NA": "handOrDoor",
+      "KR": null
+    },
+    "1121": {
+      "JP": "魔神柱",
+      "CN": "魔神柱",
+      "TW": "魔神柱",
+      "NA": "Demon God Pillar",
+      "KR": "마신주"
+    },
+    "1122": {
+      "JP": "シャド",
+      "CN": "影",
+      "TW": "影",
+      "NA": "Shadow",
+      "KR": "섀도 서번트"
+    },
+    "1132": {
+      "JP": "鬼",
+      "CN": "鬼",
+      "TW": "鬼",
+      "NA": "Oni",
+      "KR": "오니"
+    },
+    "1133": {
+      "JP": "hand",
+      "CN": "手",
+      "TW": "hand",
+      "NA": "hand",
+      "KR": null
+    },
+    "1134": {
+      "JP": "door",
+      "CN": "门",
+      "TW": "door",
+      "NA": "door",
+      "KR": null
+    },
+    "1172": {
+      "JP": "人類の脅威",
+      "CN": "人类的威胁",
+      "TW": "人類的威脅",
+      "NA": "Threat to Humanity",
+      "KR": "인류의 위협"
+    },
+    "1177": {
+      "JP": "妖精",
+      "CN": "妖精",
+      "TW": "妖精",
+      "NA": "Fae",
+      "KR": "요정"
+    },
+    "2000": {
+      "JP": "神性",
+      "CN": "神性",
+      "TW": "神性",
+      "NA": "Divine",
+      "KR": "신성"
+    },
+    "2001": {
+      "JP": "人型",
+      "CN": "人型",
+      "TW": "人型",
+      "NA": "Humanoid",
+      "KR": "인간형"
+    },
+    "2002": {
+      "JP": "竜",
+      "CN": "龙",
+      "TW": "龍",
+      "NA": "Dragon",
+      "KR": "용"
+    },
+    "2003": {
+      "JP": "dragonSlayer",
+      "CN": "屠龙者",
+      "TW": "dragonSlayer",
+      "NA": "dragonSlayer",
+      "KR": "용살자"
+    },
+    "2004": {
+      "JP": "ローマ",
+      "CN": "罗马",
+      "TW": "羅馬",
+      "NA": "Roman",
+      "KR": "로마"
+    },
+    "2005": {
+      "JP": "猛獣",
+      "CN": "猛兽",
+      "TW": "猛獸",
+      "NA": "Wild Beast",
+      "KR": "맹수"
+    },
+    "2006": {
+      "JP": "月",
+      "CN": "月",
+      "TW": "月",
+      "NA": "Moon",
+      "KR": "달"
+    },
+    "2007": {
+      "JP": "アルトリア顔",
+      "CN": "阿尔托莉雅脸",
+      "TW": "阿爾托莉亞臉",
+      "NA": "Altria Face",
+      "KR": "알트리아 얼굴"
+    },
+    "2008": {
+      "JP": "エヌマ特攻",
+      "CN": "被EA特攻",
+      "TW": "被EA特攻",
+      "NA": "Weak to Enuma Elish",
+      "KR": null
+    },
+    "2009": {
+      "JP": "騎乗",
+      "CN": "骑乘",
+      "TW": "騎乘",
+      "NA": "Riding",
+      "KR": "기승"
+    },
+    "2010": {
+      "JP": "アーサー",
+      "CN": "亚瑟",
+      "TW": "亞瑟",
+      "NA": "Arthur",
+      "KR": "아서"
+    },
+    "2011": {
+      "JP": "天と地のサーヴァント",
+      "CN": "天地从者",
+      "TW": "天地從者",
+      "NA": "Sky or Earth",
+      "KR": "천 또는 지"
+    },
+    "2012": {
+      "JP": "愛する者",
+      "CN": "所爱之人",
+      "TW": "所愛之人",
+      "NA": "Loved One",
+      "KR": "사랑하는 자"
+    },
+    "2018": {
+      "JP": "死霊/悪魔",
+      "CN": "死灵或恶魔",
+      "TW": "死靈或惡魔",
+      "NA": "Undead or Demon",
+      "KR": "사령/악마"
+    },
+    "2019": {
+      "JP": "魔性",
+      "CN": "魔性",
+      "TW": "魔性",
+      "NA": "Demonic",
+      "KR": "마성"
+    },
+    "2037": {
+      "JP": "天/地サーヴァント[擬似/デミサーヴァント除く]",
+      "CN": "天地从者(拟似从者和亚从者除外)",
+      "TW": "天地從者〔擬似從者和亞從者除外〕",
+      "NA": "Sky or Earth except Pseudo and Demi",
+      "KR": null
+    },
+    "2038": {
+      "JP": "フィールド:陽射し",
+      "CN": "场地:阳光照射",
+      "TW": "場地:陽光照射",
+      "NA": "Field:Sunlight",
+      "KR": "필드:햇빛"
+    },
+    "2039": {
+      "JP": "フィールド:水辺",
+      "CN": "场地:水边",
+      "TW": "場地:水邊",
+      "NA": "Field:Near Water",
+      "KR": "필드:물가"
+    },
+    "2040": {
+      "JP": "神性/死霊/悪魔",
+      "CN": "神性或恶魔或死灵",
+      "TW": "神性或死靈或惡魔",
+      "NA": "Divine/Undead/Demon",
+      "KR": "신성, 사령, 악마"
+    },
+    "2073": {
+      "JP": "フィールド:森",
+      "CN": "场地:森林",
+      "TW": "場地:森林",
+      "NA": "Field:Forest",
+      "KR": "필드:숲"
+    },
+    "2074": {
+      "JP": "冥界の護り",
+      "CN": "冥界佑护",
+      "TW": "冥界佑護",
+      "NA": "Blessing of Kur",
+      "KR": "명계의 가호"
+    },
+    "2075": {
+      "JP": "サーヴァント:セイバー",
+      "CN": "从者:Saber",
+      "TW": "從者:Saber",
+      "NA": "Servant:Saber",
+      "KR": "서번트:세이버"
+    },
+    "2076": {
+      "JP": "超巨大",
+      "CN": "超巨大",
+      "TW": "超巨大",
+      "NA": "Super Giant",
+      "KR": "초거대"
+    },
+    "2113": {
+      "JP": "王",
+      "CN": "王",
+      "TW": "王",
+      "NA": "King",
+      "KR": "왕"
+    },
+    "2114": {
+      "JP": "ギリシャ神話系男性",
+      "CN": "希腊神话系男性",
+      "TW": "希臘神話系男性",
+      "NA": "Greek Mythology Males",
+      "KR": "그리스 신화 계열 남성"
+    },
+    "2121": {
+      "JP": "フィールド:炎上",
+      "CN": "场地:燃烧",
+      "TW": "場地:燃燒",
+      "NA": "Field:Burning",
+      "KR": "필드:염상"
+    },
+    "2191": {
+      "JP": "buff女性魅了",
+      "CN": "buff女性魅惑",
+      "TW": "buff女性魅惑",
+      "NA": "buff Charm Female",
+      "KR": null
+    },
+    "2355": {
+      "JP": "イリヤ",
+      "CN": "伊莉雅",
+      "TW": "伊莉雅",
+      "NA": "Illya",
+      "KR": "이리야"
+    },
+    "2356": {
+      "JP": "紳士的な愛対象",
+      "CN": "女性长相的从者",
+      "TW": "紳士之愛從者",
+      "NA": "feminineLookingServant",
+      "KR": null
+    },
+    "2385": {
+      "JP": "呪本",
+      "CN": "咒本",
+      "TW": "咒本",
+      "NA": "Cursed Book",
+      "KR": "주서"
+    },
+    "2386": {
+      "JP": "増殖",
+      "CN": "增殖",
+      "TW": "增殖",
+      "NA": "Growth",
+      "KR": "증식"
+    },
+    "2387": {
+      "JP": "無限増殖",
+      "CN": "无限增殖",
+      "TW": "無限增殖",
+      "NA": "Infinite Growth",
+      "KR": "무한증식"
+    },
+    "2392": {
+      "JP": "フィールド:都市",
+      "CN": "场地:都市",
+      "TW": "場地:都市",
+      "NA": "Field:City",
+      "KR": "필드:도시"
+    },
+    "2466": {
+      "JP": "アルゴー号ゆかりの者",
+      "CN": "阿耳戈船相关人员",
+      "TW": "阿爾戈號相關人員",
+      "NA": "Associated to the Argo",
+      "KR": "아르고 호 관계자"
+    },
+    "2467": {
+      "JP": "急所判明",
+      "CN": "弱点确定",
+      "TW": "弱點確定",
+      "NA": "Weakness Detected",
+      "KR": "급소 판명"
+    },
+    "2615": {
+      "JP": "性別:カイニス",
+      "CN": "性别:凯尼斯",
+      "TW": "性別:凱妮絲",
+      "NA": "Gender:CaenisServant",
+      "KR": "특성: 카이니스"
+    },
+    "2631": {
+      "JP": "ヒト科サーヴァント",
+      "CN": "人科从者",
+      "TW": "人科從者",
+      "NA": "Hominidae Servant",
+      "KR": "인간형 서번트"
+    },
+    "2632": {
+      "JP": "魔獣型サーヴァン",
+      "CN": "魔兽型从者",
+      "TW": "魔獸型從者",
+      "NA": "Demonic Beast Servant",
+      "KR": "마수형 서번트"
+    },
+    "2654": {
+      "JP": "今を生きる人類",
+      "CN": "活在当下的人类",
+      "TW": "活在當下的人類",
+      "NA": "Living Human",
+      "KR": null
+    },
+    "2664": {
+      "JP": "buff宝具耐性〔増殖〕",
+      "CN": "buff宝具耐性〔増殖〕",
+      "TW": "buff寶具耐性〔増殖〕",
+      "NA": "buff NP Resist [Growth]",
+      "KR": null
+    },
+    "2666": {
+      "JP": "巨人",
+      "CN": "巨人",
+      "TW": "巨人",
+      "NA": "Giant",
+      "KR": "거인"
+    },
+    "2667": {
+      "JP": "子供のサーヴァント",
+      "CN": "孩童从者",
+      "TW": "小孩從者",
+      "NA": "Child Servant",
+      "KR": "어린이 서번트"
+    },
+    "2721": {
+      "JP": "信長",
+      "CN": "信长",
+      "TW": "信長",
+      "NA": "Nobunaga",
+      "KR": "노부나가"
+    },
+    "2729": {
+      "JP": "呪い",
+      "CN": "诅咒",
+      "TW": "詛咒",
+      "NA": "Curse",
+      "KR": "저주"
+    },
+    "2730": {
+      "JP": "フィールド:虚数空間",
+      "CN": "场地:虚数空间",
+      "TW": "場地:虛數空間",
+      "NA": "Field:Imaginary Space",
+      "KR": "필드: 허수공간"
+    },
+    "2731": {
+      "JP": "領域外の生命",
+      "CN": "领域外生命",
+      "TW": "領域外生命",
+      "NA": "Entity of the Outer Realm",
+      "KR": "영역 밖의 생명"
+    },
+    "2732": {
+      "JP": "フィールド:水辺または虚数空間",
+      "CN": "场地:水边或虚数空间",
+      "TW": "場地:水邊或虛數空間",
+      "NA": "Field:Shore Or Imaginary Space",
+      "KR": "필드: 해변 또는 허수공간"
+    },
+    "2733": {
+      "JP": "フィールドに〔酒呑童子〕がいる",
+      "CN": "酒吞童子在场",
+      "TW": "酒吞童子在場",
+      "NA": "Shuten on Field",
+      "KR": null
+    },
+    "2734": {
+      "JP": "酒呑童子",
+      "CN": "酒吞童子",
+      "TW": "酒吞童子",
+      "NA": "Shuten-Douji",
+      "KR": "슈텐도지"
+    },
+    "2735": {
+      "JP": "源氏",
+      "CN": "源氏",
+      "TW": "源氏",
+      "NA": "Genji",
+      "KR": "겐지"
+    },
+    "2759": {
+      "JP": "復讐の怨念",
+      "CN": "复仇之怨念",
+      "TW": "復仇之怨念",
+      "NA": "Grudge of Vengeance",
+      "KR": "복수의 원념"
+    },
+    "2780": {
+      "JP": "霊衣を持つ者",
+      "CN": "灵衣持有者",
+      "TW": "持有靈衣者",
+      "NA": "Has Costume",
+      "KR": "영의를 가진 자"
+    },
+    "2781": {
+      "JP": "機械",
+      "CN": "机械",
+      "TW": "機械",
+      "NA": "Mechanical",
+      "KR": "기계"
+    },
+    "2795": {
+      "JP": "円卓の騎士",
+      "CN": "圆桌骑士",
+      "TW": "圓桌騎士",
+      "NA": "Knights of the Roundtable",
+      "KR": "원탁의 기사"
+    },
+    "2797": {
+      "JP": "神霊",
+      "CN": "神灵",
+      "TW": "神靈",
+      "NA": "Divine Spirit",
+      "KR": "신령"
+    },
+    "2801": {
+      "JP": "愛炎状態",
+      "CN": "爱炎状态",
+      "TW": "愛炎狀態",
+      "NA": "Burning Love",
+      "KR": "애염 상태"
+    },
+    "2802": {
+      "JP": "buff竜特攻",
+      "CN": "buff威力提升(对龙)",
+      "TW": "buff威力特攻（龍）",
+      "NA": "buff Strong against Dragon",
+      "KR": null
+    },
+    "2803": {
+      "JP": "buff猛獣特攻",
+      "CN": "buff威力提升(对猛兽)",
+      "TW": "buff威力提升（對猛獸）",
+      "NA": "buff Strong against Wild Beast",
+      "KR": null
+    },
+    "2810": {
+      "JP": "童話特性のサーヴァント",
+      "CN": "童话特性从者",
+      "TW": "童話特性從者",
+      "NA": "Fairy Tale Servant",
+      "KR": null
+    },
+    "2821": {
+      "JP": "ケモノ科のサーヴァント",
+      "CN": "兽科从者",
+      "TW": "獸科從者",
+      "NA": "Beast Servant",
+      "KR": null
+    },
+    "2827": {
+      "JP": "いいね！",
+      "CN": "点赞！",
+      "TW": "讚！",
+      "NA": "Like!",
+      "KR": "좋아!"
+    },
+    "2828": {
+      "JP": "王勇",
+      "CN": "王威",
+      "TW": "王威",
+      "NA": "Heroic King",
+      "KR": null
+    },
+    "2829": {
+      "JP": "千年城",
+      "CN": "千年城",
+      "TW": "千年城",
+      "NA": "Millenium Castle",
+      "KR": "천년성"
+    },
+    "2833": {
+      "JP": "虞美人",
+      "CN": "虞美人",
+      "TW": "虞美人",
+      "NA": "Yu Mei-ren",
+      "KR": "우미인"
+    },
+    "2835": {
+      "JP": "豚化無効",
+      "CN": "猪化无效",
+      "TW": "豬化無效",
+      "NA": "Pigify Immune",
+      "KR": "돼지화 무효"
+    },
+    "2836": {
+      "JP": null,
+      "CN": "充能用临时标记",
+      "TW": "充能用臨時標記",
+      "NA": "NP Charge Counter",
+      "KR": null
+    },
+    "2837": {
+      "JP": "ワルキューレ",
+      "CN": "瓦尔基里",
+      "TW": "瓦爾基麗",
+      "NA": "Valkyrie",
+      "KR": "발키리"
+    },
+    "2838": {
+      "JP": "夏モードのサーヴァント",
+      "CN": "夏日模式从者",
+      "TW": "夏日模式從者",
+      "NA": "Summer Mode Servant",
+      "KR": null
+    },
+    "2839": {
+      "JP": "新選組のサーヴァント",
+      "CN": "新选组从者",
+      "TW": "新選組從者",
+      "NA": "Shinsengumi Servant",
+      "KR": "신선조 서번트"
+    },
+    "2840": {
+      "JP": "梁山泊",
+      "CN": "梁山泊",
+      "TW": "梁山泊",
+      "NA": "Mount Liang",
+      "KR": "양산박"
+    },
+    "2847": {
+      "JP": "浮遊している",
+      "CN": "浮游着的",
+      "TW": "浮游著的",
+      "NA": "Levitating",
+      "KR": "부유"
+    },
+    "2848": {
+      "JP": "\"堰き止めるもの\"",
+      "CN": "\"堰塞之物\"",
+      "TW": "\"堰塞之物\"",
+      "NA": "Obstacle Maker",
+      "KR": null
+    },
+    "2849": {
+      "JP": "\"不動の決意\"",
+      "CN": "\"不动的决意\"",
+      "TW": "\"不動的決意\"",
+      "NA": "Defender",
+      "KR": null
+    },
+    "2850": {
+      "JP": "女神変生を持つ",
+      "CN": "持有女神变生",
+      "TW": "持有女神變生",
+      "NA": "Has Goddess Metamorphosis",
+      "KR": null
+    },
+    "2851": {
+      "JP": "天の力を持つサーヴァント",
+      "CN": "拥有天之力的从者",
+      "TW": "擁有天之力的從者",
+      "NA": "Servant With Sky Attribute",
+      "KR": null
+    },
+    "2857": {
+      "JP": "聖杯所持",
+      "CN": "拥有圣杯",
+      "TW": "持有聖杯",
+      "NA": "Holding Holy Grail",
+      "KR": "성배 소지"
+    },
+    "2858": {
+      "JP": "七騎士のサーヴァント",
+      "CN": "七骑士从者",
+      "TW": "七騎士從者",
+      "NA": "Seven Knights Servant",
+      "KR": null
+    },
+    "2859": {
+      "JP": "ハッピーハロウィン",
+      "CN": "万圣节快乐",
+      "TW": "萬聖節快樂",
+      "NA": "Happy Halloween",
+      "KR": "해피 할로윈"
+    },
+    "2860": {
+      "JP": "ハッピーハロウィンFlag",
+      "CN": "万圣节快乐标记",
+      "TW": "萬聖節快樂標記",
+      "NA": "Happy Halloween Flag",
+      "KR": null
+    },
+    "2871": {
+      "JP": "千子村正霊基第一段階",
+      "CN": "千子村正灵基第一阶段",
+      "TW": "千子村正靈基第一階段",
+      "NA": "Senji Muramasa 1st Ascension Form",
+      "KR": null
+    },
+    "2872": {
+      "JP": "原稿完成",
+      "CN": "原稿完成",
+      "TW": "原稿完成",
+      "NA": "Manuscript Completion",
+      "KR": "원고완성"
+    },
+    "2873": {
+      "JP": "マイフェアソルジャー",
+      "CN": "我美丽的战士",
+      "TW": "我美麗的戰士",
+      "NA": "My Fair Soldier",
+      "KR": null
+    },
+    "2874": {
+      "JP": "祭神の怒り",
+      "CN": "祭神之怒",
+      "TW": "祭神之怒",
+      "NA": "Wrath of the Enshrined Deity",
+      "KR": null
+    },
+    "2875": {
+      "JP": "バーヴァン・シー霊基第一・第二段階",
+      "CN": "芭万·希灵基第一·第二阶段",
+      "TW": "芭班．希靈基第一・第二階段",
+      "NA": "Baobhan Sith 1st & 2nd Ascension Form",
+      "KR": "바반 시 1차 & 2차 재림 형태"
+    },
+    "2876": {
+      "JP": "バーヴァン・シー霊基第三段階",
+      "CN": "芭万·希灵基第三阶段",
+      "TW": "芭班．希靈基第三階段",
+      "NA": "Baobhan Sith 3rd Ascension Form",
+      "KR": "바반 시 3차 재림 형태"
+    },
+    "2878": {
+      "JP": "空中",
+      "CN": "空中",
+      "TW": "空中",
+      "NA": "Airspace",
+      "KR": null
+    },
+    "2879": {
+      "JP": "ケット・クー・ミコケルがフィールド",
+      "CN": "凯特·库·米可科尔在场",
+      "TW": "凱特·庫·巫女科爾在場",
+      "NA": "Cait Cú Cerpriestess On Field",
+      "KR": null
+    },
+    "2880": {
+      "JP": null,
+      "CN": "精灵之怒",
+      "TW": "精靈之怒",
+      "NA": "Wrath of the Spirits",
+      "KR": null
+    },
+    "2881": {
+      "JP": "複数で一騎のサーヴァント",
+      "CN": "多人构成一骑的从者",
+      "TW": "多人構成一騎的從者",
+      "NA": "Group Servant",
+      "KR": null
+    },
+    "2883": {
+      "JP": "Fate/stay nightのサーヴァント",
+      "CN": "Fate/stay night 从者",
+      "TW": "Fate/stay night 從者",
+      "NA": "Fate/stay night Servant",
+      "KR": null
+    },
+    "2884": {
+      "JP": "暗闇",
+      "CN": "黑暗",
+      "TW": "暗闇",
+      "NA": "Darkness",
+      "KR": null
+    },
+    "2885": {
+      "JP": "魔弾",
+      "CN": "魔弹",
+      "TW": "魔彈",
+      "NA": "Magic Bullet",
+      "KR": null
+    },
+    "2886": {
+      "JP": "コマドリカウンター",
+      "CN": "知更鸟计数器",
+      "TW": "知更鳥計數器",
+      "NA": "Robin Counter",
+      "KR": null
+    },
+    "2887": {
+      "JP": "コマドリ全滅",
+      "CN": "知更鸟全灭",
+      "TW": "知更鳥全滅",
+      "NA": "Robin all gone",
+      "KR": null
+    },
+    "2888": {
+      "JP": "主人公補正",
+      "CN": "主人公补正",
+      "TW": "主人公補正",
+      "NA": "Protagonist Correction",
+      "KR": null
+    },
+    "2903": {
+      "JP": "有珠霊基第三段階",
+      "CN": "有珠灵基第三阶段",
+      "TW": "有珠靈基第三階段",
+      "NA": "Alice 3rd Ascension Form",
+      "KR": null
+    },
+    "2911": {
+      "JP": "魔術回路（自転）buff",
+      "CN": "魔术回路（自转）buff",
+      "TW": "魔術迴路（自轉）buff",
+      "NA": "Magic Circuit (rotation) buff",
+      "KR": null
+    },
+    "2912": {
+      "JP": "buff(魔弾)攻撃力アップ",
+      "CN": "buff(魔弹)攻击力提升",
+      "TW": "buff(魔彈)攻擊力提升",
+      "NA": "buff Magic Bullet Atk Up",
+      "KR": null
+    },
+    "2913": {
+      "JP": "スキル『駒鳥の殺人』を持つ",
+      "CN": "持有技能『被杀死的知更鸟』",
+      "TW": "持有技能『被殺死的知更鳥』",
+      "NA": "Has skill [Lost Robin Rondo]",
+      "KR": null
+    },
+    "2914": {
+      "JP": "buff即死時ガッツ",
+      "CN": "buff即死时毅力",
+      "TW": "buff即死時毅力",
+      "NA": "buff Guts on Instant Death",
+      "KR": null
+    },
+    "2915": {
+      "JP": "〔竜〕特性特攻攻撃",
+      "CN": "〔龙〕特性特攻攻击",
+      "TW": "〔龍〕特性特攻攻撃",
+      "NA": null,
+      "KR": null
+    },
+    "2917": {
+      "JP": "水妃モルガン霊基第三段階",
+      "CN": "水妃摩根灵基第三阶段",
+      "TW": "水妃摩根靈基第三階段",
+      "NA": "Beach Queen Morgan 3rd Ascension Form",
+      "KR": null
+    },
+    "2919": {
+      "JP": "バニー系のサーヴァント",
+      "CN": "兔女郎系从者",
+      "TW": "兔女郎系從者",
+      "NA": "Bunny Servant",
+      "KR": null
+    },
+    "2920": {
+      "JP": "buff 善特攻",
+      "CN": "buff 善特攻",
+      "TW": "buff 善特攻",
+      "NA": "buff Strong against Alignment Good",
+      "KR": null
+    },
+    "2921": {
+      "JP": "buff 悪特攻",
+      "CN": "buff 恶特攻",
+      "TW": "buff 惡特攻",
+      "NA": "buff Strong against Alignment Evil",
+      "KR": null
+    },
+    "2922": {
+      "JP": "善特攻持ち",
+      "CN": "持有善特攻",
+      "TW": "持有善特攻",
+      "NA": "Having S.E. again Alignment Good",
+      "KR": null
+    },
+    "2923": {
+      "JP": "悪特攻持ち",
+      "CN": "持有恶特攻",
+      "TW": "持有惡特攻",
+      "NA": "Having S.E. again Alignment Evil",
+      "KR": null
+    },
+    "2924": {
+      "JP": "宇宙飛行できるサーヴァント",
+      "CN": "能宇宙飞行的从者",
+      "TW": "能宇宙飛行的從者",
+      "NA": "Can Fly in Space Servant",
+      "KR": null
+    },
+    "2925": {
+      "JP": null,
+      "CN": "樱系列系",
+      "TW": "櫻系列",
+      "NA": "Sakura Serials",
+      "KR": null
+    },
+    "2949": {
+      "JP": "フィールド:天国",
+      "CN": "场地:天国",
+      "TW": "場地:天國",
+      "NA": "Field:Heaven",
+      "KR": null
+    },
+    "2950": {
+      "JP": "フィールド:地獄",
+      "CN": "场地:地狱",
+      "TW": "場地:地獄",
+      "NA": "Field:Hell",
+      "KR": null
+    },
+    "2951": {
+      "JP": "罪の刻印",
+      "CN": "罪之刻印",
+      "TW": "罪之刻印",
+      "NA": "Mark of Sin",
+      "KR": null
+    },
+    "2957": {
+      "JP": "自陣防御",
+      "CN": "己阵防御",
+      "TW": "自陣防禦",
+      "NA": "Territory Defense",
+      "KR": null
+    },
+    "2973": {
+      "JP": "美少年",
+      "CN": "美少年",
+      "TW": "美少年",
+      "NA": "Pretty Boy",
+      "KR": null
+    },
+    "2982": {
+      "JP": "標的破壊",
+      "CN": "目标摧毁",
+      "TW": "目標摧毀",
+      "NA": "Target Destruction",
+      "KR": null
+    },
+    "2984": {
+      "JP": "func HP吸収",
+      "CN": "func HP吸收",
+      "TW": "func HP吸收",
+      "NA": "func Absorb HP",
+      "KR": null
+    },
+    "2985": {
+      "JP": "func最大HPプラス",
+      "CN": "func最大HP增加",
+      "TW": "func最大HP增加",
+      "NA": "func Max HP Plus",
+      "KR": null
+    },
+    "2986": {
+      "JP": "buff最大HPプラス",
+      "CN": "buff最大HP增加",
+      "TW": "buff最大HP增加",
+      "NA": "buff Max HP Plus",
+      "KR": null
+    },
+    "2997": {
+      "JP": "Ｕ－オルガ霊基1&2/美遊霊基3",
+      "CN": "U－奥尔加灵基1&2/美游灵基3",
+      "TW": "U－奧爾加靈基1&2/美遊靈基3",
+      "NA": "U-Olga Ascen 1&2/Miyu Ascen 3",
+      "KR": null
+    },
+    "2999": {
+      "JP": "フィールドに〔イリヤ〕がいる",
+      "CN": "伊莉雅在场",
+      "TW": "伊莉雅在場",
+      "NA": "Illya on Field",
+      "KR": null
+    },
+    "3000": {
+      "JP": "attackPhysical",
+      "CN": null,
+      "TW": null,
+      "NA": "attackPhysical",
+      "KR": null
+    },
+    "3001": {
+      "JP": "attackProjectile",
+      "CN": null,
+      "TW": null,
+      "NA": "attackProjectile",
+      "KR": null
+    },
+    "3002": {
+      "JP": "attackMagical",
+      "CN": null,
+      "TW": null,
+      "NA": "attackMagical",
+      "KR": null
+    },
+    "3004": {
+      "JP": "buff強化状態",
+      "CN": "buff强化效果",
+      "TW": "buff強化狀態",
+      "NA": "buff Positive Effect",
+      "KR": null
+    },
+    "3005": {
+      "JP": "buff弱体状態",
+      "CN": "buff弱化效果",
+      "TW": "buff弱化狀態",
+      "NA": "buff Negative Effect",
+      "KR": null
+    },
+    "3006": {
+      "JP": "buff攻撃強化",
+      "CN": "buff攻击强化",
+      "TW": "buff攻撃強化",
+      "NA": "buff ATK Buff",
+      "KR": null
+    },
+    "3007": {
+      "JP": "buff防御強化",
+      "CN": "buff防御强化",
+      "TW": "buff防禦強化",
+      "NA": "buff DEF Buff",
+      "KR": null
+    },
+    "3008": {
+      "JP": "buff攻撃弱体",
+      "CN": "buff攻击弱化",
+      "TW": "buff攻擊弱化",
+      "NA": "buff ATK Debuff",
+      "KR": null
+    },
+    "3009": {
+      "JP": "buff防御弱体",
+      "CN": "buff防御弱化",
+      "TW": "buff防禦弱化",
+      "NA": "buff DEF Debuff",
+      "KR": null
+    },
+    "3010": {
+      "JP": "buff精神異常",
+      "CN": "buff精神异常",
+      "TW": "buff精神異常",
+      "NA": "buff Mental Effect",
+      "KR": null
+    },
+    "3011": {
+      "JP": "buff毒",
+      "CN": "buff毒",
+      "TW": "buff毒",
+      "NA": "buff Poison",
+      "KR": "buff 독"
+    },
+    "3012": {
+      "JP": "buff魅了",
+      "CN": "buff魅惑",
+      "TW": "buff魅惑",
+      "NA": "buff Charm",
+      "KR": "buff 매료"
+    },
+    "3013": {
+      "JP": "buff石化",
+      "CN": "buff石化",
+      "TW": "buff石化",
+      "NA": "buff Petrify",
+      "KR": "buff 석화"
+    },
+    "3014": {
+      "JP": "buffスタン",
+      "CN": "buff晕眩",
+      "TW": "buff暈眩",
+      "NA": "buff Stun",
+      "KR": "buff 스턴"
+    },
+    "3015": {
+      "JP": "buffやけど",
+      "CN": "buff灼伤",
+      "TW": "buff燒傷",
+      "NA": "buff Burn",
+      "KR": null
+    },
+    "3016": {
+      "JP": "buff特殊耐性アップ",
+      "CN": "buff特殊耐性提升",
+      "TW": "buff特殊耐性提升",
+      "NA": "buff Special Resist Up",
+      "KR": null
+    },
+    "3017": {
+      "JP": "buff特殊耐性ダウン",
+      "CN": "buff特殊耐性下降",
+      "TW": "buff特殊耐性下降",
+      "NA": "buff Special Resist Down",
+      "KR": null
+    },
+    "3018": {
+      "JP": "buff回避・無敵",
+      "CN": "buff闪避・无敌",
+      "TW": "buff迴避・無敵",
+      "NA": "buff Evade and Invincible",
+      "KR": null
+    },
+    "3019": {
+      "JP": "buff必中",
+      "CN": "buff必中",
+      "TW": "buff必中",
+      "NA": "buff Sure Hit",
+      "KR": null
+    },
+    "3020": {
+      "JP": "buff宝具封印",
+      "CN": "buff宝具封印",
+      "TW": "buff寶具封印",
+      "NA": "buff Np Seal",
+      "KR": "buff 보구봉인"
+    },
+    "3021": {
+      "JP": "buff回避",
+      "CN": "buff回避",
+      "TW": "buff迴避",
+      "NA": "buff Evade",
+      "KR": "buff 회피"
+    },
+    "3022": {
+      "JP": "buff無敵",
+      "CN": "buff无敌",
+      "TW": "buff無敵",
+      "NA": "buff Invincible",
+      "KR": "buff 무적"
+    },
+    "3023": {
+      "JP": "buffターゲット集中",
+      "CN": "buff目标集中",
+      "TW": "buff目標集中",
+      "NA": "buff Target Focus",
+      "KR": "buff 타겟집중"
+    },
+    "3024": {
+      "JP": "buffガッツ",
+      "CN": "buff毅力",
+      "TW": "buff毅力",
+      "NA": "buff Guts",
+      "KR": "buff 근성"
+    },
+    "3025": {
+      "JP": "buffスキル封印",
+      "CN": "buff技能封印",
+      "TW": "buff技能封印",
+      "NA": "buff Skill Seal",
+      "KR": "buff 스킬 봉인"
+    },
+    "3026": {
+      "JP": "buff呪い",
+      "CN": "buff诅咒",
+      "TW": "buff詛咒",
+      "NA": "buff Curse",
+      "KR": "buff 저주"
+    },
+    "3027": {
+      "JP": "buff攻撃力アップ",
+      "CN": "buff攻击力提升",
+      "TW": "buff攻擊力提升",
+      "NA": "buff Atk Up",
+      "KR": "buff 공격력 증가"
+    },
+    "3028": {
+      "JP": "buff威力アップ",
+      "CN": "buff威力提升",
+      "TW": "buff威力提升",
+      "NA": "buff Strength Up",
+      "KR": "buff 위력 UP"
+    },
+    "3029": {
+      "JP": "buffアタックプラス",
+      "CN": "buff伤害附加",
+      "TW": "buff傷害附加",
+      "NA": "buff Damage Plus",
+      "KR": "buff 대미지 증가"
+    },
+    "3030": {
+      "JP": "buff宝具威力アップ",
+      "CN": "buff宝具威力提升",
+      "TW": "buff寶具威力提升",
+      "NA": "buff Np Damage Up",
+      "KR": "buff 보구 위력 UP"
+    },
+    "3031": {
+      "JP": "buffクリティカル威力アップ",
+      "CN": "buff暴击威力提升",
+      "TW": "buff爆擊威力提升",
+      "NA": "buff Crit Damage Up",
+      "KR": "buff 크리티컬 위력 UP"
+    },
+    "3032": {
+      "JP": "buffクリティカル発生率アップ",
+      "CN": "buff暴击率提升",
+      "TW": "buff爆擊率提升",
+      "NA": "buff Crit Rate Up",
+      "KR": "buff 크리티컬 발생률 UP"
+    },
+    "3033": {
+      "JP": "buff攻撃力ダウン",
+      "CN": "buff攻击力下降",
+      "TW": "buff攻擊力下降",
+      "NA": "buff Atk Down",
+      "KR": "buff 공격력 DOWN"
+    },
+    "3034": {
+      "JP": "buff威力ダウン",
+      "CN": "buff威力下降",
+      "TW": "buff威力下降",
+      "NA": "buff Strength Down",
+      "KR": "buff 위력 DOWN"
+    },
+    "3035": {
+      "JP": "buffアタックマイナス",
+      "CN": "buff伤害削减",
+      "TW": "buff傷害削減",
+      "NA": "buff Damage Minus",
+      "KR": "buff 대미지 감소"
+    },
+    "3036": {
+      "JP": "buff宝具威力ダウン",
+      "CN": "buff宝具威力下降",
+      "TW": "buff寶具威力下降",
+      "NA": "buff Np Damage Down",
+      "KR": "buff 보구 위력 DOWN"
+    },
+    "3037": {
+      "JP": "buffクリティカル威力ダウン",
+      "CN": "buff暴击威力下降",
+      "TW": "buff爆擊威力下降",
+      "NA": "buff Critical Down",
+      "KR": "buff 크리티컬 위력 DOWN"
+    },
+    "3038": {
+      "JP": "buffクリティカル発生ダウン",
+      "CN": "buff暴击率下降",
+      "TW": "buff爆擊率下降",
+      "NA": "buff Critical Hit Rate Down",
+      "KR": "buff 크리티컬 발생률 DOWN"
+    },
+    "3039": {
+      "JP": "buff即死耐性ダウン",
+      "CN": "buff即死耐性下降",
+      "TW": "buff即死耐性下降",
+      "NA": "buff Death Resist Down",
+      "KR": "buff 즉사 내성 감소"
+    },
+    "3040": {
+      "JP": "buff防御アップ関連",
+      "CN": "buff防御提升类",
+      "TW": "buff防禦提升类",
+      "NA": "buff Defense Up related",
+      "KR": null
+    },
+    "3041": {
+      "JP": "buff最大HPアップ（比率）",
+      "CN": "buff最大生命值提升(比例)",
+      "TW": "buff最大生命值提升（比例）",
+      "NA": "buff Max Hp Up Percent",
+      "KR": null
+    },
+    "3042": {
+      "JP": "buff最大HPダウン（比率）",
+      "CN": "buff最大生命值下降(比例)",
+      "TW": "buff最大生命值下降（比例）",
+      "NA": "buff Max Hp Down Percent",
+      "KR": null
+    },
+    "3043": {
+      "JP": "buff最大HPアップ",
+      "CN": "buff最大生命值提升",
+      "TW": "buff最大生命值提升",
+      "NA": "buff Max Hp Up",
+      "KR": "buff 최대 체력 증가"
+    },
+    "3044": {
+      "JP": "buff最大HPダウン",
+      "CN": "buff最大生命值下降",
+      "TW": "buff最大生命值下降",
+      "NA": "buff Max Hp Down",
+      "KR": "buff 최대 체력 감소"
+    },
+    "3045": {
+      "JP": "buff行動不能",
+      "CN": "buff无法行动",
+      "TW": "buff無法行動",
+      "NA": "buff Immobilize",
+      "KR": null
+    },
+    "3046": {
+      "JP": "buff蝕毒",
+      "CN": "buff蚀毒",
+      "TW": "buff蝕毒",
+      "NA": "buff Corroding Poison",
+      "KR": null
+    },
+    "3047": {
+      "JP": "buff豚化",
+      "CN": "buff猪化",
+      "TW": "buff豬化",
+      "NA": "buff Pigify",
+      "KR": null
+    },
+    "3048": {
+      "JP": "buff呪厄",
+      "CN": "buff咒厄",
+      "TW": "buff咒厄",
+      "NA": "buff Curse Effect Up",
+      "KR": null
+    },
+    "3049": {
+      "JP": "buff恐怖",
+      "CN": "buff恐怖",
+      "TW": "buff恐怖",
+      "NA": "buff Terror",
+      "KR": null
+    },
+    "3051": {
+      "JP": "func状態解除",
+      "CN": "func解除状态",
+      "TW": "func解除狀態",
+      "NA": "func Remove Effects",
+      "KR": null
+    },
+    "3052": {
+      "JP": "buff混乱",
+      "CN": "buff混乱",
+      "TW": "buff混亂",
+      "NA": "buff Confusion",
+      "KR": null
+    },
+    "3053": {
+      "JP": "buff攻撃モード",
+      "CN": "buff攻击模式",
+      "TW": "buff攻擊模式",
+      "NA": "buff Offensive Mode",
+      "KR": null
+    },
+    "3054": {
+      "JP": "buff防御モード",
+      "CN": "buff防御模式",
+      "TW": "buff防禦模式",
+      "NA": "buff Defensive Mode",
+      "KR": null
+    },
+    "3055": {
+      "JP": "buffコマンドカード固定",
+      "CN": "buff指令卡固定",
+      "TW": "buff指令卡固定",
+      "NA": "buff Lock Cards Deck",
+      "KR": null
+    },
+    "3056": {
+      "JP": "buffコマンドカード封印",
+      "CN": "buff色卡封印",
+      "TW": "buff指令卡封印",
+      "NA": "buff Disable Color Card",
+      "KR": null
+    },
+    "3057": {
+      "JP": "buffフィールド特性追加",
+      "CN": "buff改变场地",
+      "TW": "buff改變場地",
+      "NA": "buff Change Field",
+      "KR": "buff 필드 변화"
+    },
+    "3058": {
+      "JP": "buff防御力アップ",
+      "CN": "buff防御力提升",
+      "TW": "buff防禦力提升",
+      "NA": "buff DEF Up",
+      "KR": null
+    },
+    "3059": {
+      "JP": "buff無敵貫通",
+      "CN": "buff无敌贯通",
+      "TW": "buff無敵貫通",
+      "NA": "buff Invincible Pierce",
+      "KR": null
+    },
+    "3060": {
+      "JP": "buff毎ターンHP回復",
+      "CN": "buff每回合生命值回复",
+      "TW": "buff每回合回復生命值",
+      "NA": "buff Hp Recovery per Turn",
+      "KR": null
+    },
+    "3061": {
+      "JP": "buff弱体無効",
+      "CN": "buff弱化状态无效",
+      "TW": "buff弱化無效",
+      "NA": "buff Negative Effect Immunity",
+      "KR": null
+    },
+    "3063": {
+      "JP": "buff遅延発動弱体",
+      "CN": "buff延迟发动弱化",
+      "TW": "buff延遲發動弱化",
+      "NA": "buff Delayed Effect Debuff",
+      "KR": null
+    },
+    "3064": {
+      "JP": "buff対粛正防御",
+      "CN": "buff对肃正防御",
+      "TW": "buff對肅正防禦",
+      "NA": "buff Anti-Enforcement DEF",
+      "KR": null
+    },
+    "3065": {
+      "JP": "人魚の滋養",
+      "CN": "人鱼的滋养",
+      "TW": "人魚的滋養",
+      "NA": "Mermaid's Nourishment",
+      "KR": null
+    },
+    "3066": {
+      "JP": "buff睡眠",
+      "CN": "buff睡眠",
+      "TW": "buff睡眠",
+      "NA": "buff Sleep",
+      "KR": "buff 수면"
+    },
+    "3068": {
+      "JP": "陳宮宝具",
+      "CN": "陈宫宝具",
+      "TW": "陳宮寶具",
+      "NA": "ChenGong Np",
+      "KR": null
+    },
+    "3070": {
+      "JP": "buff強化無効",
+      "CN": "buff强化无效",
+      "TW": "buff強化無效",
+      "NA": "buff Nullify Buff",
+      "KR": null
+    },
+    "3076": {
+      "JP": "生贄選択不能",
+      "CN": "无法选择活祭",
+      "TW": "無法選擇活祭",
+      "NA": "Can't Be Sacrificed",
+      "KR": null
+    },
+    "3080": {
+      "JP": "buff毎ターンNP獲得",
+      "CN": "buff每回合NP获得",
+      "TW": "buff每回合NP獲得",
+      "NA": "buff NP Gain Per Turn",
+      "KR": null
+    },
+    "3081": {
+      "JP": "buff毎ターンスター獲得",
+      "CN": "buff每回合星获得",
+      "TW": "buff每回合爆擊星獲得",
+      "NA": "buff C. Star Gain Per Turn",
+      "KR": null
+    },
+    "3084": {
+      "JP": "buffNP獲得アップ",
+      "CN": "buff NP获取提升",
+      "TW": "buff NP獲得提升",
+      "NA": "buff NP Gain Up",
+      "KR": "buff NP 획득 UP"
+    },
+    "3085": {
+      "JP": "buffダメージカット",
+      "CN": "buff伤害减免",
+      "TW": "buff傷害減免",
+      "NA": "buff Damage Cut",
+      "KR": null
+    },
+    "3086": {
+      "JP": "ガッツ無効",
+      "CN": "毅力无效",
+      "TW": "毅力無效",
+      "NA": "Guts Block",
+      "KR": null
+    },
+    "3087": {
+      "JP": "buff拘束",
+      "CN": "buff束缚",
+      "TW": "buff拘束",
+      "NA": "buff Bound",
+      "KR": null
+    },
+    "3088": {
+      "JP": "buffマーキング",
+      "CN": "buff标记",
+      "TW": "buff標記",
+      "NA": "buff Marking",
+      "KR": null
+    },
+    "3089": {
+      "JP": "buff延焼",
+      "CN": "buff延烧",
+      "TW": "buff延燒",
+      "NA": "buff Spreading Fire",
+      "KR": null
+    },
+    "3090": {
+      "JP": null,
+      "CN": "buff 强化状态付与提升",
+      "TW": "buff 強化狀態賦予提升",
+      "NA": "buff Buff Chance Up",
+      "KR": null
+    },
+    "3091": {
+      "JP": "血塗れの皇子",
+      "CN": "血染的皇子",
+      "TW": "血染的皇子",
+      "NA": "Bloodstained Prince",
+      "KR": null
+    },
+    "3092": {
+      "JP": "buff Artsアップ",
+      "CN": "buff Arts性能提升",
+      "TW": "buff Arts性能提升",
+      "NA": "buff Arts Up",
+      "KR": null
+    },
+    "3093": {
+      "JP": "buff Busterアップ",
+      "CN": "buff Buster性能提升",
+      "TW": "buff Buster性能提升",
+      "NA": "buff Buster Up",
+      "KR": null
+    },
+    "3094": {
+      "JP": "buff Quickアップ",
+      "CN": "buff Quick性能提升",
+      "TW": "buff Quick性能提升",
+      "NA": "buff Quick Up",
+      "KR": null
+    },
+    "3095": {
+      "JP": "buff副属性変更関連",
+      "CN": "buff副属性变更相关",
+      "TW": "buff副屬性變更相關",
+      "NA": "buff Change Sub Attribute related",
+      "KR": null
+    },
+    "3096": {
+      "JP": "即死効果",
+      "CN": "即死效果",
+      "TW": "即死效果",
+      "NA": "Instant Death Effect",
+      "KR": null
+    },
+    "3097": {
+      "JP": "強制即死効果",
+      "CN": "强制即死效果",
+      "TW": "強制即死效果",
+      "NA": "Force Instant Death Effect",
+      "KR": null
+    },
+    "3098": {
+      "JP": "一部のデメリット効果",
+      "CN": "一部分负面效果",
+      "TW": "一部分負面效果",
+      "NA": "Part of demerit effects",
+      "KR": null
+    },
+    "3099": {
+      "JP": "buffコマドリ身代わり",
+      "CN": "buff知更鸟替身",
+      "TW": "buff知更鳥替身",
+      "NA": "buff Robin Substitution",
+      "KR": null
+    },
+    "3100": {
+      "JP": "buff Extra Attackアップ",
+      "CN": "buff Extra攻击提升",
+      "TW": "buff Extra攻擊提升",
+      "NA": "buff Extra Attack Up",
+      "KR": null
+    },
+    "3102": {
+      "JP": "保護対象",
+      "CN": "保护对象",
+      "TW": "保護對象",
+      "NA": "Protected Target",
+      "KR": null
+    },
+    "3103": {
+      "JP": "保護対象外",
+      "CN": "保护对象外",
+      "TW": "保護對象外",
+      "NA": "Not Protected Target",
+      "KR": null
+    },
+    "3104": {
+      "JP": "buff対粛正防御貫通",
+      "CN": "buff对肃正防御贯通",
+      "TW": "buff對肅正防禦貫通",
+      "NA": "buff Anti-Enforcement DEF Pierce",
+      "KR": null
+    },
+    "3106": {
+      "JP": "funcチャージ減少",
+      "CN": "func充能减少",
+      "TW": "func Charge減少",
+      "NA": "func Drain Charge",
+      "KR": "func 충전 감소"
+    },
+    "3107": {
+      "JP": "funcバフ付与",
+      "CN": "func付与Buff",
+      "TW": "func賦予Buff",
+      "NA": "func Apply Buff",
+      "KR": "func 버프 부여"
+    },
+    "3108": {
+      "JP": "funcバフ付与(Short)",
+      "CN": "func付与Buff(Short)",
+      "TW": "func賦予Buff(Short)",
+      "NA": "func Apply Buff(Short)",
+      "KR": "func 버프 부여(Short)"
+    },
+    "3109": {
+      "JP": null,
+      "CN": "buff对特性回避",
+      "TW": "buff對特性迴避",
+      "NA": "buff Evade vs Trait",
+      "KR": null
+    },
+    "3110": {
+      "JP": "buff防御力ダウン",
+      "CN": "buff防御力下降",
+      "TW": "buff防禦力下降",
+      "NA": "buff DEF Down",
+      "KR": null
+    },
+    "3115": {
+      "JP": "\"対敵注視\"",
+      "CN": "\"对敌注视\"",
+      "TW": "\"對敵注視\"",
+      "NA": null,
+      "KR": null
+    },
+    "3116": {
+      "JP": "\"増幅負荷\"",
+      "CN": null,
+      "TW": "\"增幅負荷\"",
+      "NA": null,
+      "KR": null
+    },
+    "3117": {
+      "JP": "\"放出残滓\"",
+      "CN": null,
+      "TW": "\"放出殘滓\"",
+      "NA": null,
+      "KR": null
+    },
+    "3118": {
+      "JP": "\"対極共生（彼方）\"",
+      "CN": null,
+      "TW": "\"對極共生（彼方）\"",
+      "NA": null,
+      "KR": null
+    },
+    "3119": {
+      "JP": "\"理の傍ら\"",
+      "CN": null,
+      "TW": "\"真理之側\"",
+      "NA": null,
+      "KR": null
+    },
+    "3121": {
+      "JP": "〔月下〕",
+      "CN": "〔月下〕",
+      "TW": "〔月下〕",
+      "NA": null,
+      "KR": null
+    },
+    "3122": {
+      "JP": "〔日輪〕",
+      "CN": "〔日轮〕",
+      "TW": "〔日輪〕",
+      "NA": null,
+      "KR": null
+    },
+    "3125": {
+      "JP": "〔気配遮断〕",
+      "CN": "〔气息遮断〕",
+      "TW": null,
+      "NA": "Presence Concealment",
+      "KR": null
+    },
+    "3127": {
+      "JP": "buff即死付与率アップ",
+      "CN": "buff即死付与率提升",
+      "TW": "buff即死賦予率提升",
+      "NA": "buff Death Chance Up",
+      "KR": null
+    },
+    "3128": {
+      "JP": "〔鈍の矢弾〕",
+      "CN": null,
+      "TW": null,
+      "NA": null,
+      "KR": null
+    },
+    "3133": {
+      "JP": null,
+      "CN": null,
+      "TW": null,
+      "NA": null,
+      "KR": null
+    },
+    "3134": {
+      "JP": "グランドサインフィールド効果",
+      "CN": "职阶星图场地效果",
+      "TW": null,
+      "NA": null,
+      "KR": null
+    },
+    "3135": {
+      "JP": "グランドサインフィールド効果〔Quick攻撃耐性ダウン〕",
+      "CN": "职阶星图场地效果〔Quick指令卡耐性下降〕",
+      "TW": null,
+      "NA": null,
+      "KR": null
+    },
+    "3136": {
+      "JP": "グランドサインフィールド効果〔Arts攻撃耐性ダウン〕",
+      "CN": "职阶星图场地效果〔Arts指令卡耐性下降〕",
+      "TW": null,
+      "NA": null,
+      "KR": null
+    },
+    "3137": {
+      "JP": "グランドサインフィールド効果〔Buster攻撃耐性ダウン〕",
+      "CN": "职阶星图场地效果〔Buster指令卡耐性下降〕",
+      "TW": null,
+      "NA": null,
+      "KR": null
+    },
+    "3138": {
+      "JP": null,
+      "CN": null,
+      "TW": null,
+      "NA": null,
+      "KR": null
+    },
+    "3139": {
+      "JP": "ガッツ無視",
+      "CN": "无视毅力",
+      "TW": null,
+      "NA": "Ignore Guts",
+      "KR": null
+    },
+    "4001": {
+      "JP": "アーツカード",
+      "CN": "Arts卡",
+      "TW": "Arts卡",
+      "NA": "Card:Arts",
+      "KR": "아츠 카드"
+    },
+    "4002": {
+      "JP": "バスターカード",
+      "CN": "Buster卡",
+      "TW": "Buster卡",
+      "NA": "Card:Buster",
+      "KR": "버스터 카드"
+    },
+    "4003": {
+      "JP": "クイックカード",
+      "CN": "Quick卡",
+      "TW": "Quick卡",
+      "NA": "Card:Quick",
+      "KR": "퀵 카드"
+    },
+    "4004": {
+      "JP": "エクストラカード",
+      "CN": "Extra卡",
+      "TW": "Extra卡",
+      "NA": "Card:Extra",
+      "KR": "엑스트라 카드"
+    },
+    "4005": {
+      "JP": "弱攻撃",
+      "CN": "弱攻击",
+      "TW": "弱攻擊",
+      "NA": "Card:Weak",
+      "KR": "약공격"
+    },
+    "4006": {
+      "JP": "強攻撃",
+      "CN": "强攻击",
+      "TW": "強攻擊",
+      "NA": "Card:Strong",
+      "KR": "강공격"
+    },
+    "4007": {
+      "JP": "宝具カード",
+      "CN": "宝具卡",
+      "TW": "寶具卡",
+      "NA": "Card:NP",
+      "KR": "보구 카드"
+    },
+    "4008": {
+      "JP": "通常カード",
+      "CN": "普通指令卡",
+      "TW": "普通指令卡",
+      "NA": "Normal Card",
+      "KR": "통상 카드"
+    },
+    "4100": {
+      "JP": "クリティカル",
+      "CN": "暴击",
+      "TW": "爆擊",
+      "NA": "Critical Hit",
+      "KR": "크리티컬"
+    },
+    "4101": {
+      "JP": "全体宝具",
+      "CN": "全体宝具",
+      "TW": "全體寶具",
+      "NA": "AoE NP",
+      "KR": null
+    },
+    "4102": {
+      "JP": "単体宝具",
+      "CN": "单体宝具",
+      "TW": "單體寶具",
+      "NA": "ST NP",
+      "KR": null
+    },
+    "4104": {
+      "JP": null,
+      "CN": null,
+      "TW": null,
+      "NA": "Quick Chain",
+      "KR": null
+    },
+    "4105": {
+      "JP": null,
+      "CN": null,
+      "TW": null,
+      "NA": "Arts Chain",
+      "KR": null
+    },
+    "4106": {
+      "JP": null,
+      "CN": null,
+      "TW": null,
+      "NA": "Buster Chain",
+      "KR": null
+    },
+    "4107": {
+      "JP": null,
+      "CN": null,
+      "TW": null,
+      "NA": "Mighty Chain",
+      "KR": null
+    },
+    "4108": {
+      "JP": null,
+      "CN": null,
+      "TW": null,
+      "NA": "Brave Chain",
+      "KR": null
+    },
+    "4109": {
+      "JP": null,
+      "CN": null,
+      "TW": null,
+      "NA": "Chain Error",
+      "KR": null
+    },
+    "5000": {
+      "JP": "canBeInBattle",
+      "CN": null,
+      "TW": null,
+      "NA": "canBeInBattle",
+      "KR": null
+    },
+    "5010": {
+      "JP": "非サーヴァント",
+      "CN": "非从者",
+      "TW": "非從者",
+      "NA": "Not Servant",
+      "KR": null
+    },
+    "6045": {
+      "JP": "自身が最後に攻撃を受けた相手",
+      "CN": "最后攻击自身的对手",
+      "TW": "最後攻擊自身的對手",
+      "NA": "The last enemy that attacked self",
+      "KR": null
+    },
+    "7000": {
+      "JP": "サポートサーヴァント",
+      "CN": "助战从者",
+      "TW": "支援從者",
+      "NA": "Support Servant",
+      "KR": null
+    },
+    "7001": {
+      "JP": "プレイヤー側",
+      "CN": "玩家侧",
+      "TW": null,
+      "NA": "Is Player",
+      "KR": null
+    },
+    "7010": {
+      "JP": null,
+      "CN": "男性御主",
+      "TW": "男性御主",
+      "NA": "Male Master",
+      "KR": null
+    },
+    "7011": {
+      "JP": null,
+      "CN": "女性御主",
+      "TW": "女性御主",
+      "NA": "Female Master",
+      "KR": null
+    },
+    "7012": {
+      "JP": null,
+      "CN": "存在御主",
+      "TW": "存在御主",
+      "NA": "Master Exist",
+      "KR": null
+    },
+    "7013": {
+      "JP": null,
+      "CN": "不存在御主",
+      "TW": "不存在御主",
+      "NA": "Master not Exist",
+      "KR": null
+    },
+    "7020": {
+      "JP": "直接ダメージを与えない宝具",
+      "CN": "无直接伤害宝具",
+      "TW": "無直接傷害寶具",
+      "NA": "No Direct Damage NP",
+      "KR": null
+    },
+    "7021": {
+      "JP": "単体攻撃宝具",
+      "CN": "单体攻击宝具",
+      "TW": "單體攻擊寶具",
+      "NA": "ST Attack NP",
+      "KR": null
+    },
+    "7022": {
+      "JP": "全体攻撃宝具",
+      "CN": "全体攻击宝具",
+      "TW": "全體攻擊寶具",
+      "NA": "AoE Attack NP",
+      "KR": null
+    },
+    "7023": {
+      "JP": "攻撃宝具",
+      "CN": "攻击宝具",
+      "TW": "攻擊寶具",
+      "NA": "Attack NP",
+      "KR": null
+    },
+    "7030": {
+      "JP": "無宝具",
+      "CN": "无宝具",
+      "TW": "無寶具",
+      "NA": "No NP",
+      "KR": null
+    },
+    "10000": {
+      "JP": "化け猫",
+      "CN": "怪猫",
+      "TW": "化貓",
+      "NA": "Monster Cat",
+      "KR": null
+    },
+    "10002": {
+      "JP": "猛獣がいる間",
+      "CN": "猛兽在场",
+      "TW": "猛獸在場",
+      "NA": "Wild Beast on field",
+      "KR": null
+    },
+    "10003": {
+      "JP": "魔獣型サーヴァンがいる間",
+      "CN": "魔兽型从者在场",
+      "TW": "魔獸型從者在場",
+      "NA": "Demonic Beast Servant on field",
+      "KR": null
+    },
+    "10004": {
+      "JP": "ケモノ科のサーヴァントがいる間",
+      "CN": "兽科从者在场",
+      "TW": "獸科從者在場",
+      "NA": "Beast Servant on field",
+      "KR": null
+    },
+    "10006": {
+      "JP": "〔納刀体勢〕",
+      "CN": "〔纳刀态势〕",
+      "TW": null,
+      "NA": null,
+      "KR": null
+    },
+    "10009": {
+      "JP": "新選組",
+      "CN": "新选组",
+      "TW": "新選組",
+      "NA": "Shinsengumi",
+      "KR": null
+    },
+    "10010": {
+      "JP": "エリザベート",
+      "CN": "伊丽莎白",
+      "TW": "伊莉莎白",
+      "NA": "Elisabeth",
+      "KR": "엘리자베트"
+    },
+    "10011": {
+      "JP": "フィールド:ハロウィン",
+      "CN": "场地:万圣节",
+      "TW": "場地:萬聖節",
+      "NA": "Field:Halloween",
+      "KR": "필드:할로윈"
+    },
+    "10026": {
+      "JP": "\"冥界の花園\"",
+      "CN": "\"冥界的花园\"",
+      "TW": null,
+      "NA": null,
+      "KR": null
+    },
+    "10027": {
+      "JP": "\"灰桜\"",
+      "CN": "\"樱灰\"",
+      "TW": null,
+      "NA": null,
+      "KR": null
+    },
+    "10028": {
+      "JP": "宝具を使用済み",
+      "CN": "已使用宝具",
+      "TW": null,
+      "NA": "Used Noble Phantasm",
+      "KR": null
+    },
+    "94000049": {
+      "JP": "eventNeroFest2",
+      "CN": null,
+      "TW": null,
+      "NA": "eventNeroFest2",
+      "KR": null
+    }
+  }
 }
