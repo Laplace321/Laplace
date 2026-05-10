@@ -138,8 +138,19 @@ def _describe_filters(skill_calls: list[dict]) -> list[str]:
             op_map = {"eq": "=", "gte": "≥", "lte": "≤", "gt": ">", "lt": "<"}
             descriptions.append(f"NP充能 {op_map.get(op, op)} {val}%")
         elif name == "search_by_cards":
-            card = params.get("cardType", "")
-            descriptions.append(f"配卡包含「{card}」")
+            parts = []
+            card = params.get("cardType") or params.get("cards")
+            np_card = params.get("npCard") or params.get("np_card")
+            np_target = params.get("npTarget") or params.get("np_target")
+            if card:
+                parts.append(f"配卡包含「{card}」")
+            if np_card:
+                np_card_map_local = _get_np_card_map()
+                parts.append(f"宝具卡色 = {np_card_map_local.get(np_card.lower(), np_card)}")
+            if np_target:
+                target_map = {"all": "全体(光炮)", "one": "单体", "support": "辅助"}
+                parts.append(f"宝具目标 = {target_map.get(np_target.lower(), np_target)}")
+            descriptions.append(" + ".join(parts) if parts else "配卡筛选")
         elif name == "search_by_traits":
             trait = params.get("trait", "")
             descriptions.append(f"特性包含「{trait}」")
