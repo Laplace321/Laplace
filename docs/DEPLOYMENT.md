@@ -423,10 +423,15 @@ docker restart laplace
 
 ```nginx
 location /llm-proxy/ {
-    proxy_pass https://api.obao.cloud/;
+    # 强制 IPv4 解析,避免 IPv6 不可达导致间歇性 502/503
+    resolver 8.8.8.8 ipv6=off;
+    set $llm_backend https://api.obao.cloud;
+    # 使用 rewrite 剥离 /llm-proxy/ 前缀,正确映射到上游路径
+    rewrite ^/llm-proxy/(.*)$ /$1 break;
+    proxy_pass $llm_backend;
     proxy_ssl_server_name on;
     proxy_set_header Host api.obao.cloud;
-    proxy_set_header User-Agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36";
+    proxy_set_header User-Agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
     proxy_set_header Authorization $http_authorization;
     proxy_set_header Content-Type $http_content_type;
     proxy_buffering off;
@@ -438,7 +443,10 @@ location /llm-proxy/ {
 }
 ```
 
-> **注意**: 此方案依赖 Cloudflare 当前的 User-Agent 检测策略。如未来 Cloudflare 升级检测机制导致再次 403,需重新评估绕过方案。
+> **注意事项**:
+> - `resolver ... ipv6=off` 是必须的,因为服务器 IPv6 不可达,Nginx 默认会先尝试 IPv6 导致间歇性失败。
+> - 使用 `set $llm_backend` + `rewrite` 而非直接 `proxy_pass https://api.obao.cloud/`,是因为 Nginx 使用变量时需要 resolver,同时 rewrite 确保路径正确剥离 `/llm-proxy/` 前缀。
+> - 此方案依赖 Cloudflare 当前的 User-Agent 检测策略。如未来 Cloudflare 升级检测机制导致再次 403,需重新评估绕过方案。
 
 ### 问题 5: DNS 未生效
 
