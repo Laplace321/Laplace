@@ -209,8 +209,6 @@ docker build -t laplace . && docker rm -f laplace && docker run -d --name laplac
 
 **Nginx 反向代理**：生产环境建议在容器前加 Nginx 处理 SSL 和静态文件托管。参考配置见 `deploy/nginx.conf`。注意 SSE 流式响应需要 `proxy_buffering off`。
 
-**Cloudflare 反代说明**：如果 LLM API 提供商（如 obao）前端有 Cloudflare 防护，服务器直接请求可能返回 403。解决方案是在 Nginx 中添加 `/llm-proxy/` location，注入浏览器 User-Agent 绕过 Bot 检测，然后将 `.env` 中的 `LLM_BASE_URL` 指向本地反代（如 `http://172.17.0.1/llm-proxy/v1`）。详见 [部署指南 - 问题排查](docs/DEPLOYMENT.md#问题-4-llm-api-返回-403-cloudflare-拦截)。
-
 > **Docker 环境变量补充**：除 `.env` 中的变量外，容器还支持以下额外变量：
 >
 > | 变量 | 说明 | 默认值 |

@@ -394,61 +394,7 @@ ls -la /path/to/cert.crt
 ls -la /path/to/key.key
 ```
 
-### 问题 4: LLM API 返回 403 (Cloudflare 拦截)
-
-**原因**: obao API 前端有 Cloudflare 防护,服务器直接 HTTP 请求会被当作 Bot 拦截,返回 403 JS Challenge 页面。
-
-**根因**: Cloudflare 基于 User-Agent 进行 Bot 检测。Python httpx / curl 的默认 User-Agent 被识别为 Bot。
-
-**解决**: 使用 Nginx 反向代理,注入浏览器 User-Agent 绕过 Bot 检测:
-
-```bash
-# 1. 确认 Nginx 配置中包含 /llm-proxy/ location block
-cat /etc/nginx/sites-available/laplace | grep -A 15 "llm-proxy"
-
-# 2. 验证反代生效（期望返回 401,而非 403）
-curl -s -o /dev/null -w "HTTP %{http_code}" \
-  -H "Authorization: Bearer test" \
-  http://127.0.0.1/llm-proxy/v1/models
-
-# 3. 确认 .env 的 LLM_BASE_URL 指向反代
-grep LLM_BASE_URL /opt/laplace/.env
-# 应为: LLM_BASE_URL=http://172.17.0.1/llm-proxy/v1
-
-# 4. 重启容器使配置生效
-docker restart laplace
-```
-
-**Nginx 反代配置参考** (在 80 和 443 server block 中均需添加):
-
-```nginx
-location /llm-proxy/ {
-    # 强制 IPv4 解析,避免 IPv6 不可达导致间歇性 502/503
-    resolver 8.8.8.8 ipv6=off;
-    set $llm_backend https://api.obao.cloud;
-    # 使用 rewrite 剥离 /llm-proxy/ 前缀,正确映射到上游路径
-    rewrite ^/llm-proxy/(.*)$ /$1 break;
-    proxy_pass $llm_backend;
-    proxy_ssl_server_name on;
-    proxy_set_header Host api.obao.cloud;
-    proxy_set_header User-Agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
-    proxy_set_header Authorization $http_authorization;
-    proxy_set_header Content-Type $http_content_type;
-    proxy_buffering off;
-    proxy_read_timeout 120s;
-    proxy_connect_timeout 10s;
-    allow 127.0.0.1;
-    allow 172.17.0.0/16;
-    deny all;
-}
-```
-
-> **注意事项**:
-> - `resolver ... ipv6=off` 是必须的,因为服务器 IPv6 不可达,Nginx 默认会先尝试 IPv6 导致间歇性失败。
-> - 使用 `set $llm_backend` + `rewrite` 而非直接 `proxy_pass https://api.obao.cloud/`,是因为 Nginx 使用变量时需要 resolver,同时 rewrite 确保路径正确剥离 `/llm-proxy/` 前缀。
-> - 此方案依赖 Cloudflare 当前的 User-Agent 检测策略。如未来 Cloudflare 升级检测机制导致再次 403,需重新评估绕过方案。
-
-### 问题 5: DNS 未生效
+### 问题 4: DNS 未生效
 
 **原因**: DNS 传播延迟
 
