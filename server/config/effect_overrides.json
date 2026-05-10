@@ -1,0 +1,43 @@
+{
+  "_comment": "业务扩展效果定义（Overlay）。此文件中的效果会在 runtime 合并到 effect_schema.json 之上。sync_chaldea.py 不会触碰此文件。同名效果以此文件为准（覆盖）。",
+  "effects": [
+    {
+      "name": "damageBoost",
+      "category": "attack",
+      "composite": true,
+      "includes": [
+        "upAtk",
+        "upBuster",
+        "upArts",
+        "upQuick",
+        "upCriticaldamage",
+        "upNpdamage"
+      ],
+      "aliases_zh": [
+        "增伤",
+        "威力提升",
+        "伤害提升"
+      ],
+      "description": "泛用增伤效果的统称，包含攻击力提升、色卡提升(红/蓝/绿魔放)、暴击增伤、宝具增伤（不含特攻）"
+    },
+    {
+      "name": "damageShield",
+      "category": "defence",
+      "composite": true,
+      "includes": [
+        "invincible",
+        "avoidance",
+        "upDefence",
+        "subSelfdamage",
+        "guts"
+      ],
+      "aliases_zh": [
+        "挡伤",
+        "防御",
+        "抗伤",
+        "生存"
+      ],
+      "description": "泛用防御/生存效果的统称，包含无敌、闪避、防御提升、减伤、毅力（不含回血）"
+    }
+  ]
+}

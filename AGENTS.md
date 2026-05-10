@@ -169,14 +169,20 @@
 ### 6. 知识与配置分离原则
 - **准则**：稳定领域知识与可运营配置必须物理隔离。
 - **执行**：
-  1. `server/knowledge/` — 存放 `sync_chaldea.py` 从 Chaldea Dart 源码提取的领域知识，禁止手工编辑。
+  1. `server/knowledge/` — 存放 `sync_chaldea.py` 从 Chaldea Dart 源码提取的领域知识，**严禁手工编辑**。
      - 主要是 build-time 消费（由 `data_loader.py` 生成 Materialized View）
      - 允许 runtime 读取，但仅限「查询输入映射」场景（如中文→英文效果名反查）
      - 无代码消费的纯参考文件应移到 `docs/reference/`
   2. `server/config/` — 存放可运营配置（昵称、术语映射、展示规则、Prompt 片段），支持热更新。
   3. 严禁在 `main.py`、`prompts.py` 中硬编码翻译字典（如 `CLASS_MAP`），必须从 `config/` 加载。
   4. **烘焙 vs 查表判定**：筛选字段烘焙到 MV，映射翻译 runtime 查表。详见 ADR-019。
-- **目的**：知识更新与配置维护解耦，支持运营团队独立修改配置而不触碰代码。
+  5. **Effect Schema Overlay 机制（绝对纪律）**：
+     - `server/knowledge/effect_schema.json` 由 `sync_chaldea.py` **自动生成**，每次同步会整体覆盖，**严禁在其中手工添加任何内容**。
+     - 所有手工业务扩展（虚拟复合效果如 `damageBoost`/`damageShield`、翻译修正、自定义效果分组）**必须**放入 `server/config/effect_overrides.json`。
+     - `data_loader.py` 的 `merge_effect_overlay()` 函数负责在 runtime 将 overlay 合并到 schema 之上。**同名效果以 overlay 为准（覆盖）**，新效果追加到末尾。
+     - 所有读取 `effect_schema.json` 的位置（`main.py`、`prompts.py`、Skill 模块等）**必须**经过 `merge_effect_overlay()` 合并后再使用，禁止直接使用原始 schema 数据。
+     - 新增虚拟复合效果时，只需编辑 `server/config/effect_overrides.json`，无需修改任何代码。
+- **目的**：知识更新与配置维护解耦，确保 `sync_chaldea.py` 重新同步时不会覆盖手工业务扩展。
 
 ### 7. Chaldea 依赖边界
 - **准则**：`chaldea-center/chaldea` 不是 runtime 强依赖，仅 `sync_chaldea.py` 更新领域知识时需要。

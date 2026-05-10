@@ -55,7 +55,10 @@ def get_effect_translation(effect_code: str) -> str:
         if schema_path.exists():
             with open(schema_path, encoding="utf-8") as f:
                 data = json.load(f)
-                for effect in data.get("effects", []):
+                from server.data_loader import merge_effect_overlay
+
+                effects = merge_effect_overlay(data.get("effects", []))
+                for effect in effects:
                     name = effect.get("name")
                     aliases = effect.get("aliases_zh", [])
                     if name and aliases:

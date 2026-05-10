@@ -31,8 +31,12 @@ def _load_effect_hints() -> str:
     with open(schema_path, encoding="utf-8") as f:
         data = json.load(f)
 
+    from server.data_loader import merge_effect_overlay
+
+    effects = merge_effect_overlay(data.get("effects", []))
+
     lines: list[str] = []
-    for effect in data.get("effects", []):
+    for effect in effects:
         desc = effect.get("description", "")
         aliases = effect.get("aliases_zh", [])
         if not desc:

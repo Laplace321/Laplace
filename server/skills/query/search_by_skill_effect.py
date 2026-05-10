@@ -23,7 +23,10 @@ def _ensure_zh_map() -> dict[str, str]:
         return _ZH_TO_EN
     with open(schema_path, encoding="utf-8") as f:
         data = json.load(f)
-    for effect in data.get("effects", []):
+    from server.data_loader import merge_effect_overlay
+
+    all_effects = merge_effect_overlay(data.get("effects", []))
+    for effect in all_effects:
         name = effect["name"]
         # 记录复合效果展开关系
         if effect.get("composite"):

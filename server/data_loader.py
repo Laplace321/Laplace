@@ -21,6 +21,7 @@ API_BASE = "https://api.atlasacademy.io"
 NICE_SERVANT_URL = f"{API_BASE}/export/JP/nice_servant_lang_en.json"
 OUTPUT_DIR = Path(__file__).parent / "data"
 KNOWLEDGE_DIR = Path(__file__).parent / "knowledge"
+CONFIG_DIR = Path(__file__).parent / "config"
 
 # NP 充能相关的 funcType
 GAIN_NP_FUNC_TYPES = {"gainNp"}
@@ -42,16 +43,49 @@ SKILL_LV10_INDEX = 9
 # ============================================================
 
 
+def merge_effect_overlay(effects: list[dict]) -> list[dict]:
+    """将 server/config/effect_overrides.json 中的业务扩展合并到效果列表。
+
+    合并规则：
+    - overlay 中的同名效果 **覆盖** 主 schema 中的定义
+    - overlay 中的新效果 **追加** 到列表末尾
+    - overlay 文件不存在时静默跳过（降级为纯 schema）
+    """
+    overlay_path = CONFIG_DIR / "effect_overrides.json"
+    if not overlay_path.exists():
+        return effects
+    with open(overlay_path, encoding="utf-8") as f:
+        overlay = json.load(f)
+    overlay_effects = overlay.get("effects", [])
+    if not overlay_effects:
+        return effects
+
+    existing_names = {e["name"] for e in effects}
+    merged = list(effects)
+    for eff in overlay_effects:
+        if eff["name"] in existing_names:
+            # 覆盖同名效果
+            merged = [eff if e["name"] == eff["name"] else e for e in merged]
+        else:
+            # 追加新效果
+            merged.append(eff)
+    return merged
+
+
 def load_effect_schema() -> dict:
-    """加载 effect_schema.json 知识库（含 effects, traits, triggerBuffTypes）。"""
+    """加载 effect_schema.json 知识库（含 effects, traits, triggerBuffTypes）。
+
+    自动合并 server/config/effect_overrides.json 中的业务扩展效果。
+    """
     schema_path = KNOWLEDGE_DIR / "effect_schema.json"
     if not schema_path.exists():
         print("⚠️  effect_schema.json 不存在，请先运行 sync_chaldea.py")
         return {"effects": [], "traits": {}, "triggerBuffTypes": []}
     with open(schema_path, encoding="utf-8") as f:
         data = json.load(f)
+    effects = merge_effect_overlay(data.get("effects", []))
     return {
-        "effects": data.get("effects", []),
+        "effects": effects,
         "traits": data.get("traits", {}),
         "triggerBuffTypes": data.get("triggerBuffTypes", []),
     }

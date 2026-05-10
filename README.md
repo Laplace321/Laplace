@@ -96,6 +96,12 @@ python3 -m server.data_loader
   python3 server/sync_chaldea.py
   ```
 
+**Effect Schema Overlay 机制**：
+- `sync_chaldea.py` 只生成 `server/knowledge/effect_schema.json`（纯净的 Chaldea 领域知识），每次同步会**整体覆盖**此文件。
+- 手工业务扩展（如虚拟复合效果 `damageBoost`/`damageShield`、翻译修正）存放在 `server/config/effect_overrides.json`，**不会被 sync 覆盖**。
+- 系统在 runtime 自动将两层数据合并（overlay 同名效果优先覆盖），无需手动干预。
+- 新增虚拟复合效果时，只需编辑 `server/config/effect_overrides.json`，无需修改代码。
+
 ### 代码检查与测试
 
 ```bash
