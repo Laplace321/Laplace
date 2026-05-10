@@ -57,7 +57,43 @@ Perplexity 将 Skill 的上下文成本分为三层：
 | **C. few-shot 精简** | 从 12 个减到 5 个核心示例 | ~15%（~600 token） | 低 | 需验证覆盖率 |
 | **D. B + C 组合** | 压缩 hints + 精简示例 | ~30%（~1,200 token） | 低 | 综合 |
 
-**建议**：先执行 **方案 D（B+C 组合）**，低风险高收益。后续如 Skill 数量继续增长，再考虑方案 A 的两步路由。
+### 讨论结论
+
+**选择方案 A（启发式按需注入）**。
+
+关键决策依据：项目后续会接入大量新 Skill，且可能作为开源项目，需要从一开始将架构可扩展性做到最优。方案 D 的"压缩"只是延缓膨胀，当效果数翻倍到 100+ 时终究会撞上天花板；而按需注入的架构模式具有通用性——未来新增"礼装 hints"、"关卡 hints"时，各 hints 块独立按需注入，互不干扰。
+
+**改良实现：启发式预判 + 按需注入（零额外 LLM 调用）**：
+
+```
+用户查询 → 关键词启发式预判（零 LLM 成本）→ 按需注入对应 hints → 一次路由
+```
+
+```python
+def _should_inject_effect_hints(user_message: str) -> bool:
+    """启发式判断是否需要注入效果语义表。"""
+    effect_keywords = ["效果", "技能", "能力", "增伤", "无敌", "闪避",
+                       "充能", "加攻", "魔放", "特攻", "宝具效果", ...]
+    return any(kw in user_message for kw in effect_keywords)
+```
+
+- **命中**（~40% 查询）：注入完整效果 hints
+- **未命中**（~60% 查询）：不注入，路由 Prompt 节省 ~35%
+- **误判兜底**：即使启发式没命中，LLM 仍能看到 Skill description，基本效果查询仍可路由
+
+**关键词表存放**：`server/config/routing_hints_triggers.json`，与代码解耦。未来每新增一个领域的 hints 块，只需新增一组对应的触发关键词。
+
+| 领域 hints | 触发关键词示例 |
+|:---|:---|
+| 效果 hints（当前） | "效果", "技能", "无敌", "加攻", "魔放"... |
+| 礼装 hints（未来） | "礼装", "概念礼装", "黑圣杯", "限凸"... |
+| 关卡 hints（未来） | "关卡", "副本", "自由本", "种火"... |
+
+---
+
+### 原方案 D 细节（供参考，不采纳）
+
+以下为原方案 D 的详细设计，作为备选记录。
 
 ### 具体优化细节
 
@@ -147,6 +183,41 @@ CONFUSION_PAIRS = [
 - 每次新增 Skill 或修改路由规则时，手动运行一次验证
 - 可选：记录历史 routing_output 日志作为"录制回放"式 eval，零 LLM 消耗
 
+### 讨论结论
+
+**采用混合粒度 eval 策略**：粗粒度 Skill 选择 + 反面断言，不测精确参数值。
+
+| 维度 | 粗粒度（只测 Skill 选择） | 细粒度（同时测参数） |
+|:---|:---|:---|
+| **维护成本** | **低** — 只需维护 skill_name 列表 | **高** — 参数值容易因 Prompt 调整而变化 |
+| **脆性** | **低** — Skill 选择是稳定的 | **高** — 参数值受模型版本影响大，容易假阴性 |
+| **覆盖的 Bug 类型** | 路由错误（选错/漏选 Skill） | 路由错误 + 参数错误 |
+
+决策理由：
+1. **路由选择是最高杠杆的测试**：选错 Skill = 结果完全错误，这是最严重的 Bug
+2. **参数准确性大部分由 Pydantic schema 兜底**：`params_schema` 校验会拦住格式错误
+3. **全量参数断言太脆**：模型换版本、Prompt 微调都可能改变参数格式，导致 eval 频繁误报
+
+混合策略示例：
+
+```python
+# 粗粒度：只断言 Skill 选择
+("有增伤技能的从者", {"expected_skills": ["search_by_skill_effect"]}),
+
+# 反面断言：不该选什么
+("蓝卡多的从者", {
+    "expected_skills": ["search_by_cards"],
+    "forbidden_skills": ["search_by_effect"],
+}),
+
+# 邻近域混淆：只断言不该选什么
+("配卡是三蓝的从者", {
+    "forbidden_skills": ["search_by_effect"],
+}),
+```
+
+核心理念：测「选对了什么」和「不该选什么」（正面+反面），不测「参数精确等于什么」。
+
 ---
 
 ## 优化方向三：description 重写为触发器（P2）
@@ -183,7 +254,21 @@ CONFUSION_PAIRS = [
 **注意事项**：
 - Perplexity 警告"description 里的小幅措辞调整，对路由的影响往往是巨大的"
 - 必须配合 Eval 套件（优化方向二）验证改动不会破坏现有路由
-- 建议逐个 Skill 修改 + 验证，而不是一次性全改
+
+### 讨论结论
+
+**逐个 Skill 切换，每改一个配合 eval 验证。**
+
+决策理由：如果一次性改 15 个 Skill 的 description，某个改坏了但 eval 通过了（假阴性），根本不知道是哪个出了问题。逐个改的好处是每次变更的 diff 范围小，出问题能立刻定位到具体 Skill。
+
+建议执行顺序（从使用频率最高 + 邻近域混淆风险最大的 Skill 开始）：
+
+| 批次 | Skill | 原因 |
+|:---|:---|:---|
+| 1 | `search_by_effect` | 最常用 + 与 cards/skill_effect/np_effect 混淆风险高 |
+| 2 | `search_by_cards` | 与 effect 的邻近域混淆（色卡性能 vs 配卡） |
+| 3 | `lookup_servant` / `compare_servants` | 最容易与筛选类 Skill 混淆 |
+| 4 | 其余 Query Skills | 风险较低，可以 2-3 个一批 |
 
 ---
 
@@ -239,6 +324,17 @@ class BaseSkill:
 → 添加 eval 反面例子 → 验证修复
 ```
 
+### 讨论结论
+
+**Gotcha 紧跟 description 注入。**
+
+| 方式 | 优点 | 缺点 |
+|:---|:---|:---|
+| 紧跟 description | LLM 看到 Skill 时同时看到陷阱，关联性强；Skill 自包含，开源贡献者只需在自己的 Skill 文件里写 gotcha | 如果 gotcha 多了会让 Skill 列表较长 |
+| 独立 section | 结构清晰，不干扰 Skill 列表 | LLM 可能在选 Skill 时忽略末尾注意事项；新增 Skill 时需去全局 section 加规则 |
+
+决策理由：紧跟 description 模式下，每个 Skill 的 gotcha 是自包含的，贡献者新增 Skill 时只需在自己的 Skill 文件里写 gotcha，不需要去全局 section 里加规则。这对开源可扩展性更友好。
+
 ---
 
 ## 优化方向五：Generation Prompt 分层（P3）
@@ -276,19 +372,31 @@ class ResponseSkill(BaseSkill):
 
 **预计收益**：对 `respond_servant_detail` 和 `respond_servant_compare` 场景节省 ~300-500 token。
 
-**优先级低的原因**：生成阶段只执行一次，不像路由 Prompt 那样每次对话都要付费。且当前 Response Skill 只有 4 个，规则冗余的影响有限。
+### 讨论结论
+
+**纳入执行计划，与其他方向同步推进。**
+
+虽然当前 Response Skill 只有 4 个、收益有限，但用户决策：既然未来一定要拓展，不如现在就打好分层基础，避免后续 Response Skill 增加到 6+ 时再做拆分带来的迁移成本。
+
+实现方案确认：
+- 核心规则（~5 条，始终注入）：规则 1/3/7/8/9 + 检查清单
+- 场景规则：各 Response Skill 通过 `extra_rules` 属性声明自己需要的额外规则
+- 特化补充：保留已有的 `_DETAIL_SUPPLEMENT` 等机制
 
 ---
 
-## 整体优先级与依赖关系
+## 整体优先级与执行计划
+
+### 依赖关系
 
 ```mermaid
 graph TD
-    A[方向二: Eval-First 路由测试] --> B[方向三: description 重写]
+    A[方向二: Eval-First 路由测试] --> B[方向三: description 逐个重写]
     A --> C[方向四: Gotcha 飞轮]
-    B --> D[方向一: 路由 Prompt 减肥]
+    A --> D[方向一: 路由 Prompt 按需注入]
+    B --> D
     C --> D
-    D --> E[方向五: Generation Prompt 分层]
+    E[方向五: Generation Prompt 分层]
     
     style A fill:#ff6b6b,color:#fff
     style D fill:#ff6b6b,color:#fff
@@ -297,13 +405,15 @@ graph TD
     style E fill:#4ecdc4,color:#fff
 ```
 
-| 优先级 | 方向 | 预计 Token 节省 | 前置依赖 | 建议时机 |
+### 决策总表
+
+| 方向 | 选定方案 | 预计 Token 节省 | 前置依赖 | 执行策略 |
 |:---|:---|:---|:---|:---|
-| **P1** | 方向二：Eval-First 路由测试 | 0（基础设施） | 无 | **立即** |
-| **P1** | 方向一：路由 Prompt 减肥（D 方案） | ~1,200 token/次 (~30%) | 方向二（需验证不回归） | 方向二之后 |
-| **P2** | 方向三：description 重写 | 间接（提升路由精度） | 方向二（需验证不回归） | 稳定后 |
-| **P2** | 方向四：Gotcha 飞轮 | ~200-400 token（全局规则下沉） | 方向二 | 稳定后 |
-| **P3** | 方向五：Generation Prompt 分层 | ~300-500 token/次 | 无 | 后续迭代 |
+| **方向二** | 混合粒度 eval（Skill 选择 + 反面断言） | 0（基础设施） | 无 | **最先执行** |
+| **方向一** | 方案 A（启发式按需注入），关键词表存 `config/` | ~35%（平均，~1,400 token） | 方向二 | 方向二之后 |
+| **方向三** | 逐个 Skill 切换 description 为触发器 | 间接（提升路由精度） | 方向二 | 逐个改 + eval 验证 |
+| **方向四** | 紧跟 description 注入 gotcha | ~200-400 token（全局规则下沉） | 方向二 | Skill 自包含 |
+| **方向五** | Generation Prompt 分层（核心规则 + 场景规则） | ~300-500 token/次 | 无 | 当前就执行 |
 
 ---
 
@@ -318,9 +428,12 @@ graph TD
 
 ---
 
-## 待决策问题
+## 待决策问题（讨论状态）
 
-1. **方向一的 hints 压缩**：去掉 description 后路由精度是否会下降？需要用 eval 验证。
-2. **方向三的 description 重写**：是一次性全改还是逐个改？Perplexity 警告"description 的小幅措辞调整影响巨大"。
-3. **方向四的 gotcha 注入方式**：是紧跟在 Skill description 后面，还是单独开一个 `## Gotchas` section？
-4. **方向二的 eval 粒度**：是只测路由选择（选了哪些 Skill），还是同时测参数准确性（params 是否正确）？
+1. ~~**方向一的方案选择**~~：✅ 已决策 → 选方案 A（启发式按需注入），关键词表存 `config/routing_hints_triggers.json`
+2. ~~**方向三的 description 重写**~~：✅ 已决策 → 逐个 Skill 切换，每改一个配合 eval 验证
+3. ~~**方向四的 gotcha 注入方式**~~：✅ 已决策 → 紧跟 description 注入，Skill 自包含
+4. ~~**方向二的 eval 粒度**~~：✅ 已决策 → 混合粒度（粗粒度 Skill 选择 + 反面断言，不测精确参数值）
+5. ~~**方向五的执行时机**~~：✅ 已决策 → 当前就执行，不等 Response Skill 增长
+
+**所有方向均已达成结论，可进入实施阶段。**
