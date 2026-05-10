@@ -374,7 +374,14 @@ async def _call_via_flaresolverr(url: str, payload: dict, headers: dict, use_str
     """通过 FlareSolverr 代理调用 API,绕过 Cloudflare 防护。"""
     import json
     
-    flaresolverr_url = os.getenv("FLARESOLVERR_URL", "http://localhost:8191/v1")
+    # 尝试多个可能的 FlareSolverr 地址
+    flaresolverr_urls = [
+        os.getenv("FLARESOLVERR_URL", ""),
+        "http://host.docker.internal:8191/v1",  # Docker 容器访问宿主机
+        "http://localhost:8191/v1",
+        "http://127.0.0.1:8191/v1",
+        "http://172.17.0.1:8191/v1",  # Docker 默认网关
+    ]
     
     # FlareSolverr 需要将整个请求作为参数传递
     flaresolverr_payload = {
@@ -388,22 +395,34 @@ async def _call_via_flaresolverr(url: str, payload: dict, headers: dict, use_str
         "maxTimeout": 60000,
     }
     
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(flaresolverr_url, json=flaresolverr_payload)
-        resp.raise_for_status()
-        result = resp.json()
-        
-        if result.get("status") != "ok":
-            raise Exception(f"FlareSolverr 调用失败: {result.get('message')}")
-        
-        # 解析 FlareSolverr 返回的响应
-        response_body = result.get("solution", {}).get("response", "")
-        if not response_body:
-            raise Exception("FlareSolverr 返回空响应")
-        
+    last_error = None
+    for fs_url in flaresolverr_urls:
+        if not fs_url:
+            continue
         try:
-            data = json.loads(response_body)
-            return data
-        except json.JSONDecodeError as e:
-            raise Exception(f"FlareSolverr 返回的响应不是有效 JSON: {e}")
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                resp = await client.post(fs_url, json=flaresolverr_payload)
+                resp.raise_for_status()
+                result = resp.json()
+                
+                if result.get("status") != "ok":
+                    raise Exception(f"FlareSolverr 调用失败: {result.get('message')}")
+                
+                # 解析 FlareSolverr 返回的响应
+                response_body = result.get("solution", {}).get("response", "")
+                if not response_body:
+                    raise Exception("FlareSolverr 返回空响应")
+                
+                try:
+                    data = json.loads(response_body)
+                    print(f"  ✅ FlareSolverr 成功绕过 Cloudflare (使用 {fs_url})")
+                    return data
+                except json.JSONDecodeError as e:
+                    raise Exception(f"FlareSolverr 返回的响应不是有效 JSON: {e}")
+        except Exception as e:
+            last_error = e
+            print(f"  ⚠️  FlareSolverr ({fs_url}) 失败: {e}")
+            continue
+    
+    raise Exception(f"所有 FlareSolverr 地址都失败: {last_error}")
 
