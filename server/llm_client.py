@@ -259,7 +259,7 @@ async def _post_response(
     *,
     response_schema: Callable[[], dict] | None = None,
 ) -> dict:
-    """Send one Responses API request."""
+    """Send one Responses API request, with FlareSolverr proxy fallback for Cloudflare bypass."""
     url = f"{base_url}/responses"
     headers = {
         "Content-Type": "application/json",
@@ -283,13 +283,21 @@ async def _post_response(
             }
         }
 
+    # 尝试直接调用
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(url, json=payload, headers=headers)
-        if use_structured_output and resp.status_code in (400, 422):
-            if _looks_like_response_format_error(resp):
-                raise LLMResponseFormatUnsupported(_safe_error_text(resp))
-        resp.raise_for_status()
-        return resp.json()
+        try:
+            resp = await client.post(url, json=payload, headers=headers)
+            if use_structured_output and resp.status_code in (400, 422):
+                if _looks_like_response_format_error(resp):
+                    raise LLMResponseFormatUnsupported(_safe_error_text(resp))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            # 如果是 403 Forbidden,尝试使用 FlareSolverr 绕过 Cloudflare
+            if e.response.status_code == 403:
+                print(f"  ⚡ 检测到 403,尝试使用 FlareSolverr 绕过 Cloudflare...")
+                return await _call_via_flaresolverr(url, payload, headers, use_structured_output)
+            raise
 
 
 def extract_json_object(content: str) -> str:
@@ -360,3 +368,42 @@ def _safe_error_text(resp: httpx.Response) -> str:
         return resp.text[:1000]
     except Exception:
         return ""
+
+
+async def _call_via_flaresolverr(url: str, payload: dict, headers: dict, use_structured_output: bool) -> dict:
+    """通过 FlareSolverr 代理调用 API,绕过 Cloudflare 防护。"""
+    import json
+    
+    flaresolverr_url = os.getenv("FLARESOLVERR_URL", "http://localhost:8191/v1")
+    
+    # FlareSolverr 需要将整个请求作为参数传递
+    flaresolverr_payload = {
+        "cmd": "request.post",
+        "url": url,
+        "postData": json.dumps(payload),
+        "headers": {
+            "Content-Type": "application/json",
+            "Authorization": headers.get("Authorization", ""),
+        },
+        "maxTimeout": 60000,
+    }
+    
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        resp = await client.post(flaresolverr_url, json=flaresolverr_payload)
+        resp.raise_for_status()
+        result = resp.json()
+        
+        if result.get("status") != "ok":
+            raise Exception(f"FlareSolverr 调用失败: {result.get('message')}")
+        
+        # 解析 FlareSolverr 返回的响应
+        response_body = result.get("solution", {}).get("response", "")
+        if not response_body:
+            raise Exception("FlareSolverr 返回空响应")
+        
+        try:
+            data = json.loads(response_body)
+            return data
+        except json.JSONDecodeError as e:
+            raise Exception(f"FlareSolverr 返回的响应不是有效 JSON: {e}")
+
