@@ -18,8 +18,11 @@ Phase 枚举：
 import asyncio
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# 北京时间 UTC+8
+_BEIJING_TZ = timezone(timedelta(hours=8))
 
 LOG_DIR = Path(__file__).parent / "logs"
 LOG_FILE = LOG_DIR / "query_trace.jsonl"
@@ -41,7 +44,7 @@ def _build_trace_event(
 ) -> dict:
     """构建单阶段事件数据。"""
     event = {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(_BEIJING_TZ).isoformat(),
         "traceId": trace_id,
         "phase": phase,
         "data": data or {},
@@ -116,7 +119,7 @@ def _build_trace_data(
 ) -> dict:
     """构建 trace 日志数据结构（旧模式）。"""
     trace_data = {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(_BEIJING_TZ).isoformat(),
         "level": "ERROR" if error else "INFO",
         "traceId": trace_id,
         "query": user_message,
