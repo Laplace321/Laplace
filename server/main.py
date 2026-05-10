@@ -20,7 +20,7 @@ from pydantic import BaseModel
 # 预消化翻译字典（从 config/translations.json 加载，支持热更新）
 from server.config_loader import CachedConfig
 from server.llm_client import chat_completion
-from server.logger import find_trace, log_trace_event, read_traces
+from server.logger import find_trace, log_trace_event, read_trace_summaries, read_traces
 from server.prompts import build_routing_prompt, get_generation_prompt
 from server.query_executor import load_database
 from server.rate_limiter import RateLimitMiddleware
@@ -299,6 +299,28 @@ async def get_trace(request: Request, trace_id: str):
     """按 trace_id 查询单条 trace 详情（仅 localhost 可访问）。"""
     if not _is_localhost(request):
         return JSONResponse(status_code=403, content={"error": "仅允许本地访问"})
+    trace = find_trace(trace_id)
+    if trace is None:
+        return JSONResponse(status_code=404, content={"error": f"trace {trace_id} 未找到"})
+    return trace
+
+
+# ── Admin: 日志查看 API ──
+
+
+@app.get("/api/admin/logs")
+async def admin_list_logs(
+    limit: int = 50,
+    offset: int = 0,
+    keyword: str | None = None,
+):
+    """日志列表（分页 + 关键词搜索）。"""
+    return read_trace_summaries(limit=limit, offset=offset, keyword=keyword)
+
+
+@app.get("/api/admin/logs/{trace_id}")
+async def admin_get_log(trace_id: str):
+    """单条 trace 的完整多阶段详情。"""
     trace = find_trace(trace_id)
     if trace is None:
         return JSONResponse(status_code=404, content={"error": f"trace {trace_id} 未找到"})

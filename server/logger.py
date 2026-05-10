@@ -220,3 +220,95 @@ def find_trace(trace_id: str) -> dict | None:
 
     # 旧模式：返回最后一条匹配的 entry
     return events[-1]
+
+
+def read_trace_summaries(
+    limit: int = 50,
+    offset: int = 0,
+    keyword: str | None = None,
+) -> dict:
+    """按 traceId 聚合日志，返回摘要列表（分页 + 可选关键词过滤）。
+
+    Returns:
+        {"total": int, "items": [{"traceId", "timestamp", "query", "status", "duration_ms"}, ...]}
+    """
+    if not LOG_FILE.exists():
+        return {"total": 0, "items": []}
+
+    # 1. 读取所有行并按 traceId 分组
+    from collections import OrderedDict
+
+    groups: OrderedDict[str, list[dict]] = OrderedDict()
+    with open(LOG_FILE, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            tid = entry.get("traceId")
+            if not tid:
+                continue
+            groups.setdefault(tid, []).append(entry)
+
+    # 2. 提取每个 traceId 的摘要
+    summaries: list[dict] = []
+    for tid, events in groups.items():
+        query = ""
+        status = "unknown"
+        duration_ms = None
+        timestamp = events[0].get("timestamp", "")
+        error_msg = None
+
+        for e in events:
+            phase = e.get("phase", "")
+            data = e.get("data", {})
+            if phase == "routing_input":
+                query = data.get("query", "")
+                timestamp = e.get("timestamp", timestamp)
+            elif phase == "final":
+                status = data.get("result", "unknown")
+                duration_ms = data.get("total_time_ms")
+                if e.get("error"):
+                    error_msg = e["error"][:200]
+            # 旧模式兼容
+            if not query and "query" in e:
+                query = e["query"]
+            if e.get("level") == "ERROR" and status == "unknown":
+                status = "error"
+                error_msg = e.get("error", "")[:200]
+
+        if status == "unknown" and not error_msg:
+            status = "success"
+
+        summaries.append(
+            {
+                "traceId": tid,
+                "timestamp": timestamp,
+                "query": query,
+                "status": status,
+                "duration_ms": round(duration_ms, 1) if duration_ms else None,
+                "error": error_msg,
+            }
+        )
+
+    # 3. 按时间倒序（最新在前）
+    summaries.reverse()
+
+    # 4. 关键词过滤
+    if keyword:
+        kw = keyword.lower()
+        summaries = [
+            s
+            for s in summaries
+            if kw in s.get("query", "").lower()
+            or kw in s.get("traceId", "").lower()
+            or kw in (s.get("error") or "").lower()
+        ]
+
+    total = len(summaries)
+    items = summaries[offset : offset + limit]
+
+    return {"total": total, "items": items}

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laplace — 日志查看</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Orbitron:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="logs.css">
+</head>
+<body>
+  <!-- Header -->
+  <header id="app-header">
+    <div class="header-content">
+      <div class="logo-group">
+        <div class="logo-icon">⧫</div>
+        <div class="logo-text">
+          <h1>LAPLACE</h1>
+          <span class="tagline">Query Trace Logs</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <a href="/" class="back-link">← 返回主页</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Search Bar -->
+  <div id="search-area">
+    <div class="search-wrapper">
+      <input type="text" id="search-input" placeholder="输入 traceId 或关键词搜索..." autocomplete="off">
+      <button id="search-btn" title="搜索">搜索</button>
+      <button id="clear-search-btn" class="secondary-btn" title="清空">清空</button>
+    </div>
+    <div class="search-stats" id="search-stats"></div>
+  </div>
+
+  <!-- Log Table -->
+  <main id="log-container">
+    <table id="log-table">
+      <thead>
+        <tr>
+          <th class="col-time">时间</th>
+          <th class="col-trace">TraceID</th>
+          <th class="col-query">用户查询</th>
+          <th class="col-status">状态</th>
+          <th class="col-duration">耗时</th>
+        </tr>
+      </thead>
+      <tbody id="log-tbody">
+        <!-- Rows rendered by logs.js -->
+      </tbody>
+    </table>
+    <div id="empty-state" class="hidden">暂无日志数据</div>
+    <div id="loading-state" class="hidden">加载中...</div>
+  </main>
+
+  <!-- Pagination -->
+  <div id="pagination">
+    <button id="prev-btn" disabled>上一页</button>
+    <span id="page-info"></span>
+    <button id="next-btn" disabled>下一页</button>
+  </div>
+
+  <!-- Detail Modal -->
+  <div id="detail-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Trace 详情 — <span id="detail-trace-id"></span></h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="detail-body">
+        <!-- Phase details rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <script src="logs.js"></script>
+</body>
+</html>
