@@ -370,10 +370,38 @@ def _safe_error_text(resp: httpx.Response) -> str:
         return ""
 
 
+def _extract_json_from_html(html: str) -> str | None:
+    """从 FlareSolverr 返回的 HTML 中提取 JSON 内容。
+
+    FlareSolverr 用无头浏览器抓取 API，返回的是渲染后的 HTML DOM。
+    JSON 响应通常嵌在 <pre> 标签里，如：<html>...<pre>{"key":"val"}</pre>...</html>
+    """
+    import re
+
+    # 优先从 <pre> 标签中提取
+    pre_match = re.search(r"<pre[^>]*>(.*?)</pre>", html, re.DOTALL)
+    if pre_match:
+        content = pre_match.group(1).strip()
+        # 去除可能的 HTML 实体编码
+        content = content.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"')
+        if content.startswith("{") or content.startswith("["):
+            return content
+
+    # 回退：尝试直接在 HTML 中找到 JSON 对象
+    json_match = re.search(r"(\{.+\})", html, re.DOTALL)
+    if json_match:
+        candidate = json_match.group(1)
+        # 简单验证：检查是否像 JSON（避免匹配到 HTML 属性里的花括号）
+        if '"' in candidate and ":" in candidate:
+            return candidate
+
+    return None
+
+
 async def _call_via_flaresolverr(url: str, payload: dict, headers: dict, use_structured_output: bool) -> dict:
     """通过 FlareSolverr 代理调用 API,绕过 Cloudflare 防护。"""
     import json
-    
+
     # 尝试多个可能的 FlareSolverr 地址
     flaresolverr_urls = [
         os.getenv("FLARESOLVERR_URL", ""),
@@ -382,7 +410,7 @@ async def _call_via_flaresolverr(url: str, payload: dict, headers: dict, use_str
         "http://127.0.0.1:8191/v1",
         "http://172.17.0.1:8191/v1",  # Docker 默认网关
     ]
-    
+
     # FlareSolverr 需要将整个请求作为参数传递
     flaresolverr_payload = {
         "cmd": "request.post",
@@ -394,7 +422,7 @@ async def _call_via_flaresolverr(url: str, payload: dict, headers: dict, use_str
         },
         "maxTimeout": 60000,
     }
-    
+
     last_error = None
     for fs_url in flaresolverr_urls:
         if not fs_url:
@@ -404,23 +432,29 @@ async def _call_via_flaresolverr(url: str, payload: dict, headers: dict, use_str
                 resp = await client.post(fs_url, json=flaresolverr_payload)
                 resp.raise_for_status()
                 result = resp.json()
-                
+
                 if result.get("status") != "ok":
                     raise Exception(f"FlareSolverr 调用失败: {result.get('message')}")
-                
+
                 # 解析 FlareSolverr 返回的响应
                 solution = result.get("solution", {})
                 response_body = solution.get("response", "")
-                
+
                 if not response_body:
                     raise Exception(f"FlareSolverr 返回空响应 (HTTP {solution.get('status')})")
-                
-                # 检查是否是 HTML (Cloudflare 挑战页面)
-                if response_body.strip().startswith("<"):
-                    raise Exception(f"FlareSolverr 返回 HTML 而非 JSON (HTTP {solution.get('status')})")
-                
+
+                # FlareSolverr 用无头浏览器抓取，返回的是 HTML DOM
+                # JSON 数据嵌在 <pre> 标签里，如：<html>...<pre>{"key":"val"}</pre>...</html>
+                # 需要先尝试从 HTML 中提取 JSON
+                body = response_body.strip()
+                if body.startswith("<"):
+                    extracted = _extract_json_from_html(body)
+                    if extracted is None:
+                        raise Exception(f"FlareSolverr 返回 HTML 但无法提取 JSON (HTTP {solution.get('status')})")
+                    body = extracted
+
                 try:
-                    data = json.loads(response_body)
+                    data = json.loads(body)
                     print(f"  ✅ FlareSolverr 成功绕过 Cloudflare (使用 {fs_url})")
                     return data
                 except json.JSONDecodeError as e:
@@ -429,6 +463,5 @@ async def _call_via_flaresolverr(url: str, payload: dict, headers: dict, use_str
             last_error = e
             print(f"  ⚠️  FlareSolverr ({fs_url}) 失败: {e}")
             continue
-    
-    raise Exception(f"所有 FlareSolverr 地址都失败: {last_error}")
 
+    raise Exception(f"所有 FlareSolverr 地址都失败: {last_error}")
