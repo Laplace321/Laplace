@@ -802,6 +802,20 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// === Mobile Debug: tap logo 5 times ===
+let _logoTapCount = 0;
+let _logoTapTimer = null;
+document.querySelector(".logo-icon")?.addEventListener("click", () => {
+  _logoTapCount++;
+  clearTimeout(_logoTapTimer);
+  _logoTapTimer = setTimeout(() => { _logoTapCount = 0; }, 1500);
+  if (_logoTapCount >= 5) {
+    _logoTapCount = 0;
+    debugVisible = !debugVisible;
+    toggleDebugPanel();
+  }
+});
+
 // === Session Persistence ===
 function saveSession() {
   const sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
