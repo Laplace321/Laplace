@@ -6,7 +6,7 @@
  */
 
 const API_URL = "http://localhost:8000/api/chat";
-const STREAM_API_URL = "/api/chat/stream";
+const STREAM_API_URL = "http://localhost:8000/api/chat/stream";
 
 // === Class Display Names ===
 const CLASS_NAMES = {
