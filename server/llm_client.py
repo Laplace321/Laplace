@@ -295,7 +295,7 @@ async def _post_response(
         except httpx.HTTPStatusError as e:
             # 如果是 403 Forbidden,尝试使用 FlareSolverr 绕过 Cloudflare
             if e.response.status_code == 403:
-                print(f"  ⚡ 检测到 403,尝试使用 FlareSolverr 绕过 Cloudflare...")
+                print("  ⚡ 检测到 403,尝试使用 FlareSolverr 绕过 Cloudflare...")
                 return await _call_via_flaresolverr(url, payload, headers, use_structured_output)
             raise
 
@@ -409,9 +409,15 @@ async def _call_via_flaresolverr(url: str, payload: dict, headers: dict, use_str
                     raise Exception(f"FlareSolverr 调用失败: {result.get('message')}")
                 
                 # 解析 FlareSolverr 返回的响应
-                response_body = result.get("solution", {}).get("response", "")
+                solution = result.get("solution", {})
+                response_body = solution.get("response", "")
+                
                 if not response_body:
-                    raise Exception("FlareSolverr 返回空响应")
+                    raise Exception(f"FlareSolverr 返回空响应 (HTTP {solution.get('status')})")
+                
+                # 检查是否是 HTML (Cloudflare 挑战页面)
+                if response_body.strip().startswith("<"):
+                    raise Exception(f"FlareSolverr 返回 HTML 而非 JSON (HTTP {solution.get('status')})")
                 
                 try:
                     data = json.loads(response_body)
