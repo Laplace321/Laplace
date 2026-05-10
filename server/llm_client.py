@@ -271,6 +271,7 @@ async def _post_response(
         "input": input_text,
         "max_output_tokens": max_tokens,
         "temperature": temperature,
+        "enable_thinking": False,  # 关闭思考链，避免思考模型产生大量 reasoning tokens 导致超时
     }
     if use_structured_output:
         schema = response_schema()
