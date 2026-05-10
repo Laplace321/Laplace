@@ -5,8 +5,8 @@
  * 向后兼容：保留旧 JSON 端点常量供调试使用
  */
 
-const API_URL = "http://localhost:8000/api/chat";
-const STREAM_API_URL = "http://localhost:8000/api/chat/stream";
+const API_URL = "/api/chat";
+const STREAM_API_URL = "/api/chat/stream";
 
 // === Class Display Names ===
 const CLASS_NAMES = {
