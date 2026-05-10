@@ -213,6 +213,16 @@
      - `demo/app.js` → `SKILL_DISPLAY_NAMES` 新增中文映射
 - **目的**：确保用户体验始终是面向玩家的自然语言，杜绝技术实现细节泄露到用户界面。
 
+### 10. LLM API 网关反代 (Cloudflare Bypass)
+- **准则**：当 LLM API 提供商使用 Cloudflare 防护导致服务器直接请求返回 403 时，通过 Nginx 反向代理注入浏览器 User-Agent 绕过 Bot 检测，**禁止在应用代码中实现绕过逻辑**（如 FlareSolverr）。
+- **执行**：
+  1. 在服务器 Nginx 配置中添加 `/llm-proxy/` location block，代理到上游 API 并设置浏览器 User-Agent。
+  2. 该 location 必须设置 `allow 127.0.0.1; allow 172.17.0.0/16; deny all;` 限制仅本机和 Docker 容器访问。
+  3. `.env` 中的 `LLM_BASE_URL` 指向本地 Nginx 反代地址（如 `http://172.17.0.1/llm-proxy/v1`），而非直连上游 API。
+  4. 80 端口和 443 端口的 server block 中均需配置 `/llm-proxy/`，因为 Docker 容器通过 HTTP 访问宿主机 Nginx。
+  5. `server/llm_client.py` 保持纯净的 HTTP 客户端逻辑，不包含任何 Cloudflare 绕过代码。
+- **目的**：将网络层问题隔离在基础设施层（Nginx）解决，保持应用代码简洁，避免引入不稳定的第三方绕过依赖。
+
 ## 禁止事项
 
 - ❌ 未经确认删除文件或数据
