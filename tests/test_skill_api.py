@@ -384,3 +384,33 @@ class TestPresetB1SupplementParsing:
         assert resp.status_code == 200
         # 空 message 不应触发 Stage 2 路由
         assert not routing_called
+
+
+# ── 阵营组合特性名解析 ──
+
+
+def test_resolve_trait_names_alignment_combinations():
+    """阵营组合字符串应被正确拆解为两个 trait ID。"""
+    from server.skills.query.search_by_traits import _TRAIT_NAME_TO_ID, resolve_trait_names
+
+    _TRAIT_NAME_TO_ID.clear()  # 确保从 mappings.json 重新加载
+
+    # 秩序善 → [300(秩序), 303(善)]
+    ids = resolve_trait_names(["秩序善"])
+    assert 300 in ids and 303 in ids, f"秩序善 → {ids}"
+
+    # 混沌恶 → [301(混沌), 304(恶)]
+    ids = resolve_trait_names(["混沌恶"])
+    assert 301 in ids and 304 in ids, f"混沌恶 → {ids}"
+
+    # 秩序中庸 → [300(秩序), 305(中庸)]
+    ids = resolve_trait_names(["秩序中庸"])
+    assert 300 in ids and 305 in ids, f"秩序中庸 → {ids}"
+
+    # 带分隔符：秩序·善 → [300, 303]
+    ids = resolve_trait_names(["秩序·善"])
+    assert 300 in ids and 303 in ids, f"秩序·善 → {ids}"
+
+    # 普通特性不受影响
+    ids = resolve_trait_names(["龙"])
+    assert len(ids) == 1, f"龙 → {ids}"
