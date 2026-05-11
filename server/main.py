@@ -759,8 +759,16 @@ async def _handle_preset_mode(
     )
 
 
-def _expand_preset(preset: Preset, user_params: dict | list | None) -> list[dict]:
-    """将 Preset 展开为 skill_calls 列表，合并用户参数。"""
+def _expand_preset(
+    preset: Preset,
+    user_params: dict | list | None,
+    user_message: str = "",
+) -> list[dict]:
+    """将 Preset 展开为 skill_calls 列表，合并用户参数。
+
+    message_as_param 机制：当 preset 配置了 message_as_param（如 {"lookup_servant": "name"}），
+    且该参数在 param_template 和 user_params 中均未指定时，自动将 user_message 注入到该参数。
+    """
     skill_calls = []
     params = user_params or {}
     for skill_name in preset.query_skills:
@@ -769,6 +777,10 @@ def _expand_preset(preset: Preset, user_params: dict | list | None) -> list[dict
             merged_params.update(params[skill_name])
         elif params and len(preset.query_skills) == 1:
             merged_params.update(params)
+        # message_as_param 注入：仅当目标参数尚未设置且 message 非空时生效
+        target_param = preset.message_as_param.get(skill_name)
+        if target_param and target_param not in merged_params and user_message.strip():
+            merged_params[target_param] = user_message.strip()
         skill_calls.append({"skill_name": skill_name, "params": merged_params})
     return skill_calls
 
@@ -848,7 +860,7 @@ async def chat(request: ChatRequest):
                 model="error",
                 traceId=trace_id,
             )
-        skill_calls = _expand_preset(preset, request.params)
+        skill_calls = _expand_preset(preset, request.params, user_message=user_message)
         response_skill_name = preset.response_skill
 
         # B1 策略：用户补充文字走 LLM 路由合并
@@ -906,7 +918,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 yield _sse_event("error", {"phase": "routing", "message": f"未知的预设：{preset_name}"})
                 return
 
-            skill_calls = _expand_preset(preset, None)
+            skill_calls = _expand_preset(preset, None, user_message=message)
             response_skill_name = preset.response_skill
             model_used = "preset_mode"
 
