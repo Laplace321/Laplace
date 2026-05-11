@@ -32,6 +32,7 @@ from server.logger import (  # noqa: E402
     log_chat_trace_async,
     log_trace_event,
     log_trace_event_sync,
+    read_trace_summaries,
     read_traces,
 )
 
@@ -247,3 +248,37 @@ class TestBackwardCompatibility:
         assert new_result is not None
         assert "phases" in new_result
         assert len(new_result["phases"]) == 2
+
+
+class TestModeAndTokensInSummary:
+    """验证摘要和 find_trace 中包含 mode 和 total_tokens 字段。"""
+
+    def test_summary_includes_mode_and_tokens(self):
+        """read_trace_summaries 应返回 mode 和 total_tokens。"""
+        log_trace_event_sync("mt1", "routing_input", {"query": "test mode", "mode": "oneshot_llm"})
+        log_trace_event_sync(
+            "mt1",
+            "final",
+            {"total_time_ms": 150, "result": "success", "mode": "oneshot", "total_tokens": 1234},
+        )
+
+        result = read_trace_summaries(limit=100)
+        items = result["items"]
+        mt1 = next((s for s in items if s["traceId"] == "mt1"), None)
+        assert mt1 is not None
+        assert mt1["mode"] == "oneshot"
+        assert mt1["total_tokens"] == 1234
+
+    def test_find_trace_includes_mode_and_tokens(self):
+        """find_trace 聚合视图应包含 mode 和 total_tokens。"""
+        log_trace_event_sync("mt2", "routing_input", {"query": "agent test", "mode": "oneshot_llm"})
+        log_trace_event_sync(
+            "mt2",
+            "final",
+            {"total_time_ms": 300, "result": "agent_fallback", "mode": "agent_fallback", "total_tokens": 5678},
+        )
+
+        result = find_trace("mt2")
+        assert result is not None
+        assert result["mode"] == "agent_fallback"
+        assert result["total_tokens"] == 5678

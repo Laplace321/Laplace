@@ -4,7 +4,8 @@
 
 | 日期 | 事件 | 备注 |
 | :--- | :--- | :--- |
-| 2026-05-11 | Agentic Tool Use 路由 | 新增 Agent 模式（分支 `feat/agentic-tool-use-routing`），LLM 多轮 tool 调用支持自我纠正和 Atlas API 反查，待验证合并 |
+| 2026-05-12 | 职阶克制查询 + 空结果明示 | 新增 `search_by_class_advantage` Skill（基于 Atlas API 克制关系数据）；OneShot 结果为 0 时传递上下文给 Agent fallback，明确告知空结果+条件列表+放宽建议（Agent tokens 降低 85%） |
+| 2026-05-11 | OneShot优先+Agent兜底混合路由 | 回滚 OneShot 路由为主路径，3 个 fallback 点位最小侵入接入 Agent 兜底；llm_client.py 双 SDK 统一封装（dashscope SDK + openai SDK），移除 httpx 手动调用 |
 | 2026-05-09 | 使用说明弹窗 | 新增面向普通玩家的使用说明弹窗，首次访问自动弹出，支持可点击示例查询 |
 | 2026-05-09 | 虚拟复合效果 | 新增 `damageBoost`（泛用增伤，442从者）和 `damageShield`（挡伤害，320从者）虚拟复合效果 + 路由规则 9 |
 | 2026-05-09 | 统一效果搜索 Skill | 新增 `search_by_effect`，默认同时搜技能+宝具效果，修复天草四郎等宝具效果遗漏问题 |

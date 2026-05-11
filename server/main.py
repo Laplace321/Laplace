@@ -17,6 +17,10 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+# Agent 兜底模块
+from server.agent.agent_loop import AgentResult, agent_route
+from server.agent.tool_handlers import TOOL_HANDLERS
+
 # 预消化翻译字典（从 config/translations.json 加载，支持热更新）
 from server.config_loader import CachedConfig
 from server.llm_client import chat_completion
@@ -136,7 +140,10 @@ def _describe_filters(skill_calls: list[dict]) -> list[str]:
             op = params.get("op", "gte")
             val = params.get("value", "")
             op_map = {"eq": "=", "gte": "≥", "lte": "≤", "gt": ">", "lt": "<"}
-            descriptions.append(f"NP充能 {op_map.get(op, op)} {val}%")
+            target_type = params.get("targetType")
+            charge_label_map = {"self": "自充", "ptOne": "他充", "ptAll": "群充"}
+            charge_label = charge_label_map.get(target_type, "NP充能")
+            descriptions.append(f"{charge_label} {op_map.get(op, op)} {val}%")
         elif name == "search_by_cards":
             parts = []
             card = params.get("cardType") or params.get("cards")
@@ -151,9 +158,19 @@ def _describe_filters(skill_calls: list[dict]) -> list[str]:
                 target_map = {"all": "全体(光炮)", "one": "单体", "support": "辅助"}
                 parts.append(f"宝具目标 = {target_map.get(np_target.lower(), np_target)}")
             descriptions.append(" + ".join(parts) if parts else "配卡筛选")
+        elif name == "search_by_class_advantage":
+            target = params.get("targetClass") or params.get("target_class", "")
+            descriptions.append(f"克制「{target}」职阶")
         elif name == "search_by_traits":
-            trait = params.get("trait", "")
-            descriptions.append(f"特性包含「{trait}」")
+            # 兼容多种字段名: traitNames(LLM原始) / trait_names(Pydantic) / trait(旧)
+            trait_names = params.get("traitNames") or params.get("trait_names") or []
+            if trait_names:
+                for t in trait_names:
+                    descriptions.append(f"特性包含「{t}」")
+            else:
+                trait = params.get("trait", "")
+                if trait:
+                    descriptions.append(f"特性包含「{trait}」")
         elif name == "search_by_attribute":
             attr = params.get("attribute", "")
             descriptions.append(f"属性 = {attr}")
@@ -235,6 +252,68 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
         "全局统计": stats_summary,
         "代表从者详情": top_results,
     }, top_results
+
+
+# === OneShot 空结果上下文 ===
+
+
+def _build_oneshot_context(skill_calls: list[dict]) -> str:
+    """将 OneShot 已识别的筛选条件转为中文描述字符串，供 Agent fallback 使用。
+
+    当 OneShot 执行结果为 0 时，将此上下文传给 Agent，
+    让 Agent 知道之前尝试过什么条件，给出更有针对性的回答。
+    """
+    filters = _describe_filters(skill_calls)
+    if filters:
+        return "、".join(filters)
+    return "（未识别到具体筛选条件）"
+
+
+# === Agent 兜底辅助 ===
+
+_FALLBACK_TEMPLATES = {
+    "GREETING": (
+        "你好！我是 **Laplace**，一个 FGO 智能数据助手。"
+        "你可以用日常语言向我提问，我会从数据库中检索和分析从者信息。\n\n"
+        "**我能帮你做这些事：**\n"
+        "- **条件筛选** — 按职阶、星级、配卡、属性、特性等条件筛选从者\n"
+        "- **效果搜索** — 搜索拥有特定效果的从者（如充能、增伤、无敌、闪避等）\n"
+        "- **从者详情** — 查看某个从者的完整数据和技能信息\n"
+        "- **从者对比** — 把几个从者放在一起比较，分析各自优劣\n\n"
+        "**试试这样问我：**\n"
+        '- "30自充以上的五星Caster"\n'
+        '- "有增伤技能的从者"\n'
+        '- "对比梅林和斯卡蒂"\n'
+        '- "查一下村正"'
+    ),
+    "OUT_OF_SCOPE": (
+        "抱歉，这个问题超出了我的能力范围。"
+        "我是一个 FGO 从者数据助手，只能帮你查询和分析从者信息。\n\n"
+        "你可以试试问我：\n"
+        '- "有哪些5星弓阶从者"\n'
+        '- "对比梅林和斯卡蒂"\n'
+        '- "有无敌技能的从者"'
+    ),
+    "UNSUPPORTED": (
+        "这个功能暂时还不支持。目前我只能帮你查询从者数据（筛选、搜索、对比），"
+        "还不能做队伍搭配推荐、关卡攻略、礼装推荐等。\n\n"
+        "你可以试试问我从者相关的查询，比如：\n"
+        '- "50%以上充能的五星Caster"\n'
+        '- "有增伤效果的从者"'
+    ),
+}
+
+
+def _classify_agent_reply(reply: str) -> tuple[str | None, str]:
+    """解析 Agent 回复中的分类标记，返回 (category, clean_reply)。
+
+    Agent Prompt 要求在无需调用工具时，以 [GREETING]/[OUT_OF_SCOPE]/[UNSUPPORTED] 开头。
+    检测到标记后替换为标准化模板回复。
+    """
+    for tag in ("GREETING", "OUT_OF_SCOPE", "UNSUPPORTED"):
+        if reply.strip().startswith(f"[{tag}]"):
+            return tag, _FALLBACK_TEMPLATES[tag]
+    return None, reply
 
 
 def _sse_event(event: str, data: dict) -> str:
@@ -390,6 +469,8 @@ async def _handle_skill_mode(
     request_start = time.monotonic()
     executor = SkillExecutor()
     model_used = "skill_mode"
+    trace_mode = "oneshot"  # 追踪最终模式：oneshot | agent_fallback | fallback_*
+    trace_total_tokens = 0  # 累计 token 消耗
 
     # 如果已有 skill_calls（preset 或前端直传），记录 routing 事件
     if skill_calls is not None:
@@ -399,6 +480,7 @@ async def _handle_skill_mode(
             {
                 "query": user_message,
                 "source": "direct",
+                "mode": "oneshot_direct",
                 "skill_count": len(skill_calls),
             },
         )
@@ -426,6 +508,7 @@ async def _handle_skill_mode(
             "routing_input",
             {
                 "query": user_message,
+                "mode": "oneshot_llm",
                 "routing_prompt_length": len(routing_prompt),
                 "skill_count": len(skill_descriptions),
             },
@@ -444,6 +527,8 @@ async def _handle_skill_mode(
             routing_result.pop("_response_format", None)
             routing_result.pop("_provider", None)
             routing_result.pop("_attempts", None)
+            routing_usage = routing_result.pop("_usage", {})
+            trace_total_tokens += routing_usage.get("total_tokens", 0)
             skill_calls = routing_result.get("skill_calls", [])
             response_skill_name = routing_result.get("response_skill", response_skill_name)
 
@@ -456,49 +541,152 @@ async def _handle_skill_mode(
                     "response_skill": response_skill_name,
                     "fallback": routing_result.get("fallback"),
                     "model": model_used,
+                    "routing_usage": routing_usage,
                 },
             )
 
             # 检查 fallback
             fallback = routing_result.get("fallback")
             if fallback is not None:
+                fb_code = fallback.get("code", "no_match")
                 fb_msg = fallback.get("message", "无法理解你的问题，请尝试更具体的描述。")
-                await log_trace_event(
-                    trace_id,
-                    "final",
-                    {
-                        "total_time_ms": (time.monotonic() - request_start) * 1000,
-                        "result": "fallback",
-                    },
-                )
-                return ChatResponse(
-                    reply=fb_msg,
-                    servants=[],
-                    count=0,
-                    query=routing_result,
-                    model=model_used,
-                    traceId=trace_id,
-                )
+                # greeting / out_of_scope → 直接模板回复
+                if fb_code in ("greeting", "out_of_scope"):
+                    template_reply = _FALLBACK_TEMPLATES.get(fb_code.upper(), fb_msg)
+                    trace_mode = f"fallback_{fb_code}"
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": (time.monotonic() - request_start) * 1000,
+                            "result": trace_mode,
+                            "mode": trace_mode,
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                    return ChatResponse(
+                        reply=template_reply,
+                        servants=[],
+                        count=0,
+                        query=routing_result,
+                        model=model_used,
+                        traceId=trace_id,
+                    )
+                # no_match / ambiguous → Agent 兜底
+                try:
+                    agent_result: AgentResult = await agent_route(user_message, TOOL_HANDLERS, trace_id)
+                    trace_total_tokens += agent_result.total_tokens
+                    category, clean_reply = _classify_agent_reply(agent_result.reply)
+                    returned = (
+                        agent_result.servants_data[:MAX_RESULTS] if agent_result.servants_data and not category else []
+                    )
+                    await log_trace_event(
+                        trace_id,
+                        "agent_detail",
+                        {
+                            "rounds": agent_result.rounds,
+                            "agent_tokens": agent_result.total_tokens,
+                            "tool_trace": agent_result.tool_trace,
+                            "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                        },
+                    )
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": (time.monotonic() - request_start) * 1000,
+                            "result": "agent_fallback",
+                            "mode": "agent_fallback",
+                            "total_found": len(agent_result.servants_data),
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                    return ChatResponse(
+                        reply=clean_reply,
+                        servants=returned,
+                        count=len(agent_result.servants_data),
+                        query={"mode": "agent_fallback"},
+                        model=f"agent_{agent_result.rounds}r",
+                        traceId=trace_id,
+                    )
+                except Exception:
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": (time.monotonic() - request_start) * 1000,
+                            "result": "fallback",
+                            "mode": "fallback_no_match",
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                    return ChatResponse(
+                        reply=fb_msg,
+                        servants=[],
+                        count=0,
+                        query=routing_result,
+                        model=model_used,
+                        traceId=trace_id,
+                    )
 
-            # 空 skill_calls 且无 fallback — LLM 未能识别意图
+            # 空 skill_calls 且无 fallback → Agent 兜底
             if not skill_calls:
-                no_match_msg = "无法从你的问题中识别出查询条件，请尝试更具体的描述。"
-                await log_trace_event(
-                    trace_id,
-                    "final",
-                    {
-                        "total_time_ms": (time.monotonic() - request_start) * 1000,
-                        "result": "no_match",
-                    },
-                )
-                return ChatResponse(
-                    reply=no_match_msg,
-                    servants=[],
-                    count=0,
-                    query=routing_result,
-                    model=model_used,
-                    traceId=trace_id,
-                )
+                try:
+                    agent_result = await agent_route(user_message, TOOL_HANDLERS, trace_id)
+                    trace_total_tokens += agent_result.total_tokens
+                    category, clean_reply = _classify_agent_reply(agent_result.reply)
+                    returned = (
+                        agent_result.servants_data[:MAX_RESULTS] if agent_result.servants_data and not category else []
+                    )
+                    await log_trace_event(
+                        trace_id,
+                        "agent_detail",
+                        {
+                            "rounds": agent_result.rounds,
+                            "agent_tokens": agent_result.total_tokens,
+                            "tool_trace": agent_result.tool_trace,
+                            "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                        },
+                    )
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": (time.monotonic() - request_start) * 1000,
+                            "result": "agent_fallback",
+                            "mode": "agent_fallback",
+                            "total_found": len(agent_result.servants_data),
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                    return ChatResponse(
+                        reply=clean_reply,
+                        servants=returned,
+                        count=len(agent_result.servants_data),
+                        query={"mode": "agent_fallback"},
+                        model=f"agent_{agent_result.rounds}r",
+                        traceId=trace_id,
+                    )
+                except Exception:
+                    no_match_msg = "无法从你的问题中识别出查询条件，请尝试更具体的描述。"
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": (time.monotonic() - request_start) * 1000,
+                            "result": "no_match",
+                            "mode": "fallback_no_match",
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                    return ChatResponse(
+                        reply=no_match_msg,
+                        servants=[],
+                        count=0,
+                        query=routing_result,
+                        model=model_used,
+                        traceId=trace_id,
+                    )
         except Exception as e:
             await log_trace_event(
                 trace_id,
@@ -506,6 +694,8 @@ async def _handle_skill_mode(
                 {
                     "total_time_ms": (time.monotonic() - request_start) * 1000,
                     "result": "routing_error",
+                    "mode": "routing_error",
+                    "total_tokens": trace_total_tokens,
                 },
                 error=str(e),
             )
@@ -537,9 +727,45 @@ async def _handle_skill_mode(
         },
     )
 
-    # Fallback 处理
+    # Fallback 处理 → Agent 兜底（传入 OneShot 上下文）
     if result.is_fallback:
-        final_reply = result.fallback_message or "未找到匹配的从者。"
+        oneshot_ctx = _build_oneshot_context(skill_calls)
+        try:
+            agent_result = await agent_route(user_message, TOOL_HANDLERS, trace_id, oneshot_context=oneshot_ctx)
+            trace_total_tokens += agent_result.total_tokens
+            category, clean_reply = _classify_agent_reply(agent_result.reply)
+            returned = agent_result.servants_data[:MAX_RESULTS] if agent_result.servants_data and not category else []
+            await log_trace_event(
+                trace_id,
+                "agent_detail",
+                {
+                    "rounds": agent_result.rounds,
+                    "agent_tokens": agent_result.total_tokens,
+                    "tool_trace": agent_result.tool_trace,
+                    "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                },
+            )
+            await log_trace_event(
+                trace_id,
+                "final",
+                {
+                    "total_time_ms": (time.monotonic() - request_start) * 1000,
+                    "result": "agent_fallback",
+                    "mode": "agent_fallback",
+                    "total_found": len(agent_result.servants_data),
+                    "total_tokens": trace_total_tokens,
+                },
+            )
+            return ChatResponse(
+                reply=clean_reply,
+                servants=returned,
+                count=len(agent_result.servants_data),
+                query={"mode": "agent_fallback"},
+                model=f"agent_{agent_result.rounds}r",
+                traceId=trace_id,
+            )
+        except Exception:
+            final_reply = result.fallback_message or "未找到匹配的从者。"
     else:
         # RAG 生成
         context_data, _ = _build_context(servants)
@@ -584,6 +810,8 @@ async def _handle_skill_mode(
                 json_mode=False,
             )
             final_reply = gen_response.get("text", "").strip()
+            gen_usage = gen_response.get("_usage", {})
+            trace_total_tokens += gen_usage.get("total_tokens", 0)
             if not final_reply:
                 raise ValueError("Empty response from LLM")
         except Exception as e:
@@ -603,10 +831,12 @@ async def _handle_skill_mode(
                 "generation_output",
                 {
                     "reply": final_reply,
+                    "generation_usage": gen_usage,
                 },
             )
 
     # ── Trace: final ──
+    trace_mode = "oneshot" if not result.is_fallback else "execution_fallback"
     await log_trace_event(
         trace_id,
         "final",
@@ -614,6 +844,8 @@ async def _handle_skill_mode(
             "total_time_ms": round((time.monotonic() - request_start) * 1000, 2),
             "total_found": total_found,
             "result": "success" if not result.is_fallback else "fallback",
+            "mode": trace_mode,
+            "total_tokens": trace_total_tokens,
         },
     )
 
@@ -733,6 +965,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
         trace_id = uuid.uuid4().hex[:8]
         stream_start = time.monotonic()
         model_used = "unknown"
+        trace_total_tokens = 0  # 累计 token 消耗
 
         # ── 阶段 1: Skill 路由（或 Preset 展开） ──
         if preset_name:
@@ -846,6 +1079,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 "routing_input",
                 {
                     "query": message,
+                    "mode": "oneshot_llm",
                     "routing_prompt_length": len(routing_prompt),
                     "skill_count": len(skill_descriptions),
                 },
@@ -867,6 +1101,8 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     {
                         "total_time_ms": (time.monotonic() - stream_start) * 1000,
                         "result": "routing_error",
+                        "mode": "routing_error",
+                        "total_tokens": trace_total_tokens,
                     },
                     error=str(e),
                 )
@@ -877,6 +1113,8 @@ async def chat_stream(message: str, preset_name: str | None = None):
             routing_result.pop("_response_format", None)
             routing_result.pop("_provider", None)
             routing_result.pop("_attempts", None)
+            routing_usage = routing_result.pop("_usage", {})
+            trace_total_tokens += routing_usage.get("total_tokens", 0)
 
             skill_calls = routing_result.get("skill_calls", [])
             response_skill_name = routing_result.get("response_skill", "respond_servant_list")
@@ -890,6 +1128,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     "response_skill": response_skill_name,
                     "fallback": routing_result.get("fallback"),
                     "model": model_used,
+                    "routing_usage": routing_usage,
                 },
             )
 
@@ -906,31 +1145,123 @@ async def chat_stream(message: str, preset_name: str | None = None):
             # 检查 fallback
             fallback = routing_result.get("fallback")
             if fallback is not None:
+                fb_code = fallback.get("code", "no_match")
                 fb_msg = fallback.get("message", "无法理解你的问题，请尝试更具体的描述。")
-                await log_trace_event(
-                    trace_id,
-                    "final",
-                    {
-                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
-                        "result": "fallback",
-                    },
-                )
-                yield _sse_event("delta", {"text": fb_msg})
+                # greeting / out_of_scope → 直接模板回复，无需 Agent
+                if fb_code in ("greeting", "out_of_scope"):
+                    template_reply = _FALLBACK_TEMPLATES.get(fb_code.upper(), fb_msg)
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                            "result": f"fallback_{fb_code}",
+                            "mode": f"fallback_{fb_code}",
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                    yield _sse_event("delta", {"text": template_reply})
+                    yield _sse_event("done", {"model": model_used, "traceId": trace_id})
+                    return
+                # no_match / ambiguous → Agent 兜底
+                yield _sse_event("thinking", {"phase": "agent_fallback", "message": "需要更深入分析，启动智能搜索..."})
+                try:
+                    agent_result: AgentResult = await agent_route(message, TOOL_HANDLERS, trace_id)
+                    trace_total_tokens += agent_result.total_tokens
+                    category, clean_reply = _classify_agent_reply(agent_result.reply)
+                    if agent_result.servants_data and not category:
+                        returned = agent_result.servants_data[:MAX_RESULTS]
+                        yield _sse_event(
+                            "servants",
+                            {"servants": returned, "count": len(returned), "total": len(agent_result.servants_data)},
+                        )
+                    yield _sse_event("delta", {"text": clean_reply})
+                    await log_trace_event(
+                        trace_id,
+                        "agent_detail",
+                        {
+                            "rounds": agent_result.rounds,
+                            "agent_tokens": agent_result.total_tokens,
+                            "tool_trace": agent_result.tool_trace,
+                            "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                        },
+                    )
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                            "result": "agent_fallback",
+                            "mode": "agent_fallback",
+                            "total_found": len(agent_result.servants_data),
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                except Exception as agent_err:
+                    print(f"⚠️ [{trace_id}] Agent 兜底也失败: {agent_err}")
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                            "result": "fallback",
+                            "mode": "fallback_no_match",
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                    yield _sse_event("delta", {"text": fb_msg})
                 yield _sse_event("done", {"model": model_used, "traceId": trace_id})
                 return
 
-            # 空 skill_calls 且无 fallback
+            # 空 skill_calls 且无 fallback → Agent 兜底
             if not skill_calls:
-                no_match_msg = "无法从你的问题中识别出查询条件，请尝试更具体的描述。"
-                await log_trace_event(
-                    trace_id,
-                    "final",
-                    {
-                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
-                        "result": "no_match",
-                    },
-                )
-                yield _sse_event("delta", {"text": no_match_msg})
+                yield _sse_event("thinking", {"phase": "agent_fallback", "message": "需要更深入分析，启动智能搜索..."})
+                try:
+                    agent_result = await agent_route(message, TOOL_HANDLERS, trace_id)
+                    trace_total_tokens += agent_result.total_tokens
+                    category, clean_reply = _classify_agent_reply(agent_result.reply)
+                    if agent_result.servants_data and not category:
+                        returned = agent_result.servants_data[:MAX_RESULTS]
+                        yield _sse_event(
+                            "servants",
+                            {"servants": returned, "count": len(returned), "total": len(agent_result.servants_data)},
+                        )
+                    yield _sse_event("delta", {"text": clean_reply})
+                    await log_trace_event(
+                        trace_id,
+                        "agent_detail",
+                        {
+                            "rounds": agent_result.rounds,
+                            "agent_tokens": agent_result.total_tokens,
+                            "tool_trace": agent_result.tool_trace,
+                            "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                        },
+                    )
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                            "result": "agent_fallback",
+                            "mode": "agent_fallback",
+                            "total_found": len(agent_result.servants_data),
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                except Exception as agent_err:
+                    print(f"⚠️ [{trace_id}] Agent 兜底也失败: {agent_err}")
+                    no_match_msg = "无法从你的问题中识别出查询条件，请尝试更具体的描述。"
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                            "result": "no_match",
+                            "mode": "fallback_no_match",
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                    yield _sse_event("delta", {"text": no_match_msg})
                 yield _sse_event("done", {"model": model_used, "traceId": trace_id})
                 return
 
@@ -956,19 +1287,57 @@ async def chat_stream(message: str, preset_name: str | None = None):
             },
         )
 
-        # 执行阶段 fallback（结果为空）
+        # 执行阶段 fallback（结果为空）→ Agent 兜底（传入 OneShot 上下文）
         if result.is_fallback:
+            oneshot_ctx = _build_oneshot_context(skill_calls)
             fb_reply = result.fallback_message or "未找到匹配的从者。"
-            await log_trace_event(
-                trace_id,
-                "final",
-                {
-                    "total_time_ms": (time.monotonic() - stream_start) * 1000,
-                    "total_found": 0,
-                    "result": "execution_fallback",
-                },
-            )
-            yield _sse_event("delta", {"text": fb_reply})
+            yield _sse_event("thinking", {"phase": "agent_fallback", "message": "需要更深入分析，启动智能搜索..."})
+            try:
+                agent_result = await agent_route(message, TOOL_HANDLERS, trace_id, oneshot_context=oneshot_ctx)
+                trace_total_tokens += agent_result.total_tokens
+                category, clean_reply = _classify_agent_reply(agent_result.reply)
+                if agent_result.servants_data and not category:
+                    returned = agent_result.servants_data[:MAX_RESULTS]
+                    yield _sse_event(
+                        "servants",
+                        {"servants": returned, "count": len(returned), "total": len(agent_result.servants_data)},
+                    )
+                yield _sse_event("delta", {"text": clean_reply})
+                await log_trace_event(
+                    trace_id,
+                    "agent_detail",
+                    {
+                        "rounds": agent_result.rounds,
+                        "agent_tokens": agent_result.total_tokens,
+                        "tool_trace": agent_result.tool_trace,
+                        "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                    },
+                )
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                        "result": "agent_fallback",
+                        "mode": "agent_fallback",
+                        "total_found": len(agent_result.servants_data),
+                        "total_tokens": trace_total_tokens,
+                    },
+                )
+            except Exception as agent_err:
+                print(f"⚠️ [{trace_id}] Agent 兜底也失败: {agent_err}")
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                        "total_found": 0,
+                        "result": "execution_fallback",
+                        "mode": "execution_fallback",
+                        "total_tokens": trace_total_tokens,
+                    },
+                )
+                yield _sse_event("delta", {"text": fb_reply})
             yield _sse_event("done", {"model": model_used, "traceId": trace_id})
             return
 
@@ -1028,6 +1397,8 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 json_mode=False,
             )
             final_reply = generation_response.get("text", "").strip()
+            gen_usage = generation_response.get("_usage", {})
+            trace_total_tokens += gen_usage.get("total_tokens", 0)
             if not final_reply:
                 raise ValueError("Empty response from LLM")
         except Exception as e:
@@ -1048,6 +1419,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 "generation_output",
                 {
                     "reply": final_reply,
+                    "generation_usage": gen_usage,
                 },
             )
 
@@ -1065,6 +1437,8 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
                 "total_found": total_found,
                 "result": final_result,
+                "mode": "oneshot",
+                "total_tokens": trace_total_tokens,
             },
         )
 

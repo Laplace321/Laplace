@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from server.query_executor import _match_effect, _match_np_effect
 from server.skills.base import QuerySkill, register_skill
-from server.skills.query.search_by_skill_effect import _expand_effect, _resolve_effect_name
+from server.skills.query.search_by_skill_effect import _expand_effect
 
 
 class Params(BaseModel):
@@ -73,13 +73,23 @@ class SearchByEffect(QuerySkill):
                 return any(_check_effect(servant, eff, source, target_type, min_value, max_value) for eff in expanded)
             return _check_effect(servant, expanded[0], source, target_type, min_value, max_value)
 
-        # 多效果模式
+        # 多效果模式（每个效果都可能是复合效果，需展开）
         if effects is not None and isinstance(effects, list):
-            resolved = [_resolve_effect_name(eff) for eff in effects]
             op = params.get("effects_op", "and").lower()
+
+            def _match_one(eff_name: str) -> bool:
+                """单个效果匹配（支持复合效果展开为 OR）。"""
+                expanded = _expand_effect(eff_name)
+                if len(expanded) > 1:
+                    # 复合效果：子效果之间是 OR（任一命中即可）
+                    return any(
+                        _check_effect(servant, sub, source, target_type, min_value, max_value) for sub in expanded
+                    )
+                return _check_effect(servant, expanded[0], source, target_type, min_value, max_value)
+
             if op == "or":
-                return any(_check_effect(servant, eff, source, target_type, min_value, max_value) for eff in resolved)
+                return any(_match_one(eff) for eff in effects)
             else:
-                return all(_check_effect(servant, eff, source, target_type, min_value, max_value) for eff in resolved)
+                return all(_match_one(eff) for eff in effects)
 
         return True

@@ -253,7 +253,7 @@ class TestSkillModeLLMRouting:
 
     @pytest.mark.anyio
     async def test_llm_routing_fallback(self, mock_chat_completion_fallback):
-        """LLM 路由 fallback：返回降级消息。"""
+        """LLM 路由 fallback（out_of_scope）：返回模板回复。"""
         with patch("server.main.chat_completion", new=AsyncMock(side_effect=mock_chat_completion_fallback)):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
@@ -263,12 +263,24 @@ class TestSkillModeLLMRouting:
         assert resp.status_code == 200
         data = resp.json()
         assert data["count"] == 0
-        assert "不是 FGO" in data["reply"]
+        # out_of_scope 走模板回复
+        assert "超出" in data["reply"] or "能力范围" in data["reply"]
 
     @pytest.mark.anyio
     async def test_llm_routing_empty_skills_no_fallback(self, mock_chat_completion_empty_skills):
-        """LLM 返回空 skill_calls 且无 fallback — 应返回无法识别的提示。"""
-        with patch("server.main.chat_completion", new=AsyncMock(side_effect=mock_chat_completion_empty_skills)):
+        """LLM 返回空 skill_calls 且无 fallback — 触发 Agent 兜底。"""
+        from server.agent.agent_loop import AgentResult
+
+        mock_agent_result = AgentResult(
+            reply="[OUT_OF_SCOPE] 无法处理",
+            rounds=1,
+            total_tokens=100,
+            servants_data=[],
+        )
+        with (
+            patch("server.main.chat_completion", new=AsyncMock(side_effect=mock_chat_completion_empty_skills)),
+            patch("server.main.agent_route", new=AsyncMock(return_value=mock_agent_result)),
+        ):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
                     "/api/chat",
@@ -277,7 +289,8 @@ class TestSkillModeLLMRouting:
         assert resp.status_code == 200
         data = resp.json()
         assert data["count"] == 0
-        assert "无法" in data["reply"] or "识别" in data["reply"]
+        # Agent 返回 OUT_OF_SCOPE → 走模板回复
+        assert "超出" in data["reply"] or "能力范围" in data["reply"]
 
     @pytest.mark.anyio
     async def test_llm_routing_error(self):
@@ -371,3 +384,33 @@ class TestPresetB1SupplementParsing:
         assert resp.status_code == 200
         # 空 message 不应触发 Stage 2 路由
         assert not routing_called
+
+
+# ── 阵营组合特性名解析 ──
+
+
+def test_resolve_trait_names_alignment_combinations():
+    """阵营组合字符串应被正确拆解为两个 trait ID。"""
+    from server.skills.query.search_by_traits import _TRAIT_NAME_TO_ID, resolve_trait_names
+
+    _TRAIT_NAME_TO_ID.clear()  # 确保从 mappings.json 重新加载
+
+    # 秩序善 → [300(秩序), 303(善)]
+    ids = resolve_trait_names(["秩序善"])
+    assert 300 in ids and 303 in ids, f"秩序善 → {ids}"
+
+    # 混沌恶 → [301(混沌), 304(恶)]
+    ids = resolve_trait_names(["混沌恶"])
+    assert 301 in ids and 304 in ids, f"混沌恶 → {ids}"
+
+    # 秩序中庸 → [300(秩序), 305(中庸)]
+    ids = resolve_trait_names(["秩序中庸"])
+    assert 300 in ids and 305 in ids, f"秩序中庸 → {ids}"
+
+    # 带分隔符：秩序·善 → [300, 303]
+    ids = resolve_trait_names(["秩序·善"])
+    assert 300 in ids and 303 in ids, f"秩序·善 → {ids}"
+
+    # 普通特性不受影响
+    ids = resolve_trait_names(["龙"])
+    assert len(ids) == 1, f"龙 → {ids}"

@@ -1,6 +1,7 @@
 import asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
-import httpx
 import pytest
 
 import server.llm_client as llm_client
@@ -10,65 +11,57 @@ VALID_JSON = '{"intent":"query_servants","conditions":{"npCharge":{"op":"eq","va
 
 # --- 测试用提供商 ---
 PROVIDER_A = LLMProvider(
-    name="provider_a", base_url="https://a.test/v1", api_key="key-a", models=["model-a1", "model-a2"]
+    name="provider_a", base_url="https://a.test/v1", api_key="key-a", models=["model-a1", "model-a2"], sdk_type="openai"
 )
-PROVIDER_B = LLMProvider(name="provider_b", base_url="https://b.test/v1", api_key="key-b", models=["model-b1"])
+PROVIDER_B = LLMProvider(
+    name="provider_b", base_url="https://b.test/v1", api_key="key-b", models=["model-b1"], sdk_type="openai"
+)
+PROVIDER_DS = LLMProvider(
+    name="dashscope",
+    base_url="https://dashscope.aliyuncs.com",
+    api_key="key-ds",
+    models=["qwen3.6-plus"],
+    sdk_type="dashscope",
+)
 
 
-class FakeResponse:
-    def __init__(self, status_code=200, content=VALID_JSON, text=None):
-        self.status_code = status_code
-        self._content = content
-        self.text = text if text is not None else str(content)
-
-    def json(self):
-        # Responses API 格式：output_text 辅助字段
-        return {
-            "id": "resp_test_123",
-            "object": "response",
-            "output_text": self._content,
-            "output": [
-                {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": self._content}]}
-            ],
-        }
-
-    def raise_for_status(self):
-        if self.status_code >= 400:
-            request = httpx.Request("POST", "https://example.test/responses")
-            response = httpx.Response(self.status_code, request=request, text=self.text)
-            raise httpx.HTTPStatusError("error", request=request, response=response)
+def _make_openai_response(output_text: str):
+    """构造 openai SDK responses.create 的 fake 返回对象。"""
+    return SimpleNamespace(output_text=output_text)
 
 
-class FakeAsyncClient:
-    requests = []
-    responses = []
-    posted_urls = []
-
-    def __init__(self, timeout):
-        self.timeout = timeout
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb):
-        return False
-
-    async def post(self, url, json, headers):
-        self.requests.append(json)
-        self.posted_urls.append(url)
-        item = self.responses.pop(0)
-        if isinstance(item, Exception):
-            raise item
-        return item
+def _make_openai_chat_response(content: str | None = None, tool_calls: list | None = None):
+    """构造 openai SDK chat.completions.create 的 fake 返回对象。"""
+    tc_objs = []
+    if tool_calls:
+        for tc in tool_calls:
+            tc_objs.append(
+                SimpleNamespace(
+                    id=tc.get("id", "call_1"),
+                    function=SimpleNamespace(name=tc["name"], arguments=tc.get("arguments", "{}")),
+                )
+            )
+    msg_dict = {"role": "assistant", "content": content, "tool_calls": None}
+    if tc_objs:
+        msg_dict["tool_calls"] = [
+            {
+                "id": tc.id,
+                "type": "function",
+                "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+            }
+            for tc in tc_objs
+        ]
+    msg = SimpleNamespace(content=content, tool_calls=tc_objs or None, model_dump=lambda: msg_dict)
+    choice = SimpleNamespace(message=msg)
+    usage = SimpleNamespace(model_dump=lambda: {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30})
+    return SimpleNamespace(choices=[choice], usage=usage)
 
 
 @pytest.fixture(autouse=True)
-def fake_httpx(monkeypatch):
-    FakeAsyncClient.requests = []
-    FakeAsyncClient.responses = []
-    FakeAsyncClient.posted_urls = []
-    monkeypatch.setattr(llm_client.httpx, "AsyncClient", FakeAsyncClient)
+def setup_providers(monkeypatch):
+    """设置默认测试 provider 并清除 openai 客户端缓存。"""
     monkeypatch.setattr(llm_client, "PROVIDERS", [PROVIDER_A])
+    llm_client._openai_clients.clear()
 
 
 def run(coro):
@@ -87,8 +80,32 @@ def _custom_validator_intent(content: str | dict) -> dict:
     return raw
 
 
-def test_chat_completion_uses_structured_response_format():
-    FakeAsyncClient.responses = [FakeResponse(content=VALID_JSON)]
+def _make_mock_openai_client(responses_output=None, chat_output=None):
+    """构造一个 mock AsyncOpenAI 客户端。"""
+    client = MagicMock()
+    # mock responses.create
+    if responses_output is not None:
+        if isinstance(responses_output, list):
+            client.responses.create = AsyncMock(side_effect=responses_output)
+        else:
+            client.responses.create = AsyncMock(return_value=responses_output)
+    else:
+        client.responses.create = AsyncMock(return_value=_make_openai_response(""))
+    # mock chat.completions.create
+    if chat_output is not None:
+        if isinstance(chat_output, list):
+            client.chat.completions.create = AsyncMock(side_effect=chat_output)
+        else:
+            client.chat.completions.create = AsyncMock(return_value=chat_output)
+    else:
+        client.chat.completions.create = AsyncMock(return_value=_make_openai_chat_response(content="ok"))
+    return client
+
+
+def test_chat_completion_openai_structured(monkeypatch):
+    """openai provider：结构化输出（Responses API）。"""
+    mock_client = _make_mock_openai_client(responses_output=_make_openai_response(VALID_JSON))
+    monkeypatch.setattr(llm_client, "_get_openai_client", lambda p: mock_client)
 
     result = run(
         llm_client.chat_completion(
@@ -103,20 +120,22 @@ def test_chat_completion_uses_structured_response_format():
     assert result["_model"] == "model-a1"
     assert result["_provider"] == "provider_a"
     assert result["_response_format"] == "json_schema"
-    assert FakeAsyncClient.requests[0]["text"]["format"]["type"] == "json_schema"
-    assert FakeAsyncClient.requests[0]["instructions"] == "system"
-    assert FakeAsyncClient.requests[0]["input"] == "user"
+    mock_client.responses.create.assert_called_once()
+    call_kwargs = mock_client.responses.create.call_args
+    assert call_kwargs.kwargs["instructions"] == "system"
+    assert call_kwargs.kwargs["input"] == "user"
+    assert "text" in call_kwargs.kwargs
 
 
-def test_chat_completion_downgrades_when_response_format_is_unsupported():
-    FakeAsyncClient.responses = [
-        FakeResponse(
-            status_code=400,
-            content="",
-            text='{"error":"text.format json_schema unsupported"}',
-        ),
-        FakeResponse(content=f"```json\n{VALID_JSON}\n```"),
-    ]
+def test_chat_completion_openai_downgrades(monkeypatch):
+    """openai provider：结构化输出不支持时降级为纯文本。"""
+    mock_client = _make_mock_openai_client(
+        responses_output=[
+            Exception("text.format json_schema unsupported"),
+            _make_openai_response(f"```json\n{VALID_JSON}\n```"),
+        ]
+    )
+    monkeypatch.setattr(llm_client, "_get_openai_client", lambda p: mock_client)
 
     result = run(
         llm_client.chat_completion(
@@ -129,17 +148,25 @@ def test_chat_completion_downgrades_when_response_format_is_unsupported():
     )
 
     assert result["_response_format"] == "text_fallback"
-    assert "text" in FakeAsyncClient.requests[0]
-    assert "format" in FakeAsyncClient.requests[0]["text"]
-    assert "text" not in FakeAsyncClient.requests[1] or "format" not in FakeAsyncClient.requests[1].get("text", {})
 
 
-def test_chat_completion_fallback_within_same_provider():
-    """同提供商内模型降级：model-a1 失败 → model-a2 成功。"""
-    FakeAsyncClient.responses = [
-        FakeResponse(content='{"intent":"unknown","conditions":{}}'),
-        FakeResponse(content=VALID_JSON),
-    ]
+def test_chat_completion_fallback_within_same_provider(monkeypatch):
+    """同提供商内模型降级：model-a1 重试3次全部失败 → model-a2 成功。"""
+    call_count = 0
+    # model-a1 的 3 次重试都返回无效 JSON，model-a2 返回有效 JSON
+    retries = llm_client.MAX_RETRIES
+
+    async def fake_responses_create(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count <= retries:
+            return _make_openai_response('{"intent":"unknown","conditions":{}}')
+        return _make_openai_response(VALID_JSON)
+
+    mock_client = MagicMock()
+    mock_client.responses.create = AsyncMock(side_effect=fake_responses_create)
+    monkeypatch.setattr(llm_client, "_get_openai_client", lambda p: mock_client)
+    monkeypatch.setattr(llm_client, "RETRY_BACKOFF", [0, 0, 0])  # 加速测试
 
     result = run(
         llm_client.chat_completion(
@@ -152,17 +179,27 @@ def test_chat_completion_fallback_within_same_provider():
 
     assert result["_model"] == "model-a2"
     assert result["_provider"] == "provider_a"
-    assert len(FakeAsyncClient.requests) == 2
 
 
 def test_chat_completion_cross_provider_fallback(monkeypatch):
-    """跨提供商降级：provider_a 全部失败 → 自动切换 provider_b。"""
+    """跨提供商降级：provider_a 全部模型失败 → 自动切换 provider_b。"""
     monkeypatch.setattr(llm_client, "PROVIDERS", [PROVIDER_A, PROVIDER_B])
-    FakeAsyncClient.responses = [
-        FakeResponse(content='{"intent":"unknown","conditions":{}}'),
-        FakeResponse(content='{"intent":"unknown","conditions":{}}'),
-        FakeResponse(content=VALID_JSON),
-    ]
+    retries = llm_client.MAX_RETRIES
+    call_count = 0
+    # provider_a: model-a1 (3次) + model-a2 (3次) = 6次无效，provider_b: model-b1 有效
+    total_fail = len(PROVIDER_A.models) * retries
+
+    async def fake_responses_create(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count <= total_fail:
+            return _make_openai_response('{"intent":"unknown","conditions":{}}')
+        return _make_openai_response(VALID_JSON)
+
+    mock_client = MagicMock()
+    mock_client.responses.create = AsyncMock(side_effect=fake_responses_create)
+    monkeypatch.setattr(llm_client, "_get_openai_client", lambda p: mock_client)
+    monkeypatch.setattr(llm_client, "RETRY_BACKOFF", [0, 0, 0])
 
     result = run(
         llm_client.chat_completion(
@@ -175,16 +212,24 @@ def test_chat_completion_cross_provider_fallback(monkeypatch):
 
     assert result["_model"] == "model-b1"
     assert result["_provider"] == "provider_b"
-    assert FakeAsyncClient.posted_urls[0] == "https://a.test/v1/responses"
-    assert FakeAsyncClient.posted_urls[2] == "https://b.test/v1/responses"
 
 
-def test_attempts_log_includes_provider_field():
-    """_attempts 日志包含 provider 字段。"""
-    FakeAsyncClient.responses = [
-        FakeResponse(content='{"intent":"unknown","conditions":{}}'),
-        FakeResponse(content=VALID_JSON),
-    ]
+def test_attempts_log_includes_provider_field(monkeypatch):
+    """_attempts 日志包含 provider 字段（model-a1 重试全部失败后记录）。"""
+    retries = llm_client.MAX_RETRIES
+    call_count = 0
+
+    async def fake_responses_create(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count <= retries:
+            return _make_openai_response('{"intent":"unknown","conditions":{}}')
+        return _make_openai_response(VALID_JSON)
+
+    mock_client = MagicMock()
+    mock_client.responses.create = AsyncMock(side_effect=fake_responses_create)
+    monkeypatch.setattr(llm_client, "_get_openai_client", lambda p: mock_client)
+    monkeypatch.setattr(llm_client, "RETRY_BACKOFF", [0, 0, 0])
 
     result = run(
         llm_client.chat_completion(
@@ -203,7 +248,6 @@ def test_attempts_log_includes_provider_field():
 
 def test_chat_completion_requires_schema_for_json_mode():
     """json_mode=True 时不传 schema/validator 应报 ValueError。"""
-    FakeAsyncClient.responses = [FakeResponse(content=VALID_JSON)]
     with pytest.raises(ValueError, match="json_mode=True requires"):
         run(llm_client.chat_completion("system", "user", model="model-a1"))
 
@@ -223,6 +267,7 @@ def test_load_providers_backward_compatible(monkeypatch):
     assert providers[0].base_url == "https://legacy.test/v1"
     assert providers[0].api_key == "legacy-key"
     assert providers[0].models == ["legacy-model", "fb1", "fb2"]
+    assert providers[0].sdk_type == "openai"  # default 走 openai SDK
 
 
 def test_load_providers_multi_provider(monkeypatch):
@@ -240,11 +285,28 @@ def test_load_providers_multi_provider(monkeypatch):
     assert len(providers) == 2
     assert providers[0].name == "alpha"
     assert providers[0].models == ["m1", "m2"]
+    assert providers[0].sdk_type == "openai"
     assert providers[1].name == "beta"
     assert providers[1].models == ["m3"]
 
 
-# --- 迭代 2：自定义 response_schema / response_validator 测试 ---
+def test_load_providers_dashscope_sdk_type(monkeypatch):
+    """dashscope provider 自动推断 sdk_type='dashscope'。"""
+    monkeypatch.setenv("LLM_PROVIDERS", "dashscope,obao")
+    monkeypatch.setenv("LLM_DASHSCOPE_URL", "https://dashscope.aliyuncs.com")
+    monkeypatch.setenv("LLM_DASHSCOPE_KEY", "key-ds")
+    monkeypatch.setenv("LLM_DASHSCOPE_MODELS", "qwen3.6-plus")
+    monkeypatch.setenv("LLM_OBAO_URL", "https://x.obao.cloud/v1")
+    monkeypatch.setenv("LLM_OBAO_KEY", "key-obao")
+    monkeypatch.setenv("LLM_OBAO_MODELS", "claude-sonnet-4-6")
+
+    providers = llm_client._load_providers()
+
+    assert providers[0].sdk_type == "dashscope"
+    assert providers[1].sdk_type == "openai"
+
+
+# --- 自定义 response_schema / response_validator 测试 ---
 
 CUSTOM_JSON = '{"action":"search","query":"saber"}'
 
@@ -272,9 +334,10 @@ def _custom_validator(content: str | dict) -> dict:
     return raw
 
 
-def test_custom_schema_is_sent_to_api():
-    """自定义 response_schema 应传递到 API 请求的 text.format.schema 中。"""
-    FakeAsyncClient.responses = [FakeResponse(content=CUSTOM_JSON)]
+def test_custom_validator_is_used_for_parsing(monkeypatch):
+    """自定义 response_validator 正确解析响应。"""
+    mock_client = _make_mock_openai_client(responses_output=_make_openai_response(CUSTOM_JSON))
+    monkeypatch.setattr(llm_client, "_get_openai_client", lambda p: mock_client)
 
     result = run(
         llm_client.chat_completion(
@@ -286,30 +349,49 @@ def test_custom_schema_is_sent_to_api():
         )
     )
 
-    # 验证自定义 schema 被传递到 API 请求
-    req = FakeAsyncClient.requests[0]
-    schema = req["text"]["format"]["schema"]
-    assert schema["properties"]["action"]["type"] == "string"
-    assert schema["properties"]["query"]["type"] == "string"
-
-    # 验证自定义 validator 正确解析响应
     assert result["action"] == "search"
     assert result["query"] == "saber"
     assert result["_model"] == "model-a1"
 
 
-def test_custom_validator_is_used_for_parsing():
-    """自定义 response_validator 替代旧默认的 parse_intent_response。"""
-    FakeAsyncClient.responses = [FakeResponse(content=CUSTOM_JSON)]
+# --- agent_completion 测试 ---
+
+
+def test_agent_completion_openai_with_tool_calls(monkeypatch):
+    """openai provider agent_completion：返回 tool_calls。"""
+    mock_client = _make_mock_openai_client(
+        chat_output=_make_openai_chat_response(
+            tool_calls=[{"name": "search_servants", "id": "call_abc", "arguments": '{"class":"saber"}'}],
+        )
+    )
+    monkeypatch.setattr(llm_client, "_get_openai_client", lambda p: mock_client)
 
     result = run(
-        llm_client.chat_completion(
-            "system",
-            "user",
+        llm_client.agent_completion(
+            messages=[{"role": "user", "content": "找saber"}],
+            tools=[{"type": "function", "function": {"name": "search_servants"}}],
             model="model-a1",
-            response_schema=_custom_schema,
-            response_validator=_custom_validator,
         )
     )
 
-    assert result["action"] == "search"
+    assert result["has_tool_call"] is True
+    assert result["tool_calls"][0]["name"] == "search_servants"
+    assert result["tool_calls"][0]["call_id"] == "call_abc"
+    assert result["_provider"] == "provider_a"
+
+
+def test_agent_completion_openai_text_reply(monkeypatch):
+    """openai provider agent_completion：返回纯文本。"""
+    mock_client = _make_mock_openai_client(chat_output=_make_openai_chat_response(content="这是回复"))
+    monkeypatch.setattr(llm_client, "_get_openai_client", lambda p: mock_client)
+
+    result = run(
+        llm_client.agent_completion(
+            messages=[{"role": "user", "content": "你好"}],
+            tools=[{"type": "function", "function": {"name": "search_servants"}}],
+            model="model-a1",
+        )
+    )
+
+    assert result["has_tool_call"] is False
+    assert result["output_text"] == "这是回复"

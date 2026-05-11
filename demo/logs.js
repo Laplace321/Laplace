@@ -34,8 +34,37 @@ const PHASE_NAMES = {
   context_build: "Context 构建",
   generation_input: "生成输入",
   generation_output: "生成输出",
+  agent_detail: "Agent 详情",
   final: "请求完成",
 };
+
+// === Mode Display ===
+function getModeLabel(mode) {
+  const map = {
+    oneshot: "OneShot",
+    oneshot_direct: "OneShot",
+    oneshot_llm: "OneShot",
+    agent_fallback: "Agent",
+    fallback_greeting: "问候",
+    fallback_out_of_scope: "超范围",
+    fallback_no_match: "无匹配",
+    routing_error: "错误",
+    execution_fallback: "降级",
+  };
+  return map[mode] || mode || "-";
+}
+
+function getModeClass(mode) {
+  if (!mode) return "";
+  if (mode.startsWith("oneshot")) return "mode-oneshot";
+  if (mode === "agent_fallback") return "mode-agent";
+  return "mode-fallback";
+}
+
+function formatTokens(tokens) {
+  if (tokens == null || tokens === 0) return "-";
+  return tokens.toLocaleString();
+}
 
 // === Fetch Logs ===
 async function fetchLogs() {
@@ -84,11 +113,17 @@ function renderLogs(items) {
     const duration = item.duration_ms != null ? `${item.duration_ms.toFixed(0)}ms` : "-";
     const query = escapeHtml(item.query || "(无)");
 
+    const modeLabel = getModeLabel(item.mode);
+    const modeClass = getModeClass(item.mode);
+    const tokens = formatTokens(item.total_tokens);
+
     return `<tr data-trace-id="${escapeHtml(item.traceId)}">
       <td class="time-cell">${time}</td>
       <td><span class="trace-id">${escapeHtml(item.traceId)}</span></td>
       <td><span class="query-text" title="${query}">${query}</span></td>
       <td style="text-align:center"><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+      <td style="text-align:center"><span class="mode-badge ${modeClass}">${modeLabel}</span></td>
+      <td style="text-align:right"><span class="tokens">${tokens}</span></td>
       <td style="text-align:right"><span class="duration">${duration}</span></td>
     </tr>`;
   }).join("");
@@ -108,7 +143,7 @@ function formatTime(ts) {
 function getStatusClass(status) {
   if (status === "success") return "status-success";
   if (status === "error" || status === "routing_error") return "status-error";
-  if (status === "fallback" || status === "no_match") return "status-fallback";
+  if (status === "fallback" || status === "no_match" || status === "agent_fallback") return "status-fallback";
   return "status-unknown";
 }
 
@@ -118,7 +153,10 @@ function getStatusLabel(status) {
     error: "错误",
     routing_error: "路由错误",
     fallback: "降级",
+    agent_fallback: "Agent兜底",
     no_match: "无匹配",
+    fallback_greeting: "问候",
+    fallback_out_of_scope: "超范围",
   };
   return map[status] || status;
 }

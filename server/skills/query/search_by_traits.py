@@ -38,10 +38,29 @@ def _ensure_trait_name_map() -> dict[str, int]:
     return _TRAIT_NAME_TO_ID
 
 
+# FGO 阵营两轴（用于组合字符串拆解）
+_ALIGNMENT_AXIS1 = ["秩序", "混沌", "中立"]
+_ALIGNMENT_AXIS2 = ["善", "恶", "中庸", "狂", "夏", "兽", "花嫁"]
+
+
+def _try_split_alignment(name: str, name_map: dict[str, int]) -> list[int]:
+    """尝试将阵营组合字符串拆解为两个独立特性 ID。
+
+    例如 "秩序善" → [300, 303]，"混沌恶" → [301, 304]。
+    如果前缀或后缀不在映射表中，返回空列表。
+    """
+    for prefix in _ALIGNMENT_AXIS1:
+        if name.startswith(prefix):
+            suffix = name[len(prefix) :]
+            if suffix and prefix in name_map and suffix in name_map:
+                return [name_map[prefix], name_map[suffix]]
+    return []
+
+
 def resolve_trait_names(names: list[str]) -> list[int]:
     """将中文特性名列表解析为 trait ID 列表。
 
-    匹配策略：精确匹配 → 子串匹配（名称包含输入或输入包含名称）。
+    匹配策略：精确匹配 → 阵营组合拆解 → 子串匹配。
     """
     name_map = _ensure_trait_name_map()
     result: list[int] = []
@@ -49,11 +68,18 @@ def resolve_trait_names(names: list[str]) -> list[int]:
         name = name.strip()
         if not name:
             continue
+        # 标准化分隔符：秩序·善 → 秩序善
+        normalized = name.replace("·", "").replace("・", "").replace("‧", "").replace(" ", "")
         # 精确匹配
-        if name in name_map:
-            result.append(name_map[name])
+        if normalized in name_map:
+            result.append(name_map[normalized])
             continue
-        # 子串匹配
+        # 阵营组合拆解：秩序善 → [秩序, 善] → [300, 303]
+        alignment_ids = _try_split_alignment(normalized, name_map)
+        if alignment_ids:
+            result.extend(alignment_ids)
+            continue
+        # 子串匹配（原始名称）
         found = False
         for cn, tid in name_map.items():
             if name in cn or cn in name:
