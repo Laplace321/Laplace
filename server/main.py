@@ -140,7 +140,10 @@ def _describe_filters(skill_calls: list[dict]) -> list[str]:
             op = params.get("op", "gte")
             val = params.get("value", "")
             op_map = {"eq": "=", "gte": "≥", "lte": "≤", "gt": ">", "lt": "<"}
-            descriptions.append(f"NP充能 {op_map.get(op, op)} {val}%")
+            target_type = params.get("targetType")
+            charge_label_map = {"self": "自充", "ptOne": "他充", "ptAll": "群充"}
+            charge_label = charge_label_map.get(target_type, "NP充能")
+            descriptions.append(f"{charge_label} {op_map.get(op, op)} {val}%")
         elif name == "search_by_cards":
             parts = []
             card = params.get("cardType") or params.get("cards")
@@ -448,6 +451,8 @@ async def _handle_skill_mode(
     request_start = time.monotonic()
     executor = SkillExecutor()
     model_used = "skill_mode"
+    trace_mode = "oneshot"  # 追踪最终模式：oneshot | agent_fallback | fallback_*
+    trace_total_tokens = 0  # 累计 token 消耗
 
     # 如果已有 skill_calls（preset 或前端直传），记录 routing 事件
     if skill_calls is not None:
@@ -457,6 +462,7 @@ async def _handle_skill_mode(
             {
                 "query": user_message,
                 "source": "direct",
+                "mode": "oneshot_direct",
                 "skill_count": len(skill_calls),
             },
         )
@@ -484,6 +490,7 @@ async def _handle_skill_mode(
             "routing_input",
             {
                 "query": user_message,
+                "mode": "oneshot_llm",
                 "routing_prompt_length": len(routing_prompt),
                 "skill_count": len(skill_descriptions),
             },
@@ -502,6 +509,8 @@ async def _handle_skill_mode(
             routing_result.pop("_response_format", None)
             routing_result.pop("_provider", None)
             routing_result.pop("_attempts", None)
+            routing_usage = routing_result.pop("_usage", {})
+            trace_total_tokens += routing_usage.get("total_tokens", 0)
             skill_calls = routing_result.get("skill_calls", [])
             response_skill_name = routing_result.get("response_skill", response_skill_name)
 
@@ -514,6 +523,7 @@ async def _handle_skill_mode(
                     "response_skill": response_skill_name,
                     "fallback": routing_result.get("fallback"),
                     "model": model_used,
+                    "routing_usage": routing_usage,
                 },
             )
 
@@ -525,10 +535,16 @@ async def _handle_skill_mode(
                 # greeting / out_of_scope → 直接模板回复
                 if fb_code in ("greeting", "out_of_scope"):
                     template_reply = _FALLBACK_TEMPLATES.get(fb_code.upper(), fb_msg)
+                    trace_mode = f"fallback_{fb_code}"
                     await log_trace_event(
                         trace_id,
                         "final",
-                        {"total_time_ms": (time.monotonic() - request_start) * 1000, "result": f"fallback_{fb_code}"},
+                        {
+                            "total_time_ms": (time.monotonic() - request_start) * 1000,
+                            "result": trace_mode,
+                            "mode": trace_mode,
+                            "total_tokens": trace_total_tokens,
+                        },
                     )
                     return ChatResponse(
                         reply=template_reply,
@@ -541,9 +557,20 @@ async def _handle_skill_mode(
                 # no_match / ambiguous → Agent 兜底
                 try:
                     agent_result: AgentResult = await agent_route(user_message, TOOL_HANDLERS, trace_id)
+                    trace_total_tokens += agent_result.total_tokens
                     category, clean_reply = _classify_agent_reply(agent_result.reply)
                     returned = (
                         agent_result.servants_data[:MAX_RESULTS] if agent_result.servants_data and not category else []
+                    )
+                    await log_trace_event(
+                        trace_id,
+                        "agent_detail",
+                        {
+                            "rounds": agent_result.rounds,
+                            "agent_tokens": agent_result.total_tokens,
+                            "tool_trace": agent_result.tool_trace,
+                            "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                        },
                     )
                     await log_trace_event(
                         trace_id,
@@ -551,7 +578,9 @@ async def _handle_skill_mode(
                         {
                             "total_time_ms": (time.monotonic() - request_start) * 1000,
                             "result": "agent_fallback",
+                            "mode": "agent_fallback",
                             "total_found": len(agent_result.servants_data),
+                            "total_tokens": trace_total_tokens,
                         },
                     )
                     return ChatResponse(
@@ -566,7 +595,12 @@ async def _handle_skill_mode(
                     await log_trace_event(
                         trace_id,
                         "final",
-                        {"total_time_ms": (time.monotonic() - request_start) * 1000, "result": "fallback"},
+                        {
+                            "total_time_ms": (time.monotonic() - request_start) * 1000,
+                            "result": "fallback",
+                            "mode": "fallback_no_match",
+                            "total_tokens": trace_total_tokens,
+                        },
                     )
                     return ChatResponse(
                         reply=fb_msg,
@@ -581,9 +615,20 @@ async def _handle_skill_mode(
             if not skill_calls:
                 try:
                     agent_result = await agent_route(user_message, TOOL_HANDLERS, trace_id)
+                    trace_total_tokens += agent_result.total_tokens
                     category, clean_reply = _classify_agent_reply(agent_result.reply)
                     returned = (
                         agent_result.servants_data[:MAX_RESULTS] if agent_result.servants_data and not category else []
+                    )
+                    await log_trace_event(
+                        trace_id,
+                        "agent_detail",
+                        {
+                            "rounds": agent_result.rounds,
+                            "agent_tokens": agent_result.total_tokens,
+                            "tool_trace": agent_result.tool_trace,
+                            "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                        },
                     )
                     await log_trace_event(
                         trace_id,
@@ -591,7 +636,9 @@ async def _handle_skill_mode(
                         {
                             "total_time_ms": (time.monotonic() - request_start) * 1000,
                             "result": "agent_fallback",
+                            "mode": "agent_fallback",
                             "total_found": len(agent_result.servants_data),
+                            "total_tokens": trace_total_tokens,
                         },
                     )
                     return ChatResponse(
@@ -607,7 +654,12 @@ async def _handle_skill_mode(
                     await log_trace_event(
                         trace_id,
                         "final",
-                        {"total_time_ms": (time.monotonic() - request_start) * 1000, "result": "no_match"},
+                        {
+                            "total_time_ms": (time.monotonic() - request_start) * 1000,
+                            "result": "no_match",
+                            "mode": "fallback_no_match",
+                            "total_tokens": trace_total_tokens,
+                        },
                     )
                     return ChatResponse(
                         reply=no_match_msg,
@@ -624,6 +676,8 @@ async def _handle_skill_mode(
                 {
                     "total_time_ms": (time.monotonic() - request_start) * 1000,
                     "result": "routing_error",
+                    "mode": "routing_error",
+                    "total_tokens": trace_total_tokens,
                 },
                 error=str(e),
             )
@@ -659,15 +713,28 @@ async def _handle_skill_mode(
     if result.is_fallback:
         try:
             agent_result = await agent_route(user_message, TOOL_HANDLERS, trace_id)
+            trace_total_tokens += agent_result.total_tokens
             category, clean_reply = _classify_agent_reply(agent_result.reply)
             returned = agent_result.servants_data[:MAX_RESULTS] if agent_result.servants_data and not category else []
+            await log_trace_event(
+                trace_id,
+                "agent_detail",
+                {
+                    "rounds": agent_result.rounds,
+                    "agent_tokens": agent_result.total_tokens,
+                    "tool_trace": agent_result.tool_trace,
+                    "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                },
+            )
             await log_trace_event(
                 trace_id,
                 "final",
                 {
                     "total_time_ms": (time.monotonic() - request_start) * 1000,
                     "result": "agent_fallback",
+                    "mode": "agent_fallback",
                     "total_found": len(agent_result.servants_data),
+                    "total_tokens": trace_total_tokens,
                 },
             )
             return ChatResponse(
@@ -724,6 +791,8 @@ async def _handle_skill_mode(
                 json_mode=False,
             )
             final_reply = gen_response.get("text", "").strip()
+            gen_usage = gen_response.get("_usage", {})
+            trace_total_tokens += gen_usage.get("total_tokens", 0)
             if not final_reply:
                 raise ValueError("Empty response from LLM")
         except Exception as e:
@@ -743,10 +812,12 @@ async def _handle_skill_mode(
                 "generation_output",
                 {
                     "reply": final_reply,
+                    "generation_usage": gen_usage,
                 },
             )
 
     # ── Trace: final ──
+    trace_mode = "oneshot" if not result.is_fallback else "execution_fallback"
     await log_trace_event(
         trace_id,
         "final",
@@ -754,6 +825,8 @@ async def _handle_skill_mode(
             "total_time_ms": round((time.monotonic() - request_start) * 1000, 2),
             "total_found": total_found,
             "result": "success" if not result.is_fallback else "fallback",
+            "mode": trace_mode,
+            "total_tokens": trace_total_tokens,
         },
     )
 
@@ -873,6 +946,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
         trace_id = uuid.uuid4().hex[:8]
         stream_start = time.monotonic()
         model_used = "unknown"
+        trace_total_tokens = 0  # 累计 token 消耗
 
         # ── 阶段 1: Skill 路由（或 Preset 展开） ──
         if preset_name:
@@ -986,6 +1060,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 "routing_input",
                 {
                     "query": message,
+                    "mode": "oneshot_llm",
                     "routing_prompt_length": len(routing_prompt),
                     "skill_count": len(skill_descriptions),
                 },
@@ -1007,6 +1082,8 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     {
                         "total_time_ms": (time.monotonic() - stream_start) * 1000,
                         "result": "routing_error",
+                        "mode": "routing_error",
+                        "total_tokens": trace_total_tokens,
                     },
                     error=str(e),
                 )
@@ -1017,6 +1094,8 @@ async def chat_stream(message: str, preset_name: str | None = None):
             routing_result.pop("_response_format", None)
             routing_result.pop("_provider", None)
             routing_result.pop("_attempts", None)
+            routing_usage = routing_result.pop("_usage", {})
+            trace_total_tokens += routing_usage.get("total_tokens", 0)
 
             skill_calls = routing_result.get("skill_calls", [])
             response_skill_name = routing_result.get("response_skill", "respond_servant_list")
@@ -1030,6 +1109,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     "response_skill": response_skill_name,
                     "fallback": routing_result.get("fallback"),
                     "model": model_used,
+                    "routing_usage": routing_usage,
                 },
             )
 
@@ -1054,7 +1134,12 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     await log_trace_event(
                         trace_id,
                         "final",
-                        {"total_time_ms": (time.monotonic() - stream_start) * 1000, "result": f"fallback_{fb_code}"},
+                        {
+                            "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                            "result": f"fallback_{fb_code}",
+                            "mode": f"fallback_{fb_code}",
+                            "total_tokens": trace_total_tokens,
+                        },
                     )
                     yield _sse_event("delta", {"text": template_reply})
                     yield _sse_event("done", {"model": model_used, "traceId": trace_id})
@@ -1063,6 +1148,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 yield _sse_event("thinking", {"phase": "agent_fallback", "message": "需要更深入分析，启动智能搜索..."})
                 try:
                     agent_result: AgentResult = await agent_route(message, TOOL_HANDLERS, trace_id)
+                    trace_total_tokens += agent_result.total_tokens
                     category, clean_reply = _classify_agent_reply(agent_result.reply)
                     if agent_result.servants_data and not category:
                         returned = agent_result.servants_data[:MAX_RESULTS]
@@ -1073,11 +1159,23 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     yield _sse_event("delta", {"text": clean_reply})
                     await log_trace_event(
                         trace_id,
+                        "agent_detail",
+                        {
+                            "rounds": agent_result.rounds,
+                            "agent_tokens": agent_result.total_tokens,
+                            "tool_trace": agent_result.tool_trace,
+                            "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                        },
+                    )
+                    await log_trace_event(
+                        trace_id,
                         "final",
                         {
                             "total_time_ms": (time.monotonic() - stream_start) * 1000,
                             "result": "agent_fallback",
+                            "mode": "agent_fallback",
                             "total_found": len(agent_result.servants_data),
+                            "total_tokens": trace_total_tokens,
                         },
                     )
                 except Exception as agent_err:
@@ -1085,7 +1183,12 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     await log_trace_event(
                         trace_id,
                         "final",
-                        {"total_time_ms": (time.monotonic() - stream_start) * 1000, "result": "fallback"},
+                        {
+                            "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                            "result": "fallback",
+                            "mode": "fallback_no_match",
+                            "total_tokens": trace_total_tokens,
+                        },
                     )
                     yield _sse_event("delta", {"text": fb_msg})
                 yield _sse_event("done", {"model": model_used, "traceId": trace_id})
@@ -1096,6 +1199,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 yield _sse_event("thinking", {"phase": "agent_fallback", "message": "需要更深入分析，启动智能搜索..."})
                 try:
                     agent_result = await agent_route(message, TOOL_HANDLERS, trace_id)
+                    trace_total_tokens += agent_result.total_tokens
                     category, clean_reply = _classify_agent_reply(agent_result.reply)
                     if agent_result.servants_data and not category:
                         returned = agent_result.servants_data[:MAX_RESULTS]
@@ -1106,11 +1210,23 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     yield _sse_event("delta", {"text": clean_reply})
                     await log_trace_event(
                         trace_id,
+                        "agent_detail",
+                        {
+                            "rounds": agent_result.rounds,
+                            "agent_tokens": agent_result.total_tokens,
+                            "tool_trace": agent_result.tool_trace,
+                            "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                        },
+                    )
+                    await log_trace_event(
+                        trace_id,
                         "final",
                         {
                             "total_time_ms": (time.monotonic() - stream_start) * 1000,
                             "result": "agent_fallback",
+                            "mode": "agent_fallback",
                             "total_found": len(agent_result.servants_data),
+                            "total_tokens": trace_total_tokens,
                         },
                     )
                 except Exception as agent_err:
@@ -1119,7 +1235,12 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     await log_trace_event(
                         trace_id,
                         "final",
-                        {"total_time_ms": (time.monotonic() - stream_start) * 1000, "result": "no_match"},
+                        {
+                            "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                            "result": "no_match",
+                            "mode": "fallback_no_match",
+                            "total_tokens": trace_total_tokens,
+                        },
                     )
                     yield _sse_event("delta", {"text": no_match_msg})
                 yield _sse_event("done", {"model": model_used, "traceId": trace_id})
@@ -1153,6 +1274,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
             yield _sse_event("thinking", {"phase": "agent_fallback", "message": "需要更深入分析，启动智能搜索..."})
             try:
                 agent_result = await agent_route(message, TOOL_HANDLERS, trace_id)
+                trace_total_tokens += agent_result.total_tokens
                 category, clean_reply = _classify_agent_reply(agent_result.reply)
                 if agent_result.servants_data and not category:
                     returned = agent_result.servants_data[:MAX_RESULTS]
@@ -1163,11 +1285,23 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 yield _sse_event("delta", {"text": clean_reply})
                 await log_trace_event(
                     trace_id,
+                    "agent_detail",
+                    {
+                        "rounds": agent_result.rounds,
+                        "agent_tokens": agent_result.total_tokens,
+                        "tool_trace": agent_result.tool_trace,
+                        "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                    },
+                )
+                await log_trace_event(
+                    trace_id,
                     "final",
                     {
                         "total_time_ms": (time.monotonic() - stream_start) * 1000,
                         "result": "agent_fallback",
+                        "mode": "agent_fallback",
                         "total_found": len(agent_result.servants_data),
+                        "total_tokens": trace_total_tokens,
                     },
                 )
             except Exception as agent_err:
@@ -1179,6 +1313,8 @@ async def chat_stream(message: str, preset_name: str | None = None):
                         "total_time_ms": (time.monotonic() - stream_start) * 1000,
                         "total_found": 0,
                         "result": "execution_fallback",
+                        "mode": "execution_fallback",
+                        "total_tokens": trace_total_tokens,
                     },
                 )
                 yield _sse_event("delta", {"text": fb_reply})
@@ -1241,6 +1377,8 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 json_mode=False,
             )
             final_reply = generation_response.get("text", "").strip()
+            gen_usage = generation_response.get("_usage", {})
+            trace_total_tokens += gen_usage.get("total_tokens", 0)
             if not final_reply:
                 raise ValueError("Empty response from LLM")
         except Exception as e:
@@ -1261,6 +1399,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 "generation_output",
                 {
                     "reply": final_reply,
+                    "generation_usage": gen_usage,
                 },
             )
 
@@ -1278,6 +1417,8 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
                 "total_found": total_found,
                 "result": final_result,
+                "mode": "oneshot",
+                "total_tokens": trace_total_tokens,
             },
         )
 

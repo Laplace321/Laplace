@@ -6,13 +6,14 @@ Laplace — 结构化 Trace 日志
 2. 新模式（多阶段事件流）：log_trace_event — 同一 traceId 下按阶段记录事件
 
 Phase 枚举：
-  routing_input  → 路由前（query、skill 列表数量）
-  routing_output → 路由后（skill_calls、model）
+  routing_input  → 路由前（query、mode、skill 列表数量）
+  routing_output → 路由后（skill_calls、model、routing_usage）
   execution      → Skill 执行结果（accepted/rejected、耗时）
   context_build  → Context 构建（applied_filters、context 大小）
   generation_input  → 生成 Prompt 元数据
-  generation_output → 生成结果（reply 长度、model）
-  final          → 请求结束（总耗时、错误信息）
+  generation_output → 生成结果（reply、generation_usage）
+  agent_detail   → Agent 兜底详情（rounds、agent_tokens、tool_trace）
+  final          → 请求结束（总耗时、mode、total_tokens）
 """
 
 import asyncio
@@ -219,6 +220,19 @@ def find_trace(trace_id: str) -> dict | None:
                     "skill_calls": e.get("data", {}).get("skill_calls", []),
                 }
                 break
+        # 从 routing_input 提取 mode
+        for e in phased_events:
+            if e.get("phase") == "routing_input":
+                result["mode"] = e.get("data", {}).get("mode", "")
+                break
+        # 从 final 提取 mode（优先）和 total_tokens
+        for e in phased_events:
+            if e.get("phase") == "final":
+                final_data = e.get("data", {})
+                if final_data.get("mode"):
+                    result["mode"] = final_data["mode"]
+                result["total_tokens"] = final_data.get("total_tokens")
+                break
         return result
 
     # 旧模式：返回最后一条匹配的 entry
@@ -264,6 +278,8 @@ def read_trace_summaries(
         duration_ms = None
         timestamp = events[0].get("timestamp", "")
         error_msg = None
+        mode = None
+        total_tokens = None
 
         for e in events:
             phase = e.get("phase", "")
@@ -274,6 +290,8 @@ def read_trace_summaries(
             elif phase == "final":
                 status = data.get("result", "unknown")
                 duration_ms = data.get("total_time_ms")
+                mode = data.get("mode")
+                total_tokens = data.get("total_tokens")
                 if e.get("error"):
                     error_msg = e["error"][:200]
             # 旧模式兼容
@@ -294,6 +312,8 @@ def read_trace_summaries(
                 "status": status,
                 "duration_ms": round(duration_ms, 1) if duration_ms else None,
                 "error": error_msg,
+                "mode": mode,
+                "total_tokens": total_tokens,
             }
         )
 

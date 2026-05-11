@@ -251,7 +251,14 @@ async def _call_openai_model(
                     max_output_tokens=max_tokens,
                     temperature=temperature,
                 )
-                return {"text": resp.output_text or "", "_model": model}
+                usage = {}
+                if hasattr(resp, "usage") and resp.usage:
+                    usage = {
+                        "input_tokens": resp.usage.input_tokens,
+                        "output_tokens": resp.usage.output_tokens,
+                        "total_tokens": resp.usage.total_tokens,
+                    }
+                return {"text": resp.output_text or "", "_model": model, "_usage": usage}
             except Exception as e:
                 last_error = e
                 if attempt < MAX_RETRIES - 1:
@@ -290,6 +297,14 @@ async def _call_openai_model(
             parsed = response_validator(content)
             parsed["_model"] = model
             parsed["_response_format"] = response_format_label
+            usage = {}
+            if hasattr(resp, "usage") and resp.usage:
+                usage = {
+                    "input_tokens": resp.usage.input_tokens,
+                    "output_tokens": resp.usage.output_tokens,
+                    "total_tokens": resp.usage.total_tokens,
+                }
+            parsed["_usage"] = usage
             return parsed
         except Exception as e:
             err_str = str(e).lower()
@@ -511,7 +526,8 @@ async def _call_dashscope_model(
                 content = resp.output.choices[0].message.content
                 if isinstance(content, list):
                     content = content[0].get("text", "") if isinstance(content[0], dict) else str(content[0])
-                return {"text": content or "", "_model": model}
+                usage = dict(resp.usage) if hasattr(resp, "usage") and resp.usage else {}
+                return {"text": content or "", "_model": model, "_usage": usage}
             except Exception as e:
                 last_error = e
                 if attempt < MAX_RETRIES - 1:
@@ -542,6 +558,7 @@ async def _call_dashscope_model(
             parsed = response_validator(content)
             parsed["_model"] = model
             parsed["_response_format"] = response_format_label
+            parsed["_usage"] = dict(resp.usage) if hasattr(resp, "usage") and resp.usage else {}
             return parsed
         except LLMResponseFormatUnsupported:
             # 结构化输出不支持 → 降级为纯文本
