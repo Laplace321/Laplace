@@ -132,7 +132,7 @@ class TestSkillModePreset:
         assert resp.status_code == 200
         data = resp.json()
         assert data["count"] > 0
-        assert data["query"]["mode"] == "skill"
+        assert data["query"]["mode"] == "preset"
         assert data["reply"]  # 有回复内容
 
     @pytest.mark.anyio
@@ -229,73 +229,110 @@ class TestSkillModeDirectParams:
 
 
 # ============================================================
-# Skill 模式：LLM 路由路径测试
+# Agent 路由路径测试（OneShot 已废弃，Agent 为唯一路由入口）
 # ============================================================
 
 
-class TestSkillModeLLMRouting:
-    """测试 skill 模式下走 LLM 路由。"""
+class TestAgentRouting:
+    """测试 Agent 路由模式（唯一路由入口）。"""
 
     @pytest.mark.anyio
-    async def test_llm_routing_success(self, mock_chat_completion_routing_and_rag):
-        """LLM 路由成功：返回 Saber 职阶从者。"""
-        with patch("server.main.chat_completion", new=AsyncMock(side_effect=mock_chat_completion_routing_and_rag)):
+    async def test_agent_routing_success(self):
+        """Agent 路由成功：查询 Saber 从者，走 Agent Loop + Generation。"""
+        from server.agent.agent_loop import AgentResult
+
+        mock_result = AgentResult(
+            reply="找到了一些 Saber 从者",
+            rounds=2,
+            total_tokens=1000,
+            elapsed_ms=500,
+            tool_trace=[
+                {
+                    "round": 1,
+                    "tool": "search_servants",
+                    "args": {"class_name": "Saber"},
+                    "result_summary": "找到 20 位",
+                },
+            ],
+            is_fallback=False,
+            servants_data=[
+                {"name": "Artoria", "aliasCN": "阿尔托莉雅", "className": "Saber", "rarity": 5},
+            ],
+        )
+
+        async def mock_gen(**kwargs):
+            return {"text": "为你找到了 Saber 职阶的从者，包括阿尔托莉雅等。"}
+
+        with (
+            patch("server.main.agent_route", new=AsyncMock(return_value=mock_result)),
+            patch("server.main.chat_completion", new=AsyncMock(side_effect=mock_gen)),
+        ):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                resp = await client.post(
-                    "/api/chat",
-                    json={"message": "有哪些Saber", "mode": "skill"},
-                )
+                resp = await client.post("/api/chat", json={"message": "有哪些Saber"})
         assert resp.status_code == 200
         data = resp.json()
         assert data["count"] > 0
-        assert "Saber" in data["reply"] or "从者" in data["reply"]
-        assert data["model"] == "mock-routing"
+        assert data["query"]["mode"] == "agent"
+        assert "agent_" in data["model"]
 
     @pytest.mark.anyio
-    async def test_llm_routing_fallback(self, mock_chat_completion_fallback):
-        """LLM 路由 fallback：返回降级消息。"""
-        with patch("server.main.chat_completion", new=AsyncMock(side_effect=mock_chat_completion_fallback)):
+    async def test_agent_routing_out_of_scope(self):
+        """Agent fallback — 超出能力范围的问题应返回 OUT_OF_SCOPE 模板。"""
+        from server.agent.agent_loop import AgentResult
+
+        mock_result = AgentResult(
+            reply="[OUT_OF_SCOPE] 这个问题与 FGO 无关",
+            rounds=1,
+            total_tokens=500,
+            elapsed_ms=200,
+            tool_trace=[],
+            is_fallback=True,
+            servants_data=[],
+        )
+
+        with patch("server.main.agent_route", new=AsyncMock(return_value=mock_result)):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                resp = await client.post(
-                    "/api/chat",
-                    json={"message": "今天天气怎么样", "mode": "skill"},
-                )
+                resp = await client.post("/api/chat", json={"message": "今天天气怎么样"})
         assert resp.status_code == 200
         data = resp.json()
         assert data["count"] == 0
-        assert "不是 FGO" in data["reply"]
+        assert "超出了我的能力范围" in data["reply"]
 
     @pytest.mark.anyio
-    async def test_llm_routing_empty_skills_no_fallback(self, mock_chat_completion_empty_skills):
-        """LLM 返回空 skill_calls 且无 fallback — 应返回无法识别的提示。"""
-        with patch("server.main.chat_completion", new=AsyncMock(side_effect=mock_chat_completion_empty_skills)):
+    async def test_agent_routing_greeting(self):
+        """Agent fallback — 问候语应返回 GREETING 模板。"""
+        from server.agent.agent_loop import AgentResult
+
+        mock_result = AgentResult(
+            reply="[GREETING] 你好",
+            rounds=1,
+            total_tokens=300,
+            elapsed_ms=100,
+            tool_trace=[],
+            is_fallback=True,
+            servants_data=[],
+        )
+
+        with patch("server.main.agent_route", new=AsyncMock(return_value=mock_result)):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                resp = await client.post(
-                    "/api/chat",
-                    json={"message": "嗯嗯", "mode": "skill"},
-                )
+                resp = await client.post("/api/chat", json={"message": "你好"})
         assert resp.status_code == 200
         data = resp.json()
         assert data["count"] == 0
-        assert "无法" in data["reply"] or "识别" in data["reply"]
+        assert "Laplace" in data["reply"]
+        assert "FGO" in data["reply"]
 
     @pytest.mark.anyio
-    async def test_llm_routing_error(self):
-        """LLM 路由异常：应返回友好错误而非 500。"""
+    async def test_agent_routing_error(self):
+        """Agent 路由异常：应返回友好错误而非 500。"""
 
-        async def raise_error(**kwargs):
-            raise ConnectionError("Network error")
-
-        with patch("server.main.chat_completion", new=AsyncMock(side_effect=raise_error)):
+        with patch("server.main.agent_route", new=AsyncMock(side_effect=ConnectionError("Network error"))):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                resp = await client.post(
-                    "/api/chat",
-                    json={"message": "查一下Saber", "mode": "skill"},
-                )
+                resp = await client.post("/api/chat", json={"message": "查一下Saber"})
         assert resp.status_code == 200
         data = resp.json()
         assert data["model"] == "error"
-        assert "路由" in data["reply"] or "重试" in data["reply"]
+        assert "重试" in data["reply"]
 
 
 # ============================================================

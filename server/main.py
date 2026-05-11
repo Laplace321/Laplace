@@ -30,7 +30,7 @@ from server.rate_limiter import RateLimitMiddleware
 from server.schemas import parse_routing_response, routing_response_json_schema
 from server.skills.base import SKILL_REGISTRY, QuerySkill
 from server.skills.executor import SkillExecutor
-from server.skills.presets import PRESET_REGISTRY
+from server.skills.presets import PRESET_REGISTRY, Preset
 
 _translations_cache = CachedConfig(Path(__file__).parent / "config" / "translations.json")
 
@@ -70,8 +70,6 @@ def get_effect_translation(effect_code: str) -> str:
 
 
 # === 路由模式切换 ===
-ROUTING_MODE = os.getenv("ROUTING_MODE", "oneshot")  # agent | oneshot
-
 # === 共享业务逻辑 ===
 
 MAX_CONTEXT_SIZE = 5
@@ -291,6 +289,142 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
     }, top_results
 
 
+# === Fallback 分类与模板 ===
+
+_FALLBACK_TEMPLATES = {
+    "GREETING": (
+        "你好！我是 **Laplace**，一个 FGO 智能数据助手。"
+        "你可以用日常语言向我提问，我会从数据库中检索和分析从者信息。\n\n"
+        "**我能帮你做这些事：**\n"
+        "- **条件筛选** — 按职阶、星级、配卡、属性、特性等条件筛选从者\n"
+        "- **效果搜索** — 搜索拥有特定效果的从者（如充能、增伤、无敌、闪避等）\n"
+        "- **从者详情** — 查看某个从者的完整数据和技能信息\n"
+        "- **从者对比** — 把几个从者放在一起比较，分析各自优劣\n\n"
+        "**试试这样问我：**\n"
+        '- "30自充以上的五星Caster"\n'
+        '- "有增伤技能的从者"\n'
+        '- "对比梅林和斯卡蒂"\n'
+        '- "查一下村正"'
+    ),
+    "OUT_OF_SCOPE": (
+        "抱歉，这个问题超出了我的能力范围。"
+        "我是一个 FGO 从者数据助手，只能帮你查询和分析从者信息。\n\n"
+        "你可以试试问我：\n"
+        '- "有哪些5星弓阶从者"\n'
+        '- "对比梅林和斯卡蒂"\n'
+        '- "有无敌技能的从者"'
+    ),
+    "UNSUPPORTED": (
+        "这个功能暂时还不支持。目前我只能帮你查询从者数据（筛选、搜索、对比），"
+        "还不能做队伍搭配推荐、关卡攻略、礼装推荐等。\n\n"
+        "你可以试试问我从者相关的查询，比如：\n"
+        '- "50%以上充能的五星Caster"\n'
+        '- "有增伤效果的从者"'
+    ),
+}
+
+
+def _classify_agent_reply(reply: str) -> tuple[str | None, str]:
+    """解析 Agent 回复中的分类标记，返回 (category, clean_reply)。
+
+    Agent Prompt 要求在无需调用工具时，以 [GREETING]/[OUT_OF_SCOPE]/[UNSUPPORTED] 开头。
+    检测到标记后替换为标准化模板回复。
+    """
+    for tag in ("GREETING", "OUT_OF_SCOPE", "UNSUPPORTED"):
+        if reply.strip().startswith(f"[{tag}]"):
+            return tag, _FALLBACK_TEMPLATES[tag]
+    return None, reply
+
+
+# === 统一后置管线 ===
+
+
+async def _generate_reply(
+    user_message: str,
+    servants: list[dict],
+    applied_filters: list[str],
+    trace_id: str,
+    response_skill=None,
+    fallback_reply: str | None = None,
+) -> tuple[str, str]:
+    """统一的 Generation Prompt 调用。Agent/Preset 共用。
+
+    Args:
+        user_message: 用户原始消息
+        servants: 从者数据列表
+        applied_filters: 筛选条件中文描述
+        trace_id: 日志追踪 ID
+        response_skill: 可选的 ResponseSkill 实例
+        fallback_reply: Generation 失败时的降级回复
+
+    Returns:
+        (final_reply, result_status) — 最终回复和状态标记
+    """
+    context_data, _ = _build_context(servants)
+    context_data["已应用的筛选条件"] = applied_filters
+    context_data["筛选条件"] = applied_filters
+    context_json = json.dumps(context_data, ensure_ascii=False)
+
+    if response_skill is not None and hasattr(response_skill, "build_prompt"):
+        gen_prompt = response_skill.build_prompt(user_message, context_json)
+    else:
+        gen_prompt = get_generation_prompt(user_message, context_json)
+
+    # ── Trace: context_build ──
+    await log_trace_event(
+        trace_id,
+        "context_build",
+        {
+            "applied_filters": applied_filters,
+            "context_data": context_data,
+        },
+    )
+
+    # ── Trace: generation_input ──
+    await log_trace_event(
+        trace_id,
+        "generation_input",
+        {"generation_prompt": gen_prompt},
+    )
+
+    try:
+        gen_response = await chat_completion(
+            system_prompt=(
+                "You are a helpful AI assistant. You MUST strictly follow "
+                "the provided data and NEVER use your internal knowledge about FGO."
+            ),
+            user_message=gen_prompt,
+            temperature=0.1,
+            json_mode=False,
+        )
+        final_reply = gen_response.get("text", "").strip()
+        if not final_reply:
+            raise ValueError("Empty response from LLM")
+    except Exception as e:
+        final_reply = fallback_reply or f"为你找到了 {len(servants)} 位从者。"
+        await log_trace_event(
+            trace_id,
+            "generation_output",
+            {"reply": final_reply, "source": "fallback"},
+            error=str(e),
+        )
+        return final_reply, "generation_fallback"
+    else:
+        await log_trace_event(
+            trace_id,
+            "generation_output",
+            {"reply": final_reply, "source": "generation"},
+        )
+        return final_reply, "success"
+
+
+async def _log_final(trace_id: str, total_time_ms: float, result: str, **extra_fields):
+    """统一的 final trace 写入。"""
+    data = {"total_time_ms": round(total_time_ms, 2), "result": result}
+    data.update(extra_fields)
+    await log_trace_event(trace_id, "final", data)
+
+
 def _sse_event(event: str, data: dict) -> str:
     """格式化一条 SSE 事件。"""
     payload = json.dumps(data, ensure_ascii=False)
@@ -430,31 +564,42 @@ async def startup():
     _validate_translations()
 
 
-async def _handle_agent_mode(
+async def _handle_chat(
     user_message: str,
     trace_id: str,
 ) -> ChatResponse:
-    """Agentic Tool Use 模式的核心处理逻辑。
+    """Agent 路由模式的核心处理逻辑（唯一路由入口）。
 
     LLM 自主决定调用哪些工具，支持多轮 tool 调用和自我纠正。
+    Fallback 场景通过 Agent Prompt 的分类标记自动识别。
     """
-    # ── Trace: routing_input (agent) ──
+    # ── Trace: routing_input ──
     await log_trace_event(
         trace_id,
         "routing_input",
         {
             "query": user_message,
             "source": "agent",
-            "routing_mode": "agent",
         },
     )
 
-    agent_result: AgentResult = await agent_route(
-        user_message=user_message,
-        tool_handlers=TOOL_HANDLERS,
-        trace_id=trace_id,
-        max_rounds=5,
-    )
+    try:
+        agent_result: AgentResult = await agent_route(
+            user_message=user_message,
+            tool_handlers=TOOL_HANDLERS,
+            trace_id=trace_id,
+            max_rounds=5,
+        )
+    except Exception as e:
+        await _log_final(trace_id, total_time_ms=0, result="agent_error")
+        return ChatResponse(
+            reply="抱歉，处理你的问题时遇到了问题，请稍后重试。",
+            servants=[],
+            count=0,
+            query={"mode": "agent", "error": str(e)},
+            model="error",
+            traceId=trace_id,
+        )
 
     # ── Trace: agent_complete ──
     await log_trace_event(
@@ -469,91 +614,42 @@ async def _handle_agent_mode(
         },
     )
 
-    # 从者卡片数据（来自 AgentResult.servants_data）
     returned_servants = agent_result.servants_data or []
     model_used = f"agent_{agent_result.rounds}r"
     agent_elapsed_ms = round(agent_result.elapsed_ms, 2)
     gen_elapsed_ms = 0.0
     final_result = "fallback" if agent_result.is_fallback else "success"
 
-    # ── Agent 后置管线：有从者数据时走 Generation Prompt ──
+    # ── Agent 后置管线：有从者数据时走统一 Generation Prompt ──
     if returned_servants and not agent_result.is_fallback:
         gen_start = time.monotonic()
         applied_filters = _describe_agent_filters(agent_result.tool_trace)
-        context_data, _ = _build_context(returned_servants)
-        context_data["已应用的筛选条件"] = applied_filters
-        context_data["筛选条件"] = applied_filters
-        context_json = json.dumps(context_data, ensure_ascii=False)
 
-        gen_prompt = get_generation_prompt(user_message, context_json)
-
-        # ── Trace: context_build (agent sync) ──
-        await log_trace_event(
-            trace_id,
-            "context_build",
-            {
-                "applied_filters": applied_filters,
-                "context_data": context_data,
-                "source": "agent_generation_sync",
-            },
+        final_reply, gen_status = await _generate_reply(
+            user_message=user_message,
+            servants=returned_servants,
+            applied_filters=applied_filters,
+            trace_id=trace_id,
+            fallback_reply=agent_result.reply,
         )
-
-        # ── Trace: generation_input (agent sync) ──
-        await log_trace_event(
-            trace_id,
-            "generation_input",
-            {
-                "generation_prompt": gen_prompt,
-            },
-        )
-
-        try:
-            generation_response = await chat_completion(
-                system_prompt=(
-                    "You are a helpful AI assistant. You MUST strictly follow "
-                    "the provided data and NEVER use your internal knowledge about FGO."
-                ),
-                user_message=gen_prompt,
-                temperature=0.1,
-                json_mode=False,
-            )
-            final_reply = generation_response.get("text", "").strip()
-            if not final_reply:
-                raise ValueError("Empty response from LLM")
-        except Exception as e:
-            # Generation 失败时降级为 Agent 原始回复
-            final_reply = agent_result.reply
-            final_result = "agent_generation_fallback"
-            await log_trace_event(
-                trace_id,
-                "generation_output",
-                {"reply": final_reply, "source": "agent_fallback"},
-                error=str(e),
-            )
-        else:
-            await log_trace_event(
-                trace_id,
-                "generation_output",
-                {"reply": final_reply, "source": "agent_generation"},
-            )
-
+        final_result = gen_status
         gen_elapsed_ms = round((time.monotonic() - gen_start) * 1000, 2)
     else:
-        # 兜底：无从者数据或 fallback 时直接使用 Agent 回复
-        final_reply = agent_result.reply
-        final_result = "fallback" if agent_result.is_fallback else "no_servants"
+        # 兜底：无从者数据或 fallback 时，走分类逻辑
+        category, final_reply = _classify_agent_reply(agent_result.reply)
+        if category:
+            final_result = f"fallback_{category.lower()}"
+        else:
+            final_result = "fallback" if agent_result.is_fallback else "no_servants"
 
-    # ── Trace: final（全链路结束后才写）──
-    await log_trace_event(
+    # ── Trace: final ──
+    await _log_final(
         trace_id,
-        "final",
-        {
-            "total_time_ms": round(agent_elapsed_ms + gen_elapsed_ms, 2),
-            "agent_time_ms": agent_elapsed_ms,
-            "generation_time_ms": gen_elapsed_ms,
-            "result": final_result,
-            "agent_rounds": agent_result.rounds,
-        },
+        total_time_ms=agent_elapsed_ms + gen_elapsed_ms,
+        result=final_result,
+        agent_time_ms=agent_elapsed_ms,
+        generation_time_ms=gen_elapsed_ms,
+        agent_rounds=agent_result.rounds,
     )
 
     return ChatResponse(
@@ -577,149 +673,42 @@ async def _handle_agent_mode(
     )
 
 
-async def _handle_skill_mode(
+async def _handle_preset_mode(
     user_message: str,
     trace_id: str,
-    skill_calls: list[dict] | None = None,
+    skill_calls: list[dict],
     response_skill_name: str = "respond_servant_list",
 ) -> ChatResponse:
-    """Skill 模式的核心处理逻辑。
+    """Preset 旁路模式：跳过 Agent Loop，直接执行 SkillExecutor + 统一后置管线。
 
-    接收已确定的 skill_calls（来自 LLM 路由或前端直传），
-    执行 SkillExecutor 并生成 RAG 回复。
+    Preset 由前端预设按钮触发，skill_calls 已确定，无需 LLM 路由。
     """
     request_start = time.monotonic()
-    executor = SkillExecutor()
-    model_used = "skill_mode"
+    model_used = "preset_mode"
 
-    # 如果已有 skill_calls（preset 或前端直传），记录 routing 事件
-    if skill_calls is not None:
-        await log_trace_event(
-            trace_id,
-            "routing_input",
-            {
-                "query": user_message,
-                "source": "direct",
-                "skill_count": len(skill_calls),
-            },
-        )
-        await log_trace_event(
-            trace_id,
-            "routing_output",
-            {
-                "skill_calls": skill_calls,
-                "response_skill": response_skill_name,
-                "fallback": None,
-                "model": model_used,
-            },
-        )
-
-    # 如果没有传入 skill_calls，通过 LLM 路由获取
-    if skill_calls is None:
-        skill_descriptions = [
-            {"name": s.name, "description": s.description} for s in SKILL_REGISTRY.values() if isinstance(s, QuerySkill)
-        ]
-        routing_prompt = build_routing_prompt(skill_descriptions)
-
-        # ── Trace: routing_input ──
-        await log_trace_event(
-            trace_id,
-            "routing_input",
-            {
-                "query": user_message,
-                "routing_prompt_length": len(routing_prompt),
-                "skill_count": len(skill_descriptions),
-            },
-        )
-
-        try:
-            routing_result = await chat_completion(
-                system_prompt=routing_prompt,
-                user_message=user_message,
-                temperature=0.1,
-                json_mode=True,
-                response_schema=routing_response_json_schema,
-                response_validator=parse_routing_response,
-            )
-            model_used = routing_result.pop("_model", "unknown")
-            routing_result.pop("_response_format", None)
-            routing_result.pop("_provider", None)
-            routing_result.pop("_attempts", None)
-            skill_calls = routing_result.get("skill_calls", [])
-            response_skill_name = routing_result.get("response_skill", response_skill_name)
-
-            # ── Trace: routing_output ──
-            await log_trace_event(
-                trace_id,
-                "routing_output",
-                {
-                    "skill_calls": skill_calls,
-                    "response_skill": response_skill_name,
-                    "fallback": routing_result.get("fallback"),
-                    "model": model_used,
-                },
-            )
-
-            # 检查 fallback
-            fallback = routing_result.get("fallback")
-            if fallback is not None:
-                fb_msg = fallback.get("message", "无法理解你的问题，请尝试更具体的描述。")
-                await log_trace_event(
-                    trace_id,
-                    "final",
-                    {
-                        "total_time_ms": (time.monotonic() - request_start) * 1000,
-                        "result": "fallback",
-                    },
-                )
-                return ChatResponse(
-                    reply=fb_msg,
-                    servants=[],
-                    count=0,
-                    query=routing_result,
-                    model=model_used,
-                    traceId=trace_id,
-                )
-
-            # 空 skill_calls 且无 fallback — LLM 未能识别意图
-            if not skill_calls:
-                no_match_msg = "无法从你的问题中识别出查询条件，请尝试更具体的描述。"
-                await log_trace_event(
-                    trace_id,
-                    "final",
-                    {
-                        "total_time_ms": (time.monotonic() - request_start) * 1000,
-                        "result": "no_match",
-                    },
-                )
-                return ChatResponse(
-                    reply=no_match_msg,
-                    servants=[],
-                    count=0,
-                    query=routing_result,
-                    model=model_used,
-                    traceId=trace_id,
-                )
-        except Exception as e:
-            await log_trace_event(
-                trace_id,
-                "final",
-                {
-                    "total_time_ms": (time.monotonic() - request_start) * 1000,
-                    "result": "routing_error",
-                },
-                error=str(e),
-            )
-            return ChatResponse(
-                reply="抱歉，Skill 路由遇到问题，请稍后重试。",
-                servants=[],
-                count=0,
-                query={},
-                model="error",
-                traceId=trace_id,
-            )
+    # ── Trace: routing_input (preset) ──
+    await log_trace_event(
+        trace_id,
+        "routing_input",
+        {
+            "query": user_message,
+            "source": "preset",
+            "skill_count": len(skill_calls),
+        },
+    )
+    await log_trace_event(
+        trace_id,
+        "routing_output",
+        {
+            "skill_calls": skill_calls,
+            "response_skill": response_skill_name,
+            "fallback": None,
+            "model": model_used,
+        },
+    )
 
     # 执行 Skills
+    executor = SkillExecutor()
     result = executor.execute(skill_calls, response_skill_name)
     servants = result.servants
     total_found = result.total_found
@@ -741,105 +730,115 @@ async def _handle_skill_mode(
     # Fallback 处理
     if result.is_fallback:
         final_reply = result.fallback_message or "未找到匹配的从者。"
+        final_result = "execution_fallback"
     else:
-        # RAG 生成
-        context_data, _ = _build_context(servants)
+        # 统一后置管线：Generation Prompt
         applied_filters = _describe_filters(skill_calls)
-        context_data["已应用的筛选条件"] = applied_filters
-        context_data["筛选条件"] = applied_filters
-        context_json = json.dumps(context_data, ensure_ascii=False)
-
-        # ── Trace: context_build ──
-        await log_trace_event(
-            trace_id,
-            "context_build",
-            {
-                "applied_filters": applied_filters,
-                "context_data": context_data,
-            },
+        final_reply, final_result = await _generate_reply(
+            user_message=user_message,
+            servants=servants,
+            applied_filters=applied_filters,
+            trace_id=trace_id,
+            response_skill=result.response_skill,
         )
-
-        # 使用 Response Skill 的 prompt（如果可用）
-        if result.response_skill is not None:
-            gen_prompt = result.response_skill.build_prompt(user_message, context_json)
-        else:
-            gen_prompt = get_generation_prompt(user_message, context_json)
-
-        # ── Trace: generation_input ──
-        await log_trace_event(
-            trace_id,
-            "generation_input",
-            {
-                "generation_prompt": gen_prompt,
-            },
-        )
-
-        try:
-            gen_response = await chat_completion(
-                system_prompt=(
-                    "You are a helpful AI assistant. You MUST strictly follow "
-                    "the provided data and NEVER use your internal knowledge about FGO."
-                ),
-                user_message=gen_prompt,
-                temperature=0.1,
-                json_mode=False,
-            )
-            final_reply = gen_response.get("text", "").strip()
-            if not final_reply:
-                raise ValueError("Empty response from LLM")
-        except Exception as e:
-            final_reply = f"为你找到了 {total_found} 位从者。"
-            await log_trace_event(
-                trace_id,
-                "generation_output",
-                {
-                    "reply": final_reply,
-                },
-                error=str(e),
-            )
-        else:
-            # ── Trace: generation_output (success) ──
-            await log_trace_event(
-                trace_id,
-                "generation_output",
-                {
-                    "reply": final_reply,
-                },
-            )
 
     # ── Trace: final ──
-    await log_trace_event(
+    await _log_final(
         trace_id,
-        "final",
-        {
-            "total_time_ms": round((time.monotonic() - request_start) * 1000, 2),
-            "total_found": total_found,
-            "result": "success" if not result.is_fallback else "fallback",
-        },
+        total_time_ms=(time.monotonic() - request_start) * 1000,
+        result=final_result,
+        total_found=total_found,
     )
 
     return ChatResponse(
         reply=final_reply,
         servants=returned_servants,
         count=total_found,
-        query={"mode": "skill", "skill_calls": skill_calls},
+        query={"mode": "preset", "skill_calls": skill_calls},
         model=model_used,
         traceId=trace_id,
     )
 
 
+def _expand_preset(preset: Preset, user_params: dict | list | None) -> list[dict]:
+    """将 Preset 展开为 skill_calls 列表，合并用户参数。"""
+    skill_calls = []
+    params = user_params or {}
+    for skill_name in preset.query_skills:
+        merged_params = {**preset.param_template.get(skill_name, {})}
+        if skill_name in params:
+            merged_params.update(params[skill_name])
+        elif params and len(preset.query_skills) == 1:
+            merged_params.update(params)
+        skill_calls.append({"skill_name": skill_name, "params": merged_params})
+    return skill_calls
+
+
+async def _merge_b1_extra_skills(
+    user_text: str,
+    skill_calls: list[dict],
+    response_skill_name: str,
+) -> tuple[list[dict], str]:
+    """B1 策略：用户补充文字走 LLM 路由解析额外 Skills 并合并到 preset 的 skill_calls 中。
+
+    Returns:
+        (merged_skill_calls, resolved_response_skill)
+    """
+    if not user_text.strip():
+        return skill_calls, response_skill_name
+
+    try:
+        skill_descriptions = [
+            {"name": s.name, "description": s.description} for s in SKILL_REGISTRY.values() if isinstance(s, QuerySkill)
+        ]
+        routing_prompt = build_routing_prompt(skill_descriptions)
+        extra_routing = await chat_completion(
+            system_prompt=routing_prompt,
+            user_message=user_text.strip(),
+            temperature=0.1,
+            json_mode=True,
+            response_schema=routing_response_json_schema,
+            response_validator=parse_routing_response,
+        )
+        extra_routing.pop("_model", None)
+        extra_routing.pop("_response_format", None)
+        extra_routing.pop("_provider", None)
+        extra_routing.pop("_attempts", None)
+        extra_skills = extra_routing.get("skill_calls", [])
+        # 合并：同名 Skill 补充参数，新 Skill 追加
+        existing_map = {s["skill_name"]: s for s in skill_calls}
+        for es in extra_skills:
+            es_name = es.get("skill_name")
+            if es_name in existing_map:
+                for k, v in es.get("params", {}).items():
+                    if k not in existing_map[es_name]["params"]:
+                        existing_map[es_name]["params"][k] = v
+            else:
+                skill_calls.append(es)
+                existing_map[es_name] = es
+        extra_resp_skill = extra_routing.get("response_skill")
+        if extra_resp_skill and extra_resp_skill != "respond_servant_list":
+            response_skill_name = extra_resp_skill
+    except Exception:
+        # 补充解析失败不影响预设查询（静默）
+        pass
+
+    return skill_calls, response_skill_name
+
+
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """处理用户对话请求（Skill-Based Architecture）。"""
+    """处理用户对话请求。
+
+    路由策略：
+    - preset_name → Preset 旁路（SkillExecutor + Generation）
+    - 其余 → Agent 路由（唯一路由入口）
+    """
     user_message = request.message
     trace_id = uuid.uuid4().hex[:8]
 
-    # 确定 skill_calls 来源：preset > params > LLM 路由
-    resolved_skill_calls: list[dict] | None = None
-    resolved_response_skill = request.response_skill or "respond_servant_list"
-
+    # Preset 模式
     if request.preset_name:
-        # 从 Preset Registry 展开为 skill_calls
         preset = PRESET_REGISTRY.get(request.preset_name)
         if preset is None:
             return ChatResponse(
@@ -850,82 +849,27 @@ async def chat(request: ChatRequest):
                 model="error",
                 traceId=trace_id,
             )
-        resolved_response_skill = preset.response_skill
-        resolved_skill_calls = []
-        # 用前端 params 覆盖预设模板中的默认参数
-        user_params = request.params or {}
-        for skill_name in preset.query_skills:
-            merged_params = {**preset.param_template.get(skill_name, {})}
-            if skill_name in user_params:
-                merged_params.update(user_params[skill_name])
-            elif user_params and len(preset.query_skills) == 1:
-                # 单 Skill 预设：直接用 user_params 作为该 Skill 的参数
-                merged_params.update(user_params)
-            resolved_skill_calls.append({"skill_name": skill_name, "params": merged_params})
+        skill_calls = _expand_preset(preset, request.params)
+        response_skill_name = preset.response_skill
 
-        # B1 策略：用户补充文字走 Stage 2 LLM 路由解析额外 Skills 并合并
-        user_text = user_message.strip()
-        if user_text:
-            try:
-                skill_descriptions = [
-                    {"name": s.name, "description": s.description}
-                    for s in SKILL_REGISTRY.values()
-                    if isinstance(s, QuerySkill)
-                ]
-                routing_prompt = build_routing_prompt(skill_descriptions)
-                extra_routing = await chat_completion(
-                    system_prompt=routing_prompt,
-                    user_message=user_text,
-                    temperature=0.1,
-                    json_mode=True,
-                    response_schema=routing_response_json_schema,
-                    response_validator=parse_routing_response,
-                )
-                extra_routing.pop("_model", None)
-                extra_routing.pop("_response_format", None)
-                extra_routing.pop("_provider", None)
-                extra_routing.pop("_attempts", None)
-                extra_skills = extra_routing.get("skill_calls", [])
-                # 合并：同名 Skill 补充参数，新 Skill 追加
-                existing_map = {s["skill_name"]: s for s in resolved_skill_calls}
-                for es in extra_skills:
-                    es_name = es.get("skill_name")
-                    if es_name in existing_map:
-                        # 同名 Skill：LLM 解析的参数补充 preset 缺失的字段
-                        for k, v in es.get("params", {}).items():
-                            if k not in existing_map[es_name]["params"]:
-                                existing_map[es_name]["params"][k] = v
-                    else:
-                        resolved_skill_calls.append(es)
-                        existing_map[es_name] = es
-                # 如果额外路由建议了不同的 response_skill，优先使用
-                extra_resp_skill = extra_routing.get("response_skill")
-                if extra_resp_skill and extra_resp_skill != "respond_servant_list":
-                    resolved_response_skill = extra_resp_skill
-                # B1 合并日志将通过 trace event 记录（在 _handle_skill_mode 中）
-            except Exception:
-                # 补充解析失败不影响预设查询（静默，trace 中可见）
-                pass
-    elif request.params:
-        # 前端直传 skill_calls（params 格式：[{"skill_name": ..., "params": ...}]）
-        if isinstance(request.params, list):
-            resolved_skill_calls = request.params
-        elif isinstance(request.params, dict):
-            # 单 dict 视为单个 skill_call
-            resolved_skill_calls = [request.params]
-
-    # Agent 模式：无 preset 且无直传 skill_calls 时，走 Agent 路由
-    if ROUTING_MODE == "agent" and resolved_skill_calls is None and not request.preset_name:
-        return await _handle_agent_mode(
-            user_message=user_message,
-            trace_id=trace_id,
+        # B1 策略：用户补充文字走 LLM 路由合并
+        skill_calls, response_skill_name = await _merge_b1_extra_skills(
+            user_message,
+            skill_calls,
+            response_skill_name,
         )
 
-    return await _handle_skill_mode(
+        return await _handle_preset_mode(
+            user_message=user_message,
+            trace_id=trace_id,
+            skill_calls=skill_calls,
+            response_skill_name=response_skill_name,
+        )
+
+    # Agent 模式（唯一路由入口）
+    return await _handle_chat(
         user_message=user_message,
         trace_id=trace_id,
-        skill_calls=resolved_skill_calls,  # None 则走 LLM 路由
-        response_skill_name=resolved_response_skill,
     )
 
 
@@ -933,218 +877,29 @@ async def chat(request: ChatRequest):
 async def chat_stream(message: str, preset_name: str | None = None):
     """SSE 流式对话端点 — 分阶段推送思考过程和结果。
 
-    使用 Skill-Based Architecture：Stage 1 LLM 路由 → SkillExecutor → RAG 生成。
-    支持 preset_name 参数：有值时跳过 LLM 路由，直接展开预设 skill_calls。
+    路由策略：
+    - preset_name → Preset 旁路（SkillExecutor + Generation）
+    - 其余 → Agent 路由（唯一路由入口）
     """
+
+    # Agent Tool Labels（中文化，禁止暴露工具名）
+    _AGENT_TOOL_LABELS = {
+        "search_servants": "正在检索从者数据...",
+        "lookup_servant": "正在查询从者详情...",
+        "compare_servants": "正在对比从者...",
+        "list_effects": "正在查询效果列表...",
+        "list_traits": "正在查询特性列表...",
+        "list_classes": "正在查询职阶列表...",
+        "lookup_skill_detail": "正在查询技能详情...",
+    }
 
     async def event_generator():
         trace_id = uuid.uuid4().hex[:8]
         stream_start = time.monotonic()
         model_used = "unknown"
 
-        # ── Agent 模式：整个流程由 Agent Loop 接管 ──
-        if ROUTING_MODE == "agent" and not preset_name:
-            yield _sse_event("thinking", {"phase": "routing", "message": "正在理解你的问题..."})
-
-            # ── Trace: routing_input (agent) ──
-            await log_trace_event(
-                trace_id,
-                "routing_input",
-                {
-                    "query": message,
-                    "source": "agent",
-                    "routing_mode": "agent",
-                },
-            )
-
-            try:
-                agent_result: AgentResult = await agent_route(
-                    user_message=message,
-                    tool_handlers=TOOL_HANDLERS,
-                    trace_id=trace_id,
-                    max_rounds=5,
-                )
-            except Exception as e:
-                await log_trace_event(
-                    trace_id,
-                    "final",
-                    {
-                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
-                        "result": "agent_error",
-                    },
-                    error=str(e),
-                )
-                yield _sse_event("error", {"phase": "routing", "message": "处理失败，请稍后重试"})
-                return
-
-            model_used = f"agent_{agent_result.rounds}r"
-            agent_elapsed_ms = round(agent_result.elapsed_ms, 2)
-
-            # 推送每轮 tool 调用作为 thinking steps（中文化，禁止暴露工具名）
-            _AGENT_TOOL_LABELS = {
-                "search_servants": "正在检索从者数据...",
-                "lookup_servant": "正在查询从者详情...",
-                "compare_servants": "正在对比从者...",
-                "list_effects": "正在查询效果列表...",
-                "list_traits": "正在查询特性列表...",
-                "list_classes": "正在查询职阶列表...",
-                "lookup_skill_detail": "正在查询技能详情...",
-            }
-            for step in agent_result.tool_trace:
-                label = _AGENT_TOOL_LABELS.get(step["tool"], "正在处理...")
-                yield _sse_event(
-                    "thinking",
-                    {
-                        "phase": "tool_call",
-                        "message": label,
-                        "detail": step.get("result_summary", ""),
-                    },
-                )
-
-            # ── Trace: agent_complete ──
-            await log_trace_event(
-                trace_id,
-                "agent_complete",
-                {
-                    "rounds": agent_result.rounds,
-                    "total_tokens": agent_result.total_tokens,
-                    "elapsed_ms": agent_elapsed_ms,
-                    "tool_trace": agent_result.tool_trace,
-                    "is_fallback": agent_result.is_fallback,
-                },
-            )
-
-            # ── Agent 后置管线：有从者数据时走 Generation Prompt ──
-            if agent_result.servants_data and not agent_result.is_fallback:
-                servants = agent_result.servants_data
-                gen_start = time.monotonic()
-
-                # Thinking: 意图识别完成（补齐 routed 阶段，与 OneShot 一致）
-                applied_filters = _describe_agent_filters(agent_result.tool_trace)
-                yield _sse_event(
-                    "thinking",
-                    {
-                        "phase": "routed",
-                        "message": "意图识别完成",
-                        "detail": "、".join(applied_filters),
-                    },
-                )
-
-                # 卡片先行 — 推送从者数据
-                yield _sse_event(
-                    "servants",
-                    {
-                        "servants": servants,
-                        "count": len(servants),
-                        "total": len(servants),
-                    },
-                )
-
-                # Thinking: 正在生成分析（补齐 generating 阶段）
-                yield _sse_event(
-                    "thinking",
-                    {"phase": "generating", "message": "正在生成分析..."},
-                )
-
-                # 构建 Context + Generation Prompt（复用 OneShot 管线）
-                context_data, _ = _build_context(servants)
-                context_data["已应用的筛选条件"] = applied_filters
-                context_data["筛选条件"] = applied_filters
-                context_json = json.dumps(context_data, ensure_ascii=False)
-
-                gen_prompt = get_generation_prompt(message, context_json)
-
-                # ── Trace: context_build (agent) ──
-                await log_trace_event(
-                    trace_id,
-                    "context_build",
-                    {
-                        "applied_filters": applied_filters,
-                        "context_data": context_data,
-                        "source": "agent_generation",
-                    },
-                )
-
-                # ── Trace: generation_input (agent) ──
-                await log_trace_event(
-                    trace_id,
-                    "generation_input",
-                    {
-                        "generation_prompt": gen_prompt,
-                    },
-                )
-
-                # 第二轮 LLM 调用：生成格式化回复
-                final_result = "success"
-                try:
-                    generation_response = await chat_completion(
-                        system_prompt=(
-                            "You are a helpful AI assistant. You MUST strictly follow "
-                            "the provided data and NEVER use your internal knowledge about FGO."
-                        ),
-                        user_message=gen_prompt,
-                        temperature=0.1,
-                        json_mode=False,
-                    )
-                    final_reply = generation_response.get("text", "").strip()
-                    if not final_reply:
-                        raise ValueError("Empty response from LLM")
-                except Exception as e:
-                    # Generation 失败时降级为 Agent 原始回复
-                    final_reply = agent_result.reply
-                    final_result = "agent_generation_fallback"
-                    await log_trace_event(
-                        trace_id,
-                        "generation_output",
-                        {"reply": final_reply, "source": "agent_fallback"},
-                        error=str(e),
-                    )
-                else:
-                    await log_trace_event(
-                        trace_id,
-                        "generation_output",
-                        {"reply": final_reply, "source": "agent_generation"},
-                    )
-
-                gen_elapsed_ms = round((time.monotonic() - gen_start) * 1000, 2)
-
-                # ── Trace: final（全链路结束后才写）──
-                await log_trace_event(
-                    trace_id,
-                    "final",
-                    {
-                        "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
-                        "agent_time_ms": agent_elapsed_ms,
-                        "generation_time_ms": gen_elapsed_ms,
-                        "result": final_result,
-                        "agent_rounds": agent_result.rounds,
-                    },
-                )
-
-                yield _sse_event("delta", {"text": final_reply})
-                yield _sse_event("done", {"model": model_used, "traceId": trace_id})
-                return
-
-            # ── Agent 兜底：无从者数据或 fallback 时直接使用 Agent 回复 ──
-            # ── Trace: final（兜底路径）──
-            await log_trace_event(
-                trace_id,
-                "final",
-                {
-                    "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
-                    "agent_time_ms": agent_elapsed_ms,
-                    "result": "fallback" if agent_result.is_fallback else "no_servants",
-                    "agent_rounds": agent_result.rounds,
-                },
-            )
-
-            yield _sse_event("delta", {"text": agent_result.reply})
-            yield _sse_event("done", {"model": model_used, "traceId": trace_id})
-            return
-
-        # ── 阶段 1: Skill 路由（或 Preset 展开） ──
+        # ── Preset 模式：跳过 Agent Loop，直接 SkillExecutor + Generation ──
         if preset_name:
-            # Preset 模式：跳过 LLM 路由，直接展开预设
             yield _sse_event("thinking", {"phase": "routing", "message": "正在解析预设..."})
 
             preset = PRESET_REGISTRY.get(preset_name)
@@ -1152,70 +907,23 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 yield _sse_event("error", {"phase": "routing", "message": f"未知的预设：{preset_name}"})
                 return
 
+            skill_calls = _expand_preset(preset, None)
             response_skill_name = preset.response_skill
-            skill_calls = []
-            for skill_name in preset.query_skills:
-                merged_params = {**preset.param_template.get(skill_name, {})}
-                skill_calls.append({"skill_name": skill_name, "params": merged_params})
-
             model_used = "preset_mode"
 
-            # B1 策略：用户补充文字走 Stage 2 LLM 路由解析额外 Skills 并合并
-            user_text = message.strip()
-            if user_text:
-                try:
-                    skill_descriptions = [
-                        {"name": s.name, "description": s.description}
-                        for s in SKILL_REGISTRY.values()
-                        if isinstance(s, QuerySkill)
-                    ]
-                    routing_prompt = build_routing_prompt(skill_descriptions)
-                    extra_routing = await chat_completion(
-                        system_prompt=routing_prompt,
-                        user_message=user_text,
-                        temperature=0.1,
-                        json_mode=True,
-                        response_schema=routing_response_json_schema,
-                        response_validator=parse_routing_response,
-                    )
-                    extra_routing.pop("_model", None)
-                    extra_routing.pop("_response_format", None)
-                    extra_routing.pop("_provider", None)
-                    extra_routing.pop("_attempts", None)
-                    extra_skills = extra_routing.get("skill_calls", [])
-                    # 合并：同名 Skill 补充参数，新 Skill 追加
-                    existing_map = {s["skill_name"]: s for s in skill_calls}
-                    for es in extra_skills:
-                        es_name = es.get("skill_name")
-                        if es_name in existing_map:
-                            # 同名 Skill：LLM 解析的参数补充 preset 缺失的字段
-                            for k, v in es.get("params", {}).items():
-                                if k not in existing_map[es_name]["params"]:
-                                    existing_map[es_name]["params"][k] = v
-                        else:
-                            skill_calls.append(es)
-                            existing_map[es_name] = es
-                    extra_resp_skill = extra_routing.get("response_skill")
-                    if extra_resp_skill and extra_resp_skill != "respond_servant_list":
-                        response_skill_name = extra_resp_skill
-                    # B1 合并日志将通过后续 trace event 记录
-                except Exception:
-                    # 补充解析失败不影响预设查询（静默，trace 中可见）
-                    pass
+            # B1 策略：用户补充文字走 LLM 路由合并
+            skill_calls, response_skill_name = await _merge_b1_extra_skills(
+                message,
+                skill_calls,
+                response_skill_name,
+            )
 
-            # ── Trace: routing_input (preset) ──
+            # ── Trace: routing ──
             await log_trace_event(
                 trace_id,
                 "routing_input",
-                {
-                    "query": message,
-                    "source": "preset",
-                    "preset_name": preset_name,
-                    "skill_count": len(skill_calls),
-                },
+                {"query": message, "source": "preset", "preset_name": preset_name, "skill_count": len(skill_calls)},
             )
-
-            # ── Trace: routing_output (preset) ──
             await log_trace_event(
                 trace_id,
                 "routing_output",
@@ -1227,256 +935,168 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 },
             )
 
-            # 推送路由结果（预消化：中文描述替代原始英文 skill_name）
             yield _sse_event(
                 "thinking",
+                {"phase": "routed", "message": "意图识别完成", "detail": "、".join(_describe_filters(skill_calls))},
+            )
+
+            # ── Skill 执行 ──
+            yield _sse_event("thinking", {"phase": "executing", "message": "正在检索从者数据..."})
+
+            executor = SkillExecutor()
+            result = executor.execute(skill_calls, response_skill_name)
+            servants = result.servants
+            total_found = result.total_found
+            returned_servants = servants[:MAX_RESULTS]
+
+            # ── Trace: execution ──
+            await log_trace_event(
+                trace_id,
+                "execution",
                 {
-                    "phase": "routed",
-                    "message": "意图识别完成",
-                    "detail": "、".join(_describe_filters(skill_calls)),
+                    "accepted_skills": result.accepted_skills,
+                    "rejected_skills": result.rejected_skills,
+                    "total_found": total_found,
+                    "execution_time_ms": round(result.execution_time_ms, 2),
+                    "is_fallback": result.is_fallback,
                 },
             )
 
-        else:
-            # 普通模式：Stage 1 LLM 路由
-            yield _sse_event("thinking", {"phase": "routing", "message": "正在理解你的问题..."})
+            if result.is_fallback:
+                fb_reply = result.fallback_message or "未找到匹配的从者。"
+                await _log_final(
+                    trace_id, (time.monotonic() - stream_start) * 1000, "execution_fallback", total_found=0
+                )
+                yield _sse_event("delta", {"text": fb_reply})
+                yield _sse_event("done", {"model": model_used, "traceId": trace_id})
+                return
 
-            skill_descriptions = [
-                {"name": s.name, "description": s.description}
-                for s in SKILL_REGISTRY.values()
-                if isinstance(s, QuerySkill)
-            ]
-            routing_prompt = build_routing_prompt(skill_descriptions)
+            # 卡片先行
+            yield _sse_event(
+                "servants", {"servants": returned_servants, "count": len(returned_servants), "total": total_found}
+            )
 
-            # ── Trace: routing_input ──
-            await log_trace_event(
-                trace_id,
-                "routing_input",
-                {
-                    "query": message,
-                    "routing_prompt_length": len(routing_prompt),
-                    "skill_count": len(skill_descriptions),
-                },
+            # ── Generation（统一后置管线）──
+            yield _sse_event("thinking", {"phase": "generating", "message": "正在生成分析..."})
+
+            applied_filters = _describe_filters(skill_calls)
+            final_reply, final_result = await _generate_reply(
+                user_message=message,
+                servants=servants,
+                applied_filters=applied_filters,
+                trace_id=trace_id,
+                response_skill=result.response_skill,
             )
 
             try:
-                routing_result = await chat_completion(
-                    system_prompt=routing_prompt,
-                    user_message=message,
-                    temperature=0.1,
-                    json_mode=True,
-                    response_schema=routing_response_json_schema,
-                    response_validator=parse_routing_response,
-                )
-            except Exception as e:
-                await log_trace_event(
-                    trace_id,
-                    "final",
-                    {
-                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
-                        "result": "routing_error",
-                    },
-                    error=str(e),
-                )
-                yield _sse_event("error", {"phase": "routing", "message": "路由失败，请稍后重试"})
-                return
+                yield _sse_event("delta", {"text": final_reply})
+            except Exception:
+                final_result = "client_disconnected"
 
-            model_used = routing_result.pop("_model", "unknown")
-            routing_result.pop("_response_format", None)
-            routing_result.pop("_provider", None)
-            routing_result.pop("_attempts", None)
-
-            skill_calls = routing_result.get("skill_calls", [])
-            response_skill_name = routing_result.get("response_skill", "respond_servant_list")
-
-            # ── Trace: routing_output ──
-            await log_trace_event(
-                trace_id,
-                "routing_output",
-                {
-                    "skill_calls": skill_calls,
-                    "response_skill": response_skill_name,
-                    "fallback": routing_result.get("fallback"),
-                    "model": model_used,
-                },
-            )
-
-            # 推送路由结果（预消化：中文描述替代原始英文 skill_name）
-            yield _sse_event(
-                "thinking",
-                {
-                    "phase": "routed",
-                    "message": "意图识别完成",
-                    "detail": "、".join(_describe_filters(skill_calls)),
-                },
-            )
-
-            # 检查 fallback
-            fallback = routing_result.get("fallback")
-            if fallback is not None:
-                fb_msg = fallback.get("message", "无法理解你的问题，请尝试更具体的描述。")
-                await log_trace_event(
-                    trace_id,
-                    "final",
-                    {
-                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
-                        "result": "fallback",
-                    },
-                )
-                yield _sse_event("delta", {"text": fb_msg})
-                yield _sse_event("done", {"model": model_used, "traceId": trace_id})
-                return
-
-            # 空 skill_calls 且无 fallback
-            if not skill_calls:
-                no_match_msg = "无法从你的问题中识别出查询条件，请尝试更具体的描述。"
-                await log_trace_event(
-                    trace_id,
-                    "final",
-                    {
-                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
-                        "result": "no_match",
-                    },
-                )
-                yield _sse_event("delta", {"text": no_match_msg})
-                yield _sse_event("done", {"model": model_used, "traceId": trace_id})
-                return
-
-        # ── 阶段 2: Skill 执行 ──
-        yield _sse_event("thinking", {"phase": "executing", "message": "正在检索从者数据..."})
-
-        executor = SkillExecutor()
-        result = executor.execute(skill_calls, response_skill_name)
-        servants = result.servants
-        total_found = result.total_found
-        returned_servants = servants[:MAX_RESULTS]
-
-        # ── Trace: execution ──
-        await log_trace_event(
-            trace_id,
-            "execution",
-            {
-                "accepted_skills": result.accepted_skills,
-                "rejected_skills": result.rejected_skills,
-                "total_found": total_found,
-                "execution_time_ms": round(result.execution_time_ms, 2),
-                "is_fallback": result.is_fallback,
-            },
-        )
-
-        # 执行阶段 fallback（结果为空）
-        if result.is_fallback:
-            fb_reply = result.fallback_message or "未找到匹配的从者。"
-            await log_trace_event(
-                trace_id,
-                "final",
-                {
-                    "total_time_ms": (time.monotonic() - stream_start) * 1000,
-                    "total_found": 0,
-                    "result": "execution_fallback",
-                },
-            )
-            yield _sse_event("delta", {"text": fb_reply})
+            await _log_final(trace_id, (time.monotonic() - stream_start) * 1000, final_result, total_found=total_found)
             yield _sse_event("done", {"model": model_used, "traceId": trace_id})
             return
 
-        # 卡片先行 — 立即推送从者数据
-        yield _sse_event(
-            "servants",
-            {
-                "servants": returned_servants,
-                "count": len(returned_servants),
-                "total": total_found,
-            },
-        )
+        # ── Agent 模式（唯一路由入口） ──
+        yield _sse_event("thinking", {"phase": "routing", "message": "正在理解你的问题..."})
 
-        # ── 阶段 3: RAG 生成 ──
-        yield _sse_event("thinking", {"phase": "generating", "message": "正在生成分析..."})
-
-        context_data, _ = _build_context(servants)
-        applied_filters = _describe_filters(skill_calls)
-        context_data["已应用的筛选条件"] = applied_filters
-        context_data["筛选条件"] = applied_filters
-        context_json = json.dumps(context_data, ensure_ascii=False)
-
-        # ── Trace: context_build ──
+        # ── Trace: routing_input ──
         await log_trace_event(
             trace_id,
-            "context_build",
-            {
-                "applied_filters": applied_filters,
-                "context_data": context_data,
-            },
+            "routing_input",
+            {"query": message, "source": "agent"},
         )
 
-        # 使用 Response Skill 的 prompt（如果可用）
-        if result.response_skill is not None:
-            gen_prompt = result.response_skill.build_prompt(message, context_json)
-        else:
-            gen_prompt = get_generation_prompt(message, context_json)
-
-        # ── Trace: generation_input ──
-        await log_trace_event(
-            trace_id,
-            "generation_input",
-            {
-                "generation_prompt": gen_prompt,
-            },
-        )
-
-        final_result = "success"
         try:
-            generation_response = await chat_completion(
-                system_prompt=(
-                    "You are a helpful AI assistant. You MUST strictly follow "
-                    "the provided data and NEVER use your internal knowledge about FGO."
-                ),
-                user_message=gen_prompt,
-                temperature=0.1,
-                json_mode=False,
+            agent_result: AgentResult = await agent_route(
+                user_message=message,
+                tool_handlers=TOOL_HANDLERS,
+                trace_id=trace_id,
+                max_rounds=5,
             )
-            final_reply = generation_response.get("text", "").strip()
-            if not final_reply:
-                raise ValueError("Empty response from LLM")
-        except Exception as e:
-            final_reply = f"为你找到了 {total_found} 位从者。"
-            final_result = "generation_error"
-            await log_trace_event(
-                trace_id,
-                "generation_output",
-                {
-                    "reply": final_reply,
-                },
-                error=str(e),
-            )
-        else:
-            # ── Trace: generation_output (success) ──
-            await log_trace_event(
-                trace_id,
-                "generation_output",
-                {
-                    "reply": final_reply,
-                },
-            )
-
-        # 推送生成的文本（客户端可能已断连，捕获异常确保 final trace 写入）
-        try:
-            yield _sse_event("delta", {"text": final_reply})
         except Exception:
-            final_result = "client_disconnected"
+            await _log_final(trace_id, (time.monotonic() - stream_start) * 1000, "agent_error")
+            yield _sse_event("error", {"phase": "routing", "message": "处理失败，请稍后重试"})
+            return
 
-        # ── Trace: final ──
+        model_used = f"agent_{agent_result.rounds}r"
+        agent_elapsed_ms = round(agent_result.elapsed_ms, 2)
+
+        # 推送每轮 tool 调用作为 thinking steps
+        for step in agent_result.tool_trace:
+            label = _AGENT_TOOL_LABELS.get(step["tool"], "正在处理...")
+            yield _sse_event(
+                "thinking",
+                {"phase": "tool_call", "message": label, "detail": step.get("result_summary", "")},
+            )
+
+        # ── Trace: agent_complete ──
         await log_trace_event(
             trace_id,
-            "final",
+            "agent_complete",
             {
-                "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
-                "total_found": total_found,
-                "result": final_result,
+                "rounds": agent_result.rounds,
+                "total_tokens": agent_result.total_tokens,
+                "elapsed_ms": agent_elapsed_ms,
+                "tool_trace": agent_result.tool_trace,
+                "is_fallback": agent_result.is_fallback,
             },
         )
 
-        # ── 完成 ──
+        # ── Agent 后置管线：有从者数据时走统一 Generation Prompt ──
+        if agent_result.servants_data and not agent_result.is_fallback:
+            servants = agent_result.servants_data
+            gen_start = time.monotonic()
+
+            applied_filters = _describe_agent_filters(agent_result.tool_trace)
+            yield _sse_event(
+                "thinking",
+                {"phase": "routed", "message": "意图识别完成", "detail": "、".join(applied_filters)},
+            )
+
+            # 卡片先行
+            yield _sse_event("servants", {"servants": servants, "count": len(servants), "total": len(servants)})
+
+            yield _sse_event("thinking", {"phase": "generating", "message": "正在生成分析..."})
+
+            final_reply, final_result = await _generate_reply(
+                user_message=message,
+                servants=servants,
+                applied_filters=applied_filters,
+                trace_id=trace_id,
+                fallback_reply=agent_result.reply,
+            )
+
+            gen_elapsed_ms = round((time.monotonic() - gen_start) * 1000, 2)
+
+            await _log_final(
+                trace_id,
+                total_time_ms=(time.monotonic() - stream_start) * 1000,
+                result=final_result,
+                agent_time_ms=agent_elapsed_ms,
+                generation_time_ms=gen_elapsed_ms,
+                agent_rounds=agent_result.rounds,
+            )
+
+            yield _sse_event("delta", {"text": final_reply})
+            yield _sse_event("done", {"model": model_used, "traceId": trace_id})
+            return
+
+        # ── Agent 兜底：无从者数据或 fallback，走分类逻辑 ──
+        category, final_reply = _classify_agent_reply(agent_result.reply)
+        final_result = (
+            f"fallback_{category.lower()}" if category else ("fallback" if agent_result.is_fallback else "no_servants")
+        )
+
+        await _log_final(
+            trace_id,
+            total_time_ms=(time.monotonic() - stream_start) * 1000,
+            result=final_result,
+            agent_time_ms=agent_elapsed_ms,
+            agent_rounds=agent_result.rounds,
+        )
+
+        yield _sse_event("delta", {"text": final_reply})
         yield _sse_event("done", {"model": model_used, "traceId": trace_id})
 
     return StreamingResponse(
