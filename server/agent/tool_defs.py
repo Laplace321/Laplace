@@ -140,8 +140,9 @@ def _tool_search_servants() -> dict:
                     "type": "string",
                     "enum": ["all", "one", "support"],
                     "description": (
-                        "宝具目标：all（全体/光炮/AOE）、one（单体）、support（辅助宝具）。"
-                        "当用户说「辅助从者」「辅助型」时，使用 support 筛选辅助宝具从者"
+                        "宝具目标类型：all（全体/光炮/AOE）、one（单体）、support（辅助宝具，即非攻击型宝具）。"
+                        "仅用于筛选宝具类型本身，不要用来判断从者是否具有辅助能力。"
+                        "用户说「辅助从者」时应按辅助类效果搜索，而非用此参数"
                     ),
                 },
                 "trait_names": {
