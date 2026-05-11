@@ -17,6 +17,9 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from server.agent.agent_loop import AgentResult, agent_route
+from server.agent.tool_handlers import TOOL_HANDLERS
+
 # 预消化翻译字典（从 config/translations.json 加载，支持热更新）
 from server.config_loader import CachedConfig
 from server.llm_client import chat_completion
@@ -65,6 +68,9 @@ def get_effect_translation(effect_code: str) -> str:
                         _effect_map[name] = aliases[0]
     return _effect_map.get(effect_code, effect_code)
 
+
+# === 路由模式切换 ===
+ROUTING_MODE = os.getenv("ROUTING_MODE", "oneshot")  # agent | oneshot
 
 # === 共享业务逻辑 ===
 
@@ -374,6 +380,70 @@ async def startup():
     """启动时预加载数据库并校验配置一致性。"""
     load_database()
     _validate_translations()
+
+
+async def _handle_agent_mode(
+    user_message: str,
+    trace_id: str,
+) -> ChatResponse:
+    """Agentic Tool Use 模式的核心处理逻辑。
+
+    LLM 自主决定调用哪些工具，支持多轮 tool 调用和自我纠正。
+    """
+    # ── Trace: routing_input (agent) ──
+    await log_trace_event(
+        trace_id,
+        "routing_input",
+        {
+            "query": user_message,
+            "source": "agent",
+            "routing_mode": "agent",
+        },
+    )
+
+    agent_result: AgentResult = await agent_route(
+        user_message=user_message,
+        tool_handlers=TOOL_HANDLERS,
+        trace_id=trace_id,
+        max_rounds=5,
+    )
+
+    # ── Trace: agent_complete ──
+    await log_trace_event(
+        trace_id,
+        "agent_complete",
+        {
+            "rounds": agent_result.rounds,
+            "total_tokens": agent_result.total_tokens,
+            "elapsed_ms": round(agent_result.elapsed_ms, 2),
+            "tool_trace": agent_result.tool_trace,
+            "is_fallback": agent_result.is_fallback,
+        },
+    )
+
+    # ── Trace: final ──
+    await log_trace_event(
+        trace_id,
+        "final",
+        {
+            "total_time_ms": round(agent_result.elapsed_ms, 2),
+            "result": "fallback" if agent_result.is_fallback else "success",
+            "agent_rounds": agent_result.rounds,
+        },
+    )
+
+    return ChatResponse(
+        reply=agent_result.reply,
+        servants=[],
+        count=0,
+        query={
+            "mode": "agent",
+            "rounds": agent_result.rounds,
+            "tool_trace": agent_result.tool_trace,
+        },
+        model=f"agent_{agent_result.rounds}r",
+        traceId=trace_id,
+    )
 
 
 async def _handle_skill_mode(
@@ -713,6 +783,13 @@ async def chat(request: ChatRequest):
             # 单 dict 视为单个 skill_call
             resolved_skill_calls = [request.params]
 
+    # Agent 模式：无 preset 且无直传 skill_calls 时，走 Agent 路由
+    if ROUTING_MODE == "agent" and resolved_skill_calls is None and not request.preset_name:
+        return await _handle_agent_mode(
+            user_message=user_message,
+            trace_id=trace_id,
+        )
+
     return await _handle_skill_mode(
         user_message=user_message,
         trace_id=trace_id,
@@ -733,6 +810,71 @@ async def chat_stream(message: str, preset_name: str | None = None):
         trace_id = uuid.uuid4().hex[:8]
         stream_start = time.monotonic()
         model_used = "unknown"
+
+        # ── Agent 模式：整个流程由 Agent Loop 接管 ──
+        if ROUTING_MODE == "agent" and not preset_name:
+            yield _sse_event("thinking", {"phase": "routing", "message": "正在理解你的问题..."})
+
+            try:
+                agent_result: AgentResult = await agent_route(
+                    user_message=message,
+                    tool_handlers=TOOL_HANDLERS,
+                    trace_id=trace_id,
+                    max_rounds=5,
+                )
+            except Exception as e:
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                        "result": "agent_error",
+                    },
+                    error=str(e),
+                )
+                yield _sse_event("error", {"phase": "routing", "message": "处理失败，请稍后重试"})
+                return
+
+            model_used = f"agent_{agent_result.rounds}r"
+
+            # 推送每轮 tool 调用作为 thinking steps
+            for step in agent_result.tool_trace:
+                yield _sse_event(
+                    "thinking",
+                    {
+                        "phase": "tool_call",
+                        "message": f"调用工具: {step['tool']}",
+                        "detail": step.get("result_summary", ""),
+                    },
+                )
+
+            # ── Trace: agent_complete ──
+            await log_trace_event(
+                trace_id,
+                "agent_complete",
+                {
+                    "rounds": agent_result.rounds,
+                    "total_tokens": agent_result.total_tokens,
+                    "elapsed_ms": round(agent_result.elapsed_ms, 2),
+                    "tool_trace": agent_result.tool_trace,
+                    "is_fallback": agent_result.is_fallback,
+                },
+            )
+
+            # ── Trace: final ──
+            await log_trace_event(
+                trace_id,
+                "final",
+                {
+                    "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
+                    "result": "fallback" if agent_result.is_fallback else "success",
+                    "agent_rounds": agent_result.rounds,
+                },
+            )
+
+            yield _sse_event("delta", {"text": agent_result.reply})
+            yield _sse_event("done", {"model": model_used, "traceId": trace_id})
+            return
 
         # ── 阶段 1: Skill 路由（或 Preset 展开） ──
         if preset_name:
