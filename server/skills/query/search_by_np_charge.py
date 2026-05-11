@@ -28,7 +28,7 @@ class SearchByNpCharge(QuerySkill):
         op = params.get("op", "gte")
         value = params.get("value", 30)
         if op == "eq":
-            return any(c["chargePercent"] == value for c in servant.get("npCharges", []))
+            return charge == value
         elif op == "gte":
             return charge >= value
         elif op == "gt":
