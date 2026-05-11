@@ -1016,6 +1016,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
             },
         )
 
+        final_result = "success"
         try:
             generation_response = await chat_completion(
                 system_prompt=(
@@ -1031,6 +1032,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 raise ValueError("Empty response from LLM")
         except Exception as e:
             final_reply = f"为你找到了 {total_found} 位从者。"
+            final_result = "generation_error"
             await log_trace_event(
                 trace_id,
                 "generation_output",
@@ -1049,8 +1051,11 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 },
             )
 
-        # 推送生成的文本
-        yield _sse_event("delta", {"text": final_reply})
+        # 推送生成的文本（客户端可能已断连，捕获异常确保 final trace 写入）
+        try:
+            yield _sse_event("delta", {"text": final_reply})
+        except Exception:
+            final_result = "client_disconnected"
 
         # ── Trace: final ──
         await log_trace_event(
@@ -1059,7 +1064,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
             {
                 "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
                 "total_found": total_found,
-                "result": "success",
+                "result": final_result,
             },
         )
 
