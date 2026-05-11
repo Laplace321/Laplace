@@ -91,7 +91,15 @@ def _tool_search_servants() -> dict:
                 "effect_target_type": {
                     "type": "string",
                     "enum": ["self", "party", "enemy"],
-                    "description": "效果目标：self（自身）、party（队友/全队）、enemy（敌方）",
+                    "description": (
+                        "效果目标：self（自身）、party（队友/全队）、enemy（敌方）。"
+                        "注意区分正向buff和负向debuff的施加方向："
+                        "正向buff（如无敌贯通、攻击力提升、暴击威力提升等增益效果）"
+                        "「给别人上」「给队友上」→ party，「给自己上」→ self；"
+                        "负向debuff（如防御力下降、魅惑、即死等减益效果）"
+                        "「给敌人上」→ enemy。"
+                        "大多数情况下不需要指定此参数，仅当用户明确区分目标时才使用"
+                    ),
                 },
                 "effect_min_value": {
                     "type": "integer",
