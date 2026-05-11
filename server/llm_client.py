@@ -520,14 +520,9 @@ async def _call_dashscope_model(
                     await asyncio.sleep(wait)
         raise last_error
 
-    # JSON 模式：优先尝试结构化输出
-    schema = response_schema() if response_schema else None
-    rf = (
-        {"type": "json_schema", "json_schema": {"name": "laplace_intent_response", "strict": True, "schema": schema}}
-        if schema
-        else None
-    )
-    response_format_label = "json_schema"
+    # JSON 模式：dashscope SDK 仅支持 json_object，不支持 json_schema
+    rf = {"type": "json_object"}
+    response_format_label = "json_object"
 
     last_error = None
     for attempt in range(MAX_RETRIES):
