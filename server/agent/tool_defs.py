@@ -139,7 +139,10 @@ def _tool_search_servants() -> dict:
                 "np_target": {
                     "type": "string",
                     "enum": ["all", "one", "support"],
-                    "description": "宝具目标：all（全体/光炮/AOE）、one（单体）、support（辅助）",
+                    "description": (
+                        "宝具目标：all（全体/光炮/AOE）、one（单体）、support（辅助宝具）。"
+                        "当用户说「辅助从者」「辅助型」时，使用 support 筛选辅助宝具从者"
+                    ),
                 },
                 "trait_names": {
                     "type": "array",
