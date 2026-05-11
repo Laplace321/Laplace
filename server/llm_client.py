@@ -403,8 +403,10 @@ async def _dashscope_agent_chat(
                 tools,
             )
             choice_msg = resp.output.choices[0].message
-            content = getattr(choice_msg, "content", None)
-            raw_tool_calls = getattr(choice_msg, "tool_calls", None) or []
+            # dashscope Message 是类 dict 对象，__getattr__ 在 key 不存在时
+            # 抛出 KeyError（而非 AttributeError），getattr() 无法兜底，必须用 .get()
+            content = choice_msg.get("content", None)
+            raw_tool_calls = choice_msg.get("tool_calls", None) or []
             has_tool_call = len(raw_tool_calls) > 0
 
             tool_calls = []
@@ -430,7 +432,7 @@ async def _dashscope_agent_chat(
                 "output_text": output_text,
                 "has_tool_call": has_tool_call,
                 "tool_calls": tool_calls,
-                "raw_message": choice_msg if isinstance(choice_msg, dict) else {},
+                "raw_message": dict(choice_msg) if hasattr(choice_msg, "items") else {},
                 "usage": dict(resp.usage) if hasattr(resp, "usage") and resp.usage else {},
             }
         except Exception as e:
