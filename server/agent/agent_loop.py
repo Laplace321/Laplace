@@ -41,6 +41,7 @@ async def agent_route(
     tool_handlers: dict[str, Callable],
     trace_id: str,
     max_rounds: int = 8,
+    oneshot_context: str | None = None,
 ) -> AgentResult:
     """Agent 多轮路由主循环（Chat Completions API）。
 
@@ -50,6 +51,10 @@ async def agent_route(
        - 含 tool_calls → 执行 handler → 追加 assistant + tool messages → 下一轮
        - 无 tool_calls → 提取文本 → 结束
     3. 超过 max_rounds → 强制终止，返回降级回复
+
+    Args:
+        oneshot_context: OneShot 路径已识别的筛选条件（结果为空时传入），
+            让 Agent 知道之前尝试过什么条件，给出更有针对性的回答。
     """
     tools = build_agent_tools()
     start_time = time.monotonic()
@@ -62,6 +67,21 @@ async def agent_route(
         {"role": "system", "content": AGENT_SYSTEM_PROMPT},
         {"role": "user", "content": user_message},
     ]
+
+    # OneShot 上下文注入：告知 Agent 之前的尝试结果
+    if oneshot_context:
+        messages.append(
+            {
+                "role": "system",
+                "content": (
+                    "【前置信息】系统已通过快速检索尝试回答用户的问题，但结果为空（0 条匹配）。\n"
+                    f"已识别的筛选条件：{oneshot_context}\n"
+                    "请基于以上信息，用你的工具重新搜索。如果你也找不到匹配的从者，"
+                    "请明确告知用户「按以上条件没有找到匹配的从者」，并列出具体条件，"
+                    "建议用户尝试减少条件重新搜索。"
+                ),
+            }
+        )
 
     for round_num in range(1, max_rounds + 1):
         print(f"🔄 [{trace_id}] Agent Round {round_num}, messages: {len(messages)}")
