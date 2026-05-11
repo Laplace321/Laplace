@@ -81,7 +81,7 @@ def resolve_class_name(cn_name: str) -> str | None:
     return None
 
 
-def get_advantage_classes(target_class: str, include_berserker: bool = False) -> list[str]:
+def get_advantage_classes(target_class: str, include_berserker: bool = True) -> list[str]:
     """查询克制目标职阶的所有 className 列表。
 
     Args:
@@ -103,7 +103,7 @@ def get_advantage_classes(target_class: str, include_berserker: bool = False) ->
 class Params(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     target_class: str = Field(alias="targetClass", description="要克制的目标职阶中文名")
-    include_berserker: bool = Field(default=False, alias="includeBerserker")
+    include_berserker: bool = Field(default=True, alias="includeBerserker")
 
 
 @register_skill
@@ -118,7 +118,7 @@ class SearchByClassAdvantage(QuerySkill):
 
     def filter(self, servant: dict, params: dict) -> bool:
         target_cn = params.get("target_class", "")
-        include_berserker = params.get("include_berserker", False)
+        include_berserker = params.get("include_berserker", True)
 
         if not target_cn:
             return True
