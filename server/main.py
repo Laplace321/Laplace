@@ -69,7 +69,6 @@ def get_effect_translation(effect_code: str) -> str:
     return _effect_map.get(effect_code, effect_code)
 
 
-# === 路由模式切换 ===
 # === 共享业务逻辑 ===
 
 MAX_CONTEXT_SIZE = 5

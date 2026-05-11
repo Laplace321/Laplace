@@ -1,14 +1,14 @@
 """
-Skill 模式 API 集成测试。
+API 集成测试。
 
 测试范围：
-- chat() 的 mode 分发（natural_language vs skill）
-- skill 模式下 preset / params / B1 补充解析各路径
-- _handle_skill_mode() 的 LLM 路由路径（mock chat_completion）
+- chat() 的路由分发（Agent 路由 / Preset 旁路）
+- Preset 路径（preset_name / params 覆盖 / B1 补充解析）
+- Agent 路由路径（mock agent_route，含 fallback 分类）
 - 未知 preset 错误处理
-- 旧模式（natural_language）不受影响
+- 直传 params 路径
 
-使用 FastAPI TestClient + mock chat_completion，SkillExecutor 真实执行。
+使用 FastAPI TestClient + mock agent_route / chat_completion，SkillExecutor 真实执行。
 """
 
 from collections import deque
@@ -50,60 +50,6 @@ def mock_chat_completion_rag():
             return {"text": "这是 mock 生成的回复。", "_model": "mock-rag"}
         # 路由阶段的调用（json_mode=True）— 应由各测试自行 mock
         raise ValueError("Unexpected chat_completion call with json_mode=True")
-
-    return side_effect
-
-
-@pytest.fixture
-def mock_chat_completion_routing_and_rag():
-    """Mock chat_completion 同时覆盖路由阶段和 RAG 阶段。"""
-
-    async def side_effect(**kwargs):
-        if kwargs.get("json_mode") is True:
-            # 路由阶段：返回 search_by_class Saber
-            return {
-                "skill_calls": [{"skill_name": "search_by_class", "params": {"className": "Saber"}}],
-                "response_skill": "respond_servant_list",
-                "fallback": None,
-                "_model": "mock-routing",
-            }
-        else:
-            # RAG 生成阶段
-            return {"text": "为你找到了多位 Saber 职阶从者。", "_model": "mock-rag"}
-
-    return side_effect
-
-
-@pytest.fixture
-def mock_chat_completion_fallback():
-    """Mock chat_completion 返回 fallback（路由无法匹配）。"""
-
-    async def side_effect(**kwargs):
-        if kwargs.get("json_mode") is True:
-            return {
-                "skill_calls": [],
-                "response_skill": "respond_servant_list",
-                "fallback": {"code": "out_of_scope", "message": "这不是 FGO 相关的问题。"},
-                "_model": "mock-routing",
-            }
-        return {"text": "", "_model": "mock-rag"}
-
-    return side_effect
-
-
-@pytest.fixture
-def mock_chat_completion_empty_skills():
-    """Mock chat_completion 返回空 skill_calls 且无 fallback。"""
-
-    async def side_effect(**kwargs):
-        if kwargs.get("json_mode") is True:
-            return {
-                "skill_calls": [],
-                "response_skill": "respond_servant_list",
-                "fallback": None,
-                "_model": "mock-routing",
-            }
-        return {"text": "", "_model": "mock-rag"}
 
     return side_effect
 
