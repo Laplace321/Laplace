@@ -91,15 +91,7 @@ def _tool_search_servants() -> dict:
                 "effect_target_type": {
                     "type": "string",
                     "enum": ["self", "party", "enemy"],
-                    "description": (
-                        "效果目标：self（自身）、party（队友/全队）、enemy（敌方）。"
-                        "注意区分正向buff和负向debuff的施加方向："
-                        "正向buff（如无敌贯通、攻击力提升、暴击威力提升等增益效果）"
-                        "「给别人上」「给队友上」→ party，「给自己上」→ self；"
-                        "负向debuff（如防御力下降、魅惑、即死等减益效果）"
-                        "「给敌人上」→ enemy。"
-                        "大多数情况下不需要指定此参数，仅当用户明确区分目标时才使用"
-                    ),
+                    "description": "效果目标：self（自身）、party（队友/全队）、enemy（敌方）",
                 },
                 "effect_min_value": {
                     "type": "integer",
@@ -139,11 +131,7 @@ def _tool_search_servants() -> dict:
                 "np_target": {
                     "type": "string",
                     "enum": ["all", "one", "support"],
-                    "description": (
-                        "宝具目标类型：all（全体/光炮/AOE）、one（单体）、support（辅助宝具，即非攻击型宝具）。"
-                        "仅用于筛选宝具类型本身，不要用来判断从者是否具有辅助能力。"
-                        "用户说「辅助从者」时应按辅助类效果搜索，而非用此参数"
-                    ),
+                    "description": "宝具目标：all（全体/光炮/AOE）、one（单体）、support（辅助）",
                 },
                 "trait_names": {
                     "type": "array",

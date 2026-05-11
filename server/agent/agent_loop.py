@@ -40,7 +40,7 @@ async def agent_route(
     user_message: str,
     tool_handlers: dict[str, Callable],
     trace_id: str,
-    max_rounds: int = 5,
+    max_rounds: int = 8,
 ) -> AgentResult:
     """Agent 多轮路由主循环（Chat Completions API）。
 

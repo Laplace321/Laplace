@@ -9,21 +9,13 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Preset:
-    """快捷查询预设。
-
-    Attributes:
-        message_as_param: 将用户输入的 message 自动注入到指定 skill 的指定参数中。
-            格式: {"skill_name": "param_name"}
-            例如: {"lookup_servant": "name"} 表示将 message 填入 lookup_servant 的 name 参数。
-            仅当该参数在 param_template 和 user_params 中均未指定时才生效。
-    """
+    """快捷查询预设。"""
 
     name: str
     display_name: str
     query_skills: list[str]
     response_skill: str = "respond_servant_list"
     param_template: dict[str, dict] = field(default_factory=dict)
-    message_as_param: dict[str, str] = field(default_factory=dict)
 
 
 PRESET_REGISTRY: dict[str, Preset] = {}
@@ -46,7 +38,6 @@ def _register_presets() -> None:
             display_name="从者查询",
             query_skills=["lookup_servant"],
             response_skill="respond_servant_detail",
-            message_as_param={"lookup_servant": "name"},
         ),
         Preset(
             name="servant_compare",

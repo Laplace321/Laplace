@@ -166,7 +166,15 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
 3. `params` 中的字段名必须与 Skill 定义的参数名完全一致
 4. 单从者查询用 `lookup_servant`，多从者对比用 `compare_servants`
 5. 涉及色卡性能提升（蓝魔放/红魔放/绿魔放/蓝卡增伤等）时，必须使用效果类 Skill（参见规则 8），而非 `search_by_cards`
-6. 如果用户的问题无法匹配任何 Skill，设置 fallback：
+6. 如果用户发送问候语（如"你好"、"hi"）或询问你的能力（如"你能做什么"、"帮助"），设置 fallback：
+   ```json
+   {{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": {{"code": "greeting", "message": "用户问候"}}}}
+   ```
+   如果问题与 FGO 从者数据完全无关（如"推荐充电器"、"明天天气"），设置 fallback：
+   ```json
+   {{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": {{"code": "out_of_scope", "message": "问题与FGO无关"}}}}
+   ```
+   如果问题与 FGO 相关但无法匹配任何 Skill，设置 fallback：
    ```json
    {{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": {{"code": "no_match", "message": "无法理解你的问题"}}}}
    ```

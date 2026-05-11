@@ -27,7 +27,7 @@ class FallbackReason(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    code: Literal["no_match", "ambiguous", "out_of_scope"] = "no_match"
+    code: Literal["no_match", "ambiguous", "out_of_scope", "greeting"] = "no_match"
     message: str = ""
 
 
