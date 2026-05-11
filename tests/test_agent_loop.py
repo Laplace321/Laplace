@@ -35,6 +35,7 @@ class TestAgentResult:
         assert result.total_tokens == 0
         assert result.elapsed_ms == 0.0
         assert result.is_fallback is False
+        assert result.servants_data == []
 
     def test_with_values(self):
         result = AgentResult(
@@ -92,7 +93,7 @@ class TestAgentRoute:
     @pytest.mark.asyncio
     async def test_single_tool_call_then_message(self):
         """LLM 调用 1 个工具 → 收到结果后生成 message → 2 轮完成。"""
-        # Round 1: LLM 返回 tool_calls（Chat Completions 格式）
+        # Round 1: LLM 返回 function_call（Responses API 格式）
         round1_response = {
             "output_text": None,
             "has_tool_call": True,
@@ -103,17 +104,6 @@ class TestAgentRoute:
                     "arguments": "{}",
                 }
             ],
-            "raw_message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_001",
-                        "type": "function",
-                        "function": {"name": "list_classes", "arguments": "{}"},
-                    }
-                ],
-            },
             "usage": {"total_tokens": 30},
         }
 
@@ -151,7 +141,7 @@ class TestAgentRoute:
     @pytest.mark.asyncio
     async def test_max_rounds_protection(self):
         """超过 max_rounds 时强制终止，返回降级回复。"""
-        # 每轮都返回 tool_calls，永远不返回 message
+        # 每轮都返回 function_call，永远不返回 message
         endless_response = {
             "output_text": None,
             "has_tool_call": True,
@@ -162,17 +152,6 @@ class TestAgentRoute:
                     "arguments": "{}",
                 }
             ],
-            "raw_message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_loop",
-                        "type": "function",
-                        "function": {"name": "list_effects", "arguments": "{}"},
-                    }
-                ],
-            },
             "usage": {"total_tokens": 20},
         }
 
@@ -220,17 +199,6 @@ class TestAgentRoute:
                     "arguments": "{}",
                 }
             ],
-            "raw_message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_bad",
-                        "type": "function",
-                        "function": {"name": "nonexistent_tool", "arguments": "{}"},
-                    }
-                ],
-            },
             "usage": {"total_tokens": 20},
         }
 
@@ -272,17 +240,6 @@ class TestAgentRoute:
                     "arguments": "{}",
                 }
             ],
-            "raw_message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_err",
-                        "type": "function",
-                        "function": {"name": "broken_tool", "arguments": "{}"},
-                    }
-                ],
-            },
             "usage": {"total_tokens": 20},
         }
 
@@ -326,17 +283,6 @@ class TestAgentRoute:
                     "arguments": '{"id": 1}',
                 }
             ],
-            "raw_message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_async",
-                        "type": "function",
-                        "function": {"name": "async_tool", "arguments": '{"id": 1}'},
-                    }
-                ],
-            },
             "usage": {"total_tokens": 20},
         }
 

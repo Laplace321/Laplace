@@ -837,13 +837,23 @@ async def chat_stream(message: str, preset_name: str | None = None):
 
             model_used = f"agent_{agent_result.rounds}r"
 
-            # 推送每轮 tool 调用作为 thinking steps
+            # 推送每轮 tool 调用作为 thinking steps（中文化，禁止暴露工具名）
+            _AGENT_TOOL_LABELS = {
+                "search_servants": "正在检索从者数据...",
+                "lookup_servant": "正在查询从者详情...",
+                "compare_servants": "正在对比从者...",
+                "list_effects": "正在查询效果列表...",
+                "list_traits": "正在查询特性列表...",
+                "list_classes": "正在查询职阶列表...",
+                "lookup_skill_detail": "正在查询技能详情...",
+            }
             for step in agent_result.tool_trace:
+                label = _AGENT_TOOL_LABELS.get(step["tool"], "正在处理...")
                 yield _sse_event(
                     "thinking",
                     {
                         "phase": "tool_call",
-                        "message": f"调用工具: {step['tool']}",
+                        "message": label,
                         "detail": step.get("result_summary", ""),
                     },
                 )
@@ -871,6 +881,17 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     "agent_rounds": agent_result.rounds,
                 },
             )
+
+            # 卡片先行 — 推送从者数据（与 OneShot 模式格式一致）
+            if agent_result.servants_data:
+                yield _sse_event(
+                    "servants",
+                    {
+                        "servants": agent_result.servants_data,
+                        "count": len(agent_result.servants_data),
+                        "total": len(agent_result.servants_data),
+                    },
+                )
 
             yield _sse_event("delta", {"text": agent_result.reply})
             yield _sse_event("done", {"model": model_used, "traceId": trace_id})

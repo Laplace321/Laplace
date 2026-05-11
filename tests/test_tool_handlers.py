@@ -96,6 +96,17 @@ class TestSearchServants:
         assert result["total"] == 0
         assert "message" in result
 
+    def test_full_servants_field_present(self):
+        """返回应包含 _full_servants 字段（供前端卡片渲染）。"""
+        result = handle_search_servants({"class_name": "Saber", "rarity": 5})
+        assert "_full_servants" in result
+        assert isinstance(result["_full_servants"], list)
+        assert len(result["_full_servants"]) > 0
+        # _full_servants 中的从者应包含完整 MV 字段
+        s = result["_full_servants"][0]
+        assert "collectionNo" in s
+        assert "name" in s
+
     def test_class_filter(self):
         """按职阶筛选。"""
         result = handle_search_servants({"class_name": "Saber"})

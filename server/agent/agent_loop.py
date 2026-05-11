@@ -2,8 +2,8 @@
 Laplace — Agent Loop
 
 Agentic Tool Use 核心引擎。
-负责多轮 tool 调用的编排：LLM → tool_calls → handler → LLM → ... → message。
-使用 Chat Completions API（dashscope Responses API 不支持多轮 tool 协议）。
+负责多轮 tool 调用的编排：LLM → function_call → handler → LLM → ... → message。
+使用 Responses API（/v1/responses）统一协议。
 """
 
 from __future__ import annotations
@@ -16,8 +16,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from server.agent.agent_prompt import AGENT_SYSTEM_PROMPT
-from server.agent.tool_defs import build_agent_tools_chat
+from server.agent.tool_defs import build_agent_tools
 from server.llm_client import agent_completion
+
+# 需要保留完整从者数据的 tool 名称（用于卡片渲染）
+_CARD_TOOLS = {"search_servants", "lookup_servant", "compare_servants"}
 
 
 @dataclass
@@ -30,6 +33,7 @@ class AgentResult:
     total_tokens: int = 0  # 累计 token 用量
     elapsed_ms: float = 0.0  # 总耗时
     is_fallback: bool = False  # 是否降级
+    servants_data: list[dict] = field(default_factory=list)  # 从者卡片数据
 
 
 async def agent_route(
@@ -38,34 +42,35 @@ async def agent_route(
     trace_id: str,
     max_rounds: int = 5,
 ) -> AgentResult:
-    """Agent 多轮路由主循环（Chat Completions API）。
+    """Agent 多轮路由主循环（Responses API）。
 
     流程：
-    1. 首轮：messages=[system, user] + tools 发给 LLM
-    2. 检查返回类型：
-       - has_tool_call → 执行 handler → 追加 assistant + tool messages → 下一轮
-       - 无 tool_call → 提取文本 → 结束
+    1. 首轮：input=[{"role":"user","content":...}] + tools + instructions 发给 LLM
+    2. 检查 output 数组：
+       - 含 function_call → 执行 handler → 追加 function_call + function_call_output → 下一轮
+       - 无 function_call → 提取文本 → 结束
     3. 超过 max_rounds → 强制终止，返回降级回复
     """
-    tools = build_agent_tools_chat()
+    tools = build_agent_tools()
     start_time = time.monotonic()
     tool_trace: list[dict] = []
     total_tokens = 0
+    servants_data: list[dict] = []
 
-    # Chat Completions messages 列表（累积式）
-    messages: list[dict] = [
-        {"role": "system", "content": AGENT_SYSTEM_PROMPT},
+    # Responses API input 列表（累积式）
+    input_data: list[dict] = [
         {"role": "user", "content": user_message},
     ]
 
     for round_num in range(1, max_rounds + 1):
-        print(f"🔄 [{trace_id}] Agent Round {round_num}, messages: {len(messages)}")
+        print(f"🔄 [{trace_id}] Agent Round {round_num}, input items: {len(input_data)}")
 
         # 调用 LLM
         try:
             response = await agent_completion(
-                messages=messages,
+                input_data=input_data,
                 tools=tools,
+                instructions=AGENT_SYSTEM_PROMPT,
                 temperature=0.1,
             )
         except Exception as e:
@@ -77,6 +82,7 @@ async def agent_route(
                 total_tokens=total_tokens,
                 elapsed_ms=(time.monotonic() - start_time) * 1000,
                 is_fallback=True,
+                servants_data=servants_data,
             )
 
         usage = response.get("usage", {})
@@ -92,12 +98,10 @@ async def agent_route(
                 rounds=round_num,
                 total_tokens=total_tokens,
                 elapsed_ms=(time.monotonic() - start_time) * 1000,
+                servants_data=servants_data,
             )
 
-        # 有 tool call → 追加 assistant message，然后逐个执行 handler
-        raw_message = response.get("raw_message", {})
-        messages.append(raw_message)
-
+        # 有 tool call → 逐个执行 handler，追加 function_call + function_call_output
         tool_calls = response.get("tool_calls", [])
         for tc in tool_calls:
             tool_name = tc.get("name", "")
@@ -126,6 +130,12 @@ async def agent_route(
                     print(f"  ❌ [{trace_id}] R{round_num}: {tool_name} 执行失败: {e}")
                     tool_result = {"error": f"工具执行失败: {e}"}
 
+            # 提取完整从者数据（供卡片渲染，不传给 LLM）
+            if tool_name in _CARD_TOOLS:
+                full = tool_result.pop("_full_servants", None)
+                if full:
+                    servants_data = full  # 保留最后一次的从者数据
+
             # 记录 trace
             tool_trace.append(
                 {
@@ -136,12 +146,20 @@ async def agent_route(
                 }
             )
 
-            # 追加 tool result message（Chat Completions 格式）
-            messages.append(
+            # 追加 function_call + function_call_output（Responses API 格式）
+            input_data.append(
                 {
-                    "role": "tool",
-                    "content": json.dumps(tool_result, ensure_ascii=False),
-                    "tool_call_id": call_id,
+                    "type": "function_call",
+                    "name": tool_name,
+                    "arguments": json.dumps(args, ensure_ascii=False),
+                    "call_id": call_id,
+                }
+            )
+            input_data.append(
+                {
+                    "type": "function_call_output",
+                    "call_id": call_id,
+                    "output": json.dumps(tool_result, ensure_ascii=False),
                 }
             )
 
@@ -154,6 +172,7 @@ async def agent_route(
         total_tokens=total_tokens,
         elapsed_ms=(time.monotonic() - start_time) * 1000,
         is_fallback=True,
+        servants_data=servants_data,
     )
 
 

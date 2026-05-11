@@ -153,11 +153,14 @@ def handle_search_servants(params: dict) -> dict:
             }
         )
 
-    return {
+    response: dict[str, Any] = {
         "total": result.total_found,
         "top_results": summary_list,
         "message": result.fallback_message if result.is_fallback else None,
+        # 完整从者数据供前端卡片渲染（Agent Loop 会 pop 掉，不传给 LLM）
+        "_full_servants": top_servants,
     }
+    return response
 
 
 def handle_lookup_servant(params: dict) -> dict:
@@ -175,7 +178,10 @@ def handle_lookup_servant(params: dict) -> dict:
         return {"error": f"未找到名为「{name}」的从者", "total": 0}
 
     servant = result.servants[0]
-    return _build_servant_detail(servant)
+    detail = _build_servant_detail(servant)
+    # 完整从者数据供前端卡片渲染（Agent Loop 会 pop 掉，不传给 LLM）
+    detail["_full_servants"] = [servant]
+    return detail
 
 
 def handle_compare_servants(params: dict) -> dict:
@@ -193,7 +199,12 @@ def handle_compare_servants(params: dict) -> dict:
         return {"error": "未找到匹配的从者", "total": 0}
 
     details = [_build_servant_detail(s) for s in result.servants]
-    return {"total": len(details), "servants": details}
+    return {
+        "total": len(details),
+        "servants": details,
+        # 完整从者数据供前端卡片渲染（Agent Loop 会 pop 掉，不传给 LLM）
+        "_full_servants": result.servants,
+    }
 
 
 # ============================================================

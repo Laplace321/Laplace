@@ -155,38 +155,37 @@ async def chat_completion(
 
 
 # ============================================================
-# Agentic Tool Use — Chat Completions API 多轮 tool 调用
+# Agentic Tool Use — Responses API 多轮 Function Calling
 # ============================================================
 
 
 async def agent_completion(
-    messages: list[dict],
+    input_data: list[dict],
     tools: list[dict],
+    instructions: str,
     model: str | None = None,
     max_tokens: int = 1024,
     temperature: float = 0.1,
 ) -> dict:
-    """Agentic Tool Use 调用 — 使用 Chat Completions API 支持多轮 tool 调用。
-
-    dashscope Responses API 兼容层不支持多轮 function_call_output 协议，
-    因此使用标准 Chat Completions API (/chat/completions)。
+    """Agentic Tool Use 调用 — 使用 Responses API 支持多轮 Function Calling。
 
     Args:
-        messages: Chat Completions 格式的消息列表
-            首轮: [{"role":"system",...}, {"role":"user",...}]
-            多轮: [..., {"role":"assistant", "tool_calls":[...]}, {"role":"tool", ...}]
-        tools: OpenAI 格式的 tools 定义（含 function wrapper）
+        input_data: Responses API 格式的 input 列表
+            首轮: [{"role":"user","content":"..."}]
+            多轮: [..., {"type":"function_call",...}, {"type":"function_call_output",...}]
+        tools: Responses API 扁平格式的 tools 定义
+            [{"type":"function","name":"...","description":"...","parameters":{...}}]
+        instructions: 系统指令（Responses API 的 instructions 参数）
         model: 指定模型名称
         max_tokens: 最大 token 数
         temperature: 温度
 
     Returns:
         {
-            "output_text": str | None, # 文本回复（无 tool call 时）
-            "has_tool_call": bool,     # 是否包含 tool_calls
-            "tool_calls": [...],       # 统一格式: [{name, call_id, arguments}]
-            "raw_message": dict,       # assistant 原始 message（用于构造下一轮）
-            "usage": {...},            # token 用量
+            "output_text": str | None,  # 文本回复（无 tool call 时）
+            "has_tool_call": bool,      # 是否包含 function_call
+            "tool_calls": [...],        # 统一格式: [{name, call_id, arguments}]
+            "usage": {...},             # token 用量
             "_model": str,
             "_provider": str,
         }
@@ -197,12 +196,13 @@ async def agent_completion(
         models_to_try = [model] if model else provider.models
         for m in models_to_try:
             try:
-                result = await _post_agent_chat(
+                result = await _post_response_with_tools(
                     provider.base_url,
                     provider.api_key,
                     m,
-                    messages,
+                    input_data,
                     tools,
+                    instructions,
                     max_tokens,
                     temperature,
                 )
@@ -218,28 +218,36 @@ async def agent_completion(
     raise Exception(f"[agent] 所有模型都调用失败。尝试记录: {attempts_log}")
 
 
-async def _post_agent_chat(
+async def _post_response_with_tools(
     base_url: str,
     api_key: str,
     model: str,
-    messages: list[dict],
+    input_data: list[dict],
     tools: list[dict],
+    instructions: str,
     max_tokens: int,
     temperature: float,
 ) -> dict:
-    """发送 Chat Completions API 请求（支持多轮 tool 调用）。"""
-    url = f"{base_url}/chat/completions"
+    """发送 Responses API 请求（支持多轮 Function Calling）。
+
+    协议格式（阿里云官方文档）：
+    - input: 对话上下文数组，追加 function_call + function_call_output
+    - tools: 扁平格式 [{"type":"function","name":"...","parameters":{...}}]
+    - output: 响应数组，筛选 type=="function_call" 或 type=="message"
+    """
+    url = f"{base_url}/responses"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
     }
     payload: dict[str, Any] = {
         "model": model,
-        "messages": messages,
+        "input": input_data,
         "tools": tools,
-        "tool_choice": "auto",
-        "max_tokens": max_tokens,
+        "instructions": instructions,
+        "max_output_tokens": max_tokens,
         "temperature": temperature,
+        "enable_thinking": False,
     }
 
     last_error = None
@@ -250,31 +258,31 @@ async def _post_agent_chat(
                 resp.raise_for_status()
                 data = resp.json()
 
-            # 从 Chat Completions 响应中提取
-            choice = data.get("choices", [{}])[0]
-            message = choice.get("message", {})
-            raw_tool_calls = message.get("tool_calls", [])
-            has_tool_call = len(raw_tool_calls) > 0
+            # 从 Responses API output 数组中提取
+            output_items = data.get("output", [])
+            function_calls = [item for item in output_items if item.get("type") == "function_call"]
+            has_tool_call = len(function_calls) > 0
 
             # 统一 tool_calls 格式
             tool_calls = []
-            for tc in raw_tool_calls:
-                func = tc.get("function", {})
+            for fc in function_calls:
                 tool_calls.append(
                     {
-                        "name": func.get("name", ""),
-                        "call_id": tc.get("id", ""),
-                        "arguments": func.get("arguments", "{}"),
+                        "name": fc.get("name", ""),
+                        "call_id": fc.get("call_id", ""),
+                        "arguments": fc.get("arguments", "{}"),
                     }
                 )
 
-            output_text = message.get("content") if not has_tool_call else None
+            # 提取文本回复（无 tool call 时）
+            output_text = None
+            if not has_tool_call:
+                output_text = data.get("output_text", "")
 
             return {
                 "output_text": output_text,
                 "has_tool_call": has_tool_call,
                 "tool_calls": tool_calls,
-                "raw_message": message,
                 "usage": data.get("usage", {}),
             }
         except Exception as e:
