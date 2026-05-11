@@ -2,8 +2,8 @@
 Laplace — Agent Loop
 
 Agentic Tool Use 核心引擎。
-负责多轮 tool 调用的编排：LLM → function_call → handler → LLM → ... → message。
-使用 Responses API（/v1/responses）统一协议。
+负责多轮 tool 调用的编排：LLM → tool_calls → handler → LLM → ... → message。
+使用 Chat Completions API（/v1/chat/completions）统一协议。
 """
 
 from __future__ import annotations
@@ -42,13 +42,13 @@ async def agent_route(
     trace_id: str,
     max_rounds: int = 5,
 ) -> AgentResult:
-    """Agent 多轮路由主循环（Responses API）。
+    """Agent 多轮路由主循环（Chat Completions API）。
 
     流程：
-    1. 首轮：input=[{"role":"user","content":...}] + tools + instructions 发给 LLM
-    2. 检查 output 数组：
-       - 含 function_call → 执行 handler → 追加 function_call + function_call_output → 下一轮
-       - 无 function_call → 提取文本 → 结束
+    1. 首轮：messages=[system, user] + tools 发给 LLM
+    2. 检查 assistant message：
+       - 含 tool_calls → 执行 handler → 追加 assistant + tool messages → 下一轮
+       - 无 tool_calls → 提取文本 → 结束
     3. 超过 max_rounds → 强制终止，返回降级回复
     """
     tools = build_agent_tools()
@@ -57,20 +57,20 @@ async def agent_route(
     total_tokens = 0
     servants_data: list[dict] = []
 
-    # Responses API input 列表（累积式）
-    input_data: list[dict] = [
+    # Chat Completions messages 列表（累积式）
+    messages: list[dict] = [
+        {"role": "system", "content": AGENT_SYSTEM_PROMPT},
         {"role": "user", "content": user_message},
     ]
 
     for round_num in range(1, max_rounds + 1):
-        print(f"🔄 [{trace_id}] Agent Round {round_num}, input items: {len(input_data)}")
+        print(f"🔄 [{trace_id}] Agent Round {round_num}, messages: {len(messages)}")
 
         # 调用 LLM
         try:
             response = await agent_completion(
-                input_data=input_data,
+                messages=messages,
                 tools=tools,
-                instructions=AGENT_SYSTEM_PROMPT,
                 temperature=0.1,
             )
         except Exception as e:
@@ -101,7 +101,11 @@ async def agent_route(
                 servants_data=servants_data,
             )
 
-        # 有 tool call → 逐个执行 handler，追加 function_call + function_call_output
+        # 有 tool call → 先追加 assistant 原始 message（含 tool_calls）
+        raw_message = response.get("raw_message", {})
+        messages.append(raw_message)
+
+        # 逐个执行 handler，追加 tool role message
         tool_calls = response.get("tool_calls", [])
         for tc in tool_calls:
             tool_name = tc.get("name", "")
@@ -146,20 +150,12 @@ async def agent_route(
                 }
             )
 
-            # 追加 function_call + function_call_output（Responses API 格式）
-            input_data.append(
+            # 追加 tool role message（Chat Completions 格式）
+            messages.append(
                 {
-                    "type": "function_call",
-                    "name": tool_name,
-                    "arguments": json.dumps(args, ensure_ascii=False),
-                    "call_id": call_id,
-                }
-            )
-            input_data.append(
-                {
-                    "type": "function_call_output",
-                    "call_id": call_id,
-                    "output": json.dumps(tool_result, ensure_ascii=False),
+                    "role": "tool",
+                    "tool_call_id": call_id,
+                    "content": json.dumps(tool_result, ensure_ascii=False),
                 }
             )
 

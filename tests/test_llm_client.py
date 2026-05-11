@@ -22,19 +22,23 @@ class FakeResponse:
         self.text = text if text is not None else str(content)
 
     def json(self):
-        # Responses API 格式：output_text 辅助字段
+        # Chat Completions API 格式
         return {
-            "id": "resp_test_123",
-            "object": "response",
-            "output_text": self._content,
-            "output": [
-                {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": self._content}]}
+            "id": "chatcmpl_test_123",
+            "object": "chat.completion",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": self._content},
+                    "finish_reason": "stop",
+                }
             ],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
         }
 
     def raise_for_status(self):
         if self.status_code >= 400:
-            request = httpx.Request("POST", "https://example.test/responses")
+            request = httpx.Request("POST", "https://example.test/chat/completions")
             response = httpx.Response(self.status_code, request=request, text=self.text)
             raise httpx.HTTPStatusError("error", request=request, response=response)
 
@@ -103,9 +107,9 @@ def test_chat_completion_uses_structured_response_format():
     assert result["_model"] == "model-a1"
     assert result["_provider"] == "provider_a"
     assert result["_response_format"] == "json_schema"
-    assert FakeAsyncClient.requests[0]["text"]["format"]["type"] == "json_schema"
-    assert FakeAsyncClient.requests[0]["instructions"] == "system"
-    assert FakeAsyncClient.requests[0]["input"] == "user"
+    assert FakeAsyncClient.requests[0]["response_format"]["type"] == "json_schema"
+    assert FakeAsyncClient.requests[0]["messages"][0] == {"role": "system", "content": "system"}
+    assert FakeAsyncClient.requests[0]["messages"][1] == {"role": "user", "content": "user"}
 
 
 def test_chat_completion_downgrades_when_response_format_is_unsupported():
@@ -129,9 +133,9 @@ def test_chat_completion_downgrades_when_response_format_is_unsupported():
     )
 
     assert result["_response_format"] == "text_fallback"
-    assert "text" in FakeAsyncClient.requests[0]
-    assert "format" in FakeAsyncClient.requests[0]["text"]
-    assert "text" not in FakeAsyncClient.requests[1] or "format" not in FakeAsyncClient.requests[1].get("text", {})
+    assert "response_format" in FakeAsyncClient.requests[0]
+    assert FakeAsyncClient.requests[0]["response_format"]["type"] == "json_schema"
+    assert "response_format" not in FakeAsyncClient.requests[1]
 
 
 def test_chat_completion_fallback_within_same_provider():
@@ -175,8 +179,8 @@ def test_chat_completion_cross_provider_fallback(monkeypatch):
 
     assert result["_model"] == "model-b1"
     assert result["_provider"] == "provider_b"
-    assert FakeAsyncClient.posted_urls[0] == "https://a.test/v1/responses"
-    assert FakeAsyncClient.posted_urls[2] == "https://b.test/v1/responses"
+    assert FakeAsyncClient.posted_urls[0] == "https://a.test/v1/chat/completions"
+    assert FakeAsyncClient.posted_urls[2] == "https://b.test/v1/chat/completions"
 
 
 def test_attempts_log_includes_provider_field():
@@ -288,7 +292,7 @@ def test_custom_schema_is_sent_to_api():
 
     # 验证自定义 schema 被传递到 API 请求
     req = FakeAsyncClient.requests[0]
-    schema = req["text"]["format"]["schema"]
+    schema = req["response_format"]["json_schema"]["schema"]
     assert schema["properties"]["action"]["type"] == "string"
     assert schema["properties"]["query"]["type"] == "string"
 

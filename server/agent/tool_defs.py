@@ -1,18 +1,18 @@
 """
 Laplace — Agent Tool Definitions
 
-从 SKILL_REGISTRY 和领域知识生成 Responses API tools JSON 定义。
+从 SKILL_REGISTRY 和领域知识生成 Chat Completions API tools JSON 定义。
 每个 tool 的 description 包含足够的语义信息，让 LLM 无需 Prompt 规则即可正确映射。
 
-格式：Responses API 扁平格式
-[{"type":"function","name":"...","description":"...","parameters":{...}}]
+格式：Chat Completions API 嵌套格式
+[{"type":"function","function":{"name":"...","description":"...","parameters":{...}}}]
 """
 
 
 def build_agent_tools() -> list[dict]:
-    """构建 Agent 可用的 tools 定义列表（Responses API 扁平格式）。
+    """构建 Agent 可用的 tools 定义列表（Chat Completions 嵌套格式）。
 
-    格式：[{"type":"function","name":"...","description":"...","parameters":{...}}]
+    格式：[{"type":"function","function":{"name":"...","description":"...","parameters":{...}}}]
 
     分为三类：
     1. 核心查询 tools（桥接 SkillExecutor）
@@ -21,16 +21,32 @@ def build_agent_tools() -> list[dict]:
     """
     return [
         # ── 核心查询 ──
-        _tool_search_servants(),
-        _tool_lookup_servant(),
-        _tool_compare_servants(),
+        _wrap(_tool_search_servants()),
+        _wrap(_tool_lookup_servant()),
+        _wrap(_tool_compare_servants()),
         # ── 查表 tools（本地，<1ms）──
-        _tool_list_effects(),
-        _tool_list_traits(),
-        _tool_list_classes(),
+        _wrap(_tool_list_effects()),
+        _wrap(_tool_list_traits()),
+        _wrap(_tool_list_classes()),
         # ── 外部 API（Atlas API，~500ms）──
-        _tool_lookup_skill_detail(),
+        _wrap(_tool_lookup_skill_detail()),
     ]
+
+
+def _wrap(func_def: dict) -> dict:
+    """将扁平 function 定义包装为 Chat Completions 嵌套格式。
+
+    输入: {"type":"function","name":"...","description":"...","parameters":{...}}
+    输出: {"type":"function","function":{"name":"...","description":"...","parameters":{...}}}
+    """
+    return {
+        "type": "function",
+        "function": {
+            "name": func_def["name"],
+            "description": func_def["description"],
+            "parameters": func_def["parameters"],
+        },
+    }
 
 
 # ============================================================

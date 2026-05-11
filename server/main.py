@@ -432,14 +432,24 @@ async def _handle_agent_mode(
         },
     )
 
+    # 从者卡片数据（来自 AgentResult.servants_data）
+    returned_servants = agent_result.servants_data or []
+
     return ChatResponse(
         reply=agent_result.reply,
-        servants=[],
-        count=0,
+        servants=returned_servants,
+        count=len(returned_servants),
         query={
             "mode": "agent",
             "rounds": agent_result.rounds,
-            "tool_trace": agent_result.tool_trace,
+            "tool_trace": [
+                {
+                    "round": step["round"],
+                    "tool": step["tool"],
+                    "result_summary": step.get("result_summary", ""),
+                }
+                for step in agent_result.tool_trace
+            ],
         },
         model=f"agent_{agent_result.rounds}r",
         traceId=trace_id,

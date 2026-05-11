@@ -1,7 +1,7 @@
 """
 Laplace — LLM Client
 
-OpenAI Responses API client with multi-provider fallback and a structured
+OpenAI Chat Completions API client with multi-provider fallback and a structured
 intent contract for JSON-mode calls.
 
 架构：
@@ -9,7 +9,7 @@ intent contract for JSON-mode calls.
 - 两层降级策略：同提供商内模型降级 → 跨提供商降级
 - 向后兼容：未配置 LLM_PROVIDERS 时回退旧变量 LLM_BASE_URL / LLM_API_KEY 等
 
-端点：OpenAI Responses API（/v1/responses）
+端点：OpenAI Chat Completions API（/v1/chat/completions）
 """
 
 import asyncio
@@ -99,15 +99,15 @@ async def chat_completion(
     response_schema: Callable[[], dict] | None = None,
     response_validator: Callable[[str | dict], dict] | None = None,
 ) -> dict:
-    """调用 LLM Responses API，支持两层降级。
+    """调用 LLM Chat Completions API，支持两层降级。
 
     降级策略：
     1. 同提供商内按 models 列表顺序降级
     2. 同提供商所有模型失败后，切换下一个提供商
 
     Args:
-        system_prompt: 系统指令（Responses API 的 instructions）
-        user_message: 用户消息（Responses API 的 input）
+        system_prompt: 系统指令（Chat Completions 的 system message）
+        user_message: 用户消息（Chat Completions 的 user message）
         model: 指定模型名称，None 则使用提供商链默认顺序
         max_tokens: 最大 token 数
         temperature: 温度
@@ -155,27 +155,24 @@ async def chat_completion(
 
 
 # ============================================================
-# Agentic Tool Use — Responses API 多轮 Function Calling
+# Agentic Tool Use — Chat Completions API 多轮 tool 调用
 # ============================================================
 
 
 async def agent_completion(
-    input_data: list[dict],
+    messages: list[dict],
     tools: list[dict],
-    instructions: str,
     model: str | None = None,
     max_tokens: int = 1024,
     temperature: float = 0.1,
 ) -> dict:
-    """Agentic Tool Use 调用 — 使用 Responses API 支持多轮 Function Calling。
+    """Agentic Tool Use 调用 — 使用 Chat Completions API 支持多轮 tool 调用。
 
     Args:
-        input_data: Responses API 格式的 input 列表
-            首轮: [{"role":"user","content":"..."}]
-            多轮: [..., {"type":"function_call",...}, {"type":"function_call_output",...}]
-        tools: Responses API 扁平格式的 tools 定义
-            [{"type":"function","name":"...","description":"...","parameters":{...}}]
-        instructions: 系统指令（Responses API 的 instructions 参数）
+        messages: Chat Completions 格式的消息列表
+            首轮: [{"role":"system",...}, {"role":"user",...}]
+            多轮: [..., {"role":"assistant", "tool_calls":[...]}, {"role":"tool", ...}]
+        tools: Chat Completions 格式的 tools 定义（含 function wrapper）
         model: 指定模型名称
         max_tokens: 最大 token 数
         temperature: 温度
@@ -183,8 +180,9 @@ async def agent_completion(
     Returns:
         {
             "output_text": str | None,  # 文本回复（无 tool call 时）
-            "has_tool_call": bool,      # 是否包含 function_call
+            "has_tool_call": bool,      # 是否包含 tool_calls
             "tool_calls": [...],        # 统一格式: [{name, call_id, arguments}]
+            "raw_message": dict,        # assistant 原始 message（用于构造下一轮）
             "usage": {...},             # token 用量
             "_model": str,
             "_provider": str,
@@ -196,13 +194,12 @@ async def agent_completion(
         models_to_try = [model] if model else provider.models
         for m in models_to_try:
             try:
-                result = await _post_response_with_tools(
+                result = await _post_agent_chat(
                     provider.base_url,
                     provider.api_key,
                     m,
-                    input_data,
+                    messages,
                     tools,
-                    instructions,
                     max_tokens,
                     temperature,
                 )
@@ -218,36 +215,28 @@ async def agent_completion(
     raise Exception(f"[agent] 所有模型都调用失败。尝试记录: {attempts_log}")
 
 
-async def _post_response_with_tools(
+async def _post_agent_chat(
     base_url: str,
     api_key: str,
     model: str,
-    input_data: list[dict],
+    messages: list[dict],
     tools: list[dict],
-    instructions: str,
     max_tokens: int,
     temperature: float,
 ) -> dict:
-    """发送 Responses API 请求（支持多轮 Function Calling）。
-
-    协议格式（阿里云官方文档）：
-    - input: 对话上下文数组，追加 function_call + function_call_output
-    - tools: 扁平格式 [{"type":"function","name":"...","parameters":{...}}]
-    - output: 响应数组，筛选 type=="function_call" 或 type=="message"
-    """
-    url = f"{base_url}/responses"
+    """发送 Chat Completions API 请求（支持多轮 tool 调用）。"""
+    url = f"{base_url}/chat/completions"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
     }
     payload: dict[str, Any] = {
         "model": model,
-        "input": input_data,
+        "messages": messages,
         "tools": tools,
-        "instructions": instructions,
-        "max_output_tokens": max_tokens,
+        "tool_choice": "auto",
+        "max_tokens": max_tokens,
         "temperature": temperature,
-        "enable_thinking": False,
     }
 
     last_error = None
@@ -258,31 +247,31 @@ async def _post_response_with_tools(
                 resp.raise_for_status()
                 data = resp.json()
 
-            # 从 Responses API output 数组中提取
-            output_items = data.get("output", [])
-            function_calls = [item for item in output_items if item.get("type") == "function_call"]
-            has_tool_call = len(function_calls) > 0
+            # 从 Chat Completions 响应中提取
+            choice = data.get("choices", [{}])[0]
+            message = choice.get("message", {})
+            raw_tool_calls = message.get("tool_calls", [])
+            has_tool_call = len(raw_tool_calls) > 0
 
             # 统一 tool_calls 格式
             tool_calls = []
-            for fc in function_calls:
+            for tc in raw_tool_calls:
+                func = tc.get("function", {})
                 tool_calls.append(
                     {
-                        "name": fc.get("name", ""),
-                        "call_id": fc.get("call_id", ""),
-                        "arguments": fc.get("arguments", "{}"),
+                        "name": func.get("name", ""),
+                        "call_id": tc.get("id", ""),
+                        "arguments": func.get("arguments", "{}"),
                     }
                 )
 
-            # 提取文本回复（无 tool call 时）
-            output_text = None
-            if not has_tool_call:
-                output_text = data.get("output_text", "")
+            output_text = message.get("content") if not has_tool_call else None
 
             return {
                 "output_text": output_text,
                 "has_tool_call": has_tool_call,
                 "tool_calls": tool_calls,
+                "raw_message": message,
                 "usage": data.get("usage", {}),
             }
         except Exception as e:
@@ -318,7 +307,7 @@ async def _call_model(
             temperature,
             use_structured_output=False,
         )
-        content = _extract_response_text(data)
+        content = _extract_chat_text(data)
         return {"text": content, "_model": model}
 
     response_format = "json_schema"
@@ -345,7 +334,7 @@ async def _call_model(
             use_structured_output=False,
         )
 
-    parsed = response_validator(_extract_response_text(data))
+    parsed = response_validator(_extract_chat_text(data))
     parsed["_model"] = model
     parsed["_response_format"] = response_format
     return parsed
@@ -354,24 +343,24 @@ async def _call_model(
 async def _retry_call(
     provider: LLMProvider,
     model: str,
-    instructions: str,
-    input_text: str,
+    system_prompt: str,
+    user_message: str,
     max_tokens: int,
     temperature: float,
     use_structured_output: bool,
     *,
     response_schema: Callable[[], dict] | None = None,
 ) -> dict:
-    """对 _post_response 执行带 exponential backoff 的重试。"""
+    """对 _post_chat_completion 执行带 exponential backoff 的重试。"""
     last_error = None
     for attempt in range(MAX_RETRIES):
         try:
-            return await _post_response(
+            return await _post_chat_completion(
                 provider.base_url,
                 provider.api_key,
                 model,
-                instructions,
-                input_text,
+                system_prompt,
+                user_message,
                 max_tokens,
                 temperature,
                 use_structured_output,
@@ -388,44 +377,45 @@ async def _retry_call(
     raise last_error
 
 
-async def _post_response(
+async def _post_chat_completion(
     base_url: str,
     api_key: str,
     model: str,
-    instructions: str,
-    input_text: str,
+    system_prompt: str,
+    user_message: str,
     max_tokens: int,
     temperature: float,
     use_structured_output: bool,
     *,
     response_schema: Callable[[], dict] | None = None,
 ) -> dict:
-    """Send one Responses API request, with FlareSolverr proxy fallback for Cloudflare bypass."""
-    url = f"{base_url}/responses"
+    """Send one Chat Completions API request."""
+    url = f"{base_url}/chat/completions"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
     }
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_message},
+    ]
     payload: dict[str, Any] = {
         "model": model,
-        "instructions": instructions,
-        "input": input_text,
-        "max_output_tokens": max_tokens,
+        "messages": messages,
+        "max_tokens": max_tokens,
         "temperature": temperature,
-        "enable_thinking": False,  # 关闭思考链，避免思考模型产生大量 reasoning tokens 导致超时
     }
     if use_structured_output:
         schema = response_schema()
-        payload["text"] = {
-            "format": {
-                "type": "json_schema",
+        payload["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
                 "name": "laplace_intent_response",
                 "strict": True,
                 "schema": schema,
-            }
+            },
         }
 
-    # 尝试直接调用
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             resp = await client.post(url, json=payload, headers=headers)
@@ -474,25 +464,16 @@ def extract_json_object(content: str) -> str:
     raise ValueError("LLM response contains an incomplete JSON object")
 
 
-def _extract_response_text(data: dict) -> str:
-    """Extract text content from a Responses API response."""
-    # Responses API 提供 output_text 辅助字段
-    if "output_text" in data:
-        return data["output_text"]
+def _extract_chat_text(data: dict) -> str:
+    """Extract text content from a Chat Completions API response."""
+    choices = data.get("choices", [])
+    if choices:
+        message = choices[0].get("message", {})
+        content = message.get("content")
+        if content is not None:
+            return content
 
-    # 兼容格式：从 output 数组中提取
-    if "output" in data:
-        for item in data["output"]:
-            if item.get("type") == "message":
-                content = item.get("content", [])
-                if isinstance(content, list):
-                    for part in content:
-                        if isinstance(part, dict) and part.get("type") == "output_text":
-                            return part.get("text", "")
-                elif isinstance(content, str):
-                    return content
-
-    raise ValueError("Responses API response has no text content")
+    raise ValueError("Chat Completions response has no text content")
 
 
 def _looks_like_response_format_error(resp: httpx.Response) -> bool:

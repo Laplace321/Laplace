@@ -64,12 +64,6 @@ class TestAgentRoute:
     async def test_direct_message_response(self):
         """LLM 直接返回 message（不调用任何工具）→ 1 轮完成。"""
         mock_response = {
-            "output": [
-                {
-                    "type": "message",
-                    "content": [{"type": "output_text", "text": "你好，我是 Laplace！"}],
-                }
-            ],
             "output_text": "你好，我是 Laplace！",
             "has_tool_call": False,
             "tool_calls": [],
@@ -93,7 +87,7 @@ class TestAgentRoute:
     @pytest.mark.asyncio
     async def test_single_tool_call_then_message(self):
         """LLM 调用 1 个工具 → 收到结果后生成 message → 2 轮完成。"""
-        # Round 1: LLM 返回 function_call（Responses API 格式）
+        # Round 1: LLM 返回 tool_calls（Chat Completions 格式）
         round1_response = {
             "output_text": None,
             "has_tool_call": True,
@@ -104,17 +98,22 @@ class TestAgentRoute:
                     "arguments": "{}",
                 }
             ],
+            "raw_message": {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_001",
+                        "type": "function",
+                        "function": {"name": "list_classes", "arguments": "{}"},
+                    }
+                ],
+            },
             "usage": {"total_tokens": 30},
         }
 
         # Round 2: LLM 生成最终回复
         round2_response = {
-            "output": [
-                {
-                    "type": "message",
-                    "content": [{"type": "output_text", "text": "共有 15 个职阶可供查询。"}],
-                }
-            ],
             "output_text": "共有 15 个职阶可供查询。",
             "has_tool_call": False,
             "tool_calls": [],
@@ -141,7 +140,7 @@ class TestAgentRoute:
     @pytest.mark.asyncio
     async def test_max_rounds_protection(self):
         """超过 max_rounds 时强制终止，返回降级回复。"""
-        # 每轮都返回 function_call，永远不返回 message
+        # 每轮都返回 tool_calls，永远不返回 message
         endless_response = {
             "output_text": None,
             "has_tool_call": True,
@@ -152,6 +151,17 @@ class TestAgentRoute:
                     "arguments": "{}",
                 }
             ],
+            "raw_message": {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_loop",
+                        "type": "function",
+                        "function": {"name": "list_effects", "arguments": "{}"},
+                    }
+                ],
+            },
             "usage": {"total_tokens": 20},
         }
 
@@ -199,16 +209,21 @@ class TestAgentRoute:
                     "arguments": "{}",
                 }
             ],
+            "raw_message": {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_bad",
+                        "type": "function",
+                        "function": {"name": "nonexistent_tool", "arguments": "{}"},
+                    }
+                ],
+            },
             "usage": {"total_tokens": 20},
         }
 
         round2_response = {
-            "output": [
-                {
-                    "type": "message",
-                    "content": [{"type": "output_text", "text": "抱歉，出现了问题。"}],
-                }
-            ],
             "output_text": "抱歉，出现了问题。",
             "has_tool_call": False,
             "tool_calls": [],
@@ -240,16 +255,21 @@ class TestAgentRoute:
                     "arguments": "{}",
                 }
             ],
+            "raw_message": {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_err",
+                        "type": "function",
+                        "function": {"name": "broken_tool", "arguments": "{}"},
+                    }
+                ],
+            },
             "usage": {"total_tokens": 20},
         }
 
         round2_response = {
-            "output": [
-                {
-                    "type": "message",
-                    "content": [{"type": "output_text", "text": "工具出错了。"}],
-                }
-            ],
             "output_text": "工具出错了。",
             "has_tool_call": False,
             "tool_calls": [],
@@ -283,16 +303,21 @@ class TestAgentRoute:
                     "arguments": '{"id": 1}',
                 }
             ],
+            "raw_message": {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_async",
+                        "type": "function",
+                        "function": {"name": "async_tool", "arguments": '{"id": 1}'},
+                    }
+                ],
+            },
             "usage": {"total_tokens": 20},
         }
 
         round2_response = {
-            "output": [
-                {
-                    "type": "message",
-                    "content": [{"type": "output_text", "text": "异步结果"}],
-                }
-            ],
             "output_text": "异步结果",
             "has_tool_call": False,
             "tool_calls": [],
