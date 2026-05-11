@@ -69,7 +69,7 @@ def _load_providers() -> list[LLMProvider]:
             if not models:
                 print(f"⚠️  提供商 {name} 未配置模型列表，已跳过")
                 continue
-            sdk_type = "dashscope" if name.lower() == "dashscope" else "openai"
+            sdk_type = "dashscope" if name.lower().startswith("dashscope") else "openai"
             providers.append(
                 LLMProvider(name=name.lower(), base_url=base_url, api_key=api_key, models=models, sdk_type=sdk_type)
             )
