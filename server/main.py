@@ -472,9 +472,13 @@ async def _handle_agent_mode(
     # 从者卡片数据（来自 AgentResult.servants_data）
     returned_servants = agent_result.servants_data or []
     model_used = f"agent_{agent_result.rounds}r"
+    agent_elapsed_ms = round(agent_result.elapsed_ms, 2)
+    gen_elapsed_ms = 0.0
+    final_result = "fallback" if agent_result.is_fallback else "success"
 
     # ── Agent 后置管线：有从者数据时走 Generation Prompt ──
     if returned_servants and not agent_result.is_fallback:
+        gen_start = time.monotonic()
         applied_filters = _describe_agent_filters(agent_result.tool_trace)
         context_data, _ = _build_context(returned_servants)
         context_data["已应用的筛选条件"] = applied_filters
@@ -494,6 +498,15 @@ async def _handle_agent_mode(
             },
         )
 
+        # ── Trace: generation_input (agent sync) ──
+        await log_trace_event(
+            trace_id,
+            "generation_input",
+            {
+                "generation_prompt": gen_prompt,
+            },
+        )
+
         try:
             generation_response = await chat_completion(
                 system_prompt=(
@@ -510,6 +523,7 @@ async def _handle_agent_mode(
         except Exception as e:
             # Generation 失败时降级为 Agent 原始回复
             final_reply = agent_result.reply
+            final_result = "agent_generation_fallback"
             await log_trace_event(
                 trace_id,
                 "generation_output",
@@ -522,17 +536,22 @@ async def _handle_agent_mode(
                 "generation_output",
                 {"reply": final_reply, "source": "agent_generation"},
             )
+
+        gen_elapsed_ms = round((time.monotonic() - gen_start) * 1000, 2)
     else:
         # 兜底：无从者数据或 fallback 时直接使用 Agent 回复
         final_reply = agent_result.reply
+        final_result = "fallback" if agent_result.is_fallback else "no_servants"
 
-    # ── Trace: final ──
+    # ── Trace: final（全链路结束后才写）──
     await log_trace_event(
         trace_id,
         "final",
         {
-            "total_time_ms": round(agent_result.elapsed_ms, 2),
-            "result": "fallback" if agent_result.is_fallback else "success",
+            "total_time_ms": round(agent_elapsed_ms + gen_elapsed_ms, 2),
+            "agent_time_ms": agent_elapsed_ms,
+            "generation_time_ms": gen_elapsed_ms,
+            "result": final_result,
             "agent_rounds": agent_result.rounds,
         },
     )
@@ -927,6 +946,17 @@ async def chat_stream(message: str, preset_name: str | None = None):
         if ROUTING_MODE == "agent" and not preset_name:
             yield _sse_event("thinking", {"phase": "routing", "message": "正在理解你的问题..."})
 
+            # ── Trace: routing_input (agent) ──
+            await log_trace_event(
+                trace_id,
+                "routing_input",
+                {
+                    "query": message,
+                    "source": "agent",
+                    "routing_mode": "agent",
+                },
+            )
+
             try:
                 agent_result: AgentResult = await agent_route(
                     user_message=message,
@@ -948,6 +978,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 return
 
             model_used = f"agent_{agent_result.rounds}r"
+            agent_elapsed_ms = round(agent_result.elapsed_ms, 2)
 
             # 推送每轮 tool 调用作为 thinking steps（中文化，禁止暴露工具名）
             _AGENT_TOOL_LABELS = {
@@ -977,26 +1008,16 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 {
                     "rounds": agent_result.rounds,
                     "total_tokens": agent_result.total_tokens,
-                    "elapsed_ms": round(agent_result.elapsed_ms, 2),
+                    "elapsed_ms": agent_elapsed_ms,
                     "tool_trace": agent_result.tool_trace,
                     "is_fallback": agent_result.is_fallback,
-                },
-            )
-
-            # ── Trace: final ──
-            await log_trace_event(
-                trace_id,
-                "final",
-                {
-                    "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
-                    "result": "fallback" if agent_result.is_fallback else "success",
-                    "agent_rounds": agent_result.rounds,
                 },
             )
 
             # ── Agent 后置管线：有从者数据时走 Generation Prompt ──
             if agent_result.servants_data and not agent_result.is_fallback:
                 servants = agent_result.servants_data
+                gen_start = time.monotonic()
 
                 # Thinking: 意图识别完成（补齐 routed 阶段，与 OneShot 一致）
                 applied_filters = _describe_agent_filters(agent_result.tool_trace)
@@ -1044,6 +1065,15 @@ async def chat_stream(message: str, preset_name: str | None = None):
                     },
                 )
 
+                # ── Trace: generation_input (agent) ──
+                await log_trace_event(
+                    trace_id,
+                    "generation_input",
+                    {
+                        "generation_prompt": gen_prompt,
+                    },
+                )
+
                 # 第二轮 LLM 调用：生成格式化回复
                 final_result = "success"
                 try:
@@ -1076,11 +1106,38 @@ async def chat_stream(message: str, preset_name: str | None = None):
                         {"reply": final_reply, "source": "agent_generation"},
                     )
 
+                gen_elapsed_ms = round((time.monotonic() - gen_start) * 1000, 2)
+
+                # ── Trace: final（全链路结束后才写）──
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
+                        "agent_time_ms": agent_elapsed_ms,
+                        "generation_time_ms": gen_elapsed_ms,
+                        "result": final_result,
+                        "agent_rounds": agent_result.rounds,
+                    },
+                )
+
                 yield _sse_event("delta", {"text": final_reply})
                 yield _sse_event("done", {"model": model_used, "traceId": trace_id})
                 return
 
             # ── Agent 兜底：无从者数据或 fallback 时直接使用 Agent 回复 ──
+            # ── Trace: final（兜底路径）──
+            await log_trace_event(
+                trace_id,
+                "final",
+                {
+                    "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
+                    "agent_time_ms": agent_elapsed_ms,
+                    "result": "fallback" if agent_result.is_fallback else "no_servants",
+                    "agent_rounds": agent_result.rounds,
+                },
+            )
+
             yield _sse_event("delta", {"text": agent_result.reply})
             yield _sse_event("done", {"model": model_used, "traceId": trace_id})
             return
