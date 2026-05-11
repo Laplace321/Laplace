@@ -181,6 +181,54 @@ def _describe_filters(skill_calls: list[dict]) -> list[str]:
     return descriptions
 
 
+def _describe_agent_filters(tool_trace: list[dict]) -> list[str]:
+    """从 Agent tool_trace 提取筛选条件的中文描述。
+
+    Agent 的 tool_trace 格式: [{"tool": "search_servants", "args": {...}, ...}]
+    将 search_servants 的 args 映射为人类可读的中文。
+    """
+    descriptions: list[str] = []
+    class_map = _get_class_map()
+    np_card_map = _get_np_card_map()
+    for step in tool_trace:
+        tool_name = step.get("tool", "")
+        args = step.get("args", {})
+        if tool_name == "search_servants":
+            if "class_name" in args:
+                cn = class_map.get(str(args["class_name"]).lower(), args["class_name"])
+                descriptions.append(f"职阶 = {cn}")
+            if "rarity" in args:
+                op = args.get("rarity_op", "eq")
+                op_map = {"eq": "=", "gte": "≥", "lte": "≤", "gt": ">", "lt": "<"}
+                descriptions.append(f"稀有度 {op_map.get(op, op)} {args['rarity']}星")
+            if "effects" in args:
+                for eff in args["effects"]:
+                    translated = get_effect_translation(eff) if eff else eff
+                    descriptions.append(f"效果包含「{translated}」")
+            if "np_card" in args:
+                card = np_card_map.get(str(args["np_card"]).lower(), args["np_card"])
+                descriptions.append(f"宝具卡色 = {card}")
+            if "np_target" in args:
+                target_map = {"all": "全体(光炮)", "one": "单体", "support": "辅助"}
+                descriptions.append(f"宝具目标 = {target_map.get(args['np_target'], args['np_target'])}")
+            if "np_charge_value" in args:
+                op = args.get("np_charge_op", "gte")
+                op_map = {"eq": "=", "gte": "≥", "lte": "≤", "gt": ">", "lt": "<"}
+                descriptions.append(f"NP充能 {op_map.get(op, op)} {args['np_charge_value']}%")
+            if "trait_names" in args:
+                for t in args["trait_names"]:
+                    descriptions.append(f"特性包含「{t}」")
+            if "attribute" in args:
+                descriptions.append(f"属性 = {args['attribute']}")
+        elif tool_name == "lookup_servant":
+            name = args.get("name", "")
+            descriptions.append(f"查询从者「{name}」")
+        elif tool_name == "compare_servants":
+            names = args.get("names", [])
+            descriptions.append(f"对比从者「{'」与「'.join(names)}」")
+    return descriptions
+
+
 def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
     """构建预消化的精简 Context 供 RAG 生成使用。
 
@@ -421,6 +469,63 @@ async def _handle_agent_mode(
         },
     )
 
+    # 从者卡片数据（来自 AgentResult.servants_data）
+    returned_servants = agent_result.servants_data or []
+    model_used = f"agent_{agent_result.rounds}r"
+
+    # ── Agent 后置管线：有从者数据时走 Generation Prompt ──
+    if returned_servants and not agent_result.is_fallback:
+        applied_filters = _describe_agent_filters(agent_result.tool_trace)
+        context_data, _ = _build_context(returned_servants)
+        context_data["已应用的筛选条件"] = applied_filters
+        context_data["筛选条件"] = applied_filters
+        context_json = json.dumps(context_data, ensure_ascii=False)
+
+        gen_prompt = get_generation_prompt(user_message, context_json)
+
+        # ── Trace: context_build (agent sync) ──
+        await log_trace_event(
+            trace_id,
+            "context_build",
+            {
+                "applied_filters": applied_filters,
+                "context_data": context_data,
+                "source": "agent_generation_sync",
+            },
+        )
+
+        try:
+            generation_response = await chat_completion(
+                system_prompt=(
+                    "You are a helpful AI assistant. You MUST strictly follow "
+                    "the provided data and NEVER use your internal knowledge about FGO."
+                ),
+                user_message=gen_prompt,
+                temperature=0.1,
+                json_mode=False,
+            )
+            final_reply = generation_response.get("text", "").strip()
+            if not final_reply:
+                raise ValueError("Empty response from LLM")
+        except Exception as e:
+            # Generation 失败时降级为 Agent 原始回复
+            final_reply = agent_result.reply
+            await log_trace_event(
+                trace_id,
+                "generation_output",
+                {"reply": final_reply, "source": "agent_fallback"},
+                error=str(e),
+            )
+        else:
+            await log_trace_event(
+                trace_id,
+                "generation_output",
+                {"reply": final_reply, "source": "agent_generation"},
+            )
+    else:
+        # 兜底：无从者数据或 fallback 时直接使用 Agent 回复
+        final_reply = agent_result.reply
+
     # ── Trace: final ──
     await log_trace_event(
         trace_id,
@@ -432,11 +537,8 @@ async def _handle_agent_mode(
         },
     )
 
-    # 从者卡片数据（来自 AgentResult.servants_data）
-    returned_servants = agent_result.servants_data or []
-
     return ChatResponse(
-        reply=agent_result.reply,
+        reply=final_reply,
         servants=returned_servants,
         count=len(returned_servants),
         query={
@@ -451,7 +553,7 @@ async def _handle_agent_mode(
                 for step in agent_result.tool_trace
             ],
         },
-        model=f"agent_{agent_result.rounds}r",
+        model=model_used,
         traceId=trace_id,
     )
 
@@ -892,17 +994,93 @@ async def chat_stream(message: str, preset_name: str | None = None):
                 },
             )
 
-            # 卡片先行 — 推送从者数据（与 OneShot 模式格式一致）
-            if agent_result.servants_data:
+            # ── Agent 后置管线：有从者数据时走 Generation Prompt ──
+            if agent_result.servants_data and not agent_result.is_fallback:
+                servants = agent_result.servants_data
+
+                # Thinking: 意图识别完成（补齐 routed 阶段，与 OneShot 一致）
+                applied_filters = _describe_agent_filters(agent_result.tool_trace)
                 yield _sse_event(
-                    "servants",
+                    "thinking",
                     {
-                        "servants": agent_result.servants_data,
-                        "count": len(agent_result.servants_data),
-                        "total": len(agent_result.servants_data),
+                        "phase": "routed",
+                        "message": "意图识别完成",
+                        "detail": "、".join(applied_filters),
                     },
                 )
 
+                # 卡片先行 — 推送从者数据
+                yield _sse_event(
+                    "servants",
+                    {
+                        "servants": servants,
+                        "count": len(servants),
+                        "total": len(servants),
+                    },
+                )
+
+                # Thinking: 正在生成分析（补齐 generating 阶段）
+                yield _sse_event(
+                    "thinking",
+                    {"phase": "generating", "message": "正在生成分析..."},
+                )
+
+                # 构建 Context + Generation Prompt（复用 OneShot 管线）
+                context_data, _ = _build_context(servants)
+                context_data["已应用的筛选条件"] = applied_filters
+                context_data["筛选条件"] = applied_filters
+                context_json = json.dumps(context_data, ensure_ascii=False)
+
+                gen_prompt = get_generation_prompt(message, context_json)
+
+                # ── Trace: context_build (agent) ──
+                await log_trace_event(
+                    trace_id,
+                    "context_build",
+                    {
+                        "applied_filters": applied_filters,
+                        "context_data": context_data,
+                        "source": "agent_generation",
+                    },
+                )
+
+                # 第二轮 LLM 调用：生成格式化回复
+                final_result = "success"
+                try:
+                    generation_response = await chat_completion(
+                        system_prompt=(
+                            "You are a helpful AI assistant. You MUST strictly follow "
+                            "the provided data and NEVER use your internal knowledge about FGO."
+                        ),
+                        user_message=gen_prompt,
+                        temperature=0.1,
+                        json_mode=False,
+                    )
+                    final_reply = generation_response.get("text", "").strip()
+                    if not final_reply:
+                        raise ValueError("Empty response from LLM")
+                except Exception as e:
+                    # Generation 失败时降级为 Agent 原始回复
+                    final_reply = agent_result.reply
+                    final_result = "agent_generation_fallback"
+                    await log_trace_event(
+                        trace_id,
+                        "generation_output",
+                        {"reply": final_reply, "source": "agent_fallback"},
+                        error=str(e),
+                    )
+                else:
+                    await log_trace_event(
+                        trace_id,
+                        "generation_output",
+                        {"reply": final_reply, "source": "agent_generation"},
+                    )
+
+                yield _sse_event("delta", {"text": final_reply})
+                yield _sse_event("done", {"model": model_used, "traceId": trace_id})
+                return
+
+            # ── Agent 兜底：无从者数据或 fallback 时直接使用 Agent 回复 ──
             yield _sse_event("delta", {"text": agent_result.reply})
             yield _sse_event("done", {"model": model_used, "traceId": trace_id})
             return
