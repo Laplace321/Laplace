@@ -158,6 +158,9 @@ def _describe_filters(skill_calls: list[dict]) -> list[str]:
                 target_map = {"all": "全体(光炮)", "one": "单体", "support": "辅助"}
                 parts.append(f"宝具目标 = {target_map.get(np_target.lower(), np_target)}")
             descriptions.append(" + ".join(parts) if parts else "配卡筛选")
+        elif name == "search_by_class_advantage":
+            target = params.get("targetClass") or params.get("target_class", "")
+            descriptions.append(f"克制「{target}」职阶")
         elif name == "search_by_traits":
             # 兼容多种字段名: traitNames(LLM原始) / trait_names(Pydantic) / trait(旧)
             trait_names = params.get("traitNames") or params.get("trait_names") or []
@@ -249,6 +252,21 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
         "全局统计": stats_summary,
         "代表从者详情": top_results,
     }, top_results
+
+
+# === OneShot 空结果上下文 ===
+
+
+def _build_oneshot_context(skill_calls: list[dict]) -> str:
+    """将 OneShot 已识别的筛选条件转为中文描述字符串，供 Agent fallback 使用。
+
+    当 OneShot 执行结果为 0 时，将此上下文传给 Agent，
+    让 Agent 知道之前尝试过什么条件，给出更有针对性的回答。
+    """
+    filters = _describe_filters(skill_calls)
+    if filters:
+        return "、".join(filters)
+    return "（未识别到具体筛选条件）"
 
 
 # === Agent 兜底辅助 ===
@@ -709,10 +727,11 @@ async def _handle_skill_mode(
         },
     )
 
-    # Fallback 处理 → Agent 兜底
+    # Fallback 处理 → Agent 兜底（传入 OneShot 上下文）
     if result.is_fallback:
+        oneshot_ctx = _build_oneshot_context(skill_calls)
         try:
-            agent_result = await agent_route(user_message, TOOL_HANDLERS, trace_id)
+            agent_result = await agent_route(user_message, TOOL_HANDLERS, trace_id, oneshot_context=oneshot_ctx)
             trace_total_tokens += agent_result.total_tokens
             category, clean_reply = _classify_agent_reply(agent_result.reply)
             returned = agent_result.servants_data[:MAX_RESULTS] if agent_result.servants_data and not category else []
@@ -1268,12 +1287,13 @@ async def chat_stream(message: str, preset_name: str | None = None):
             },
         )
 
-        # 执行阶段 fallback（结果为空）→ Agent 兜底
+        # 执行阶段 fallback（结果为空）→ Agent 兜底（传入 OneShot 上下文）
         if result.is_fallback:
+            oneshot_ctx = _build_oneshot_context(skill_calls)
             fb_reply = result.fallback_message or "未找到匹配的从者。"
             yield _sse_event("thinking", {"phase": "agent_fallback", "message": "需要更深入分析，启动智能搜索..."})
             try:
-                agent_result = await agent_route(message, TOOL_HANDLERS, trace_id)
+                agent_result = await agent_route(message, TOOL_HANDLERS, trace_id, oneshot_context=oneshot_ctx)
                 trace_total_tokens += agent_result.total_tokens
                 category, clean_reply = _classify_agent_reply(agent_result.reply)
                 if agent_result.servants_data and not category:

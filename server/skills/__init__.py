@@ -13,6 +13,7 @@ _SKILL_MODULES = [
     "server.skills.query.search_by_attribute",
     "server.skills.query.search_by_cards",
     "server.skills.query.search_by_class",
+    "server.skills.query.search_by_class_advantage",
     "server.skills.query.search_by_effect",
     "server.skills.query.search_by_np_charge",
     "server.skills.query.search_by_np_effect",

@@ -192,6 +192,12 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
     - 用户未提及目标或数值时**不要传**这些参数
 12. **特性搜索（search_by_traits）**：当用户查询从者的"特性"/"属性"/"标签"（如"龙特性"、"王特性"、"神性"、"活在当下的人类"、"兽科从者"、"圆桌骑士"、"秩序·善"等）时，使用 `search_by_traits`。参数 `traitNames` 传中文特性名列表（如 `["龙"]`、`["活在当下的人类"]`），系统会自动查表转换为 ID。常见特性举例：龙、王、神性、人类、圆桌骑士、兽科从者、活在当下的人类、夏日模式从者、童话特性从者等
 13. **不可查效果 — 直接 fallback**：以下效果属于被动/活动/礼装效果，**当前不在从者查询能力范围内**，应直接走 fallback 回复用户"此类效果暂不支持查询"：羁绊加成（`servantFriendshipUp`）、QP 加成（`qpUp`）、素材掉落加成（`eventDropUp`）。**禁止**对这些效果调用任何 Skill，否则一定返回 0 条结果
+14. **NP 充能类型精确路由（重要）**：`search_by_np_charge` 支持可选的 `targetType` 参数，用于区分充能类型：
+    - **用户只说"自充"**（如"50自充"、"自充50以上"）→ **不传** `targetType`，默认查总充能（totalCharge，含自充+他充+群充，因为群充和他充也能给自己充能）
+    - **用户同时提到"自充"和"群充"/"他充"**（如"50自充，30群充"）→ 此时"自充"特指纯自充，必须分别发两个 `search_by_np_charge` 调用：自充用 `targetType: "self"`，群充用 `targetType: "ptAll"`，他充用 `targetType: "ptOne"`
+    - `targetType` 取值：`"self"` = 纯自充（仅给自己）、`"ptAll"` = 群充（全队含自己）、`"ptOne"` = 他充（指定单个队友）
+    - ⚠️ 注意：**禁止**使用 `"party"` 作为 targetType 值，必须使用 `"ptAll"`（群充）或 `"ptOne"`（他充）
+15. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"等表达时，使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。
 
 ## 示例
 
@@ -253,6 +259,31 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
 用户："50%以上充能且带全体攻击宝具的四星从者"（全体宝具 → search_by_cards 的 npTarget）
 ```json
 {{"skill_calls": [{{"skill_name": "search_by_np_charge", "params": {{"op": "gte", "value": 50}}}}, {{"skill_name": "search_by_cards", "params": {{"npTarget": "all"}}}}, {{"skill_name": "search_by_rarity", "params": {{"op": "eq", "value": 4}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："50自充，30群充的从者"（同时提到自充和群充 → 分别用 targetType 精确查询）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_np_charge", "params": {{"op": "gte", "value": 50, "targetType": "self"}}}}, {{"skill_name": "search_by_np_charge", "params": {{"op": "gte", "value": 30, "targetType": "ptAll"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："有20他充的从者"（单独提到他充 → 用 targetType: ptOne）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_np_charge", "params": {{"op": "gte", "value": 20, "targetType": "ptOne"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："30群充以上的术阶"（单独提到群充 → 用 targetType: ptAll）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_np_charge", "params": {{"op": "gte", "value": 30, "targetType": "ptAll"}}}}, {{"skill_name": "search_by_class", "params": {{"className": "Caster"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："克制伪装者的蓝卡无敌贯通宝具从者"（职阶克制 → search_by_class_advantage，targetClass 传中文）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_class_advantage", "params": {{"targetClass": "伪装者"}}}}, {{"skill_name": "search_by_cards", "params": {{"npCard": "arts"}}}}, {{"skill_name": "search_by_np_effect", "params": {{"npEffect": "pierceInvincible"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："克制骑阶的五星从者"（职阶克制 → search_by_class_advantage）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_class_advantage", "params": {{"targetClass": "骑阶"}}}}, {{"skill_name": "search_by_rarity", "params": {{"op": "eq", "value": 5}}}}], "response_skill": "respond_servant_list"}}
 ```
 """
 
