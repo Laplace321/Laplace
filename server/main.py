@@ -23,7 +23,7 @@ from server.agent.tool_handlers import TOOL_HANDLERS
 
 # 预消化翻译字典（从 config/translations.json 加载，支持热更新）
 from server.config_loader import CachedConfig
-from server.llm_client import chat_completion
+from server.llm import chat_completion
 from server.logger import find_trace, log_trace_event, read_trace_summaries, read_traces
 from server.prompts import build_routing_prompt, get_generation_prompt
 from server.query_executor import load_database
