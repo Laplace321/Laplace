@@ -202,6 +202,142 @@ def apply_validate(func: dict, effect_name: str, matcher: dict) -> bool:
 
 
 # ============================================================
+# 特性合并（对齐 Chaldea 羁绊加成逻辑）
+# ============================================================
+
+# Atlas API 中永久有效的 endedAt 阈值（与 Chaldea kNeverClosedTimestamp 对齐）
+_NEVER_CLOSED_TIMESTAMP = 1893423600
+
+
+def _merge_traits(svt: dict) -> dict:
+    """合并从者的完整特性数据（对齐 Chaldea equip_bond_bonus.dart 逻辑）。
+
+    三层叠加机制：
+    1. ascensionAdd.individuality — 灵基特性覆盖（非空时替代基础 traits）
+    2. traitAdd (condType=none) — 无条件附加特性（按 limitCount 分配到对应灵基）
+    3. traitAdd (condType!=none) — 有条件附加特性（存入 conditionalTraits）
+
+    Returns:
+        dict 包含：
+        - "traits": list[int]  — 全灵基并集（用于通用筛选）
+        - "traitsByAscension": dict[str, list[int]] | None — 按灵基的完整特性（仅灵基间有差异时）
+        - "conditionalTraits": list[dict] | None — 有条件的附加特性（仅存在时）
+    """
+    # 1. 基础 traits
+    base_traits = _trait_ids(svt.get("traits", []))
+
+    # 2. 解析 ascensionAdd.individuality（灵基特性覆盖）
+    asc_add = svt.get("ascensionAdd", {})
+    indiv_data = asc_add.get("individuality", {})
+    asc_indiv: dict[str, list[int]] = {}  # stage_key → trait IDs
+
+    # Atlas API 格式: {"ascension": {"0": [...], "1": [...], ...}, "costume": {...}}
+    asc_section = indiv_data.get("ascension", {})
+    if isinstance(asc_section, dict):
+        for stage_key, trait_list in asc_section.items():
+            if trait_list:  # 只保留非空的灵基覆盖
+                asc_indiv[str(stage_key)] = _trait_ids(trait_list)
+
+    # 3. 解析 traitAdd
+    trait_add_list = svt.get("traitAdd", [])
+    # 无条件附加（condType=none, eventId=0, 未过期）
+    unconditional_all: list[int] = []  # limitCount=-1，全灵基
+    unconditional_by_limit: dict[int, list[int]] = {}  # limitCount=N，指定灵基
+    # 有条件附加
+    conditional_traits: list[dict] = []
+
+    for entry in trait_add_list:
+        cond_type = entry.get("condType", "none")
+        event_id = entry.get("eventId", 0)
+        limit_count = entry.get("limitCount", -1)
+        ended_at = entry.get("endedAt", 0)
+        trait_ids = _trait_ids(entry.get("trait", []))
+
+        if not trait_ids:
+            continue
+
+        if cond_type != "none":
+            # 有条件特性（questClear / svtLimit 等）
+            conditional_traits.append(
+                {
+                    "traitIds": trait_ids,
+                    "condType": cond_type,
+                    "condId": entry.get("condId", 0),
+                }
+            )
+            continue
+
+        # condType=none：跳过活动相关和已过期的（与 Chaldea 一致）
+        if event_id != 0:
+            continue
+        if ended_at > 0 and ended_at < _NEVER_CLOSED_TIMESTAMP:
+            continue
+
+        if limit_count == -1:
+            unconditional_all.extend(trait_ids)
+        else:
+            unconditional_by_limit.setdefault(limit_count, []).extend(trait_ids)
+
+    # 4. 构建各灵基的完整特性
+    # 确定所有灵基 stage keys（0-4 是标准，也可能有 costume）
+    all_stages: set[str] = set()
+    if asc_indiv:
+        all_stages.update(asc_indiv.keys())
+    if unconditional_by_limit:
+        all_stages.update(str(k) for k in unconditional_by_limit.keys())
+    # 如果没有任何灵基差异数据，不需要生成 traitsByAscension
+    if not all_stages and not asc_indiv:
+        # 简单路径：只有无条件全灵基附加
+        merged_traits = sorted(set(base_traits + unconditional_all))
+        result: dict = {"traits": merged_traits}
+        if conditional_traits:
+            result["conditionalTraits"] = conditional_traits
+        return result
+
+    # 标准灵基 0-4
+    for i in range(5):
+        all_stages.add(str(i))
+
+    traits_by_ascension: dict[str, list[int]] = {}
+    all_traits_union: set[int] = set()
+
+    for stage_key in sorted(all_stages, key=lambda x: (not x.isdigit(), int(x) if x.isdigit() else 0)):
+        # 灵基覆盖：非空则替代基础 traits，否则用基础 traits
+        stage_base = asc_indiv.get(stage_key, [])
+        if stage_base:
+            stage_traits = list(stage_base)
+        else:
+            stage_traits = list(base_traits)
+
+        # 合并无条件全灵基附加
+        stage_traits.extend(unconditional_all)
+
+        # 合并无条件指定灵基附加
+        limit_key = int(stage_key) if stage_key.isdigit() else -1
+        if limit_key in unconditional_by_limit:
+            stage_traits.extend(unconditional_by_limit[limit_key])
+
+        stage_traits_sorted = sorted(set(stage_traits))
+        traits_by_ascension[stage_key] = stage_traits_sorted
+        all_traits_union.update(stage_traits_sorted)
+
+    # 5. 判断灵基间是否有差异
+    all_same = True
+    reference = traits_by_ascension.get("0", [])
+    for stage_key, stage_traits in traits_by_ascension.items():
+        if stage_traits != reference:
+            all_same = False
+            break
+
+    result = {"traits": sorted(all_traits_union)}
+    if not all_same:
+        result["traitsByAscension"] = traits_by_ascension
+    if conditional_traits:
+        result["conditionalTraits"] = conditional_traits
+    return result
+
+
+# ============================================================
 # 数据提取
 # ============================================================
 
@@ -613,8 +749,8 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
             "instantDeathChance": svt.get("instantDeathChance", 0),
             "hitsDistribution": svt.get("hitsDistribution", {}),
             "faceUrl": get_face_url(svt),
-            # Phase 3 新增属性
-            "traits": [t["id"] for t in svt.get("traits", [])],
+            # Phase 3 新增属性（traits 合并 traitAdd + ascensionAdd.individuality）
+            **_merge_traits(svt),
             "gender": svt.get("gender", "unknown"),
             "attribute": svt.get("attribute", "unknown"),
             "cards": cards_count,

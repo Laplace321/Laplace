@@ -11,6 +11,22 @@ import time
 import uuid
 from pathlib import Path
 
+# ── 加载 .env（本地开发用，Docker 由 entrypoint 处理）──
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    with open(_env_path, encoding="utf-8") as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if not _line or _line.startswith("#"):
+                continue
+            if "=" in _line:
+                _key, _, _val = _line.partition("=")
+                _key = _key.strip()
+                _val = _val.strip()
+                # 不覆盖已有的环境变量
+                if _key and _key not in os.environ:
+                    os.environ[_key] = _val
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -169,13 +185,18 @@ def _describe_filters(skill_calls: list[dict]) -> list[str]:
         elif name == "search_by_traits":
             # 兼容多种字段名: traitNames(LLM原始) / trait_names(Pydantic) / trait(旧)
             trait_names = params.get("traitNames") or params.get("trait_names") or []
+            ascension = params.get("ascension")
+            asc_label = ""
+            if ascension is not None:
+                asc_map = {0: "初始灵基", 1: "灵基一", 2: "灵基二", 3: "灵基三", 4: "最终再临"}
+                asc_label = f"（{asc_map.get(ascension, f'灵基{ascension}')}）"
             if trait_names:
                 for t in trait_names:
-                    descriptions.append(f"特性包含「{t}」")
+                    descriptions.append(f"特性包含「{t}」{asc_label}")
             else:
                 trait = params.get("trait", "")
                 if trait:
-                    descriptions.append(f"特性包含「{trait}」")
+                    descriptions.append(f"特性包含「{trait}」{asc_label}")
         elif name == "search_by_attribute":
             attr = params.get("attribute", "")
             descriptions.append(f"属性 = {attr}")
@@ -222,20 +243,28 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
         translated_effects = [get_effect_translation(e) for e in raw_effects]
         translated_np_effects = [get_effect_translation(e) for e in raw_np_effects]
 
-        top_results.append(
-            {
-                "名称": s.get("name"),
-                "中文名": s.get("aliasCN"),
-                "职阶": class_map.get(str(raw_class_name).lower(), raw_class_name),
-                "稀有度": s.get("rarity"),
-                "配卡": s.get("cards"),
-                "总充能": s.get("totalCharge"),
-                "宝具卡色": np_card_map.get(str(raw_np_card).lower(), raw_np_card),
-                "宝具目标": np_target_map.get(str(raw_np_target).lower(), raw_np_target),
-                "技能效果": translated_effects,
-                "宝具效果": translated_np_effects,
-            }
-        )
+        entry = {
+            "名称": s.get("name"),
+            "中文名": s.get("aliasCN"),
+            "职阶": class_map.get(str(raw_class_name).lower(), raw_class_name),
+            "稀有度": s.get("rarity"),
+            "配卡": s.get("cards"),
+            "总充能": s.get("totalCharge"),
+            "宝具卡色": np_card_map.get(str(raw_np_card).lower(), raw_np_card),
+            "宝具目标": np_target_map.get(str(raw_np_target).lower(), raw_np_target),
+            "技能效果": translated_effects,
+            "宝具效果": translated_np_effects,
+        }
+        # 条件特性注释（仅在从者有条件特性时附带，供 LLM 在分析中说明）
+        cond_traits = s.get("conditionalTraits", [])
+        if cond_traits:
+            cond_desc = []
+            for ct in cond_traits:
+                cond_type = ct.get("condType", "")
+                cond_type_zh = {"questClear": "关卡通关后", "svtLimit": "指定灵基"}.get(cond_type, cond_type)
+                cond_desc.append({"特性ID": ct["traitIds"], "条件": cond_type_zh})
+            entry["条件特性"] = cond_desc
+        top_results.append(entry)
 
     # 全局统计摘要（基于全部从者，而非仅 top N）
     from collections import Counter

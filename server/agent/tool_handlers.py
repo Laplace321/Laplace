@@ -104,11 +104,15 @@ def handle_search_servants(params: dict) -> dict:
 
     # 6. 特性筛选（中文特性名，由 search_by_traits Skill 内部做名称→ID 转换）
     trait_names = params.get("trait_names")
+    trait_ascension = params.get("trait_ascension")
     if trait_names:
+        trait_params: dict[str, Any] = {"traitNames": trait_names}
+        if trait_ascension is not None:
+            trait_params["ascension"] = trait_ascension
         skill_calls.append(
             {
                 "skill_name": "search_by_traits",
-                "params": {"traitNames": trait_names},
+                "params": trait_params,
             }
         )
 

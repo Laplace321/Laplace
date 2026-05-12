@@ -138,6 +138,10 @@ def _tool_search_servants() -> dict:
                     "items": {"type": "string"},
                     "description": "特性名列表（中文）。如 ['龙','王']。系统会自动将中文特性名转换为 ID 进行筛选",
                 },
+                "trait_ascension": {
+                    "type": "integer",
+                    "description": "指定灵基阶段(0-4)进行特性筛选。不传则匹配全灵基并集",
+                },
                 "attribute": {
                     "type": "string",
                     "description": "属性筛选。支持中文或英文：天/sky、地/earth、人/human、星/star、兽/beast",

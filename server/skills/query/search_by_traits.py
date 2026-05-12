@@ -102,6 +102,10 @@ class Params(BaseModel):
         default=None, alias="traitNames", description="中文特性名列表（如 ['龙', '王']）"
     )
     exclude_traits: list[int] | None = Field(default=None, alias="excludeTraits", description="排斥特性 ID 列表")
+    ascension: int | None = Field(
+        default=None,
+        description="指定灵基阶段(0-4)，仅匹配该灵基下的特性。不传则匹配全灵基并集",
+    )
 
 
 @register_skill
@@ -118,6 +122,7 @@ class SearchByTraits(QuerySkill):
         traits = params.get("traits")
         trait_names = params.get("trait_names")
         exclude_traits = params.get("exclude_traits")
+        ascension = params.get("ascension")
 
         # 中文特性名 → ID 转换
         if trait_names:
@@ -127,5 +132,13 @@ class SearchByTraits(QuerySkill):
 
         if not traits and not exclude_traits:
             return True
-        servant_traits = servant.get("traits", [])
+
+        # 灵基指定模式：从 traitsByAscension 取对应灵基的特性
+        if ascension is not None:
+            by_asc = servant.get("traitsByAscension", {})
+            servant_traits = by_asc.get(str(ascension), servant.get("traits", []))
+        else:
+            # 默认模式：使用全灵基并集
+            servant_traits = servant.get("traits", [])
+
         return filter_by_traits(servant_traits, traits, exclude_traits)
