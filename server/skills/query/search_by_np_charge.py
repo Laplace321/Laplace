@@ -44,9 +44,6 @@ class SearchByNpCharge(QuerySkill):
         return Params
 
     def filter(self, servant: dict, params: dict) -> bool:
-        if not servant.get("hasNpCharge", False):
-            return False
-
         target_type = params.get("targetType")
         field_name = _TARGET_TYPE_FIELD_MAP.get(target_type, "totalCharge") if target_type else "totalCharge"
         charge = servant.get(field_name, 0)
