@@ -180,8 +180,8 @@ LLM_OPENAI_MODELS=gpt-4o,gpt-4o-mini
 适用于将 Laplace 部署到云服务器供其他玩家使用。
 
 ```bash
-# 1. 构建镜像
-docker build -t laplace .
+# 1. 构建镜像（BUILD_VERSION 用于自动检测数据是否需要重建）
+docker build --build-arg BUILD_VERSION=$(git rev-parse --short HEAD) -t laplace:latest .
 
 # 2. 准备 .env 文件（填入 LLM API Key 等配置）
 cp .env.example .env
@@ -197,7 +197,7 @@ docker run -d \
   laplace
 ```
 
-容器首次启动时会自动从 Atlas Academy 下载从者数据（约 30 秒）。后续重启会跳过下载。
+容器首次启动时会自动从 Atlas Academy 下载从者数据（约 30 秒）。后续重建镜像后，entrypoint 会通过版本戳自动检测代码是否更新，如有变更则重建数据库，无变更则跳过。
 
 **常用操作**：
 
@@ -209,7 +209,7 @@ docker logs -f laplace
 docker run -d --env-file .env -e REFRESH_DATA_ON_START=1 -p 8000:8000 laplace
 
 # 更新部署（拉取最新代码后）
-docker build -t laplace . && docker rm -f laplace && docker run -d --name laplace --env-file .env -p 8000:8000 -v laplace-logs:/app/server/logs --restart unless-stopped laplace
+docker build --build-arg BUILD_VERSION=$(git rev-parse --short HEAD) -t laplace:latest . && docker rm -f laplace && docker run -d --name laplace --env-file .env -p 8000:8000 -v laplace-logs:/app/server/logs -v $(pwd)/.env:/app/.env:ro --restart unless-stopped laplace:latest
 ```
 
 **Nginx 反向代理**：生产环境建议在容器前加 Nginx 处理 SSL 和静态文件托管。参考配置见 `deploy/nginx.conf`。注意 SSE 流式响应需要 `proxy_buffering off`。

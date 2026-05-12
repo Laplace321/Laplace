@@ -11,19 +11,26 @@ if [ -f "/app/.env" ]; then
     set +a
 fi
 
-# ── 首次启动：下载从者数据 ──
+# ── 数据初始化（版本戳机制：代码更新时自动重建） ──
+NEED_REBUILD=0
+BUILD_VER=$(cat /app/.build_version 2>/dev/null || echo "unknown")
+DATA_VER=$(cat server/data/.data_build_version 2>/dev/null || echo "")
+
 if [ ! -f "server/data/servants_db.json" ]; then
-    echo "[init] servants_db.json not found, downloading from Atlas Academy..."
-    python3 -m server.data_loader
-    echo "[init] Data download complete."
+    echo "[init] servants_db.json not found, will build..."
+    NEED_REBUILD=1
+elif [ "$BUILD_VER" != "$DATA_VER" ]; then
+    echo "[init] Build version changed ($DATA_VER -> $BUILD_VER), rebuilding data..."
+    NEED_REBUILD=1
 else
-    echo "[init] servants_db.json exists, skipping download."
+    echo "[init] servants_db.json up-to-date (version: $DATA_VER), skipping."
 fi
 
-# ── 可选：启动时刷新数据 ──
-if [ "${REFRESH_DATA_ON_START}" = "1" ]; then
-    echo "[init] REFRESH_DATA_ON_START=1, re-downloading servant data..."
+# REFRESH_DATA_ON_START=1 可手动强制刷新
+if [ "$NEED_REBUILD" = "1" ] || [ "${REFRESH_DATA_ON_START}" = "1" ]; then
     python3 -m server.data_loader
+    echo "$BUILD_VER" > server/data/.data_build_version
+    echo "[init] Data build complete (version: $BUILD_VER)."
 fi
 
 # ── 持久化应用日志（防止 docker rm 后丢失） ──

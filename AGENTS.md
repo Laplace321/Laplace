@@ -213,6 +213,15 @@
      - `demo/app.js` → `SKILL_DISPLAY_NAMES` 新增中文映射
 - **目的**：确保用户体验始终是面向玩家的自然语言，杜绝技术实现细节泄露到用户界面。
 
+### 10. 部署数据一致性 (Deploy Data Consistency)
+- **准则**：代码变更可能影响 `servants_db.json` 的构建输出（如新增特性合并逻辑），部署时必须确保数据与代码版本一致。
+- **执行**：
+  1. `Dockerfile` 通过 `BUILD_VERSION` ARG 在构建时写入 `/app/.build_version` 版本戳。
+  2. `docker-entrypoint.sh` 启动时对比版本戳与 `server/data/.data_build_version`，不一致则自动重建数据库。
+  3. 构建镜像时**必须**传入 `--build-arg BUILD_VERSION=$(git rev-parse --short HEAD)`，否则版本戳为 `unknown`，每次启动都会触发重建。
+  4. `REFRESH_DATA_ON_START=1` 仍可作为手动强制刷新的手段。
+- **目的**：杜绝「代码更新但数据陈旧」导致的线上功能异常（如 traitAdd 合并逻辑上线后旧数据缺少兽科特性）。
+
 ## 禁止事项
 
 - ❌ 未经确认删除文件或数据

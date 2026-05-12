@@ -27,6 +27,10 @@ COPY admin/ admin/
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
+# ── 版本戳（用于 entrypoint 判断是否需要重建数据） ──
+ARG BUILD_VERSION=unknown
+RUN echo "${BUILD_VERSION}" > /app/.build_version
+
 # 确保日志和数据目录存在
 RUN mkdir -p server/logs server/data
 
