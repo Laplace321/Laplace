@@ -186,6 +186,7 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
    - 判断依据是用户原话中是否包含"技能"或"宝具"这两个关键词，有则精确路由，无则默认统一搜索
 9. **禁止同 Skill 多次调用表达 OR**：当用户的查询涉及"任意一种"效果时（如"能挡伤害"、"能辅助"），**禁止**对同一个 Skill 发起多次调用。应使用单次调用的 `effects` + `effectsOp: "or"` 参数，或使用虚拟复合效果名（如 `damageBoost`、`damageShield`）。多个 skill_call 之间是 AND 关系，重复调用同一 Skill 会变成"必须同时满足所有条件"，导致结果为空。
 10. **宝具目标类型筛选（全体/单体）**：用户提到"全体宝具"/"全体攻击宝具"/"AOE宝具"时，使用 `search_by_cards` 的 `npTarget` 参数：`"all"` = 全体（光炮）、`"one"` = 单体、`"support"` = 辅助。同理，"单体宝具"对应 `npTarget: "one"`。**严禁**将"全体攻击宝具"误解为宝具特攻（`damageNpSP`），它们是完全不同的概念。
+    - **FGO 俚语「d类特攻」「D特攻」**：玩家口中的"d类特攻"/"D特攻"是指**宝具附带的特攻效果**（`damageNpSP` 或 `damageNpIndividuality`），即宝具伤害对特定敌方特性有额外倍率。这是**宝具效果**，应使用 `search_by_np_effect(npEffect="damageNpSP")` 或 `search_by_np_effect(npEffect="damageNpIndividuality")`，**严禁**将"d类"误解为特性名称（如"死灵"），也**严禁**使用 `search_by_traits`。类似地，"w类特攻"指 `damageNpIndividualityAll`（全体宝具特攻）
 11. **效果的目标类型和数值条件**：效果类 Skill（`search_by_effect` / `search_by_skill_effect`）支持可选的 `targetType` 和 `minValue` 参数：
     - `targetType`：效果施加目标。`"self"` = 自身、`"party"` = 队友/全队、`"enemy"` = 敌方。用户说"给队友"/"全队"/"辅助"时传 `"party"`，说"自身"时传 `"self"`
     - `minValue`：效果最小数值（百分比）。用户说"超过50%"/"大于30%"时传对应数值。如 `"minValue": 50` 表示 ≥50%

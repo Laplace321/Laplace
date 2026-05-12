@@ -7,6 +7,7 @@ Laplace — LLM Provider 配置与路由调度
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -109,6 +110,74 @@ def _load_providers() -> list[LLMProvider]:
 PROVIDERS: list[LLMProvider] = _load_providers()
 
 
+# ── Messages 清洗 ──
+
+
+def _sanitize_tool_messages(messages: list[dict]) -> list[dict]:
+    """清洗 messages 中的 tool_call 相关字段，确保跨 provider 兼容。
+
+    不同 LLM provider 对 Chat Completions 的 tool_calls 格式要求不同：
+    - OpenAI/Claude (obao): message.model_dump() 包含 None 字段（content/refusal/audio/
+      function_call/annotations）和额外字段
+    - Dashscope: 严格要求 function.arguments 是合法 JSON 字符串，不接受额外字段
+
+    此函数对 messages 做最小化标准化，确保 fallback 到任何 provider 都不会因格式问题失败。
+    """
+    sanitized: list[dict] = []
+    for msg in messages:
+        role = msg.get("role", "")
+
+        if role == "assistant" and "tool_calls" in msg:
+            # 清洗 assistant message 中的 tool_calls，剥离 model_dump() 的额外字段
+            clean_msg: dict = {"role": "assistant", "content": msg.get("content") or ""}
+            raw_tcs = msg.get("tool_calls")
+            if raw_tcs:
+                clean_tcs = []
+                for tc in raw_tcs:
+                    func = tc.get("function", {})
+                    raw_args = func.get("arguments", "{}")
+
+                    # 确保 arguments 是合法 JSON 字符串
+                    if isinstance(raw_args, dict):
+                        raw_args = json.dumps(raw_args, ensure_ascii=False)
+                    elif isinstance(raw_args, str):
+                        try:
+                            json.loads(raw_args)
+                        except (json.JSONDecodeError, TypeError):
+                            raw_args = "{}"
+                    else:
+                        # None、int 等非预期类型
+                        raw_args = "{}"
+
+                    clean_tcs.append(
+                        {
+                            "type": "function",
+                            "id": tc.get("id", ""),
+                            "function": {
+                                "name": func.get("name", ""),
+                                "arguments": raw_args,
+                            },
+                        }
+                    )
+                clean_msg["tool_calls"] = clean_tcs
+            sanitized.append(clean_msg)
+
+        elif role == "tool":
+            # 确保 tool message 格式标准
+            sanitized.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": msg.get("tool_call_id", ""),
+                    "content": msg.get("content", ""),
+                }
+            )
+        else:
+            # system / user 消息原样保留
+            sanitized.append(msg)
+
+    return sanitized
+
+
 # ── 顶层调度函数 ──
 
 
@@ -205,6 +274,9 @@ async def agent_completion(
     """
     attempts_log: list[dict] = []
 
+    # 预清洗 messages，确保跨 provider fallback 时格式兼容
+    sanitized_messages = _sanitize_tool_messages(messages)
+
     for provider in PROVIDERS:
         if provider.adapter is None:
             continue
@@ -213,7 +285,7 @@ async def agent_completion(
             try:
                 result = await provider.adapter.agent_completion(
                     model=m,
-                    messages=messages,
+                    messages=sanitized_messages,
                     tools=tools,
                     max_tokens=max_tokens,
                     temperature=temperature,
