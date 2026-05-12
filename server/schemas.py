@@ -56,7 +56,7 @@ def parse_routing_response(content: str | dict) -> dict:
 
     from pydantic import ValidationError
 
-    from server.llm_client import extract_json_object
+    from server.llm import extract_json_object
 
     raw = content if isinstance(content, dict) else json.loads(extract_json_object(content))
     try:

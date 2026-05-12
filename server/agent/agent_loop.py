@@ -17,7 +17,7 @@ from typing import Any
 
 from server.agent.agent_prompt import AGENT_SYSTEM_PROMPT
 from server.agent.tool_defs import build_agent_tools
-from server.llm_client import agent_completion
+from server.llm import agent_completion
 
 # 需要保留完整从者数据的 tool 名称（用于卡片渲染）
 _CARD_TOOLS = {"search_servants", "lookup_servant", "compare_servants"}

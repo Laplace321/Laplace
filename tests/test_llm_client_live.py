@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from server.llm_client import chat_completion
+from server.llm import chat_completion
 
 pytestmark = pytest.mark.skipif(
     os.getenv("RUN_LIVE_LLM_TESTS") != "1",
