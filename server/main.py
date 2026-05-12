@@ -11,11 +11,16 @@ import time
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+# Admin 模块
+from server.admin.auth import require_admin
+from server.admin.auth import router as auth_router
+from server.admin.routes import router as admin_routes_router
 
 # Agent 兜底模块
 from server.agent.agent_loop import AgentResult, agent_route
@@ -328,6 +333,10 @@ app = FastAPI(
     version="0.2.0",
 )
 
+# ── Admin 路由挂载 ──
+app.include_router(auth_router, prefix="/api/admin")
+app.include_router(admin_routes_router, prefix="/api/admin")
+
 # CORS — 从环境变量读取白名单（默认仅本地开发）
 _default_origins = "http://localhost:8000,http://127.0.0.1:8000"
 cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
@@ -370,25 +379,16 @@ class ChatResponse(BaseModel):
     traceId: str | None = None
 
 
-def _is_localhost(request: Request) -> bool:
-    """检查请求是否来自本地。"""
-    return request.client.host in ("127.0.0.1", "::1", "localhost")
-
-
 @app.get("/api/traces")
-async def list_traces(request: Request, limit: int = 20):
-    """返回最近 N 条 trace（仅 localhost 可访问）。"""
-    if not _is_localhost(request):
-        return JSONResponse(status_code=403, content={"error": "仅允许本地访问"})
+async def list_traces(request: Request, limit: int = 20, _=Depends(require_admin)):
+    """返回最近 N 条 trace（需要 Admin 登录）。"""
     traces = read_traces(limit=limit)
     return traces
 
 
 @app.get("/api/traces/{trace_id}")
-async def get_trace(request: Request, trace_id: str):
-    """按 trace_id 查询单条 trace 详情（仅 localhost 可访问）。"""
-    if not _is_localhost(request):
-        return JSONResponse(status_code=403, content={"error": "仅允许本地访问"})
+async def get_trace(request: Request, trace_id: str, _=Depends(require_admin)):
+    """按 trace_id 查询单条 trace 详情（需要 Admin 登录）。"""
     trace = find_trace(trace_id)
     if trace is None:
         return JSONResponse(status_code=404, content={"error": f"trace {trace_id} 未找到"})
@@ -403,14 +403,15 @@ async def admin_list_logs(
     limit: int = 50,
     offset: int = 0,
     keyword: str | None = None,
+    _=Depends(require_admin),
 ):
-    """日志列表（分页 + 关键词搜索）。"""
+    """日志列表（分页 + 关键词搜索，需要 Admin 登录）。"""
     return read_trace_summaries(limit=limit, offset=offset, keyword=keyword)
 
 
 @app.get("/api/admin/logs/{trace_id}")
-async def admin_get_log(trace_id: str):
-    """单条 trace 的完整多阶段详情。"""
+async def admin_get_log(trace_id: str, _=Depends(require_admin)):
+    """单条 trace 的完整多阶段详情（需要 Admin 登录）。"""
     trace = find_trace(trace_id)
     if trace is None:
         return JSONResponse(status_code=404, content={"error": f"trace {trace_id} 未找到"})
@@ -1467,6 +1468,11 @@ async def health():
     """健康检查。"""
     return {"status": "ok", "service": "laplace"}
 
+
+# 挂载 Admin 后台静态文件（必须在 "/" 之前注册，否则会被 catch-all 拦截）
+_admin_dir = Path(__file__).parent.parent / "admin"
+if _admin_dir.exists():
+    app.mount("/admin", StaticFiles(directory=str(_admin_dir), html=True), name="admin-static")
 
 # 挂载前端静态文件目录
 app.mount("/", StaticFiles(directory="demo", html=True), name="static")

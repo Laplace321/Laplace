@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laplace Admin</title>
+    <link rel="stylesheet" href="admin.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+    <!-- 登录页面 -->
+    <div id="login-page" class="page">
+        <div class="login-card">
+            <h2>Laplace 管理后台</h2>
+            <form id="login-form">
+                <input type="password" id="password-input" placeholder="请输入管理员密码" autocomplete="current-password" required>
+                <button type="submit" id="login-btn">登录</button>
+                <p id="login-error" class="error-msg"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- 管理页面 -->
+    <div id="admin-page" class="page" style="display:none;">
+        <header>
+            <h1>Laplace Admin</h1>
+            <button id="logout-btn" class="btn-secondary">登出</button>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab active" data-tab="env">环境变量</button>
+            <button class="tab" data-tab="config">配置文件</button>
+            <button class="tab" data-tab="logs">日志查看</button>
+        </nav>
+
+        <!-- 环境变量 Tab -->
+        <section id="tab-env" class="tab-content active">
+            <div class="section-header">
+                <h3>环境变量 (.env)</h3>
+                <div class="btn-group">
+                    <button id="env-save-btn" class="btn-primary">保存</button>
+                    <button id="env-restart-btn" class="btn-danger">重启容器</button>
+                </div>
+            </div>
+            <textarea id="env-editor" spellcheck="false" placeholder="加载中..."></textarea>
+            <p id="env-status" class="status-msg"></p>
+        </section>
+
+        <!-- 配置文件 Tab -->
+        <section id="tab-config" class="tab-content">
+            <div class="section-header">
+                <h3>配置文件</h3>
+            </div>
+            <div class="config-layout">
+                <ul id="config-list" class="config-sidebar"></ul>
+                <div class="config-editor-wrap">
+                    <div class="config-editor-header">
+                        <span id="config-current-file">选择一个配置文件</span>
+                        <button id="config-save-btn" class="btn-primary" disabled>保存</button>
+                    </div>
+                    <textarea id="config-editor" spellcheck="false" placeholder="选择左侧配置文件进行编辑" disabled></textarea>
+                    <p id="config-status" class="status-msg"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 日志 Tab -->
+        <section id="tab-logs" class="tab-content">
+            <div class="section-header">
+                <h3>查询日志</h3>
+                <div class="logs-controls">
+                    <input type="text" id="logs-keyword" placeholder="搜索关键词...">
+                    <button id="logs-search-btn" class="btn-primary">搜索</button>
+                    <button id="logs-refresh-btn" class="btn-secondary">刷新</button>
+                </div>
+            </div>
+            <table id="logs-table">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>Trace ID</th>
+                        <th>问题</th>
+                        <th>模式</th>
+                        <th>Tokens</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-tbody"></tbody>
+            </table>
+            <div class="pagination">
+                <button id="logs-prev" class="btn-secondary" disabled>上一页</button>
+                <span id="logs-page-info">第 1 页</span>
+                <button id="logs-next" class="btn-secondary">下一页</button>
+            </div>
+            <!-- 日志详情弹窗 -->
+            <div id="log-detail-modal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Trace 详情</h3>
+                        <button class="modal-close">&times;</button>
+                    </div>
+                    <pre id="log-detail-content"></pre>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

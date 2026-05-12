@@ -3,6 +3,14 @@ set -e
 
 echo "=== Laplace Container Starting ==="
 
+# ── 从挂载的 .env 文件加载环境变量（volume 挂载模式） ──
+if [ -f "/app/.env" ]; then
+    echo "[init] Loading .env from mounted volume..."
+    set -a
+    . /app/.env
+    set +a
+fi
+
 # ── 首次启动：下载从者数据 ──
 if [ ! -f "server/data/servants_db.json" ]; then
     echo "[init] servants_db.json not found, downloading from Atlas Academy..."

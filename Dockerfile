@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ --trus
 # ── 应用代码 ──
 COPY server/ server/
 COPY demo/ demo/
+COPY admin/ admin/
 
 # ── 入口脚本 ──
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
