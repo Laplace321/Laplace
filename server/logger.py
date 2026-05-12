@@ -202,11 +202,19 @@ def find_trace(trace_id: str) -> dict | None:
             if e.get("phase") == "routing_input":
                 result["query"] = e.get("data", {}).get("query", "")
                 break
-        # 从 generation_output 或 final 提取 reply
+        # 从 generation_output 提取 reply；agent_fallback 路径回退到 agent_detail
         for e in reversed(phased_events):
             if e.get("phase") == "generation_output":
                 result["reply"] = e.get("data", {}).get("reply", e.get("data", {}).get("reply_preview", ""))
                 break
+        else:
+            # agent_fallback 路径：从 agent_detail 提取 reply
+            for e in reversed(phased_events):
+                if e.get("phase") == "agent_detail":
+                    agent_reply = e.get("data", {}).get("reply", "")
+                    if agent_reply:
+                        result["reply"] = agent_reply
+                    break
         # 从 execution 提取 results_count
         for e in phased_events:
             if e.get("phase") == "execution":

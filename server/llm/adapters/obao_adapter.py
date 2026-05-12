@@ -174,3 +174,66 @@ class ObaoAdapter(OpenAIAdapter):
                     await asyncio.sleep(wait)
 
         raise last_error  # type: ignore[misc]
+
+    # ── agent_completion: 覆写父类，显式关闭 thinking ──
+
+    async def agent_completion(
+        self,
+        model: str,
+        messages: list[dict],
+        tools: list[dict],
+        max_tokens: int = 1024,
+        temperature: float = 0.1,
+    ) -> dict:
+        """Agent tool-use 调用 — 显式关闭 Claude thinking 模式。
+
+        obao 代理的 Claude 模型可能默认开启 extended thinking，
+        通过 extra_body 传入 thinking.type=disabled 显式关闭，
+        与 dashscope 适配器的 enable_thinking=False 保持一致的防护级别。
+        """
+        client = self._get_client()
+
+        last_error: Exception | None = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                resp = await client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    tools=tools,
+                    tool_choice="auto",
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    extra_body={"thinking": {"type": "disabled"}},
+                )
+                choice = resp.choices[0]
+                message = choice.message
+                raw_tool_calls = message.tool_calls or []
+                has_tool_call = len(raw_tool_calls) > 0
+
+                tool_calls = []
+                for tc in raw_tool_calls:
+                    tool_calls.append(
+                        {
+                            "name": tc.function.name or "",
+                            "call_id": tc.id or "",
+                            "arguments": tc.function.arguments or "{}",
+                        }
+                    )
+
+                output_text = message.content if not has_tool_call else None
+
+                return {
+                    "output_text": output_text,
+                    "has_tool_call": has_tool_call,
+                    "tool_calls": tool_calls,
+                    "raw_message": message.model_dump(),
+                    "usage": resp.usage.model_dump() if resp.usage else {},
+                }
+            except Exception as e:
+                last_error = e
+                if attempt < MAX_RETRIES - 1:
+                    wait = RETRY_BACKOFF[attempt]
+                    print(f"  ↻ [agent] [{self.name}] 模型 {model} 第 {attempt + 1} 次失败，{wait}s 后重试: {e}")
+                    await asyncio.sleep(wait)
+
+        raise last_error  # type: ignore[misc]

@@ -588,6 +588,7 @@ async def _handle_skill_mode(
                             "agent_tokens": agent_result.total_tokens,
                             "tool_trace": agent_result.tool_trace,
                             "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                            "reply": clean_reply,
                         },
                     )
                     await log_trace_event(
@@ -646,6 +647,7 @@ async def _handle_skill_mode(
                             "agent_tokens": agent_result.total_tokens,
                             "tool_trace": agent_result.tool_trace,
                             "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                            "reply": clean_reply,
                         },
                     )
                     await log_trace_event(
@@ -743,6 +745,7 @@ async def _handle_skill_mode(
                     "agent_tokens": agent_result.total_tokens,
                     "tool_trace": agent_result.tool_trace,
                     "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                    "reply": clean_reply,
                 },
             )
             await log_trace_event(
@@ -1184,6 +1187,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                             "agent_tokens": agent_result.total_tokens,
                             "tool_trace": agent_result.tool_trace,
                             "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                            "reply": clean_reply,
                         },
                     )
                     await log_trace_event(
@@ -1235,6 +1239,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                             "agent_tokens": agent_result.total_tokens,
                             "tool_trace": agent_result.tool_trace,
                             "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                            "reply": clean_reply,
                         },
                     )
                     await log_trace_event(
@@ -1311,6 +1316,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
                         "agent_tokens": agent_result.total_tokens,
                         "tool_trace": agent_result.tool_trace,
                         "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
+                        "reply": clean_reply,
                     },
                 )
                 await log_trace_event(
