@@ -37,6 +37,9 @@ ignore = [
     "E741",  # ambiguous variable name (common in math-heavy code)
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"server/main.py" = ["E402"]  # 入口文件：load_dotenv() 必须在 server.* import 之前执行
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"

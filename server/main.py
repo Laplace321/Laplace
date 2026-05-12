@@ -11,21 +11,11 @@ import time
 import uuid
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # ── 加载 .env（本地开发用，Docker 由 entrypoint 处理）──
-_env_path = Path(__file__).resolve().parent.parent / ".env"
-if _env_path.exists():
-    with open(_env_path, encoding="utf-8") as _f:
-        for _line in _f:
-            _line = _line.strip()
-            if not _line or _line.startswith("#"):
-                continue
-            if "=" in _line:
-                _key, _, _val = _line.partition("=")
-                _key = _key.strip()
-                _val = _val.strip()
-                # 不覆盖已有的环境变量
-                if _key and _key not in os.environ:
-                    os.environ[_key] = _val
+# 必须在 server.* import 之前调用，因为子模块加载时可能读取环境变量
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware

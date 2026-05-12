@@ -14,9 +14,14 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 # ── 配置 ──
-ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "")
 SESSION_TTL = 24 * 3600  # 24 小时过期
 COOKIE_NAME = "laplace_admin_session"
+
+
+def _get_password_hash() -> str:
+    """延迟读取 ADMIN_PASSWORD_HASH，确保 .env 加载后才读取。"""
+    return os.getenv("ADMIN_PASSWORD_HASH", "")
+
 
 # ── 内存 Session Store ──
 _sessions: dict[str, float] = {}  # token -> expire_timestamp
@@ -75,9 +80,10 @@ class LoginRequest(BaseModel):
 @router.post("/login")
 async def admin_login(body: LoginRequest, response: Response):
     """Admin 登录。"""
-    if not ADMIN_PASSWORD_HASH:
+    pw_hash = _get_password_hash()
+    if not pw_hash:
         raise HTTPException(status_code=500, detail="未配置管理员密码，请在 .env 设置 ADMIN_PASSWORD_HASH")
-    if not verify_password(body.password, ADMIN_PASSWORD_HASH):
+    if not verify_password(body.password, pw_hash):
         raise HTTPException(status_code=403, detail="密码错误")
     token = create_session_token()
     response.set_cookie(

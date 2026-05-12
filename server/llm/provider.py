@@ -11,12 +11,7 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from dotenv import load_dotenv
-
 from server.llm.base import BaseLLMAdapter
-
-# 从项目根目录加载 .env
-load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
 
 @dataclass
