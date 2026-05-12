@@ -81,11 +81,23 @@ class TestEnvAPI:
         assert resp.status_code == 401
 
     def test_get_env(self):
-        cookies = _login()
-        resp = client.get("/api/admin/env", cookies=cookies)
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "content" in data
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        # CI 环境可能没有 .env，创建临时文件 mock
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
+            f.write("TEST_VAR=hello\n")
+            tmp_path = Path(f.name)
+        try:
+            with patch("server.admin.routes._get_env_path", return_value=tmp_path):
+                cookies = _login()
+                resp = client.get("/api/admin/env", cookies=cookies)
+                assert resp.status_code == 200
+                data = resp.json()
+                assert "content" in data
+        finally:
+            tmp_path.unlink(missing_ok=True)
 
     def test_restart_container(self):
         """Docker restart API 需要登录才能调用。"""
