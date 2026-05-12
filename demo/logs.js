@@ -80,6 +80,11 @@ async function fetchLogs() {
     if (currentKeyword) params.set("keyword", currentKeyword);
 
     const resp = await fetch(`${API_BASE}?${params}`);
+    if (resp.status === 401) {
+      // 未登录，跳转到 admin 登录页
+      window.location.href = "/admin/";
+      return;
+    }
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
 
@@ -193,6 +198,10 @@ async function showDetail(traceId) {
 
   try {
     const resp = await fetch(`${API_BASE}/${encodeURIComponent(traceId)}`);
+    if (resp.status === 401) {
+      window.location.href = "/admin/";
+      return;
+    }
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     renderDetail(data);

@@ -212,7 +212,16 @@ docker run -d --env-file .env -e REFRESH_DATA_ON_START=1 -p 8000:8000 laplace
 docker build --build-arg BUILD_VERSION=$(git rev-parse --short HEAD) -t laplace:latest . && docker rm -f laplace && docker run -d --name laplace --env-file .env -p 8000:8000 -v laplace-logs:/app/server/logs -v $(pwd)/.env:/app/.env:ro --restart unless-stopped laplace:latest
 ```
 
-**Nginx 反向代理**：生产环境建议在容器前加 Nginx 处理 SSL 和静态文件托管。参考配置见 `deploy/nginx.conf`。注意 SSE 流式响应需要 `proxy_buffering off`。
+**Nginx 反向代理**：生产环境建议在容器前加 Nginx 处理 SSL 和静态文件托管。参考配置见 `deploy/nginx.conf`。注意以下关键配置：
+- SSE 流式响应需要 `proxy_buffering off`
+- `/admin` 路径必须代理到后端（admin 后台页面和 API 由 FastAPI 统一托管）
+- `/api/` 路径代理到后端（业务 API）
+- 完整部署脚本参考 `deploy/deploy.example.sh`
+
+**管理后台**：Laplace 提供了 admin 管理后台（`/admin/`），支持环境变量编辑、配置文件管理、日志查看等功能。使用前需在 `.env` 中配置 `ADMIN_PASSWORD_HASH`（SHA256 哈希值）。生成方式：
+```bash
+echo -n "your-password" | sha256sum | awk '{print $1}'
+```
 
 > **Docker 环境变量补充**：除 `.env` 中的变量外，容器还支持以下额外变量：
 >

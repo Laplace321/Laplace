@@ -162,6 +162,16 @@ server {
         add_header Access-Control-Allow-Headers 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';
     }
 
+    # Admin 后台（代理到后端 FastAPI）
+    location /admin {
+        proxy_pass http://127.0.0.1:$BACKEND_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
     # API 反向代理
     location /api/ {
         proxy_pass http://127.0.0.1:$BACKEND_PORT;
