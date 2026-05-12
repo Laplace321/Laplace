@@ -167,6 +167,8 @@ LLM_OPENAI_MODELS=gpt-4o,gpt-4o-mini
 | `RATE_LIMIT_PER_MINUTE` | 单 IP 每分钟最大请求数 | `10` |
 | `RATE_LIMIT_GLOBAL_PER_MINUTE` | 全站每分钟最大请求数（0=不限） | `100` |
 | `CHALDEA_SRC_PATH` | Chaldea 源码路径（仅 sync 时使用） | `chaldea-center/chaldea` |
+| `ADMIN_PASSWORD_HASH` | 管理员密码 SHA256 哈希（后台登录） | （空，未设置时不可登录） |
+| `CONTAINER_NAME` | Docker 容器名称（后台重启功能） | `laplace` |
 
 > **本地开发提示**：如果在其他设备上测试时 uvicorn 绑定了非默认地址（如 `http://192.168.x.x:8000`），需要将该地址添加到 `CORS_ORIGINS` 中，否则浏览器会因 CORS 策略拦截请求。示例：
 > ```bash
@@ -230,9 +232,11 @@ Laplace/
 │   ├── index.html
 │   ├── style.css
 │   └── app.js
+├── admin/                 # 后台管理界面（密码认证 + 配置管理 + 日志查看）
 ├── server/                # Python FastAPI 后端
 │   ├── main.py            # API 入口（Skill 模式路由）
-│   ├── llm_client.py      # 大模型交互客户端（通用 schema/validator 接口）
+│   ├── llm/               # LLM 多适配器架构（base + openai/dashscope/obao 适配器）
+│   ├── llm_client.py      # 大模型交互客户端（向后兼容入口）
 │   ├── schemas.py         # RoutingResponse Pydantic 契约
 │   ├── prompts.py         # Skill 路由 Prompt 模板
 │   ├── query_executor.py  # 共享工具函数（load_database / 昵称解析）
