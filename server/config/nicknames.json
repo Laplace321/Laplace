@@ -62,5 +62,55 @@
     "name": "阿尔托莉雅·卡斯特",
     "className": "berserker"
   },
-  "烟雾镜":"特斯卡特利波卡"
+  "烟雾镜": "特斯卡特利波卡",
+  "红A": {
+    "name": "卫宫",
+    "className": "archer"
+  },
+  "红 A": {
+    "name": "卫宫",
+    "className": "archer"
+  },
+  "红弓": {
+    "name": "卫宫",
+    "className": "archer"
+  },
+  "红卫宫": {
+    "name": "卫宫",
+    "className": "archer"
+  },
+  "黑弓": {
+    "name": "卫宫〔Alter〕",
+    "className": "archer"
+  },
+  "弓凛": {
+    "name": "伊什塔尔",
+    "className": "archer"
+  },
+  "枪凛": {
+    "name": "埃列什基伽勒",
+    "className": "lancer"
+  },
+  "花之魔术师": "梅林",
+  "老福": "福尔摩斯",
+  "大公": "弗拉德三世",
+  "小太阳": "噶哦",
+  "嫁王": {
+    "name": "阿尔托莉雅·潘德拉贡",
+    "className": "saber"
+  },
+  "狮子王": {
+    "name": "阿尔托莉雅·潘德拉贡",
+    "className": "lancer"
+  },
+  "弓呆": {
+    "name": "阿尔托莉雅·潘德拉贡",
+    "className": "archer"
+  },
+  "X": "神秘女主角X",
+  "XX": "神秘女主角XX",
+  "杰克": "开膛手杰克",
+  "AUO": "吉尔伽美什",
+  "武藏": "宫本武藏",
+  "老虚": "虞美人"
 }

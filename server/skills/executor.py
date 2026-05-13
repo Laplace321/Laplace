@@ -125,6 +125,12 @@ class SkillExecutor:
 
         # 执行阶段兜底：结果为空
         if total_found == 0:
+            # Skill Fallback: lookup_servant 空结果 → resolve_nickname
+            if self._should_try_nickname_resolve(accepted):
+                resolve_result = self._try_resolve_nickname(db, accepted, response_skill, rejected, start_time)
+                if resolve_result:
+                    return resolve_result
+
             return ExecutionResult(
                 servants=[],
                 total_found=0,
@@ -176,6 +182,121 @@ class SkillExecutor:
             results = [s for s in results if s["id"] in custom_ids]
 
         return results
+
+    def _should_try_nickname_resolve(self, accepted_skills: list[dict]) -> bool:
+        """判断是否应该触发 resolve_nickname fallback。
+
+        触发条件：
+        1. accepted_skills 中仅包含 lookup_servant（纯名称查询）
+        2. resolve_nickname 已注册在 SKILL_REGISTRY 中
+        """
+        if len(accepted_skills) != 1:
+            return False
+        if accepted_skills[0].get("skill_name") != "lookup_servant":
+            return False
+        return "resolve_nickname" in SKILL_REGISTRY
+
+    def _try_resolve_nickname(
+        self,
+        db: list[dict],
+        accepted_skills: list[dict],
+        response_skill: ResponseSkill | None,
+        rejected_skills: list[dict],
+        start_time: float,
+    ) -> ExecutionResult | None:
+        """尝试通过 LLM 昵称识别进行 fallback（同步路径，仅缓存命中有效）。
+
+        返回 ExecutionResult（成功时）或 None（识别失败时）。
+        """
+        resolve_skill = SKILL_REGISTRY.get("resolve_nickname")
+        if resolve_skill is None or not isinstance(resolve_skill, QuerySkill):
+            return None
+
+        # 提取 lookup_servant 的 name 参数
+        name_param = accepted_skills[0].get("params", {}).get("name", "")
+        if not name_param:
+            return None
+
+        # 调用 resolve_nickname（同步路径仅检查缓存）
+        resolve_params = {"name": name_param}
+        results = resolve_skill.execute(db, resolve_params)
+
+        if not results:
+            return None
+
+        # 按稀有度降序 → collectionNo 升序排序
+        results.sort(key=lambda x: (-x.get("rarity", 0), x.get("collectionNo", 0)))
+
+        elapsed_ms = (time.monotonic() - start_time) * 1000
+
+        # 追加 resolve_nickname 到 accepted_skills 记录
+        accepted_with_resolve = list(accepted_skills) + [{"skill_name": "resolve_nickname", "params": resolve_params}]
+
+        return ExecutionResult(
+            servants=results,
+            total_found=len(results),
+            response_skill=response_skill,
+            accepted_skills=accepted_with_resolve,
+            rejected_skills=rejected_skills,
+            execution_time_ms=elapsed_ms,
+        )
+
+    async def try_resolve_nickname_async(
+        self,
+        result: ExecutionResult,
+        skill_calls: list[dict],
+    ) -> ExecutionResult:
+        """异步昵称识别 fallback（供 main.py 在 async 路由中调用）。
+
+        当 SkillExecutor.execute() 返回 is_fallback=True 且满足触发条件时，
+        由 main.py 的 async 路由调用此方法进行 LLM 昵称识别。
+
+        Args:
+            result: execute() 返回的原始 fallback 结果
+            skill_calls: 原始 skill_calls 列表
+
+        Returns:
+            识别成功时返回新的 ExecutionResult，失败时返回原 result 不变
+        """
+        if not self._should_try_nickname_resolve(result.accepted_skills):
+            return result
+
+        resolve_skill = SKILL_REGISTRY.get("resolve_nickname")
+        if resolve_skill is None:
+            return result
+
+        # 提取 lookup_servant 的 name 参数
+        name_param = result.accepted_skills[0].get("params", {}).get("name", "")
+        if not name_param:
+            return result
+
+        # 异步调用 resolve_nickname
+        resolve_params = {"name": name_param}
+        if hasattr(resolve_skill, "execute_async"):
+            db = load_database()
+            results = await resolve_skill.execute_async(db, resolve_params)
+        else:
+            return result
+
+        if not results:
+            return result
+
+        # 按稀有度降序 → collectionNo 升序排序
+        results.sort(key=lambda x: (-x.get("rarity", 0), x.get("collectionNo", 0)))
+
+        # 追加 resolve_nickname 到 accepted_skills 记录
+        accepted_with_resolve = list(result.accepted_skills) + [
+            {"skill_name": "resolve_nickname", "params": resolve_params}
+        ]
+
+        return ExecutionResult(
+            servants=results,
+            total_found=len(results),
+            response_skill=result.response_skill,
+            accepted_skills=accepted_with_resolve,
+            rejected_skills=result.rejected_skills,
+            execution_time_ms=result.execution_time_ms,
+        )
 
     def _resolve_response_skill(self, name: str) -> ResponseSkill | None:
         """解析 Response Skill。"""

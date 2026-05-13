@@ -20,6 +20,7 @@ _SKILL_MODULES = [
     "server.skills.query.search_by_rarity",
     "server.skills.query.search_by_skill_effect",
     "server.skills.query.search_by_traits",
+    "server.skills.query.resolve_nickname",
     # Response Skills
     "server.skills.response.respond_servant_compare",
     "server.skills.response.respond_servant_detail",
