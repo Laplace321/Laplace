@@ -61,17 +61,33 @@ def _ensure_cn_to_class() -> dict[str, str]:
     return _CN_TO_CLASS
 
 
+# 职阶别名表：覆盖 LLM 可能输出的非标准中文名
+# key 为别名，value 为英文 className
+_CLASS_ALIASES: dict[str, str] = {
+    "月之癌": "mooncancer",
+    "Moon Cancer": "mooncancer",
+    "Alter Ego": "alterego",
+    "alter ego": "alterego",
+}
+
+
 def resolve_class_name(cn_name: str) -> str | None:
     """将中文/英文职阶名转换为英文 className。
 
-    支持: "伪装者" / "伪装者(Pretender)" / "Pretender" / "pretender" / "骑阶" 等。
+    支持: "伪装者" / "伪装者(Pretender)" / "Pretender" / "pretender" / "骑阶" / "月之癌" 等。
     """
+    # 优先查别名表（覆盖 LLM 扩写变体）
+    if cn_name in _CLASS_ALIASES:
+        return _CLASS_ALIASES[cn_name]
+    lower = cn_name.lower()
+    if lower in _CLASS_ALIASES:
+        return _CLASS_ALIASES[lower]
+
     cn_map = _ensure_cn_to_class()
     # 精确匹配
     if cn_name in cn_map:
         return cn_map[cn_name]
     # 忽略大小写
-    lower = cn_name.lower()
     if lower in cn_map:
         return cn_map[lower]
     # 子串匹配（如用户输入"伪装"也能命中"伪装者"）
@@ -85,7 +101,7 @@ def get_advantage_classes(target_class: str, include_berserker: bool = True) -> 
     """查询克制目标职阶的所有 className 列表。
 
     Args:
-        target_class: 目标职阶的英文 className
+        target_class: 目标职阶的英文 className（可能是全小写或 camelCase）
         include_berserker: 是否包含 berserker
 
     Returns:
@@ -93,8 +109,16 @@ def get_advantage_classes(target_class: str, include_berserker: bool = True) -> 
     """
     relation = _ensure_class_relation()
     reverse = relation.get("reverse", {})
-    # className 在 Atlas API 中可能是 camelCase（如 alterEgo / moonCancer）
+    # class_relation.json 的 key 是 camelCase（如 alterEgo / moonCancer）
+    # resolve_class_name 返回全小写，需要做大小写不敏感查找
     attackers = reverse.get(target_class, [])
+    if not attackers:
+        # 尝试大小写不敏感匹配
+        target_lower = target_class.lower()
+        for key, val in reverse.items():
+            if key.lower() == target_lower:
+                attackers = val
+                break
     if not include_berserker:
         attackers = [c for c in attackers if c != "berserker"]
     return attackers
@@ -126,12 +150,12 @@ class SearchByClassAdvantage(QuerySkill):
         # 中文 → 英文
         target_eng = resolve_class_name(target_cn)
         if target_eng is None:
-            return True  # 无法识别时不过滤
+            return False  # 无法识别的职阶名 → 过滤掉所有从者，触发 0 结果走 fallback
 
         # 查克制关系
         advantage_classes = get_advantage_classes(target_eng, include_berserker)
         if not advantage_classes:
-            return True  # 无克制数据时不过滤
+            return False  # 无克制数据 → 过滤掉所有从者，触发 0 结果走 fallback
 
         servant_class = servant.get("className", "").lower()
         # className 在 DB 中可能是 camelCase，统一小写比较
