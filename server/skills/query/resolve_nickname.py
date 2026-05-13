@@ -41,15 +41,19 @@ def _cache_set(key: str, value: str | None) -> None:
 
 _SYSTEM_PROMPT = (
     "你是 FGO（Fate/Grand Order）从者数据库助手。"
-    "用户会给你一个从者的昵称或外号，你需要返回该从者在数据库中的**简短中文名称**。\n"
+    "用户会给你一个从者的昵称或外号，你需要返回该从者的**简短中文名称**或**英文名**。\n"
     "规则：\n"
-    "1. 只返回从者的简短中文名称，不要有任何其他文字、解释或标点。\n"
-    "2. 如果你不确定这个昵称对应哪个从者，返回「unknown」。\n"
-    "3. 优先使用简短常用名，**不要**使用全名。\n"
-    "4. 正确示例：梅林、卫宫、吉尔伽美什、诸葛孔明、斯卡蒂、伊什塔尔、贞德。\n"
-    "5. 错误示例（太长）：阿尔托莉雅·潘德拉贡〔弓〕、亚历山大大帝。\n"
+    "1. 只返回从者名称，不要有任何其他文字、解释或标点。\n"
+    "2. 只有当你**完全无法**将该昵称关联到任何 FGO 从者时，才返回「unknown」。"
+    "如果有可能的答案，即使不完全确定，也给出最可能的从者名称。\n"
+    "3. 优先使用简短常用中文名。如果不确定中文名，可以返回英文名（如 Emiya、Altria Pendragon）。\n"
+    "4. 正确示例：梅林、卫宫、吉尔伽美什、诸葛孔明、斯卡蒂、伊什塔尔、贞德、豹人、阿尔托莉雅。\n"
+    "5. 错误示例（太长）：阿尔托莉雅·潘德拉贡〔弓〕。\n"
     "6. 关键映射参考：红A/红弓=卫宫、花之魔术师=梅林、闪闪/金闪闪=吉尔伽美什、"
-    "大帝=伊斯坎达尔、孔明=诸葛孔明、杰克=开膛手杰克、弓凛=伊什塔尔。"
+    "大帝=伊斯坎达尔、孔明=诸葛孔明、杰克=开膛手杰克、弓凛=伊什塔尔、"
+    "老虎/虎=豹人、黑贞=贞德Alter、黑A=阿尔托莉雅Alter、呆毛=阿尔托莉雅、"
+    "小太阳=尼禄、CBA=库丘林Alter、术尼禄=尼禄(Caster)、"
+    "枪凛=埃列什基伽勒、弓王=阿尔托莉雅(Archer)、泳装师匠=斯卡蒂(Caster)。"
 )
 
 
@@ -64,7 +68,7 @@ def _build_user_message(nickname: str) -> str:
 def _validate_in_db(resolved_name: str) -> list[dict]:
     """在 servants_db 中校验 LLM 返回的名称是否存在。
 
-    使用与 lookup_servant 相同的模糊匹配逻辑。
+    使用与 lookup_servant 相同的模糊匹配逻辑（精确 + 子串 + 反向子串）。
     返回匹配到的从者列表。
     """
     db = load_database()
@@ -90,6 +94,17 @@ def _validate_in_db(resolved_name: str) -> list[dict]:
         # 子串匹配（LLM 返回的名称可能是部分名）
         if len(normalized_resolved) >= 2:
             if normalized_resolved in norm_cn or normalized_resolved in norm_en or normalized_resolved in norm_jp:
+                matches.append(servant)
+                continue
+
+        # 反向子串匹配（DB 中的名字是 LLM 返回名字的子串）
+        # 要求 DB 名字占 LLM 返回名字的比例 >= 50%，避免过度泛化
+        if norm_cn and len(norm_cn) >= 2 and norm_cn in normalized_resolved:
+            if len(norm_cn) / len(normalized_resolved) >= 0.5:
+                matches.append(servant)
+                continue
+        if norm_en and len(norm_en) >= 3 and norm_en in normalized_resolved:
+            if len(norm_en) / len(normalized_resolved) >= 0.5:
                 matches.append(servant)
 
     return matches
