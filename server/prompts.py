@@ -205,7 +205,7 @@ def build_routing_prompt(
     - **用户同时提到"自充"和"群充"/"他充"**（如"50自充，30群充"）→ 此时"自充"特指纯自充，必须分别发两个 `search_by_np_charge` 调用：自充用 `targetType: "self"`，群充用 `targetType: "ptAll"`，他充用 `targetType: "ptOne"`
     - `targetType` 取值：`"self"` = 纯自充（仅给自己）、`"ptAll"` = 群充（全队含自己）、`"ptOne"` = 他充（指定单个队友）
     - ⚠️ 注意：**禁止**使用 `"party"` 作为 targetType 值，必须使用 `"ptAll"`（群充）或 `"ptOne"`（他充）
-15. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"等表达时，使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。
+15. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"、"哪个职阶克制XX"、"什么克制XX"等表达时，**必须**使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"、"月癌"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。**即使用户只问"哪个职阶克制X"这种看似知识性问题，也必须走 `search_by_class_advantage`**，系统会在结果中返回克制关系和对应从者。
 16. **疑似从者名称/昵称一律用 lookup_servant（重要）**：当用户的问题中包含你不确定是否为从者名称的词语（如"红A"、"小太阳"、"花之魔术师"、"老虚"、"CBA"、"XJB"、"呆毛"、"2B"等看起来像昵称/外号/缩写/纯字母组合的表达），**必须**使用 `lookup_servant`，将该词语作为 `name` 参数传入。系统后端支持昵称映射和模糊匹配，会自动处理识别。**绝不要**因为你不认识某个名称就返回 `no_match` 或 `out_of_scope`。只要用户的问题看起来是在查询或询问某个特定角色/从者，就选择 `lookup_servant`。**特别注意**：纯英文字母、数字组合、字母+数字混合（如"CBA"、"X4"、"2B"）在 FGO 社区中是常见的从者昵称缩写形式，绝不能因为看起来不像名字就判定为超出范围。如果用户同时问了从者详情（如"XX技能介绍"、"XX宝具是什么"），response_skill 选 `respond_servant_detail`。
 
 ## 示例
@@ -293,6 +293,11 @@ def build_routing_prompt(
 用户："克制骑阶的五星从者"（职阶克制 → search_by_class_advantage）
 ```json
 {{"skill_calls": [{{"skill_name": "search_by_class_advantage", "params": {{"targetClass": "骑阶"}}}}, {{"skill_name": "search_by_rarity", "params": {{"op": "eq", "value": 5}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："哪个职阶克制月癌"（纯职阶克制关系问题 → 仍然用 search_by_class_advantage，不要判定为知识性问题）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_class_advantage", "params": {{"targetClass": "月癌"}}}}], "response_skill": "respond_servant_list"}}
 ```
 """
 
