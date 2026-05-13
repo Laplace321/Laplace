@@ -482,13 +482,20 @@ function handleServants(data, els) {
 }
 
 // === Handle Delta Event ===
+// Fix marked.js not recognizing **bold** adjacent to CJK characters
+function fixCJKBold(text) {
+  return text
+    .replace(/([\u2e80-\u9fff\uff00-\uffef])\*\*/g, '$1\u200B**')
+    .replace(/\*\*([\u2e80-\u9fff\uff00-\uffef])/g, '**\u200B$1');
+}
+
 function handleDelta(data, els) {
   // Complete generating step
   const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
   if (activeStep) completeThinkingStep(activeStep);
 
   const replyHtml = typeof marked !== "undefined"
-    ? marked.parse(data.text)
+    ? marked.parse(fixCJKBold(data.text))
     : `<p>${escapeHtml(data.text)}</p>`;
   els.replyBody.innerHTML = replyHtml + '<span class="stream-cursor"></span>';
   void els.replyBody.offsetHeight;
@@ -604,7 +611,7 @@ function appendAssistantResponse(data) {
   }
 
   // 如果引入了 marked，则解析 Markdown，否则兜底安全转义
-  const replyHtml = typeof marked !== 'undefined' ? marked.parse(data.reply) : `<p>${escapeHtml(data.reply)}</p>`;
+  const replyHtml = typeof marked !== 'undefined' ? marked.parse(fixCJKBold(data.reply)) : `<p>${escapeHtml(data.reply)}</p>`;
 
   msg.innerHTML = `
     <div class="message-avatar">⧫</div>
