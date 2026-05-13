@@ -951,7 +951,13 @@ async def chat(request: ChatRequest):
                     for s in SKILL_REGISTRY.values()
                     if isinstance(s, QuerySkill)
                 ]
-                routing_prompt = build_routing_prompt(skill_descriptions)
+                routing_prompt = build_routing_prompt(
+                    skill_descriptions,
+                    preset_context={
+                        "display_name": preset.display_name,
+                        "query_skills": preset.query_skills,
+                    },
+                )
                 extra_routing = await chat_completion(
                     system_prompt=routing_prompt,
                     user_message=user_text,
@@ -1042,7 +1048,13 @@ async def chat_stream(message: str, preset_name: str | None = None):
                         for s in SKILL_REGISTRY.values()
                         if isinstance(s, QuerySkill)
                     ]
-                    routing_prompt = build_routing_prompt(skill_descriptions)
+                    routing_prompt = build_routing_prompt(
+                        skill_descriptions,
+                        preset_context={
+                            "display_name": preset.display_name,
+                            "query_skills": preset.query_skills,
+                        },
+                    )
                     extra_routing = await chat_completion(
                         system_prompt=routing_prompt,
                         user_message=user_text,

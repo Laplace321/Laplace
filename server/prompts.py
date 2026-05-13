@@ -114,11 +114,16 @@ def get_generation_prompt(user_query: str, context_json: str) -> str:
 # ============================================================
 
 
-def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
+def build_routing_prompt(
+    skill_descriptions: list[dict[str, str]],
+    preset_context: dict | None = None,
+) -> str:
     """构建 Stage 1 路由 Prompt。
 
     Args:
         skill_descriptions: [{"name": "search_by_class", "description": "按职阶筛选"}, ...]
+        preset_context: 可选的 Preset 上下文，用于在 Prompt 中追加场景约束。
+            格式: {"display_name": "从者查询", "query_skills": ["lookup_servant"]}
 
     Returns:
         系统 Prompt 字符串
@@ -135,7 +140,7 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
 {effect_hints}
 """
 
-    return f"""你是 Laplace 路由器。根据用户的自然语言问题，选择需要执行的 Skill 组合。
+    prompt = f"""你是 Laplace 路由器。根据用户的自然语言问题，选择需要执行的 Skill 组合。
 
 ## 可用 Skills
 {skills_section}
@@ -201,7 +206,7 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
     - `targetType` 取值：`"self"` = 纯自充（仅给自己）、`"ptAll"` = 群充（全队含自己）、`"ptOne"` = 他充（指定单个队友）
     - ⚠️ 注意：**禁止**使用 `"party"` 作为 targetType 值，必须使用 `"ptAll"`（群充）或 `"ptOne"`（他充）
 15. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"等表达时，使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。
-16. **疑似从者名称/昵称一律用 lookup_servant（重要）**：当用户的问题中包含你不确定是否为从者名称的词语（如"红A"、"小太阳"、"花之魔术师"、"老虚"等看起来像昵称/外号/缩写的表达），**必须**使用 `lookup_servant`，将该词语作为 `name` 参数传入。系统后端支持昵称映射和模糊匹配，会自动处理识别。**绝不要**因为你不认识某个名称就返回 `no_match`。只要用户的问题看起来是在查询或询问某个特定角色/从者，就选择 `lookup_servant`。如果用户同时问了从者详情（如"XX技能介绍"、"XX宝具是什么"），response_skill 选 `respond_servant_detail`。
+16. **疑似从者名称/昵称一律用 lookup_servant（重要）**：当用户的问题中包含你不确定是否为从者名称的词语（如"红A"、"小太阳"、"花之魔术师"、"老虚"、"CBA"、"XJB"、"呆毛"、"2B"等看起来像昵称/外号/缩写/纯字母组合的表达），**必须**使用 `lookup_servant`，将该词语作为 `name` 参数传入。系统后端支持昵称映射和模糊匹配，会自动处理识别。**绝不要**因为你不认识某个名称就返回 `no_match` 或 `out_of_scope`。只要用户的问题看起来是在查询或询问某个特定角色/从者，就选择 `lookup_servant`。**特别注意**：纯英文字母、数字组合、字母+数字混合（如"CBA"、"X4"、"2B"）在 FGO 社区中是常见的从者昵称缩写形式，绝不能因为看起来不像名字就判定为超出范围。如果用户同时问了从者详情（如"XX技能介绍"、"XX宝具是什么"），response_skill 选 `respond_servant_detail`。
 
 ## 示例
 
@@ -290,6 +295,30 @@ def build_routing_prompt(skill_descriptions: list[dict[str, str]]) -> str:
 {{"skill_calls": [{{"skill_name": "search_by_class_advantage", "params": {{"targetClass": "骑阶"}}}}, {{"skill_name": "search_by_rarity", "params": {{"op": "eq", "value": 5}}}}], "response_skill": "respond_servant_list"}}
 ```
 """
+
+    # 追加 Preset 场景约束段落（方案 D：让 LLM 在 Preset 模式下成为约束参数提取器）
+    if preset_context:
+        display_name = preset_context.get("display_name", "未知预设")
+        query_skills = preset_context.get("query_skills", [])
+        # 从 skill_descriptions 中查找对应描述
+        skill_desc_map = {s["name"]: s["description"] for s in skill_descriptions}
+        skills_list = "\n".join(f"- `{sk}`: {skill_desc_map.get(sk, '(未知)')}" for sk in query_skills)
+        preset_section = f"""
+
+## 当前场景约束（Preset 模式）
+
+用户已通过预设选择了【{display_name}】场景，预设包含以下 Skill：
+{skills_list}
+
+**强制规则**：
+1. 你的输出**必须**包含上述预设 Skill。
+2. 将用户输入中的主体词视为预设 Skill 所需的参数（如从者名称、效果名等），直接填入对应参数字段。
+3. 即使你不认识用户输入的名称/词语，也必须将其作为参数传入，由后续系统判断是否有效。**禁止返回 fallback**。
+4. 如果用户输入还包含其他查询维度（如效果、职阶、充能等），可追加额外的 skill_calls。
+"""
+        prompt += preset_section
+
+    return prompt
 
 
 def build_params_prompt(
