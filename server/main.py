@@ -196,6 +196,9 @@ def _describe_filters(skill_calls: list[dict]) -> list[str]:
         elif name == "lookup_servant":
             query = params.get("name") or params.get("query", "")
             descriptions.append(f"查询从者「{query}」")
+        elif name == "resolve_nickname":
+            nick = params.get("name", "")
+            descriptions.append(f"智能识别昵称「{nick}」")
         else:
             # 兜底：仅输出 Skill 中文 description，禁止暴露参数结构
             from server.skills.base import SKILL_REGISTRY

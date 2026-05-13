@@ -91,6 +91,7 @@ const SKILL_DISPLAY_NAMES = {
   search_by_class_advantage: "职阶克制筛选",
   lookup_servant: "从者查询",
   compare_servants: "从者对比",
+  resolve_nickname: "昵称识别",
 };
 
 function getSkillDisplayName(skillName) {
