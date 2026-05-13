@@ -222,6 +222,34 @@
   4. `REFRESH_DATA_ON_START=1` 仍可作为手动强制刷新的手段。
 - **目的**：杜绝「代码更新但数据陈旧」导致的线上功能异常（如 traitAdd 合并逻辑上线后旧数据缺少兽科特性）。
 
+### 11. 线上部署操作规范 (Production Deploy Discipline)
+- **准则**：**[绝对纪律]** 部署到线上时，必须严格遵循以下端口映射和健康检查流程，禁止凭记忆执行。
+- **执行**：
+  1. **端口映射强制规则**：nginx 反代到 `127.0.0.1:8000`，Docker 容器端口映射**必须**使用 `-p 8000:8000`。**严禁**使用 `-p 8080:8000` 或任何非 8000 的 host 端口，否则 nginx 将无法连接到后端导致 502。
+  2. **标准 docker run 命令**（每次部署必须参照，禁止凭记忆拼写）：
+     ```bash
+     docker run -d \
+       --name laplace \
+       --restart unless-stopped \
+       -p 8000:8000 \
+       -v /opt/laplace/server/logs:/app/server/logs \
+       -v /opt/laplace/server/data:/app/server/data \
+       --env-file /opt/laplace/.env \
+       laplace:latest
+     ```
+  3. **部署后必须健康检查**：容器启动后，**必须**执行以下命令验证服务可达，确认 HTTP 200 后才可视为部署成功：
+     ```bash
+     curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/health
+     ```
+  4. **完整部署流程（强制顺序）**：
+     ```
+     git pull → docker build --build-arg BUILD_VERSION=$(git rev-parse --short HEAD) -t laplace:latest .
+     → docker stop laplace → docker rm laplace → docker run（见上方标准命令）
+     → 等待 3s → curl 健康检查 → 确认 200
+     ```
+  5. 如果健康检查失败，立即 `docker logs laplace` 查看错误，禁止无视 502 等异常。
+- **目的**：杜绝因端口映射错误、容器未启动等低级失误导致线上 502 不可用。
+
 ## 禁止事项
 
 - ❌ 未经确认删除文件或数据
