@@ -752,7 +752,29 @@ async def _handle_skill_mode(
         },
     )
 
-    # Fallback 处理 → Agent 兜底（传入 OneShot 上下文）
+    # Fallback 处理：先尝试异步昵称识别，再 Agent 兜底
+    if result.is_fallback:
+        # 异步 resolve_nickname fallback（LLM 昵称识别）
+        result = await executor.try_resolve_nickname_async(result, skill_calls)
+        if not result.is_fallback:
+            # 昵称识别成功，走正常 RAG 生成路径
+            servants = result.servants
+            total_found = result.total_found
+            returned_servants = servants[:MAX_RESULTS]
+            # 更新 execution trace（追加 resolve_nickname 信息）
+            await log_trace_event(
+                trace_id,
+                "execution_resolve_nickname",
+                {
+                    "accepted_skills": result.accepted_skills,
+                    "total_found": total_found,
+                    "execution_time_ms": round(result.execution_time_ms, 2),
+                },
+            )
+        else:
+            # 昵称识别也失败，进入 Agent fallback
+            pass
+
     if result.is_fallback:
         oneshot_ctx = _build_oneshot_context(skill_calls)
         try:
@@ -1315,7 +1337,25 @@ async def chat_stream(message: str, preset_name: str | None = None):
             },
         )
 
-        # 执行阶段 fallback（结果为空）→ Agent 兜底（传入 OneShot 上下文）
+        # 执行阶段 fallback：先尝试异步昵称识别，再 Agent 兜底
+        if result.is_fallback:
+            # 异步 resolve_nickname fallback（LLM 昵称识别）
+            result = await executor.try_resolve_nickname_async(result, skill_calls)
+            if not result.is_fallback:
+                # 昵称识别成功，更新变量走正常 RAG 路径
+                servants = result.servants
+                total_found = result.total_found
+                returned_servants = servants[:MAX_RESULTS]
+                await log_trace_event(
+                    trace_id,
+                    "execution_resolve_nickname",
+                    {
+                        "accepted_skills": result.accepted_skills,
+                        "total_found": total_found,
+                        "execution_time_ms": round(result.execution_time_ms, 2),
+                    },
+                )
+
         if result.is_fallback:
             oneshot_ctx = _build_oneshot_context(skill_calls)
             fb_reply = result.fallback_message or "未找到匹配的从者。"

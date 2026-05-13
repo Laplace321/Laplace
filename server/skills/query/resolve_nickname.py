@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from collections import OrderedDict
 
 from pydantic import BaseModel, Field
@@ -42,11 +41,15 @@ def _cache_set(key: str, value: str | None) -> None:
 
 _SYSTEM_PROMPT = (
     "你是 FGO（Fate/Grand Order）从者数据库助手。"
-    "用户会给你一个从者的昵称或外号，你需要返回该从者的中文正式名称。\n"
+    "用户会给你一个从者的昵称或外号，你需要返回该从者在数据库中的**简短中文名称**。\n"
     "规则：\n"
-    "1. 只返回从者的中文正式名称，不要有任何其他文字、解释或标点。\n"
+    "1. 只返回从者的简短中文名称，不要有任何其他文字、解释或标点。\n"
     "2. 如果你不确定这个昵称对应哪个从者，返回「unknown」。\n"
-    "3. 名称格式示例：阿尔托莉雅·潘德拉贡、吉尔伽美什、诸葛孔明、梅林。"
+    "3. 优先使用简短常用名，**不要**使用全名。\n"
+    "4. 正确示例：梅林、卫宫、吉尔伽美什、诸葛孔明、斯卡蒂、伊什塔尔、贞德。\n"
+    "5. 错误示例（太长）：阿尔托莉雅·潘德拉贡〔弓〕、亚历山大大帝。\n"
+    "6. 关键映射参考：红A/红弓=卫宫、花之魔术师=梅林、闪闪/金闪闪=吉尔伽美什、"
+    "大帝=伊斯坎达尔、孔明=诸葛孔明、杰克=开膛手杰克、弓凛=伊什塔尔。"
 )
 
 
@@ -114,11 +117,23 @@ class ResolveNickname(QuerySkill):
         return Params
 
     def execute(self, db: list[dict], params: dict) -> list[dict]:
-        """同步包装 async 执行逻辑。
+        """同步执行（仅缓存命中时有效，LLM 调用走 execute_async）。"""
+        nickname = params.get("name", "").strip()
+        if not nickname:
+            return []
 
-        注意：SkillExecutor 当前是同步调用 execute()，
-        因此这里使用 asyncio 事件循环来运行 async LLM 调用。
-        """
+        # 仅检查 LRU 缓存（同步路径）
+        cache_key = _normalize_text(nickname)
+        hit, cached_name = _cache_get(cache_key)
+        if hit and cached_name:
+            return _validate_in_db(cached_name)
+
+        # 未命中缓存时，同步路径无法调用 LLM，返回空
+        # 生产环境通过 execute_async() 调用
+        return []
+
+    async def execute_async(self, db: list[dict], params: dict) -> list[dict]:
+        """异步执行（支持 LLM 调用，用于 FastAPI 环境）。"""
         nickname = params.get("name", "").strip()
         if not nickname:
             return []
@@ -130,7 +145,7 @@ class ResolveNickname(QuerySkill):
             return _validate_in_db(cached_name)
 
         # 2. 调用 LLM 识别
-        resolved_name = self._call_llm_sync(nickname)
+        resolved_name = await self._call_llm_async(nickname)
         if not resolved_name or resolved_name.strip().lower() == "unknown":
             return []
 
@@ -143,23 +158,6 @@ class ResolveNickname(QuerySkill):
             _cache_set(cache_key, resolved_name)
 
         return matches
-
-    def _call_llm_sync(self, nickname: str) -> str | None:
-        """同步调用 LLM 进行昵称识别。"""
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # 在已有事件循环中（FastAPI 环境），使用线程池
-                import concurrent.futures
-
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    future = pool.submit(asyncio.run, self._call_llm_async(nickname))
-                    return future.result(timeout=10)
-            else:
-                return loop.run_until_complete(self._call_llm_async(nickname))
-        except Exception as e:
-            print(f"⚠️  [resolve_nickname] LLM 调用失败: {e}")
-            return None
 
     async def _call_llm_async(self, nickname: str) -> str | None:
         """异步调用 LLM。"""

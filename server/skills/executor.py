@@ -204,7 +204,7 @@ class SkillExecutor:
         rejected_skills: list[dict],
         start_time: float,
     ) -> ExecutionResult | None:
-        """尝试通过 LLM 昵称识别进行 fallback。
+        """尝试通过 LLM 昵称识别进行 fallback（同步路径，仅缓存命中有效）。
 
         返回 ExecutionResult（成功时）或 None（识别失败时）。
         """
@@ -217,7 +217,7 @@ class SkillExecutor:
         if not name_param:
             return None
 
-        # 调用 resolve_nickname
+        # 调用 resolve_nickname（同步路径仅检查缓存）
         resolve_params = {"name": name_param}
         results = resolve_skill.execute(db, resolve_params)
 
@@ -239,6 +239,63 @@ class SkillExecutor:
             accepted_skills=accepted_with_resolve,
             rejected_skills=rejected_skills,
             execution_time_ms=elapsed_ms,
+        )
+
+    async def try_resolve_nickname_async(
+        self,
+        result: ExecutionResult,
+        skill_calls: list[dict],
+    ) -> ExecutionResult:
+        """异步昵称识别 fallback（供 main.py 在 async 路由中调用）。
+
+        当 SkillExecutor.execute() 返回 is_fallback=True 且满足触发条件时，
+        由 main.py 的 async 路由调用此方法进行 LLM 昵称识别。
+
+        Args:
+            result: execute() 返回的原始 fallback 结果
+            skill_calls: 原始 skill_calls 列表
+
+        Returns:
+            识别成功时返回新的 ExecutionResult，失败时返回原 result 不变
+        """
+        if not self._should_try_nickname_resolve(result.accepted_skills):
+            return result
+
+        resolve_skill = SKILL_REGISTRY.get("resolve_nickname")
+        if resolve_skill is None:
+            return result
+
+        # 提取 lookup_servant 的 name 参数
+        name_param = result.accepted_skills[0].get("params", {}).get("name", "")
+        if not name_param:
+            return result
+
+        # 异步调用 resolve_nickname
+        resolve_params = {"name": name_param}
+        if hasattr(resolve_skill, "execute_async"):
+            db = load_database()
+            results = await resolve_skill.execute_async(db, resolve_params)
+        else:
+            return result
+
+        if not results:
+            return result
+
+        # 按稀有度降序 → collectionNo 升序排序
+        results.sort(key=lambda x: (-x.get("rarity", 0), x.get("collectionNo", 0)))
+
+        # 追加 resolve_nickname 到 accepted_skills 记录
+        accepted_with_resolve = list(result.accepted_skills) + [
+            {"skill_name": "resolve_nickname", "params": resolve_params}
+        ]
+
+        return ExecutionResult(
+            servants=results,
+            total_found=len(results),
+            response_skill=result.response_skill,
+            accepted_skills=accepted_with_resolve,
+            rejected_skills=result.rejected_skills,
+            execution_time_ms=result.execution_time_ms,
         )
 
     def _resolve_response_skill(self, name: str) -> ResponseSkill | None:

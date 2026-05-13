@@ -4,13 +4,15 @@ resolve_nickname Skill 单元测试。
 测试范围：
 - LRU 缓存命中/未命中
 - DB 存在性校验成功/失败
-- SkillExecutor fallback 链触发条件
+- SkillExecutor fallback 链触发条件（同步缓存 + 异步 LLM）
 - Mock LLM 调用（不依赖真实网络）
 
 所有测试直接调用 Skill / SkillExecutor，纯确定性测试。
 """
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 import server.skills  # noqa: F401 — 触发 @register_skill 注册
 from server.skills.base import SKILL_REGISTRY
@@ -113,22 +115,24 @@ class TestResolveNicknameSkill:
         assert skill.name == "resolve_nickname"
         assert skill.domain == "servant"
 
-    @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_sync")
-    def test_llm_success_with_valid_name(self, mock_llm):
-        """LLM 返回有效从者名时应匹配成功。"""
+    @pytest.mark.asyncio
+    @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_async", new_callable=AsyncMock)
+    async def test_llm_success_with_valid_name(self, mock_llm):
+        """LLM 返回有效从者名时应匹配成功（异步路径）。"""
         mock_llm.return_value = "梅林"
 
         from server.query_executor import load_database
 
         db = load_database()
         skill = SKILL_REGISTRY["resolve_nickname"]
-        results = skill.execute(db, {"name": "花之魔术师"})
+        results = await skill.execute_async(db, {"name": "花之魔术师"})
 
         assert len(results) >= 1
         mock_llm.assert_called_once_with("花之魔术师")
 
-    @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_sync")
-    def test_llm_returns_unknown(self, mock_llm):
+    @pytest.mark.asyncio
+    @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_async", new_callable=AsyncMock)
+    async def test_llm_returns_unknown(self, mock_llm):
         """LLM 返回 unknown 时应返回空结果。"""
         mock_llm.return_value = "unknown"
 
@@ -136,12 +140,13 @@ class TestResolveNicknameSkill:
 
         db = load_database()
         skill = SKILL_REGISTRY["resolve_nickname"]
-        results = skill.execute(db, {"name": "完全胡扯的名字"})
+        results = await skill.execute_async(db, {"name": "完全胡扯的名字"})
 
         assert results == []
 
-    @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_sync")
-    def test_llm_returns_nonexistent_name(self, mock_llm):
+    @pytest.mark.asyncio
+    @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_async", new_callable=AsyncMock)
+    async def test_llm_returns_nonexistent_name(self, mock_llm):
         """LLM 返回不存在的名称时（幻觉），DB 校验应拦截。"""
         mock_llm.return_value = "根本不存在的从者ABC"
 
@@ -149,13 +154,12 @@ class TestResolveNicknameSkill:
 
         db = load_database()
         skill = SKILL_REGISTRY["resolve_nickname"]
-        results = skill.execute(db, {"name": "某个昵称"})
+        results = await skill.execute_async(db, {"name": "某个昵称"})
 
         assert results == []
 
-    @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_sync")
-    def test_cache_hit_skips_llm(self, mock_llm):
-        """缓存命中时不应调用 LLM。"""
+    def test_cache_hit_skips_llm(self):
+        """缓存命中时同步 execute() 直接返回结果（不需要 LLM）。"""
         # 预填充缓存
         _cache_set("花之魔术师", "梅林")
 
@@ -166,10 +170,10 @@ class TestResolveNicknameSkill:
         results = skill.execute(db, {"name": "花之魔术师"})
 
         assert len(results) >= 1
-        mock_llm.assert_not_called()
 
-    @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_sync")
-    def test_successful_resolve_populates_cache(self, mock_llm):
+    @pytest.mark.asyncio
+    @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_async", new_callable=AsyncMock)
+    async def test_successful_resolve_populates_cache(self, mock_llm):
         """成功识别后应写入缓存。"""
         mock_llm.return_value = "梅林"
 
@@ -177,7 +181,7 @@ class TestResolveNicknameSkill:
 
         db = load_database()
         skill = SKILL_REGISTRY["resolve_nickname"]
-        skill.execute(db, {"name": "花之魔术师"})
+        await skill.execute_async(db, {"name": "花之魔术师"})
 
         # 验证缓存已写入
         from server.skills.query.resolve_nickname import _normalize_text
@@ -196,6 +200,15 @@ class TestResolveNicknameSkill:
         results = skill.execute(db, {"name": ""})
         assert results == []
 
+    def test_sync_execute_returns_empty_without_cache(self):
+        """同步 execute() 在缓存未命中时返回空（不调用 LLM）。"""
+        from server.query_executor import load_database
+
+        db = load_database()
+        skill = SKILL_REGISTRY["resolve_nickname"]
+        results = skill.execute(db, {"name": "花之魔术师"})
+        assert results == []
+
 
 class TestExecutorFallbackChain:
     """测试 SkillExecutor 的 nickname resolve fallback 链。"""
@@ -204,19 +217,41 @@ class TestExecutorFallbackChain:
         self.executor = SkillExecutor()
         _nickname_cache.clear()
 
-    @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_sync")
-    def test_fallback_triggers_on_lookup_empty(self, mock_llm):
-        """lookup_servant 单独查空时应触发 resolve_nickname fallback。"""
-        mock_llm.return_value = "梅林"
+    def test_sync_fallback_with_cache_hit(self):
+        """同步 fallback 在缓存命中时应触发成功。"""
+        # 使用一个不在 nicknames.json 中的昵称，预填充缓存
+        _cache_set("花魔", "梅林")
 
         result = self.executor.execute(
-            skill_calls=[{"skill_name": "lookup_servant", "params": {"name": "花之魔术师"}}],
+            skill_calls=[{"skill_name": "lookup_servant", "params": {"name": "花魔"}}],
         )
 
-        # 应该通过 fallback 找到梅林
+        # 通过缓存命中的同步 fallback 找到梅林
         assert result.total_found >= 1
         assert not result.is_fallback
-        # accepted_skills 中应包含 resolve_nickname
+        skill_names = [s["skill_name"] for s in result.accepted_skills]
+        assert "resolve_nickname" in skill_names
+
+    @pytest.mark.asyncio
+    @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_async", new_callable=AsyncMock)
+    async def test_async_fallback_triggers_on_lookup_empty(self, mock_llm):
+        """异步 fallback：lookup_servant 单独查空时应通过 LLM 识别成功。"""
+        mock_llm.return_value = "梅林"
+
+        # 使用一个不在 nicknames.json 中的昵称，确保 lookup_servant 查不到
+        result = self.executor.execute(
+            skill_calls=[{"skill_name": "lookup_servant", "params": {"name": "花魔术"}}],
+        )
+        assert result.is_fallback
+
+        # 异步 fallback
+        result = await self.executor.try_resolve_nickname_async(
+            result,
+            [{"skill_name": "lookup_servant", "params": {"name": "花魔术"}}],
+        )
+
+        assert result.total_found >= 1
+        assert not result.is_fallback
         skill_names = [s["skill_name"] for s in result.accepted_skills]
         assert "resolve_nickname" in skill_names
 
@@ -245,13 +280,21 @@ class TestExecutorFallbackChain:
         skill_names = [s["skill_name"] for s in result.accepted_skills]
         assert "resolve_nickname" not in skill_names
 
-    @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_sync")
-    def test_fallback_returns_empty_when_llm_fails(self, mock_llm):
-        """LLM 识别失败时，fallback 应正常返回空结果。"""
+    @pytest.mark.asyncio
+    @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_async", new_callable=AsyncMock)
+    async def test_async_fallback_returns_empty_when_llm_fails(self, mock_llm):
+        """LLM 识别失败时，异步 fallback 应返回原始 fallback 结果。"""
         mock_llm.return_value = None
 
         result = self.executor.execute(
             skill_calls=[{"skill_name": "lookup_servant", "params": {"name": "完全不存在"}}],
+        )
+        assert result.is_fallback
+
+        # 异步 fallback 也失败
+        result = await self.executor.try_resolve_nickname_async(
+            result,
+            [{"skill_name": "lookup_servant", "params": {"name": "完全不存在"}}],
         )
 
         assert result.total_found == 0
