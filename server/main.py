@@ -234,25 +234,33 @@ def _format_effect_detail(eff: dict, is_np: bool = False) -> str:
     target = _TARGET_TYPE_MAP.get(eff.get("targetType", ""), "")
     eff_type = eff.get("type", "")
 
-    # 数值转换：不同效果有不同单位
-    raw_value = eff.get("valueLv1", 0) if is_np else eff.get("valueMax", 0)
+    # 数值转换规则（与 Chaldea/FGO svals.Value 单位保持一致）：
+    # 1. 万分比类（/100 → 百分比）：NP充能相关
+    # 2. 直接数值类（不转换）：星/HP/伤害等绝对值
+    # 3. 千分比类（/10 → 百分比）：大多数 buff 效果（默认）
+    _NP_PERCENT_EFFECTS = {"gainNp", "regainNp"}  # 万分比，/100
+    _STAR_EFFECTS = {"gainStar", "regainStar"}  # 直接数值，单位"个"
+    _HP_EFFECTS = {"gainHp", "regainHp", "addMaxhp", "guts", "reduceHp", "subSelfdamage"}  # 直接数值，单位空
+    _DAMAGE_EFFECTS = {"addDamage", "damageNpSP"}  # 直接数值
+    _COUNT_EFFECTS = {"shortenSkill", "upChagetd"}  # 直接数值，无单位后缀
 
-    # gainNp: 万分比（5000 = 50%），用 /100
-    # gainStar/gainHp: 直接数值（不除），gainStar 的 15 就是 15颗星
-    # 其他（upBuster等）: 千分比（500 = 50%），用 /10
-    _RAW_VALUE_EFFECTS = {"gainStar", "gainHp"}  # 直接数值，不转换
-    _NP_VALUE_EFFECTS = {"gainNp"}  # 万分比，/100
+    raw_value = eff.get("valueLv1", 0) if is_np else eff.get("valueMax", 0)
 
     parts = []
     if raw_value and raw_value > 0:
-        if eff_type in _RAW_VALUE_EFFECTS:
+        if eff_type in _NP_PERCENT_EFFECTS:
+            parts.append(f"{raw_value / 100:.0f}%")
+        elif eff_type in _STAR_EFFECTS:
             parts.append(f"{raw_value}个")
-        elif eff_type in _NP_VALUE_EFFECTS:
-            value_pct = raw_value / 100
-            parts.append(f"{value_pct:.0f}%")
+        elif eff_type in _HP_EFFECTS:
+            parts.append(f"{raw_value}")
+        elif eff_type in _DAMAGE_EFFECTS:
+            parts.append(f"{raw_value}")
+        elif eff_type in _COUNT_EFFECTS:
+            parts.append(f"{raw_value}")
         else:
-            value_pct = raw_value / 10
-            parts.append(f"{value_pct:.0f}%")
+            # 默认：千分比 → 百分比
+            parts.append(f"{raw_value / 10:.0f}%")
 
     if target:
         parts.append(target)
