@@ -211,8 +211,92 @@ def _describe_filters(skill_calls: list[dict]) -> list[str]:
     return descriptions
 
 
-def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
+# ── targetType 中文映射 ──
+_TARGET_TYPE_MAP = {
+    "self": "自身",
+    "party": "全队",
+    "enemy": "敌方",
+    "other": "单体队友",
+}
+
+
+def _format_effect_detail(eff: dict, is_np: bool = False) -> str:
+    """将 effect dict 转为中文描述字符串（含数值、目标、持续）。
+
+    Args:
+        eff: {"type": "upBuster", "targetType": "self", "valueMax": 500, "turn": 1, "count": -1}
+        is_np: True 时使用 valueLv1 代替 valueMax
+
+    Returns:
+        如 "Buster提升(50%,自身,1T)" 或 "暴击星获得(15个,自身)"
+    """
+    effect_name = get_effect_translation(eff.get("type", ""))
+    target = _TARGET_TYPE_MAP.get(eff.get("targetType", ""), "")
+
+    # 数值：千分比 → 百分比
+    raw_value = eff.get("valueLv1", 0) if is_np else eff.get("valueMax", 0)
+    value_pct = raw_value / 10 if raw_value else 0
+
+    # 特殊效果类型用"个"而非"%"
+    _COUNT_EFFECTS = {"gainStar", "gainHp", "gainNp"}
+    eff_type = eff.get("type", "")
+
+    parts = []
+    if value_pct > 0:
+        if eff_type in _COUNT_EFFECTS:
+            # gainNp 千分比也转为百分比显示
+            if eff_type == "gainNp":
+                parts.append(f"{value_pct:.0f}%")
+            else:
+                parts.append(f"{value_pct:.0f}个")
+        else:
+            parts.append(f"{value_pct:.0f}%")
+
+    if target:
+        parts.append(target)
+
+    turn = eff.get("turn", 0)
+    count = eff.get("count", -1)
+    if turn and turn > 0:
+        parts.append(f"{turn}T")
+    elif count and count > 0:
+        parts.append(f"{count}次")
+
+    if parts:
+        return f"{effect_name}({','.join(parts)})"
+    return effect_name
+
+
+def _build_skill_details(servant: dict) -> list[dict]:
+    """构建单从者的技能详情（含数值）。"""
+    result = []
+    for sk in servant.get("skillDetails", []):
+        effects = []
+        for eff in sk.get("effects", []):
+            effects.append(_format_effect_detail(eff, is_np=False))
+        if effects:
+            result.append({"技能名": sk.get("skillName", ""), "效果": effects})
+    return result
+
+
+def _build_np_details(servant: dict) -> list[dict]:
+    """构建单从者的宝具详情（含数值）。"""
+    result = []
+    for np_d in servant.get("npDetails", []):
+        effects = []
+        for eff in np_d.get("effects", []):
+            effects.append(_format_effect_detail(eff, is_np=True))
+        if effects:
+            result.append({"宝具名": np_d.get("npName", ""), "效果": effects})
+    return result
+
+
+def _build_context(servants: list[dict], detail_mode: bool = False) -> tuple[dict, list[dict]]:
     """构建预消化的精简 Context 供 RAG 生成使用。
+
+    Args:
+        servants: 匹配的从者列表
+        detail_mode: True 时为单从者详情模式，输出效果数值/目标/回合数
 
     Returns:
         (context_data, top_results) — context_data 含 total_found 等元信息；
@@ -248,6 +332,15 @@ def _build_context(servants: list[dict]) -> tuple[dict, list[dict]]:
             "技能效果": translated_effects,
             "宝具效果": translated_np_effects,
         }
+        # 详情模式：附带技能/宝具的数值、目标、回合数
+        if detail_mode:
+            skill_details = _build_skill_details(s)
+            np_details = _build_np_details(s)
+            if skill_details:
+                entry["技能详情"] = skill_details
+            if np_details:
+                entry["宝具详情"] = np_details
+
         # 条件特性注释（仅在从者有条件特性时附带，供 LLM 在分析中说明）
         cond_traits = s.get("conditionalTraits", [])
         if cond_traits:
@@ -816,7 +909,8 @@ async def _handle_skill_mode(
             final_reply = result.fallback_message or "未找到匹配的从者。"
     else:
         # RAG 生成
-        context_data, _ = _build_context(servants)
+        detail_mode = response_skill_name == "respond_servant_detail"
+        context_data, _ = _build_context(servants, detail_mode=detail_mode)
         applied_filters = _describe_filters(skill_calls)
         context_data["已应用的筛选条件"] = applied_filters
         context_data["筛选条件"] = applied_filters
@@ -1435,7 +1529,8 @@ async def chat_stream(message: str, preset_name: str | None = None):
         # ── 阶段 3: RAG 生成 ──
         yield _sse_event("thinking", {"phase": "generating", "message": "正在生成分析..."})
 
-        context_data, _ = _build_context(servants)
+        detail_mode = response_skill_name == "respond_servant_detail"
+        context_data, _ = _build_context(servants, detail_mode=detail_mode)
         applied_filters = _describe_filters(skill_calls)
         context_data["已应用的筛选条件"] = applied_filters
         context_data["筛选条件"] = applied_filters
