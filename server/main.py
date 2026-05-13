@@ -228,28 +228,30 @@ def _format_effect_detail(eff: dict, is_np: bool = False) -> str:
         is_np: True 时使用 valueLv1 代替 valueMax
 
     Returns:
-        如 "Buster提升(50%,自身,1T)" 或 "暴击星获得(15个,自身)"
+        如 "Buster提升(50%,自身,1T)" 或 "获得暴击星(15个,自身)"
     """
     effect_name = get_effect_translation(eff.get("type", ""))
     target = _TARGET_TYPE_MAP.get(eff.get("targetType", ""), "")
-
-    # 数值：千分比 → 百分比
-    raw_value = eff.get("valueLv1", 0) if is_np else eff.get("valueMax", 0)
-    value_pct = raw_value / 10 if raw_value else 0
-
-    # 特殊效果类型用"个"而非"%"
-    _COUNT_EFFECTS = {"gainStar", "gainHp", "gainNp"}
     eff_type = eff.get("type", "")
 
+    # 数值转换：不同效果有不同单位
+    raw_value = eff.get("valueLv1", 0) if is_np else eff.get("valueMax", 0)
+
+    # gainNp: 万分比（5000 = 50%），用 /100
+    # gainStar/gainHp: 直接数值（不除），gainStar 的 15 就是 15颗星
+    # 其他（upBuster等）: 千分比（500 = 50%），用 /10
+    _RAW_VALUE_EFFECTS = {"gainStar", "gainHp"}  # 直接数值，不转换
+    _NP_VALUE_EFFECTS = {"gainNp"}  # 万分比，/100
+
     parts = []
-    if value_pct > 0:
-        if eff_type in _COUNT_EFFECTS:
-            # gainNp 千分比也转为百分比显示
-            if eff_type == "gainNp":
-                parts.append(f"{value_pct:.0f}%")
-            else:
-                parts.append(f"{value_pct:.0f}个")
+    if raw_value and raw_value > 0:
+        if eff_type in _RAW_VALUE_EFFECTS:
+            parts.append(f"{raw_value}个")
+        elif eff_type in _NP_VALUE_EFFECTS:
+            value_pct = raw_value / 100
+            parts.append(f"{value_pct:.0f}%")
         else:
+            value_pct = raw_value / 10
             parts.append(f"{value_pct:.0f}%")
 
     if target:
@@ -268,26 +270,28 @@ def _format_effect_detail(eff: dict, is_np: bool = False) -> str:
 
 
 def _build_skill_details(servant: dict) -> list[dict]:
-    """构建单从者的技能详情（含数值）。"""
+    """构建单从者的技能详情（含数值），使用技能序号标注。"""
     result = []
     for sk in servant.get("skillDetails", []):
         effects = []
         for eff in sk.get("effects", []):
             effects.append(_format_effect_detail(eff, is_np=False))
         if effects:
-            result.append({"技能名": sk.get("skillName", ""), "效果": effects})
+            skill_num = sk.get("skillNum", 0)
+            label = f"技能{skill_num}" if skill_num else "技能"
+            result.append({"技能名": label, "效果": effects})
     return result
 
 
 def _build_np_details(servant: dict) -> list[dict]:
-    """构建单从者的宝具详情（含数值）。"""
+    """构建单从者的宝具详情（含数值），使用"宝具"标注。"""
     result = []
     for np_d in servant.get("npDetails", []):
         effects = []
         for eff in np_d.get("effects", []):
             effects.append(_format_effect_detail(eff, is_np=True))
         if effects:
-            result.append({"宝具名": np_d.get("npName", ""), "效果": effects})
+            result.append({"宝具名": "宝具", "效果": effects})
     return result
 
 
