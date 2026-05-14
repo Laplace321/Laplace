@@ -32,8 +32,7 @@ from server.admin.routes import router as admin_routes_router
 from server.agent.agent_loop import AgentResult, agent_route
 from server.agent.tool_handlers import TOOL_HANDLERS
 
-# 预消化翻译字典（从 config/translations.json 加载，支持热更新）
-from server.config_loader import CachedConfig
+# 翻译/预消化模块
 from server.llm import chat_completion
 from server.logger import find_trace, log_trace_event, read_trace_summaries, read_traces
 from server.prompts import build_routing_prompt, get_generation_prompt
@@ -43,175 +42,28 @@ from server.schemas import parse_routing_response, routing_response_json_schema
 from server.skills.base import SKILL_REGISTRY, QuerySkill
 from server.skills.executor import SkillExecutor
 from server.skills.presets import PRESET_REGISTRY
-
-_translations_cache = CachedConfig(Path(__file__).parent / "config" / "translations.json")
-
-
-def _get_class_map() -> dict:
-    return _translations_cache.get()["className"]
-
-
-def _get_np_card_map() -> dict:
-    return _translations_cache.get()["npCard"]
-
-
-def _get_np_target_map() -> dict:
-    return _translations_cache.get()["npTarget"]
-
-
-_effect_map = None
-
-
-def get_effect_translation(effect_code: str) -> str:
-    global _effect_map
-    if _effect_map is None:
-        _effect_map = {}
-        schema_path = Path(__file__).parent / "knowledge" / "effect_schema.json"
-        if schema_path.exists():
-            with open(schema_path, encoding="utf-8") as f:
-                data = json.load(f)
-                from server.data_loader import merge_effect_overlay
-
-                effects = merge_effect_overlay(data.get("effects", []))
-                for effect in effects:
-                    name = effect.get("name")
-                    aliases = effect.get("aliases_zh", [])
-                    if name and aliases:
-                        _effect_map[name] = aliases[0]
-    return _effect_map.get(effect_code, effect_code)
-
+from server.translation import (
+    describe_filters as _describe_filters,
+)
+from server.translation import (
+    get_class_map as _get_class_map,
+)
+from server.translation import (
+    get_effect_translation,
+)
+from server.translation import (
+    get_np_card_map as _get_np_card_map,
+)
+from server.translation import (
+    get_np_target_map as _get_np_target_map,
+)
 
 # === 共享业务逻辑 ===
 
 MAX_CONTEXT_SIZE = 5
 MAX_RESULTS = 50
 
-
-def _effect_qualifier(params: dict) -> str:
-    """根据效果参数生成中文前缀修饰语（目标类型+数值条件）。"""
-    parts: list[str] = []
-    target_type = params.get("targetType") or params.get("target_type")
-    if target_type == "party":
-        parts.append("给队友的")
-    elif target_type == "self":
-        parts.append("自身的")
-    elif target_type == "enemy":
-        parts.append("对敌方的")
-
-    min_val = params.get("minValue") or params.get("min_value")
-    max_val = params.get("maxValue") or params.get("max_value")
-    if min_val is not None and max_val is not None:
-        parts.append(f"{min_val}%~{max_val}%")
-    elif min_val is not None:
-        parts.append(f"≥{min_val}%")
-    elif max_val is not None:
-        parts.append(f"≤{max_val}%")
-
-    return "".join(parts)
-
-
-def _describe_filters(skill_calls: list[dict]) -> list[str]:
-    """将 skill_calls 转换为人类可读的筛选条件描述列表。
-
-    例如: ["技能效果包含「Arts提升」", "稀有度 = 5星"]
-    供 LLM 在生成回复时明确知道系统做了什么筛选。
-    """
-    descriptions: list[str] = []
-    for call in skill_calls:
-        name = call.get("skill_name", "")
-        params = call.get("params", {})
-        if name == "search_by_effect":
-            effect = params.get("effect", "")
-            translated = get_effect_translation(effect) if effect else effect
-            source = params.get("source", "both")
-            qualifier = _effect_qualifier(params)
-            if source == "skill":
-                descriptions.append(f"技能效果包含「{qualifier}{translated}」")
-            elif source == "np":
-                descriptions.append(f"宝具效果包含「{qualifier}{translated}」")
-            else:
-                descriptions.append(f"效果包含「{qualifier}{translated}」（技能或宝具）")
-        elif name == "search_by_skill_effect":
-            effect = params.get("skillEffect") or params.get("effect", "")
-            translated = get_effect_translation(effect) if effect else effect
-            qualifier = _effect_qualifier(params)
-            descriptions.append(f"技能效果包含「{qualifier}{translated}」")
-        elif name == "search_by_np_effect":
-            effect = params.get("npEffect") or params.get("effect", "")
-            translated = get_effect_translation(effect) if effect else effect
-            descriptions.append(f"宝具效果包含「{translated}」")
-        elif name == "search_by_rarity":
-            op = params.get("op", "eq")
-            val = params.get("value", "")
-            op_map = {"eq": "=", "gte": "≥", "lte": "≤", "gt": ">", "lt": "<"}
-            descriptions.append(f"稀有度 {op_map.get(op, op)} {val}星")
-        elif name == "search_by_class":
-            descriptions.append(f"职阶 = {params.get('className', '')}")
-        elif name == "search_by_np_charge":
-            op = params.get("op", "gte")
-            val = params.get("value", "")
-            op_map = {"eq": "=", "gte": "≥", "lte": "≤", "gt": ">", "lt": "<"}
-            target_type = params.get("targetType")
-            charge_label_map = {"self": "自充", "ptOne": "他充", "ptAll": "群充"}
-            charge_label = charge_label_map.get(target_type, "NP充能")
-            descriptions.append(f"{charge_label} {op_map.get(op, op)} {val}%")
-        elif name == "search_by_cards":
-            parts = []
-            card = params.get("cardType") or params.get("cards")
-            np_card = params.get("npCard") or params.get("np_card")
-            np_target = params.get("npTarget") or params.get("np_target")
-            if card:
-                parts.append(f"配卡包含「{card}」")
-            if np_card:
-                np_card_map_local = _get_np_card_map()
-                parts.append(f"宝具卡色 = {np_card_map_local.get(np_card.lower(), np_card)}")
-            if np_target:
-                target_map = {"all": "全体(光炮)", "one": "单体", "support": "辅助"}
-                parts.append(f"宝具目标 = {target_map.get(np_target.lower(), np_target)}")
-            descriptions.append(" + ".join(parts) if parts else "配卡筛选")
-        elif name == "search_by_class_advantage":
-            target = params.get("targetClass") or params.get("target_class", "")
-            descriptions.append(f"克制「{target}」职阶")
-        elif name == "search_by_traits":
-            # 兼容多种字段名: traitNames(LLM原始) / trait_names(Pydantic) / trait(旧)
-            trait_names = params.get("traitNames") or params.get("trait_names") or []
-            ascension = params.get("ascension")
-            asc_label = ""
-            if ascension is not None:
-                asc_map = {0: "初始灵基", 1: "灵基一", 2: "灵基二", 3: "灵基三", 4: "最终再临"}
-                asc_label = f"（{asc_map.get(ascension, f'灵基{ascension}')}）"
-            if trait_names:
-                for t in trait_names:
-                    descriptions.append(f"特性包含「{t}」{asc_label}")
-            else:
-                trait = params.get("trait", "")
-                if trait:
-                    descriptions.append(f"特性包含「{trait}」{asc_label}")
-        elif name == "search_by_attribute":
-            attr = params.get("attribute", "")
-            descriptions.append(f"属性 = {attr}")
-        elif name == "compare_servants":
-            names = params.get("names", [])
-            descriptions.append(f"对比从者「{'」与「'.join(names)}」")
-        elif name == "lookup_servant":
-            query = params.get("name") or params.get("query", "")
-            descriptions.append(f"查询从者「{query}」")
-        elif name == "resolve_nickname":
-            nick = params.get("name", "")
-            descriptions.append(f"智能识别昵称「{nick}」")
-        else:
-            # 兜底：仅输出 Skill 中文 description，禁止暴露参数结构
-            from server.skills.base import SKILL_REGISTRY
-
-            skill_instance = SKILL_REGISTRY.get(name)
-            if skill_instance:
-                descriptions.append(skill_instance.description)
-            else:
-                descriptions.append(f"筛选条件: {name}")
-    return descriptions
-
-
-# ── targetType 中文映射 ──
+# ── targetType 中文映射（Context 构建使用）──
 _TARGET_TYPE_MAP = {
     "self": "自身",
     "party": "全队",
