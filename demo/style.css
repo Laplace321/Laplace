@@ -100,6 +100,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  overflow: hidden;
 }
 
 .logo-group {
@@ -127,6 +128,7 @@ body {
   letter-spacing: 4px;
   color: var(--text-gold);
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .tagline {
@@ -134,6 +136,7 @@ body {
   letter-spacing: 2px;
   color: var(--text-muted);
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .model-badge {
@@ -749,21 +752,68 @@ body {
 
 /* --- Responsive --- */
 @media (max-width: 768px) {
-  .chat-messages {
-    padding: var(--space-md);
-  }
+  /* Header: 隐藏 model-badge，缩小间距 */
+  .model-badge { display: none; }
+  .header-content { padding: 0 var(--space-md); }
+  .logo-text h1 { font-size: 16px; letter-spacing: 3px; }
+  .tagline { font-size: 8px; letter-spacing: 1.5px; }
+  .header-actions { gap: 4px; margin-left: 8px; }
+  .icon-btn { padding: 5px 6px; }
 
-  .message-content {
-    max-width: 90%;
-  }
+  /* Chat */
+  .chat-messages { padding: var(--space-md); }
+  .message-content { max-width: 90%; }
+  .chat-cards-grid { flex-direction: column; }
+  .chat-card { max-width: 100%; }
 
-  .chat-cards-grid {
-    grid-template-columns: 1fr;
-  }
+  /* Input */
+  #chat-input-area { padding: var(--space-sm) var(--space-md); }
 
-  #chat-input-area {
-    padding: var(--space-sm) var(--space-md);
+  /* Preset bar: 横向滚动 */
+  .preset-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
   }
+  .preset-bar::-webkit-scrollbar { display: none; }
+  .preset-bar-tab { white-space: nowrap; flex-shrink: 0; }
+
+  /* Help modal */
+  .help-modal { width: 95%; max-height: 85vh; }
+  .help-modal-body { padding: 12px 16px 16px; }
+}
+
+@media (max-width: 480px) {
+  /* Header: 隐藏 tagline，进一步缩小 logo */
+  .tagline { display: none; }
+  .logo-text h1 { font-size: 15px; letter-spacing: 2px; }
+  .logo-icon { font-size: 20px; }
+  .logo-group { gap: var(--space-sm); }
+
+  /* Input: 缩小 */
+  #chat-input { padding: 10px 14px; font-size: 13px; }
+  #send-btn { width: 40px; height: 40px; }
+
+  /* Message: 头像缩小 */
+  .message-avatar { width: 30px; height: 30px; font-size: 14px; }
+  .message-bubble { font-size: 13px; padding: 12px; }
+
+  /* Footer disclaimer 缩小 */
+  .input-footer .disclaimer { font-size: 8px; }
+}
+
+@media (max-width: 360px) {
+  /* 极窄屏：最小化 header */
+  .logo-text h1 { font-size: 14px; letter-spacing: 1px; }
+  .logo-icon { font-size: 18px; }
+  .logo-group { gap: 6px; }
+  .header-actions { gap: 2px; }
+  .icon-btn { padding: 4px 5px; }
+
+  /* 隐藏 disclaimer，太窄放不下 */
+  .input-footer .disclaimer { display: none; }
 }
 
 /* --- Debug Panel (Ctrl+D) --- */
