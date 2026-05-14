@@ -481,22 +481,30 @@ function handleServants(data, els) {
   }
 }
 
-// === Handle Delta Event ===
-// Fix marked.js not recognizing **bold** adjacent to CJK characters
-function fixCJKBold(text) {
-  return text
-    .replace(/([\u2e80-\u9fff\uff00-\uffef])\*\*/g, '$1\u200B**')
-    .replace(/\*\*([\u2e80-\u9fff\uff00-\uffef])/g, '**\u200B$1');
+// === Unified Markdown Rendering ===
+// marked.js v15 has a known edge case: when the closing ** has an ASCII punctuation
+// char (like %) on its left (inside) and a CJK char on its right (outside), it fails
+// to recognize the right delimiter. Fix: insert a space between closing ** and CJK.
+// Previous fixCJKBold (inserting zero-width space INSIDE **) was harmful — it broke
+// far more cases than it fixed. This approach matches complete **...** pairs safely.
+function fixBoldBoundary(text) {
+  return text.replace(/\*\*(.+?)\*\*([\u2e80-\u9fff\uff00-\uffef])/g, '**$1** $2');
 }
 
+function renderMarkdown(text) {
+  if (typeof marked !== "undefined") {
+    return marked.parse(fixBoldBoundary(text));
+  }
+  return `<p>${escapeHtml(text)}</p>`;
+}
+
+// === Handle Delta Event ===
 function handleDelta(data, els) {
   // Complete generating step
   const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
   if (activeStep) completeThinkingStep(activeStep);
 
-  const replyHtml = typeof marked !== "undefined"
-    ? marked.parse(fixCJKBold(data.text))
-    : `<p>${escapeHtml(data.text)}</p>`;
+  const replyHtml = renderMarkdown(data.text);
   els.replyBody.innerHTML = replyHtml + '<span class="stream-cursor"></span>';
   void els.replyBody.offsetHeight;
   els.replyBody.classList.remove("stream-hidden");
@@ -610,8 +618,8 @@ function appendAssistantResponse(data) {
     </div>`;
   }
 
-  // 如果引入了 marked，则解析 Markdown，否则兜底安全转义
-  const replyHtml = typeof marked !== 'undefined' ? marked.parse(fixCJKBold(data.reply)) : `<p>${escapeHtml(data.reply)}</p>`;
+  // 统一 Markdown 渲染（marked v15 原生支持 CJK + bold）
+  const replyHtml = renderMarkdown(data.reply);
 
   msg.innerHTML = `
     <div class="message-avatar">⧫</div>
