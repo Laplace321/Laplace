@@ -101,6 +101,65 @@ def load_svt_names_mapping() -> dict:
     return data.get("svt_names", {})
 
 
+# CN 服从者数据 URL（用于获取中文技能名/宝具名）
+CN_SERVANT_URL = f"{API_BASE}/export/CN/nice_servant.json"
+# 缓存文件路径
+SKILL_NAMES_CN_CACHE = OUTPUT_DIR / "skill_names_cn.json"
+
+
+def load_skill_names_cn() -> dict:
+    """从 Atlas API CN 服获取中文技能名/宝具名映射。
+
+    构建 {skill_id: cn_name} 和 {td_id: cn_name} 映射表。
+    优先使用本地缓存（server/data/skill_names_cn.json），缓存不存在时从远程下载。
+
+    Returns:
+        {"skills": {skill_id_str: cn_name, ...}, "tds": {td_id_str: cn_name, ...}}
+    """
+    # 尝试加载缓存
+    if SKILL_NAMES_CN_CACHE.exists():
+        with open(SKILL_NAMES_CN_CACHE, encoding="utf-8") as f:
+            cached = json.load(f)
+        if cached.get("skills") and cached.get("tds"):
+            return cached
+
+    # 从远程下载 CN 服数据
+    print("   📥 从 Atlas API CN 服下载中文技能名映射...")
+    try:
+        resp = requests.get(CN_SERVANT_URL, timeout=120)
+        resp.raise_for_status()
+        cn_servants = resp.json()
+    except (requests.RequestException, ValueError) as e:
+        print(f"   ⚠️  CN 服数据下载失败: {e}，跳过中文技能名填充")
+        return {"skills": {}, "tds": {}}
+
+    # 构建映射表
+    skill_map: dict[str, str] = {}
+    td_map: dict[str, str] = {}
+
+    for svt in cn_servants:
+        for sk in svt.get("skills", []):
+            sk_id = sk.get("id")
+            sk_name = sk.get("name", "")
+            if sk_id and sk_name:
+                skill_map[str(sk_id)] = sk_name
+        for np in svt.get("noblePhantasms", []):
+            np_id = np.get("id")
+            np_name = np.get("name", "")
+            if np_id and np_name:
+                td_map[str(np_id)] = np_name
+
+    result = {"skills": skill_map, "tds": td_map}
+
+    # 写入缓存
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    with open(SKILL_NAMES_CN_CACHE, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    print(f"   ✅ 获取 {len(skill_map)} 个中文技能名, {len(td_map)} 个中文宝具名")
+
+    return result
+
+
 def build_effect_matcher(schema: dict) -> dict:
     """构建效果匹配索引（含 validate 规则）。
 
@@ -632,6 +691,7 @@ def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[
         if skill_effects:
             skill_details.append(
                 {
+                    "skillId": skill.get("id", 0),
                     "skillName": skill.get("name", ""),
                     "skillNum": skill.get("num", 0),
                     "effects": skill_effects,
@@ -641,14 +701,31 @@ def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[
     return all_effects, skill_details
 
 
-def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> list[dict]:
-    """构建通用从者数据库。"""
+def build_database(
+    servants: list[dict], matcher: dict, name_mapping: dict, skill_cn_map: dict | None = None
+) -> list[dict]:
+    """构建通用从者数据库。
+
+    Args:
+        servants: Atlas API 返回的从者列表
+        matcher: 效果匹配索引
+        name_mapping: 从者名翻译映射
+        skill_cn_map: 中文技能名/宝具名映射 {"skills": {id: cn_name}, "tds": {id: cn_name}}
+    """
     db = []
     total_with_effects = 0
+    cn_skills = (skill_cn_map or {}).get("skills", {})
+    cn_tds = (skill_cn_map or {}).get("tds", {})
 
     for svt in servants:
         charges = extract_np_charges(svt)
         skill_effects, skill_details = extract_skill_effects(svt, matcher)
+
+        # 填充中文技能名（有映射用中文，无映射保留英文原名）
+        for sk_detail in skill_details:
+            sk_id = str(sk_detail.get("skillId", 0))
+            if sk_id in cn_skills:
+                sk_detail["skillName"] = cn_skills[sk_id]
 
         # 计算 NP 充能统计（三分类：self / ptOne / ptAll）
         self_charges = [c["chargePercent"] for c in charges if c["targetType"] == "self"]
@@ -721,11 +798,18 @@ def build_database(servants: list[dict], matcher: dict, name_mapping: dict) -> l
                 if np_effect_entries:
                     np_details.append(
                         {
+                            "npId": np.get("id", 0),
                             "npName": np.get("name", ""),
                             "effects": np_effect_entries,
                         }
                     )
                 break
+
+        # 填充中文宝具名（有映射用中文，无映射保留英文原名）
+        for np_detail in np_details:
+            np_id = str(np_detail.get("npId", 0))
+            if np_id in cn_tds:
+                np_detail["npName"] = cn_tds[np_id]
 
         # 获取原名与中文翻译
         original_name = svt.get("originalName", "")
@@ -809,8 +893,11 @@ def main():
         print("   ⚠️  无效果知识库，仅提取 NP 充能数据")
     print(f"   ✅ 加载 {len(name_mapping)} 个多语言名字翻译")
 
+    # 加载中文技能名/宝具名映射
+    skill_cn_map = load_skill_names_cn()
+
     servants = fetch_normal_servants()
-    db = build_database(servants, matcher, name_mapping)
+    db = build_database(servants, matcher, name_mapping, skill_cn_map)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     output_path = OUTPUT_DIR / "servants_db.json"

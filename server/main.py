@@ -278,28 +278,33 @@ def _format_effect_detail(eff: dict, is_np: bool = False) -> str:
 
 
 def _build_skill_details(servant: dict) -> list[dict]:
-    """构建单从者的技能详情（含数值），使用技能序号标注。"""
+    """构建单从者的技能详情（含数值），使用中文技能名或英文原名作为标签。"""
     result = []
     for sk in servant.get("skillDetails", []):
         effects = []
         for eff in sk.get("effects", []):
             effects.append(_format_effect_detail(eff, is_np=False))
         if effects:
-            skill_num = sk.get("skillNum", 0)
-            label = f"技能{skill_num}" if skill_num else "技能"
+            # 使用 skillName（已在数据构建时填充中文，无映射时为英文原名）
+            label = sk.get("skillName", "")
+            if not label:
+                skill_num = sk.get("skillNum", 0)
+                label = f"技能{skill_num}" if skill_num else "技能"
             result.append({"技能名": label, "效果": effects})
     return result
 
 
 def _build_np_details(servant: dict) -> list[dict]:
-    """构建单从者的宝具详情（含数值），使用"宝具"标注。"""
+    """构建单从者的宝具详情（含数值），使用中文宝具名或英文原名作为标签。"""
     result = []
     for np_d in servant.get("npDetails", []):
         effects = []
         for eff in np_d.get("effects", []):
             effects.append(_format_effect_detail(eff, is_np=True))
         if effects:
-            result.append({"宝具名": "宝具", "效果": effects})
+            # 使用 npName（已在数据构建时填充中文，无映射时为英文原名）
+            label = np_d.get("npName", "") or "宝具"
+            result.append({"宝具名": label, "效果": effects})
     return result
 
 
