@@ -250,6 +250,22 @@
   5. 如果健康检查失败，立即 `docker logs laplace` 查看错误，禁止无视 502 等异常。
 - **目的**：杜绝因端口映射错误、容器未启动等低级失误导致线上 502 不可用。
 
+### 12. 前端静态资源部署纪律 (Frontend Asset Deploy Discipline)
+- **准则**：**[绝对纪律]** 修改前端静态文件（CSS/JS）后部署到线上时，必须同步更新 HTML 中的缓存版本号，否则浏览器将继续加载旧版本缓存，导致修改不生效。
+- **执行**：
+  1. **缓存版本号强制递增**：`demo/index.html` 中通过 `?v=N` 查询参数控制浏览器缓存（如 `style.css?v=10`、`app.js?v=10`）。每次修改 `demo/style.css` 或 `demo/app.js` 后，**必须**在同一次提交中递增对应的 `?v=N` 版本号。
+  2. **本地 index.html 污染防护**：`demo/index.html` 中的 Google Fonts `<link>` 可能被本地开发环境修改（如替换为本地字体路径）。提交前**必须**先执行 `git checkout origin/main -- demo/index.html` 回滚到远程版本，再修改版本号，避免将本地字体配置推送到线上。
+  3. **禁止直接修改线上容器文件**：严禁使用 `docker exec sed` 或 `ssh sed` 直接修改运行中容器内的文件。所有前端变更必须通过 git commit → docker build → docker run 标准流程部署，确保镜像与代码一致。
+  4. **前端部署检查清单**（每次涉及 `demo/` 目录的部署必须逐项确认）：
+     ```
+     ✅ demo/index.html 中 style.css?v=N 版本号已递增
+     ✅ demo/index.html 中 app.js?v=N 版本号已递增（如 JS 有改动）
+     ✅ demo/index.html 不包含本地字体修改（对比 origin/main）
+     ✅ 通过标准 docker build → docker run 流程部署（非容器内直接修改）
+     ✅ 部署后浏览器硬刷新（Ctrl+Shift+R）验证新版本生效
+     ```
+- **目的**：杜绝因浏览器缓存导致的「代码已更新但线上不生效」问题，以及因本地开发配置污染导致线上字体加载失败。
+
 ## 禁止事项
 
 - ❌ 未经确认删除文件或数据
