@@ -256,15 +256,21 @@
   1. **缓存版本号强制递增**：`demo/index.html` 中通过 `?v=N` 查询参数控制浏览器缓存（如 `style.css?v=10`、`app.js?v=10`）。每次修改 `demo/style.css` 或 `demo/app.js` 后，**必须**在同一次提交中递增对应的 `?v=N` 版本号。
   2. **本地 index.html 污染防护**：`demo/index.html` 中的 Google Fonts `<link>` 可能被本地开发环境修改（如替换为本地字体路径）。提交前**必须**先执行 `git checkout origin/main -- demo/index.html` 回滚到远程版本，再修改版本号，避免将本地字体配置推送到线上。
   3. **禁止直接修改线上容器文件**：严禁使用 `docker exec sed` 或 `ssh sed` 直接修改运行中容器内的文件。所有前端变更必须通过 git commit → docker build → docker run 标准流程部署，确保镜像与代码一致。
-  4. **前端部署检查清单**（每次涉及 `demo/` 目录的部署必须逐项确认）：
+  4. **外部 CDN 国内镜像规则**：前端引用的外部 CDN 资源（如 Google Fonts）**必须**使用国内可访问的镜像源，禁止直接使用被墙或高延迟的原始域名。当前项目标准镜像：
+     - `fonts.googleapis.com` → `fonts.loli.net`
+     - `fonts.gstatic.com` → `gstatic.loli.net`
+     - `<link>` 标签需添加 `crossorigin` 属性以配合镜像源的 CORS 策略
+     - 新增外部 CDN 依赖时，必须先验证国内可达性（`curl --connect-timeout 5`），不可达则必须替换为镜像或本地化。
+  5. **前端部署检查清单**（每次涉及 `demo/` 目录的部署必须逐项确认）：
      ```
      ✅ demo/index.html 中 style.css?v=N 版本号已递增
      ✅ demo/index.html 中 app.js?v=N 版本号已递增（如 JS 有改动）
      ✅ demo/index.html 不包含本地字体修改（对比 origin/main）
+     ✅ 外部 CDN 使用国内镜像源（非 googleapis.com 等被墙域名）
      ✅ 通过标准 docker build → docker run 流程部署（非容器内直接修改）
      ✅ 部署后浏览器硬刷新（Ctrl+Shift+R）验证新版本生效
      ```
-- **目的**：杜绝因浏览器缓存导致的「代码已更新但线上不生效」问题，以及因本地开发配置污染导致线上字体加载失败。
+- **目的**：杜绝因浏览器缓存导致的「代码已更新但线上不生效」问题、因本地开发配置污染导致线上字体加载失败、以及因外部 CDN 在国内不可达导致的资源加载失败。
 
 ## 禁止事项
 
