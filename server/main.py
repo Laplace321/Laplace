@@ -308,12 +308,65 @@ def _build_np_details(servant: dict) -> list[dict]:
     return result
 
 
-def _build_context(servants: list[dict], detail_mode: bool = False) -> tuple[dict, list[dict]]:
+def _extract_value_hints(servant: dict, skill_calls: list[dict]) -> list[str]:
+    """当 skill_calls 含数值条件时，提取该从者所有匹配效果的具体数值摘要。
+
+    匹配条件：效果类型 + targetType（与查询条件一致），不做二次数值过滤。
+    筛选阶段已保证该从者满足数值条件，这里只需列出所有同类效果供 LLM 展示。
+    """
+    from server.skills.query.search_by_skill_effect import _expand_effect
+
+    hints: list[str] = []
+    for call in skill_calls:
+        name = call.get("skill_name", "")
+        params = call.get("params", {})
+        if name not in ("search_by_effect", "search_by_skill_effect", "search_by_np_effect"):
+            continue
+        min_val = params.get("minValue") or params.get("min_value")
+        max_val = params.get("maxValue") or params.get("max_value")
+        if min_val is None and max_val is None:
+            continue
+        # 有数值条件 → 提取所有匹配效果类型的条目
+        effect = params.get("effect") or params.get("skillEffect") or params.get("npEffect", "")
+        target_type = params.get("targetType") or params.get("target_type")
+        source = params.get("source", "both")
+        expanded = _expand_effect(effect) if effect else [effect]
+        # 从 skillDetails 提取（带技能名前缀）
+        if source in ("both", "skill") and name != "search_by_np_effect":
+            for sk in servant.get("skillDetails", []):
+                sk_label = sk.get("skillName", "") or f"技能{sk.get('skillNum', '')}"
+                for eff in sk.get("effects", []):
+                    if eff.get("type") not in expanded:
+                        continue
+                    if target_type and eff.get("targetType") != target_type:
+                        continue
+                    detail = _format_effect_detail(eff, is_np=False)
+                    hints.append(f"{sk_label}: {detail}")
+        # 从 npDetails 提取（带宝具名前缀）
+        if source in ("both", "np") and name != "search_by_skill_effect":
+            for np_d in servant.get("npDetails", []):
+                np_label = np_d.get("npName", "") or "宝具"
+                for eff in np_d.get("effects", []):
+                    if eff.get("type") not in expanded:
+                        continue
+                    if target_type and eff.get("targetType") != target_type:
+                        continue
+                    detail = _format_effect_detail(eff, is_np=True)
+                    hints.append(f"{np_label}: {detail}")
+    return hints
+
+
+def _build_context(
+    servants: list[dict],
+    detail_mode: bool = False,
+    skill_calls: list[dict] | None = None,
+) -> tuple[dict, list[dict]]:
     """构建预消化的精简 Context 供 RAG 生成使用。
 
     Args:
         servants: 匹配的从者列表
         detail_mode: True 时为单从者详情模式，输出效果数值/目标/回合数
+        skill_calls: 路由解析的 Skill 调用列表，用于提取数值摘要
 
     Returns:
         (context_data, top_results) — context_data 含 total_found 等元信息；
@@ -357,6 +410,12 @@ def _build_context(servants: list[dict], detail_mode: bool = False) -> tuple[dic
                 entry["技能详情"] = skill_details
             if np_details:
                 entry["宝具详情"] = np_details
+
+        # 列表模式下：如果查询含数值条件，附带匹配效果的具体数值摘要
+        if not detail_mode and skill_calls:
+            value_hints = _extract_value_hints(s, skill_calls)
+            if value_hints:
+                entry["查询效果数值"] = value_hints
 
         # 条件特性注释（仅在从者有条件特性时附带，供 LLM 在分析中说明）
         cond_traits = s.get("conditionalTraits", [])
@@ -927,7 +986,7 @@ async def _handle_skill_mode(
     else:
         # RAG 生成
         detail_mode = response_skill_name == "respond_servant_detail"
-        context_data, _ = _build_context(servants, detail_mode=detail_mode)
+        context_data, _ = _build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
         applied_filters = _describe_filters(skill_calls)
         context_data["已应用的筛选条件"] = applied_filters
         context_data["筛选条件"] = applied_filters
@@ -1547,7 +1606,7 @@ async def chat_stream(message: str, preset_name: str | None = None):
         yield _sse_event("thinking", {"phase": "generating", "message": "正在生成分析..."})
 
         detail_mode = response_skill_name == "respond_servant_detail"
-        context_data, _ = _build_context(servants, detail_mode=detail_mode)
+        context_data, _ = _build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
         applied_filters = _describe_filters(skill_calls)
         context_data["已应用的筛选条件"] = applied_filters
         context_data["筛选条件"] = applied_filters

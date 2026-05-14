@@ -74,19 +74,23 @@ def _match_effect(
 
     # 如果有任何精细条件，遍历 skillDetails 做三维过滤
     if target_type is not None or min_value is not None or max_value is not None:
+        # 累加判定：同效果多条数值相加后与 minValue/maxValue 比较
+        total_value = 0
         for skill in servant.get("skillDetails", []):
             for eff in skill.get("effects", []):
                 if eff.get("type") != effect_name:
                     continue
                 if target_type is not None and eff.get("targetType") != target_type:
                     continue
-                value = eff.get("valueMax", 0)
-                if min_value is not None and value < min_value:
-                    continue
-                if max_value is not None and value > max_value:
-                    continue
-                return True
-        return False
+                total_value += eff.get("valueMax", 0)
+        # 必须至少有一条匹配的效果
+        if total_value == 0:
+            return False
+        if min_value is not None and total_value < min_value:
+            return False
+        if max_value is not None and total_value > max_value:
+            return False
+        return True
 
     return True
 
@@ -113,19 +117,23 @@ def _match_np_effect(
 
     # 如果有精细条件，遍历 npDetails 做三维过滤
     if target_type is not None or min_value is not None or max_value is not None:
+        # 累加判定：同效果多条数值相加后与 minValue/maxValue 比较
+        total_value = 0
         for np_detail in servant.get("npDetails", []):
             for eff in np_detail.get("effects", []):
                 if eff.get("type") != effect_name:
                     continue
                 if target_type is not None and eff.get("targetType") != target_type:
                     continue
-                value = eff.get("valueLv1", 0)
-                if min_value is not None and value < min_value:
-                    continue
-                if max_value is not None and value > max_value:
-                    continue
-                return True
-        return False
+                total_value += eff.get("valueLv1", 0)
+        # 必须至少有一条匹配的效果
+        if total_value == 0:
+            return False
+        if min_value is not None and total_value < min_value:
+            return False
+        if max_value is not None and total_value > max_value:
+            return False
+        return True
 
     return True
 
