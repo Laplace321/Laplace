@@ -22,16 +22,15 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-# Admin 模块
+# ── Admin 模块 ──
 from server.admin.auth import require_admin
 from server.admin.auth import router as auth_router
 from server.admin.routes import router as admin_routes_router
 
-# Agent 兜底模块
-# === 共享业务逻辑 ===
-# 翻译/预消化模块
+# ── 业务模块 ──
 from server.llm import chat_completion
 from server.logger import find_trace, read_trace_summaries, read_traces
+from server.pipeline import ChatResponse, handle_skill_mode, stream_event_generator
 from server.prompts import build_routing_prompt
 from server.query_executor import load_database
 from server.rate_limiter import RateLimitMiddleware
@@ -81,17 +80,6 @@ class ChatRequest(BaseModel):
     preset_name: str | None = None
     params: dict | list | None = None
     response_skill: str | None = None
-
-
-class ChatResponse(BaseModel):
-    """对话响应。"""
-
-    reply: str
-    servants: list[dict]
-    count: int
-    query: dict
-    model: str
-    traceId: str | None = None
 
 
 @app.get("/api/traces")
@@ -169,14 +157,6 @@ async def startup():
     """启动时预加载数据库并校验配置一致性。"""
     load_database()
     _validate_translations()
-
-
-# ── Pipeline 模块（核心业务处理） ──
-from server.pipeline import (
-    ChatResponse,  # noqa: F811
-    stream_event_generator,
-)
-from server.pipeline import handle_skill_mode as _handle_skill_mode
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -271,7 +251,7 @@ async def chat(request: ChatRequest):
             # 单 dict 视为单个 skill_call
             resolved_skill_calls = [request.params]
 
-    return await _handle_skill_mode(
+    return await handle_skill_mode(
         user_message=user_message,
         trace_id=trace_id,
         skill_calls=resolved_skill_calls,  # None 则走 LLM 路由
