@@ -650,16 +650,21 @@ def _match_func_effects(func: dict, matcher: dict) -> set[str]:
 def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[dict]]:
     """提取从者所有技能中的全部效果（使用 validate 执行器替代手写 refine）。
 
+    同一 skillNum 可能因技能强化存在多个版本，仅保留最后出现的
+    （Atlas Academy 数据中强化后版本排在后面）。
+
     Returns:
         (效果集合, 技能详情列表)
     """
     all_effects: set[str] = set()
-    skill_details: list[dict] = []
+    # 用 skillNum 作为 key 去重，后出现的覆盖前出现的（即最新版本）
+    details_by_num: dict[int, dict] = {}
 
     for skill in servant.get("skills", []):
         if skill.get("type") != "active":
             continue
 
+        skill_num = skill.get("num", 0)
         skill_effects: list[dict] = []
         for func in skill.get("functions", []):
             func_type = func.get("funcType", "")
@@ -689,16 +694,14 @@ def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[
                 )
 
         if skill_effects:
-            skill_details.append(
-                {
-                    "skillId": skill.get("id", 0),
-                    "skillName": skill.get("name", ""),
-                    "skillNum": skill.get("num", 0),
-                    "effects": skill_effects,
-                }
-            )
+            details_by_num[skill_num] = {
+                "skillId": skill.get("id", 0),
+                "skillName": skill.get("name", ""),
+                "skillNum": skill_num,
+                "effects": skill_effects,
+            }
 
-    return all_effects, skill_details
+    return all_effects, list(details_by_num.values())
 
 
 def build_database(
