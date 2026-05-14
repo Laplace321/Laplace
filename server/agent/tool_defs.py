@@ -90,8 +90,8 @@ def _tool_search_servants() -> dict:
                 },
                 "effect_target_type": {
                     "type": "string",
-                    "enum": ["self", "party", "enemy"],
-                    "description": "效果目标：self（自身）、party（队友/全队）、enemy（敌方）",
+                    "enum": ["self", "party", "ptOne", "enemy"],
+                    "description": "效果目标：self（自身）、party（队友，含全队+单体队友）、ptOne（仅单体队友）、enemy（敌方）",
                 },
                 "effect_min_value": {
                     "type": "integer",

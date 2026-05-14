@@ -215,8 +215,9 @@ def _describe_filters(skill_calls: list[dict]) -> list[str]:
 _TARGET_TYPE_MAP = {
     "self": "自身",
     "party": "全队",
+    "ptOne": "单体队友",
     "enemy": "敌方",
-    "other": "单体队友",
+    "other": "其他",
 }
 
 
@@ -308,6 +309,15 @@ def _build_np_details(servant: dict) -> list[dict]:
     return result
 
 
+def _match_target_type_display(query_type: str, data_type: str) -> bool:
+    """匹配目标类型（展示层）。party 查询同时匹配 party（全队）和 ptOne（单体队友）。"""
+    if query_type == data_type:
+        return True
+    if query_type == "party" and data_type == "ptOne":
+        return True
+    return False
+
+
 def _extract_value_hints(servant: dict, skill_calls: list[dict]) -> list[str]:
     """当 skill_calls 含数值条件时，提取该从者所有匹配效果的具体数值摘要。
 
@@ -338,7 +348,7 @@ def _extract_value_hints(servant: dict, skill_calls: list[dict]) -> list[str]:
                 for eff in sk.get("effects", []):
                     if eff.get("type") not in expanded:
                         continue
-                    if target_type and eff.get("targetType") != target_type:
+                    if target_type and not _match_target_type_display(target_type, eff.get("targetType", "")):
                         continue
                     detail = _format_effect_detail(eff, is_np=False)
                     hints.append(f"{sk_label}: {detail}")
@@ -349,7 +359,7 @@ def _extract_value_hints(servant: dict, skill_calls: list[dict]) -> list[str]:
                 for eff in np_d.get("effects", []):
                     if eff.get("type") not in expanded:
                         continue
-                    if target_type and eff.get("targetType") != target_type:
+                    if target_type and not _match_target_type_display(target_type, eff.get("targetType", "")):
                         continue
                     detail = _format_effect_detail(eff, is_np=True)
                     hints.append(f"{np_label}: {detail}")

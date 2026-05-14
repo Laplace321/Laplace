@@ -17,7 +17,9 @@ class Params(BaseModel):
         alias="source",
         description="搜索来源: skill(仅技能) / np(仅宝具) / both(默认，同时搜)",
     )
-    target_type: str | None = Field(default=None, alias="targetType", description="目标类型: self/party/enemy")
+    target_type: str | None = Field(
+        default=None, alias="targetType", description="目标类型: self/party(含单体队友)/ptOne(仅单体队友)/enemy"
+    )
     min_value: int | None = Field(default=None, alias="minValue", description="效果最小数值（百分比，如50表示≥50%）")
     max_value: int | None = Field(default=None, alias="maxValue", description="效果最大数值（百分比）")
 

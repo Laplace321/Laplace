@@ -51,6 +51,15 @@ def load_database() -> list[dict]:
     return _servants_db
 
 
+def _match_target_type(query_type: str, data_type: str) -> bool:
+    """匹配目标类型。party 查询同时匹配 party（全队）和 ptOne（单体队友）。"""
+    if query_type == data_type:
+        return True
+    if query_type == "party" and data_type == "ptOne":
+        return True
+    return False
+
+
 def _match_effect(
     servant: dict,
     effect_name: str,
@@ -80,7 +89,7 @@ def _match_effect(
             for eff in skill.get("effects", []):
                 if eff.get("type") != effect_name:
                     continue
-                if target_type is not None and eff.get("targetType") != target_type:
+                if target_type is not None and not _match_target_type(target_type, eff.get("targetType", "")):
                     continue
                 total_value += eff.get("valueMax", 0)
         # 必须至少有一条匹配的效果
@@ -123,7 +132,7 @@ def _match_np_effect(
             for eff in np_detail.get("effects", []):
                 if eff.get("type") != effect_name:
                     continue
-                if target_type is not None and eff.get("targetType") != target_type:
+                if target_type is not None and not _match_target_type(target_type, eff.get("targetType", "")):
                     continue
                 total_value += eff.get("valueLv1", 0)
         # 必须至少有一条匹配的效果

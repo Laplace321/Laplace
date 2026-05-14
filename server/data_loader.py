@@ -614,11 +614,26 @@ def _classify_charge_target(func_target_type: str) -> str:
 
 
 def classify_target_type(func_target_type: str) -> str:
-    """将 FuncTargetType 分类为简单的目标类型。"""
+    """将 FuncTargetType 分类为简单的目标类型。
+
+    细分单体队友（ptOne）和全体队友（party），数据层区分存储。
+    """
     if func_target_type in ("self", "commandTypeSelfTreasureDevice"):
         return "self"
-    if func_target_type.startswith("pt") or func_target_type == "fieldAll":
+    # 单体队友类（指定一个队友）
+    if func_target_type in (
+        "ptOne",
+        "ptOneOther",
+        "ptOneHpLowestRate",
+        "ptSelfAnotherFirst",
+        "ptRandom",
+    ):
+        return "ptOne"
+    # 全体队友类（全队含自己）
+    if func_target_type in ("ptAll", "ptFull", "ptOther", "fieldAll"):
         return "party"
+    if func_target_type.startswith("pt"):
+        return "party"  # 未知 pt* 类型兜底
     if func_target_type.startswith("enemy"):
         return "enemy"
     return "other"
