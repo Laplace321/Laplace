@@ -17,6 +17,9 @@ from server.skills.base import QuerySkill, register_skill
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "config" / "coronation"
 
+# 七骑标准职阶集合
+_STANDARD_CLASSES = frozenset({"saber", "archer", "lancer", "rider", "caster", "assassin", "berserker"})
+
 # 中文职阶名 → 英文文件名映射
 CLASS_NAME_MAP = {
     "剑": "saber",
@@ -95,6 +98,9 @@ class CoronationTeamSkill(QuerySkill):
         role_categories = data.get("roleCategories", [])
         if role:
             role_categories = [rc for rc in role_categories if role in rc.get("role", "")]
+
+        # 运行时职阶校验：剔除 collectionNo 在 db 中不匹配本职阶的从者
+        role_categories = self._filter_by_class(role_categories, resolved, db)
         result["roleCategories"] = role_categories
 
         # 附带 Boss 机制摘要
@@ -103,6 +109,55 @@ class CoronationTeamSkill(QuerySkill):
             result["bossSummary"] = boss_summary
 
         return [result]
+
+    def _filter_by_class(self, role_categories: list[dict], target_class: str, db: list[dict]) -> list[dict]:
+        """运行时职阶校验：剔除 collectionNo 在 db 中不匹配本职阶的从者。
+
+        规则：
+        - 七骑职阶(saber/archer/...)：从者 className 必须完全匹配
+        - EX 职阶：从者 className 不在七骑中即可（允许所有非七骑 EX 职阶）
+        - collectionNo 为 None 的从者（泛称条目如"冠位从者们"）跳过校验
+        """
+        is_ex = target_class not in _STANDARD_CLASSES
+
+        # db 为空时跳过校验（测试场景或数据未加载时）
+        if not db:
+            return role_categories
+
+        # 构建 collectionNo → className 快速查找表
+        cno_to_class: dict[int, str] = {}
+        for s in db:
+            cno = s.get("collectionNo")
+            if cno is not None:
+                cno_to_class[cno] = s.get("className", "").lower()
+
+        filtered_categories: list[dict] = []
+        for rc in role_categories:
+            valid_servants = []
+            for servant in rc.get("servants", []):
+                cno = servant.get("collectionNo")
+                if cno is None:
+                    # 泛称条目（如"冠位从者们(剑阶全员)"），跳过校验
+                    valid_servants.append(servant)
+                    continue
+                db_class = cno_to_class.get(cno)
+                if db_class is None:
+                    # db 中找不到该 collectionNo，静默跳过
+                    continue
+                if is_ex:
+                    # EX 戴冠：允许所有非七骑职阶
+                    if db_class not in _STANDARD_CLASSES:
+                        valid_servants.append(servant)
+                else:
+                    # 标准七骑：必须完全匹配
+                    if db_class == target_class:
+                        valid_servants.append(servant)
+
+            if valid_servants:
+                filtered_rc = {**rc, "servants": valid_servants}
+                filtered_categories.append(filtered_rc)
+
+        return filtered_categories
 
     def _load_boss_summary(self, class_name: str) -> dict | None:
         """加载 Boss 机制摘要（精简版）。"""

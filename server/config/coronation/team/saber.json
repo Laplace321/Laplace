@@ -38,7 +38,7 @@
       "servants": [
         {
           "servantName": "红阎魔",
-          "collectionNo": 240,
+          "collectionNo": 234,
           "rarity": 5,
           "tier": "S",
           "reasons": ["群体20充(帮助队友启动宝具)", "群体20攻+降防", "特攻(混沌，武藏为混沌善)"],
@@ -60,7 +60,7 @@
       "servants": [
         {
           "servantName": "红阎魔",
-          "collectionNo": 240,
+          "collectionNo": 234,
           "rarity": 5,
           "tier": "S",
           "reasons": ["群体20攻", "按时降防", "兼具充能"],
@@ -119,7 +119,7 @@
         },
         {
           "servantName": "红阎魔",
-          "collectionNo": 240,
+          "collectionNo": 234,
           "rarity": 5,
           "tier": "A",
           "npColor": "buster",
