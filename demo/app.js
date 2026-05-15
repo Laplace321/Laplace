@@ -1072,6 +1072,7 @@ function createHelpModal() {
           <li><strong>从者详情</strong> — 查看某个从者的完整数据和技能信息</li>
           <li><strong>从者对比</strong> — 把几个从者放在一起比较，分析各自优劣</li>
           <li><strong>辅助推荐</strong> — 根据需求推荐合适的辅助从者搭配</li>
+          <li><strong>戴冠战攻略</strong> — 查询戴冠战 Boss 机制、配队推荐、通关思路</li>
         </ul>
       </div>
 
@@ -1084,6 +1085,8 @@ function createHelpModal() {
           <span class="help-example-chip" data-query="对比梅林和斯卡蒂">对比梅林和斯卡蒂</span>
           <span class="help-example-chip" data-query="查一下村正">查一下村正</span>
           <span class="help-example-chip" data-query="宝具带即死效果的从者">宝具带即死的从者</span>
+          <span class="help-example-chip" data-query="剑阶戴冠配队推荐">剑阶戴冠配队</span>
+          <span class="help-example-chip" data-query="剑阶戴冠战攻略">戴冠战攻略</span>
         </div>
       </div>
 

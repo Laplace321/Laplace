@@ -103,6 +103,11 @@ class CoronationTeamSkill(QuerySkill):
         role_categories = self._filter_by_class(role_categories, resolved, db)
         result["roleCategories"] = role_categories
 
+        # 精简 playstyles：移除 requirements/tips 减少 token
+        for ps in result.get("playstyles", []):
+            ps.pop("requirements", None)
+            ps.pop("tips", None)
+
         # 附带 Boss 机制摘要
         boss_summary = self._load_boss_summary(resolved)
         if boss_summary:

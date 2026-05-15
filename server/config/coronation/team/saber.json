@@ -29,6 +29,38 @@
           "servantName": "冠位从者们(剑阶全员)",
           "tier": "通用",
           "reasons": ["前排冠位从者被发牌后出星，配合50星保证暴击"]
+        },
+        {
+          "servantName": "高文",
+          "collectionNo": 123,
+          "rarity": 4,
+          "tier": "A",
+          "reasons": ["Hit数高出星性能好", "群体充星技能"],
+          "notes": "兼具出星与增伤"
+        },
+        {
+          "servantName": "兰陵王",
+          "collectionNo": 227,
+          "rarity": 4,
+          "tier": "A",
+          "reasons": ["群体攻防buff+星集中度下降(把星让给打手)", "三技能出星"],
+          "notes": "辅助全能型，出星+增伤+充能"
+        },
+        {
+          "servantName": "骑士迪昂",
+          "collectionNo": 10,
+          "rarity": 4,
+          "tier": "B",
+          "reasons": ["嘲讽集火吃牌出星", "群体攻防buff"],
+          "notes": "耐久型出星辅助"
+        },
+        {
+          "servantName": "冲田总司",
+          "collectionNo": 68,
+          "rarity": 5,
+          "tier": "A",
+          "reasons": ["Quick宝具高Hit出星", "自身出星率高"],
+          "notes": "出星打手兼用"
         }
       ]
     },
@@ -51,6 +83,22 @@
           "tier": "S",
           "reasons": ["30他充(最高剑阶单体充能)", "单体40攻buff"],
           "notes": "纯辅助向，自身不输出"
+        },
+        {
+          "servantName": "阿尔托莉雅",
+          "collectionNo": 2,
+          "rarity": 5,
+          "tier": "A",
+          "reasons": ["全体30充(宝具强化后)", "群体攻buff"],
+          "notes": "宝具强化后充能量可观，兼具群体增伤"
+        },
+        {
+          "servantName": "兰陵王",
+          "collectionNo": 227,
+          "rarity": 4,
+          "tier": "A",
+          "reasons": ["单体20充", "群体攻防buff"],
+          "notes": "充能+增伤+出星三栖辅助"
         }
       ]
     },
@@ -65,6 +113,62 @@
           "tier": "S",
           "reasons": ["群体20攻", "按时降防", "兼具充能"],
           "notes": "充能+增伤双栖"
+        },
+        {
+          "servantName": "恺撒",
+          "collectionNo": 7,
+          "rarity": 3,
+          "tier": "A",
+          "reasons": ["群体攻击力up", "星集中+暴击威力up(打手暴击增伤)", "单体充能"],
+          "notes": "低星全能辅助，练度门槛极低"
+        },
+        {
+          "servantName": "高文",
+          "collectionNo": 123,
+          "rarity": 4,
+          "tier": "A",
+          "reasons": ["群体攻击力up+Buster性能up", "出星性能好"],
+          "notes": "Buster打手最佳同职阶辅助"
+        },
+        {
+          "servantName": "阿尔托莉雅Alter",
+          "collectionNo": 3,
+          "rarity": 4,
+          "tier": "A",
+          "reasons": ["群体攻击力up", "宝具高倍率兼任副输出"],
+          "notes": "增伤+副输出兼用"
+        },
+        {
+          "servantName": "拉克什米",
+          "collectionNo": 245,
+          "rarity": 4,
+          "tier": "B",
+          "reasons": ["群体攻击力up", "群体暴击星集中度down(让星给打手)"],
+          "notes": "攻buff+让星辅助"
+        },
+        {
+          "servantName": "莫德雷德",
+          "collectionNo": 76,
+          "rarity": 5,
+          "tier": "B",
+          "reasons": ["自身NP效率高，可兼任副输出", "对亚瑟特攻"],
+          "notes": "增伤有限，主要作为副输出"
+        },
+        {
+          "servantName": "冲田总司",
+          "collectionNo": 68,
+          "rarity": 5,
+          "tier": "B",
+          "reasons": ["自身Quick性能up+星出率up", "高出星兼增伤"],
+          "notes": "Quick体系增伤+出星"
+        },
+        {
+          "servantName": "柳生但马守宗矩",
+          "collectionNo": 187,
+          "rarity": 4,
+          "tier": "B",
+          "reasons": ["敌全体攻击力大幅down(减伤等效增伤)", "宝具附带攻击力down"],
+          "notes": "减伤辅助型，通过降低敌人攻击提升生存"
         }
       ]
     },
