@@ -76,8 +76,8 @@ class TestPresetRegistry:
     """测试 Preset 注册机制。"""
 
     def test_presets_registered(self):
-        """4 个内置预设应全部注册。"""
-        expected = {"cycle_farming", "servant_lookup", "servant_compare", "support_recommend"}
+        """6 个内置预设应全部注册。"""
+        expected = {"cycle_farming", "servant_lookup", "servant_compare", "support_recommend", "coronation_guide", "coronation_team"}
         assert expected == set(PRESET_REGISTRY.keys())
 
     def test_preset_skills_exist(self):

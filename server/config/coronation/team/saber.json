@@ -74,7 +74,7 @@
       "servants": [
         {
           "servantName": "宫本伊织",
-          "collectionNo": null,
+          "collectionNo": 405,
           "rarity": 4,
           "tier": "S",
           "npColor": "red",
@@ -101,7 +101,7 @@
         },
         {
           "servantName": "千子村正",
-          "collectionNo": 347,
+          "collectionNo": 302,
           "rarity": 5,
           "tier": "A",
           "npColor": "arts",

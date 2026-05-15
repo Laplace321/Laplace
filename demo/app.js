@@ -62,6 +62,18 @@ const PRESETS = [
     description: "筛选辅助向从者并推荐搭配",
     defaultMessage: "有充能技能的辅助从者",
   },
+  {
+    name: "coronation_guide",
+    label: "戴冠战攻略",
+    description: "查询戴冠战机制、星图、礼装等知识",
+    defaultMessage: "戴冠战机制是什么",
+  },
+  {
+    name: "coronation_team",
+    label: "戴冠战配队",
+    description: "查询戴冠战配队推荐",
+    defaultMessage: "剑阶戴冠配队推荐",
+  },
 ];
 
 // === Thinking Step Labels ===
