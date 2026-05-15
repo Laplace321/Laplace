@@ -383,11 +383,21 @@ async def handle_skill_mode(
             final_reply = result.fallback_message or "未找到匹配的从者。"
     else:
         # RAG 生成
-        detail_mode = response_skill_name == "respond_servant_detail"
-        context_data, _ = build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
         applied_filters = describe_filters(skill_calls)
-        context_data["已应用的筛选条件"] = applied_filters
-        context_data["筛选条件"] = applied_filters
+
+        # custom_context 路径：知识/配队数据直接作为 context
+        if result.custom_context:
+            context_data = {
+                "知识数据": result.custom_context,
+                "已应用的筛选条件": applied_filters,
+                "关联从者数量": total_found,
+            }
+        else:
+            detail_mode = response_skill_name == "respond_servant_detail"
+            context_data, _ = build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
+            context_data["已应用的筛选条件"] = applied_filters
+            context_data["筛选条件"] = applied_filters
+
         context_json = json.dumps(context_data, ensure_ascii=False)
 
         # ── Trace: context_build ──
@@ -431,7 +441,9 @@ async def handle_skill_mode(
             if not final_reply:
                 raise ValueError("Empty response from LLM")
         except Exception as e:
-            final_reply = f"为你找到了 {total_found} 位从者。"
+            final_reply = (
+                f"为你找到了 {total_found} 位从者。" if not result.custom_context else "暂时无法生成回复，请稍后重试。"
+            )
             await log_trace_event(
                 trace_id,
                 "generation_output",
@@ -790,7 +802,14 @@ async def stream_event_generator(message: str, preset_name: str | None = None):
             return
 
     # ── 阶段 2: Skill 执行 ──
-    yield sse_event("thinking", {"phase": "executing", "message": "正在检索从者数据..."})
+    # 判断是否包含知识类 Skill（用于动态调整 thinking message）
+    has_knowledge_skill = (
+        any(getattr(SKILL_REGISTRY.get(c.get("skill_name", "")), "domain", "servant") != "servant" for c in skill_calls)
+        if skill_calls
+        else False
+    )
+    executing_msg = "正在检索知识库..." if has_knowledge_skill else "正在检索从者数据..."
+    yield sse_event("thinking", {"phase": "executing", "message": executing_msg})
 
     executor = SkillExecutor()
     result = executor.execute(skill_calls, response_skill_name)
@@ -884,24 +903,35 @@ async def stream_event_generator(message: str, preset_name: str | None = None):
         yield sse_event("done", {"model": model_used, "traceId": trace_id})
         return
 
-    # 卡片先行 — 立即推送从者数据
-    yield sse_event(
-        "servants",
-        {
-            "servants": returned_servants,
-            "count": len(returned_servants),
-            "total": total_found,
-        },
-    )
+    # 卡片先行 — 有从者时推送卡片数据
+    if returned_servants:
+        yield sse_event(
+            "servants",
+            {
+                "servants": returned_servants,
+                "count": len(returned_servants),
+                "total": total_found,
+            },
+        )
 
     # ── 阶段 3: RAG 生成 ──
     yield sse_event("thinking", {"phase": "generating", "message": "正在生成分析..."})
 
-    detail_mode = response_skill_name == "respond_servant_detail"
-    context_data, _ = build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
     applied_filters = describe_filters(skill_calls)
-    context_data["已应用的筛选条件"] = applied_filters
-    context_data["筛选条件"] = applied_filters
+
+    # custom_context 路径：知识/配队数据直接作为 context
+    if result.custom_context:
+        context_data = {
+            "知识数据": result.custom_context,
+            "已应用的筛选条件": applied_filters,
+            "关联从者数量": total_found,
+        }
+    else:
+        detail_mode = response_skill_name == "respond_servant_detail"
+        context_data, _ = build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
+        context_data["已应用的筛选条件"] = applied_filters
+        context_data["筛选条件"] = applied_filters
+
     context_json = json.dumps(context_data, ensure_ascii=False)
 
     # ── Trace: context_build ──
@@ -946,7 +976,9 @@ async def stream_event_generator(message: str, preset_name: str | None = None):
         if not final_reply:
             raise ValueError("Empty response from LLM")
     except Exception as e:
-        final_reply = f"为你找到了 {total_found} 位从者。"
+        final_reply = (
+            f"为你找到了 {total_found} 位从者。" if not result.custom_context else "暂时无法生成回复，请稍后重试。"
+        )
         final_result = "generation_error"
         await log_trace_event(
             trace_id,

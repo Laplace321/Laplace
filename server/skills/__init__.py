@@ -21,11 +21,14 @@ _SKILL_MODULES = [
     "server.skills.query.search_by_skill_effect",
     "server.skills.query.search_by_traits",
     "server.skills.query.resolve_nickname",
+    "server.skills.query.coronation_knowledge",
+    "server.skills.query.coronation_team",
     # Response Skills
     "server.skills.response.respond_servant_compare",
     "server.skills.response.respond_servant_detail",
     "server.skills.response.respond_servant_list",
     "server.skills.response.respond_support_analysis",
+    "server.skills.response.respond_coronation",
 ]
 
 for _mod in _SKILL_MODULES:

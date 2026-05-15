@@ -92,6 +92,8 @@ const SKILL_DISPLAY_NAMES = {
   lookup_servant: "从者查询",
   compare_servants: "从者对比",
   resolve_nickname: "昵称识别",
+  coronation_knowledge: "戴冠战攻略",
+  coronation_team: "戴冠战配队",
 };
 
 function getSkillDisplayName(skillName) {

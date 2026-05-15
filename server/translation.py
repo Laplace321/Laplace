@@ -165,6 +165,23 @@ def describe_filters(skill_calls: list[dict]) -> list[str]:
         elif name == "resolve_nickname":
             nick = params.get("name", "")
             descriptions.append(f"智能识别昵称「{nick}」")
+        elif name == "coronation_knowledge":
+            topic = params.get("topic", "通用")
+            class_name = params.get("className")
+            if topic == "boss" and class_name:
+                descriptions.append(f"戴冠战Boss机制查询: {class_name}阶")
+            else:
+                descriptions.append(f"戴冠战知识查询: {topic}")
+        elif name == "coronation_team":
+            class_name = params.get("className", "")
+            role = params.get("role")
+            playstyle = params.get("playstyle")
+            desc = f"戴冠战配队推荐: {class_name}阶"
+            if role:
+                desc += f" - {role}"
+            if playstyle:
+                desc += f" - {playstyle}流"
+            descriptions.append(desc)
         else:
             # 兜底：仅输出 Skill 中文 description，禁止暴露参数结构
             skill_instance = SKILL_REGISTRY.get(name)

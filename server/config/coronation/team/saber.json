@@ -1,0 +1,133 @@
+{
+  "className": "saber",
+  "title": "剑（尽量出打手的卡 达成三连）",
+  "difficulty": "较难(剑阶群buff弱，缺自充)",
+  "playstyles": [
+    {
+      "name": "双宝具爆破流",
+      "description": "双冠位单体从者原地起爆，无视发牌",
+      "pros": ["伤害稳定", "无视发牌", "剩余4位自由组人"],
+      "cons": ["练度要求高", "需双黑杯", "强制单体宝具"],
+      "requirements": ["十绊50NP刚需", "需至少20他充启动"],
+      "tips": ["异色双宝具可触发三色连击30%加攻", "宫本伊织红卡+美杜莎绿卡=异色三色"]
+    },
+    {
+      "name": "EX连击流",
+      "description": "借助战大腿放后排，利用发牌机制换人打EX连击",
+      "pros": ["对自身练度要求极低", "可贪收益礼装", "冠位从者选择自由"],
+      "cons": ["必须首操(看发牌换人)", "需前排凑暴击星(50星保证暴击)"],
+      "requirements": ["FGO发牌机制: 第一回合至少1人被发2张卡", "将该从者与后排大腿交换即保证EX"],
+      "tips": ["宝具尽量放末位吃更多魔放", "避免选与宝具同色指令卡(减少魔放收益)", "大腿首选黑杯美杜莎"]
+    }
+  ],
+  "roleCategories": [
+    {
+      "role": "出星辅助",
+      "description": "为打手提供暴击星的从者，保证打手暴击",
+      "servants": [
+        {
+          "servantName": "冠位从者们(剑阶全员)",
+          "tier": "通用",
+          "reasons": ["前排冠位从者被发牌后出星，配合50星保证暴击"]
+        }
+      ]
+    },
+    {
+      "role": "充能辅助",
+      "description": "为队友提供NP充能，帮助T1启动宝具",
+      "servants": [
+        {
+          "servantName": "红阎魔",
+          "collectionNo": 240,
+          "rarity": 5,
+          "tier": "S",
+          "reasons": ["群体20充(帮助队友启动宝具)", "群体20攻+降防", "特攻(混沌，武藏为混沌善)"],
+          "notes": "即使宝具等级低也是极好的辅助插件，定冠也没问题"
+        },
+        {
+          "servantName": "花嫁尼禄",
+          "collectionNo": 90,
+          "rarity": 5,
+          "tier": "S",
+          "reasons": ["30他充(最高剑阶单体充能)", "单体40攻buff"],
+          "notes": "纯辅助向，自身不输出"
+        }
+      ]
+    },
+    {
+      "role": "增伤辅助",
+      "description": "提供攻击力/宝具威力/暴击威力等增伤buff的从者",
+      "servants": [
+        {
+          "servantName": "红阎魔",
+          "collectionNo": 240,
+          "rarity": 5,
+          "tier": "S",
+          "reasons": ["群体20攻", "按时降防", "兼具充能"],
+          "notes": "充能+增伤双栖"
+        }
+      ]
+    },
+    {
+      "role": "打手",
+      "description": "稳定1T配置的主力输出从者，要求满树哈(满技能圣杯)",
+      "servants": [
+        {
+          "servantName": "宫本伊织",
+          "collectionNo": null,
+          "rarity": 4,
+          "tier": "S",
+          "npColor": "red",
+          "reasons": ["稀有棱镜(叶子)可兑换，默认满宝无需抽卡", "被动3: 剑阶攻击力+30%", "红卡宝具可与美杜莎(绿卡)组异色三色连击"],
+          "notes": "对BOX浅的玩家最友好的选择"
+        },
+        {
+          "servantName": "齐格鲁德",
+          "collectionNo": 213,
+          "rarity": 5,
+          "tier": "S",
+          "npColor": "buster",
+          "reasons": ["地之力特性，吃1.1倍阵营克制(天地人相性)", "被动3: 剑阶攻击力+30%", "同等级同夫妇强化下剑阶输出第一"],
+          "cons": ["无自充(需自备20他充)", "硬币压力大(被动2+被动3均需硬币)"]
+        },
+        {
+          "servantName": "剑阶美杜莎",
+          "collectionNo": 384,
+          "rarity": 4,
+          "tier": "S",
+          "npColor": "quick",
+          "reasons": ["地之力特性，吃1.1倍阵营克制", "对神性特攻(武藏持有神性)", "自充方便启动", "两宝即可做大腿助战"],
+          "notes": "EX连击流最强助战大腿，全剑阶输出仅次于齐格鲁德"
+        },
+        {
+          "servantName": "千子村正",
+          "collectionNo": 347,
+          "rarity": 5,
+          "tier": "A",
+          "npColor": "arts",
+          "reasons": ["对无敌特攻(武藏有闪避/无敌)", "暴击流适性强，暴击打手"],
+          "cons": ["吃发牌（需要至少发两张牌，才能与宝具实现三连）", "非纯爆发型，稳定性不如双宝具流"]
+        },
+        {
+          "servantName": "宫本武藏",
+          "collectionNo": 153,
+          "rarity": 5,
+          "tier": "A",
+          "npColor": "buster",
+          "reasons": ["宝具倍率高(宝具强化)"],
+          "cons": ["比齐格鲁德少地之力阵营克制和被动3", "无自充(需20他充)"]
+        },
+        {
+          "servantName": "红阎魔",
+          "collectionNo": 240,
+          "rarity": 5,
+          "tier": "A",
+          "npColor": "buster",
+          "reasons": ["群体20充(帮助队友启动宝具)", "群体20攻+降防", "特攻(混沌，武藏为混沌善)"],
+          "cons": ["一宝伤害不如五宝伊织"],
+          "notes": "即使宝具等级低也是极好的辅助插件"
+        }
+      ]
+    }
+  ]
+}

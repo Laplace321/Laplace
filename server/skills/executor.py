@@ -28,6 +28,7 @@ class ExecutionResult:
         accepted_skills: list[dict] | None = None,
         rejected_skills: list[dict] | None = None,
         execution_time_ms: float = 0.0,
+        custom_context: list[dict] | None = None,
     ):
         self.servants = servants
         self.total_found = total_found
@@ -37,6 +38,7 @@ class ExecutionResult:
         self.accepted_skills = accepted_skills or []
         self.rejected_skills = rejected_skills or []
         self.execution_time_ms = execution_time_ms
+        self.custom_context = custom_context
 
 
 class SkillExecutor:
@@ -114,14 +116,54 @@ class SkillExecutor:
                 execution_time_ms=elapsed_ms,
             )
 
+        # 分离非 servant domain 的 Skills（如 coronation），它们返回知识/配队数据而非从者列表
+        domain_skills = [(s, p) for s, p in query_skills if s.domain == "servant"]
+        knowledge_skills = [(s, p) for s, p in query_skills if s.domain != "servant"]
+
+        # 执行 knowledge_skills，收集 custom_context 和关联从者
+        custom_context: list[dict] = []
+        knowledge_servants: list[dict] = []
+
+        for skill, params in knowledge_skills:
+            ctx_entries = skill.execute(db, params)
+            custom_context.extend(ctx_entries)
+            # 从配队数据中提取关联从者（通过 collectionNo 匹配 db）
+            knowledge_servants.extend(self._extract_servants_from_context(db, ctx_entries))
+
         # 按 domain 分组，同 domain AND 合并（一次数据扫描）
-        results = self._execute_and_merge(db, query_skills)
+        if domain_skills:
+            results = self._execute_and_merge(db, domain_skills)
+        elif knowledge_servants:
+            # 纯 knowledge Skills 但有关联从者
+            results = knowledge_servants
+        else:
+            results = []
+
+        # 如果有 knowledge_skills 产出的从者，合并（去重）
+        if domain_skills and knowledge_servants:
+            existing_ids = {s.get("id") for s in results}
+            for s in knowledge_servants:
+                if s.get("id") not in existing_ids:
+                    results.append(s)
+                    existing_ids.add(s.get("id"))
 
         # 按稀有度降序 → collectionNo 升序排序
         results.sort(key=lambda x: (-x.get("rarity", 0), x.get("collectionNo", 0)))
 
         total_found = len(results)
         elapsed_ms = (time.monotonic() - start_time) * 1000
+
+        # 如果有 custom_context，即使 servants 为空也不进 fallback
+        if custom_context:
+            return ExecutionResult(
+                servants=results,
+                total_found=total_found,
+                response_skill=response_skill,
+                accepted_skills=accepted,
+                rejected_skills=rejected,
+                execution_time_ms=elapsed_ms,
+                custom_context=custom_context,
+            )
 
         # 执行阶段兜底：结果为空
         if total_found == 0:
@@ -150,6 +192,24 @@ class SkillExecutor:
             rejected_skills=rejected,
             execution_time_ms=elapsed_ms,
         )
+
+    def _extract_servants_from_context(self, db: list[dict], ctx_entries: list[dict]) -> list[dict]:
+        """从 custom_context 条目中提取关联从者（通过 collectionNo 匹配 db）。"""
+        collection_nos: set[int] = set()
+        for entry in ctx_entries:
+            if entry.get("type") != "team":
+                continue
+            for rc in entry.get("roleCategories", []):
+                for s in rc.get("servants", []):
+                    cno = s.get("collectionNo")
+                    if cno is not None:
+                        collection_nos.add(cno)
+
+        if not collection_nos:
+            return []
+
+        # 从 db 中查找匹配的从者
+        return [s for s in db if s.get("collectionNo") in collection_nos]
 
     def _execute_and_merge(
         self,

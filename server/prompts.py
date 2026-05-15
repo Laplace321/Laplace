@@ -150,6 +150,7 @@ def build_routing_prompt(
 - `respond_servant_detail`: 展示单个从者的详细信息
 - `respond_servant_compare`: 对比多个从者并给出分析
 - `respond_support_analysis`: 分析辅助从者的能力并推荐搭配
+- `respond_coronation`: 戴冠战相关查询的专属回复（知识/Boss/配队）
 
 ## 输出格式
 严格按以下 JSON 格式输出，不要有任何其他内容：
@@ -207,6 +208,8 @@ def build_routing_prompt(
     - ⚠️ 注意：**禁止**使用 `"party"` 作为 targetType 值，必须使用 `"ptAll"`（群充）或 `"ptOne"`（他充）
 15. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"、"哪个职阶克制XX"、"什么克制XX"等表达时，**必须**使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"、"月癌"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。**即使用户只问"哪个职阶克制X"这种看似知识性问题，也必须走 `search_by_class_advantage`**，系统会在结果中返回克制关系和对应从者。
 16. **疑似从者名称/昵称一律用 lookup_servant（重要）**：当用户的问题中包含你不确定是否为从者名称的词语（如"红A"、"小太阳"、"花之魔术师"、"老虚"、"CBA"、"XJB"、"呆毛"、"2B"等看起来像昵称/外号/缩写/纯字母组合的表达），**必须**使用 `lookup_servant`，将该词语作为 `name` 参数传入。系统后端支持昵称映射和模糊匹配，会自动处理识别。**绝不要**因为你不认识某个名称就返回 `no_match` 或 `out_of_scope`。只要用户的问题看起来是在查询或询问某个特定角色/从者，就选择 `lookup_servant`。**特别注意**：纯英文字母、数字组合、字母+数字混合（如"CBA"、"X4"、"2B"）在 FGO 社区中是常见的从者昵称缩写形式，绝不能因为看起来不像名字就判定为超出范围。如果用户同时问了从者详情（如"XX技能介绍"、"XX宝具是什么"），response_skill 选 `respond_servant_detail`。
+17. **戴冠战知识查询**：当用户提到"戴冠战"/"冠位"/"剑冠"/"弓冠"等并询问机制/星图/礼装/刷取策略/Boss怎么打时，使用 `coronation_knowledge`。参数 `topic` 从 ["机制","星图","礼装","刷取","boss"] 中选择。如果涉及特定职阶Boss（如"剑冠武藏"、"剑阶戴冠boss"），额外传 `className`（中文职阶名如"剑"/"弓"等）。response_skill 选 `respond_coronation`。
+18. **戴冠战配队推荐**：当用户提到"戴冠战"/"冠位"/"剑冠"等并询问"带谁"/"配队"/"推荐"/"XX辅助"/"打手"时，使用 `coronation_team`。`className` 必填（中文职阶名如"剑"/"弓"等）。可选 `playstyle`（流派名如"双宝具爆破"/"EX连击"）和 `role`（角色分类名如"出星辅助"/"充能辅助"/"增伤辅助"/"打手"）。用户未指定role时不传此参数（返回全部分类）。response_skill 选 `respond_coronation`。
 
 ## 示例
 

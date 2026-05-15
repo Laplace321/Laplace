@@ -54,6 +54,18 @@ def _register_presets() -> None:
                 "search_by_effect": {"effects": ["gainNp"], "effectsOp": "or"},
             },
         ),
+        Preset(
+            name="coronation_guide",
+            display_name="戴冠战攻略",
+            query_skills=["coronation_knowledge"],
+            response_skill="respond_coronation",
+        ),
+        Preset(
+            name="coronation_team",
+            display_name="戴冠战配队",
+            query_skills=["coronation_team"],
+            response_skill="respond_coronation",
+        ),
     ]
     for p in presets:
         PRESET_REGISTRY[p.name] = p
