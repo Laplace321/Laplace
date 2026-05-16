@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laplace — 系统架构文档</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-card: #1a2332;
+  --bg-code: #0d1117;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #38bdf8;
+  --accent-dim: #0ea5e9;
+  --border: #1e293b;
+  --green: #34d399;
+  --yellow: #fbbf24;
+  --red: #f87171;
+  --purple: #a78bfa;
+  --orange: #fb923c;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.7;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+h1 { font-size: 2rem; color: var(--accent); margin-bottom: 0.5rem; letter-spacing: 2px; }
+h2 { font-size: 1.5rem; color: var(--accent); margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+h3 { font-size: 1.15rem; color: var(--green); margin: 1.5rem 0 0.75rem; }
+h4 { font-size: 1rem; color: var(--yellow); margin: 1rem 0 0.5rem; }
+p { margin-bottom: 0.75rem; color: var(--text-secondary); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+  background: var(--bg-code);
+  color: var(--accent);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+pre {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+pre code { background: none; padding: 0; }
+.subtitle { color: var(--text-muted); font-size: 1rem; margin-bottom: 2rem; }
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.card-title { color: var(--accent); font-weight: 600; margin-bottom: 0.5rem; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+@media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+.tag {
+  display: inline-block;
+  padding: 0.15em 0.6em;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-right: 0.3rem;
+}
+.tag-blue { background: rgba(56,189,248,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--green); }
+.tag-yellow { background: rgba(251,191,36,0.15); color: var(--yellow); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--purple); }
+.tag-orange { background: rgba(251,146,60,0.15); color: var(--orange); }
+.tag-red { background: rgba(248,113,113,0.15); color: var(--red); }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  font-size: 0.9rem;
+}
+th, td {
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+th { color: var(--accent); font-weight: 600; background: var(--bg-secondary); }
+td { color: var(--text-secondary); }
+tr:hover td { background: rgba(56,189,248,0.03); }
+ul, ol { margin: 0.5rem 0 0.75rem 1.5rem; color: var(--text-secondary); }
+li { margin-bottom: 0.3rem; }
+.layer-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 1.5rem 0;
+}
+.layer {
+  padding: 0.8rem 1.2rem;
+  text-align: center;
+  font-weight: 500;
+  position: relative;
+}
+.layer::after {
+  content: '▼';
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  z-index: 1;
+}
+.layer:last-child::after { display: none; }
+.l-api { background: rgba(56,189,248,0.12); color: var(--accent); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px 8px 0 0; }
+.l-route { background: rgba(167,139,250,0.12); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+.l-exec { background: rgba(52,211,153,0.12); color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
+.l-data { background: rgba(251,191,36,0.12); color: var(--yellow); border: 1px solid rgba(251,191,36,0.3); }
+.l-gen { background: rgba(251,146,60,0.12); color: var(--orange); border: 1px solid rgba(251,146,60,0.3); border-radius: 0 0 8px 8px; }
+.flow-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-card);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+}
+.flow-step .step-num {
+  background: var(--accent);
+  color: var(--bg-primary);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.flow-step .step-content { flex: 1; }
+.flow-step .step-title { font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem; }
+.flow-step .step-desc { font-size: 0.9rem; color: var(--text-secondary); }
+.version-badge {
+  display: inline-block;
+  background: rgba(56,189,248,0.15);
+  color: var(--accent);
+  padding: 0.2em 0.8em;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  margin-left: 0.5rem;
+}
+.toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 2rem; }
+.toc-title { color: var(--accent); font-weight: 600; margin-bottom: 0.75rem; }
+.toc ul { list-style: none; margin: 0; padding: 0; }
+.toc li { margin-bottom: 0.4rem; }
+.toc a { color: var(--text-secondary); font-size: 0.95rem; }
+.toc a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>LAPLACE <span class="version-badge">v0.2.6</span></h1>
+<p class="subtitle">系统架构与业务流转文档 — 面向开发者</p>
+<p style="color: var(--text-muted); font-size: 0.85rem;">最后更新：2025-05-16 &nbsp;|&nbsp; 本文档随每次架构/流程迭代同步更新</p>
+
+<!-- 目录 -->
+<div class="toc">
+<div class="toc-title">目录</div>
+<ul>
+  <li><a href="#overview">1. 系统概览</a></li>
+  <li><a href="#tech-stack">2. 技术栈</a></li>
+  <li><a href="#layered-arch">3. 分层架构</a></li>
+  <li><a href="#request-flow">4. 核心请求处理流程</a></li>
+  <li><a href="#skill-arch">5. Skill-Based Architecture</a></li>
+  <li><a href="#llm-layer">6. LLM 调度层</a></li>
+  <li><a href="#data-layer">7. 数据层</a></li>
+  <li><a href="#agent-fallback">8. Agent 兜底系统</a></li>
+  <li><a href="#logging">9. 日志追踪系统</a></li>
+  <li><a href="#deploy">10. 部署架构</a></li>
+  <li><a href="#file-map">11. 目录结构</a></li>
+</ul>
+</div>
+
+<!-- 1. 系统概览 -->
+<h2 id="overview">1. 系统概览</h2>
+<div class="card">
+<p><strong>Laplace</strong> 是一个 <strong>AI Native</strong> 的对话式 FGO（Fate/Grand Order）数据助手。用户通过自然语言提问，系统自动解析意图、检索数据库、生成结构化回答。</p>
+<p>核心设计理念：<strong>Two-Step RAG</strong>（路由 + 生成）架构，以 <strong>Skill-Based Architecture</strong> 实现可扩展的查询能力，配合 <strong>OneShot 优先 + Agent 兜底</strong> 的混合路由策略。</p>
+</div>
+<div class="grid-3">
+  <div class="card">
+    <div class="card-title">对话式交互</div>
+    <p>自然语言输入，无需记忆指令语法。支持 JSON API 和 SSE 流式两种端点。</p>
+  </div>
+  <div class="card">
+    <div class="card-title">Skill 可扩展</div>
+    <p>查询逻辑以独立 Skill 模块实现，新增维度只需新建文件 + 注册，无需改动核心路由。</p>
+  </div>
+  <div class="card">
+    <div class="card-title">多层降级</div>
+    <p>OneShot 路由 → Routing Fallback → Execution Fallback → Agent 多轮兜底，保证回复质量。</p>
+  </div>
+</div>
+
+<!-- 2. 技术栈 -->
+<h2 id="tech-stack">2. 技术栈</h2>
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title">后端</div>
+    <ul>
+      <li><span class="tag tag-blue">Python 3.12</span> 运行时</li>
+      <li><span class="tag tag-blue">FastAPI</span> Web 框架 + ASGI</li>
+      <li><span class="tag tag-blue">Pydantic v2</span> 数据校验与 Schema 契约</li>
+      <li><span class="tag tag-blue">Uvicorn</span> ASGI 服务器</li>
+      <li><span class="tag tag-purple">DashScope SDK</span> + <span class="tag tag-purple">OpenAI SDK</span> 双 LLM 适配</li>
+      <li><span class="tag tag-green">Ruff</span> Lint + Format</li>
+      <li><span class="tag tag-green">Pytest</span> 测试框架</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">前端 &amp; 部署</div>
+    <ul>
+      <li><span class="tag tag-yellow">Vanilla JS</span> + <span class="tag tag-yellow">HTML/CSS</span> 无框架前端</li>
+      <li><span class="tag tag-yellow">SSE</span> Server-Sent Events 流式推送</li>
+      <li><span class="tag tag-orange">Docker</span> 容器化部署</li>
+      <li><span class="tag tag-orange">Nginx</span> 反向代理</li>
+      <li><span class="tag tag-green">Atlas Academy API</span> FGO 数据源</li>
+    </ul>
+  </div>
+</div>
+
+<!-- 3. 分层架构 -->
+<h2 id="layered-arch">3. 分层架构</h2>
+<div class="layer-diagram">
+  <div class="layer l-api">
+    <strong>API 层</strong> — FastAPI 端点（JSON API + SSE Stream）、CORS、Rate Limiter、Admin 路由
+    <br><code>server/main.py</code>
+  </div>
+  <div class="layer l-route">
+    <strong>路由层</strong> — LLM OneShot 意图路由、Preset 展开、前端直传、Pydantic Schema 校验
+    <br><code>server/pipeline.py</code> · <code>server/prompts.py</code> · <code>server/schemas.py</code>
+  </div>
+  <div class="layer l-exec">
+    <strong>执行层</strong> — SkillExecutor（参数校验 → domain 分组 → AND 合并）、QuerySkill / ResponseSkill
+    <br><code>server/skills/executor.py</code> · <code>server/skills/query/*</code> · <code>server/skills/response/*</code>
+  </div>
+  <div class="layer l-data">
+    <strong>数据层</strong> — servants_db.json（Materialized View）、knowledge/（Schema Mirror）、config/（可运营配置）
+    <br><code>server/data_loader.py</code> · <code>server/query_executor.py</code> · <code>server/translation.py</code>
+  </div>
+  <div class="layer l-gen">
+    <strong>生成层</strong> — Context 预消化构建、ResponseSkill Prompt、LLM RAG 生成
+    <br><code>server/context_builder.py</code> · <code>server/llm/</code>
+  </div>
+</div>
+
+<!-- 4. 核心请求处理流程 -->
+<h2 id="request-flow">4. 核心请求处理流程</h2>
+
+<h3>4.1 请求入口</h3>
+<p>系统提供两个对话端点，业务逻辑完全一致：</p>
+<table>
+  <tr><th>端点</th><th>方法</th><th>特点</th></tr>
+  <tr><td><code>/api/chat</code></td><td>POST</td><td>JSON 请求/响应，适合程序调用</td></tr>
+  <tr><td><code>/api/chat/stream</code></td><td>GET</td><td>SSE 流式推送，分阶段展示思考过程</td></tr>
+</table>
+
+<h3>4.2 Skill 调用来源（三路径）</h3>
+<div class="grid-3">
+  <div class="card">
+    <div class="card-title">路径 A：Preset 展开</div>
+    <p>前端传入 <code>preset_name</code>，从 <code>PRESET_REGISTRY</code> 展开为固定 skill_calls。支持 B1 策略：用户补充文字走 LLM 路由解析额外 Skills 并合并。</p>
+  </div>
+  <div class="card">
+    <div class="card-title">路径 B：前端直传</div>
+    <p>前端传入 <code>params</code>（skill_calls 列表），跳过 LLM 路由直接执行。适用于 UI 交互构建的查询条件。</p>
+  </div>
+  <div class="card">
+    <div class="card-title">路径 C：LLM 路由</div>
+    <p>用户纯自然语言输入，调用 LLM 解析为 <code>RoutingResponse</code>（skill_calls + response_skill + fallback）。OneShot 模式：1 次 LLM 调用。</p>
+  </div>
+</div>
+
+<h3>4.3 完整处理流程</h3>
+
+<div class="flow-step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">请求接收与路由解析</div>
+    <div class="step-desc">
+      <code>main.py</code> 接收请求，按优先级确定 skill_calls 来源：Preset &gt; params 直传 &gt; LLM 路由。<br>
+      LLM 路由：<code>build_routing_prompt()</code> 构建 System Prompt → <code>chat_completion()</code> 调用 LLM → <code>parse_routing_response()</code> Pydantic 校验。<br>
+      输出：<code>skill_calls[]</code> + <code>response_skill</code> + <code>fallback</code>
+    </div>
+  </div>
+</div>
+
+<div class="flow-step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">Fallback 检查</div>
+    <div class="step-desc">
+      如果路由返回 <code>fallback</code>：<br>
+      • <code>greeting</code> / <code>out_of_scope</code> → 直接返回 <code>FALLBACK_TEMPLATES</code> 模板回复<br>
+      • <code>no_match</code> / <code>ambiguous</code> → 进入 Agent 兜底<br>
+      • 空 skill_calls 且无 fallback → 也进入 Agent 兜底
+    </div>
+  </div>
+</div>
+
+<div class="flow-step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <div class="step-title">SkillExecutor 执行</div>
+    <div class="step-desc">
+      <code>executor.execute(skill_calls, response_skill_name)</code><br>
+      ① Pydantic <code>params_schema</code> 参数校验（失败跳过并记录 rejected）<br>
+      ② 按 domain 分组：<code>servant</code> domain 走 filter AND 合并；<code>coronation</code> 等走 custom_context<br>
+      ③ 自定义 <code>execute()</code> 的 Skill 分别执行后取交集<br>
+      ④ 结果按稀有度降序 → collectionNo 升序排序<br>
+      ⑤ 空结果 → 尝试 resolve_nickname fallback → 仍空则标记 <code>is_fallback=True</code>
+    </div>
+  </div>
+</div>
+
+<div class="flow-step">
+  <div class="step-num">4</div>
+  <div class="step-content">
+    <div class="step-title">Execution Fallback 处理</div>
+    <div class="step-desc">
+      如果 <code>is_fallback=True</code>（执行结果为空）：<br>
+      ① 先尝试异步 <code>resolve_nickname</code>（LLM 昵称识别）<br>
+      ② 仍失败 → <code>build_oneshot_context()</code> 构建已尝试条件的中文描述 → 传给 Agent 兜底
+    </div>
+  </div>
+</div>
+
+<div class="flow-step">
+  <div class="step-num">5</div>
+  <div class="step-content">
+    <div class="step-title">Context 构建与 RAG 生成</div>
+    <div class="step-desc">
+      <code>build_context()</code> 构建预消化 Context：<br>
+      • 全中文 key（名称、职阶、技能效果…）→ 杜绝 LLM 技术术语泄露<br>
+      • 前 5 条代表从者详情 + 全局统计摘要（宝具卡色/职阶/稀有度分布）<br>
+      • <code>describe_filters()</code> 将 skill_calls 转为人类可读筛选条件<br>
+      <code>ResponseSkill.build_prompt()</code> 构建 Generation Prompt → <code>chat_completion()</code> 生成最终回复
+    </div>
+  </div>
+</div>
+
+<div class="flow-step">
+  <div class="step-num">6</div>
+  <div class="step-content">
+    <div class="step-title">响应返回</div>
+    <div class="step-desc">
+      JSON API：返回 <code>ChatResponse(reply, servants, count, query, model, traceId)</code><br>
+      SSE Stream：分阶段推送 <code>thinking</code> / <code>result</code> / <code>complete</code> 事件
+    </div>
+  </div>
+</div>
+
+<!-- 5. Skill-Based Architecture -->
+<h2 id="skill-arch">5. Skill-Based Architecture</h2>
+
+<h3>5.1 核心机制</h3>
+<div class="card">
+<p>所有查询逻辑以独立 Skill 模块实现，通过 <code>@register_skill</code> 装饰器自动注册到全局 <code>SKILL_REGISTRY</code>。</p>
+<pre><code># server/skills/base.py
+SKILL_REGISTRY: dict[str, BaseSkill] = {}
+
+@register_skill       # 装饰器自动实例化并注册
+class SearchByClass(QuerySkill):
+    name = "search_by_class"
+    description = "按职阶筛选从者"
+    def filter(self, servant, params) -> bool:
+        return servant["className"].lower() == params["className"].lower()</code></pre>
+<p>扩展方式：新建 Skill 文件 → 在 <code>server/skills/__init__.py</code> 追加 import → 自动注册可用。</p>
+</div>
+
+<h3>5.2 已注册 Query Skills</h3>
+<table>
+  <tr><th>Skill</th><th>描述</th><th>Domain</th></tr>
+  <tr><td><code>lookup_servant</code></td><td>按名称查询单个从者（支持昵称/模糊匹配）</td><td>servant</td></tr>
+  <tr><td><code>compare_servants</code></td><td>对比多个从者的属性和能力</td><td>servant</td></tr>
+  <tr><td><code>search_by_class</code></td><td>按职阶筛选</td><td>servant</td></tr>
+  <tr><td><code>search_by_rarity</code></td><td>按稀有度筛选（支持 eq/gte/lte 等比较）</td><td>servant</td></tr>
+  <tr><td><code>search_by_effect</code></td><td>统一效果搜索（同时搜技能+宝具效果）</td><td>servant</td></tr>
+  <tr><td><code>search_by_skill_effect</code></td><td>仅搜索技能效果</td><td>servant</td></tr>
+  <tr><td><code>search_by_np_effect</code></td><td>仅搜索宝具效果</td><td>servant</td></tr>
+  <tr><td><code>search_by_np_charge</code></td><td>按 NP 充能量筛选（支持 targetType 区分自充/群充/他充）</td><td>servant</td></tr>
+  <tr><td><code>search_by_cards</code></td><td>按配卡、宝具卡色、宝具目标筛选</td><td>servant</td></tr>
+  <tr><td><code>search_by_traits</code></td><td>按特性筛选（支持灵基阶段精确筛选）</td><td>servant</td></tr>
+  <tr><td><code>search_by_attribute</code></td><td>按属性筛选（天/地/人/星/兽）</td><td>servant</td></tr>
+  <tr><td><code>search_by_class_advantage</code></td><td>按职阶克制关系查询</td><td>servant</td></tr>
+  <tr><td><code>resolve_nickname</code></td><td>LLM 驱动的智能昵称识别</td><td>servant</td></tr>
+  <tr><td><code>coronation_knowledge</code></td><td>戴冠战知识查询（机制/星图/礼装/Boss）</td><td>coronation</td></tr>
+  <tr><td><code>coronation_team</code></td><td>戴冠战配队推荐（按职阶/流派/角色）</td><td>coronation</td></tr>
+</table>
+
+<h3>5.3 已注册 Response Skills</h3>
+<table>
+  <tr><th>Skill</th><th>描述</th></tr>
+  <tr><td><code>respond_servant_list</code></td><td>以列表形式展示筛选到的从者（默认）</td></tr>
+  <tr><td><code>respond_servant_detail</code></td><td>展示单个从者的详细信息</td></tr>
+  <tr><td><code>respond_servant_compare</code></td><td>对比多个从者并给出分析</td></tr>
+  <tr><td><code>respond_support_analysis</code></td><td>分析辅助从者的能力并推荐搭配</td></tr>
+  <tr><td><code>respond_coronation</code></td><td>戴冠战相关查询的专属回复</td></tr>
+</table>
+
+<h3>5.4 Preset 快捷预设</h3>
+<table>
+  <tr><th>预设名</th><th>显示名</th><th>Query Skills</th><th>Response Skill</th></tr>
+  <tr><td><code>cycle_farming</code></td><td>周回筛选</td><td>search_by_np_charge</td><td>respond_servant_list</td></tr>
+  <tr><td><code>servant_lookup</code></td><td>从者查询</td><td>lookup_servant</td><td>respond_servant_detail</td></tr>
+  <tr><td><code>servant_compare</code></td><td>从者对比</td><td>compare_servants</td><td>respond_servant_compare</td></tr>
+  <tr><td><code>support_recommend</code></td><td>辅助推荐</td><td>search_by_effect</td><td>respond_support_analysis</td></tr>
+  <tr><td><code>coronation_guide</code></td><td>戴冠战攻略</td><td>coronation_knowledge</td><td>respond_coronation</td></tr>
+  <tr><td><code>coronation_team</code></td><td>戴冠战配队</td><td>coronation_team</td><td>respond_coronation</td></tr>
+</table>
+
+<!-- 6. LLM 调度层 -->
+<h2 id="llm-layer">6. LLM 调度层</h2>
+
+<h3>6.1 架构概览</h3>
+<div class="card">
+<p>LLM 模块 (<code>server/llm/</code>) 采用 <strong>适配器模式</strong>，统一封装多家 LLM 供应商的差异化 API：</p>
+<pre><code>server/llm/
+├── __init__.py          # 公共 API: chat_completion, agent_completion
+├── base.py              # BaseLLMAdapter 抽象基类
+├── provider.py          # Provider 配置解析 + 两层降级调度
+└── adapters/
+    ├── dashscope_adapter.py   # 阿里 DashScope SDK
+    ├── openai_adapter.py      # OpenAI 兼容 API
+    └── obao_adapter.py        # Obao（Claude 兼容）</code></pre>
+</div>
+
+<h3>6.2 两层降级策略</h3>
+<div class="card">
+<ol>
+  <li><strong>同提供商内降级</strong>：按 <code>models</code> 列表顺序（如 qwen-max → qwen-plus → qwen-turbo）</li>
+  <li><strong>跨提供商降级</strong>：当前提供商所有模型失败 → 切换下一个 Provider（如 dashscope → obao）</li>
+</ol>
+<p>配置方式：<code>.env</code> 中 <code>LLM_PROVIDERS=dashscope,obao</code> + 对应 URL/KEY/MODELS 环境变量。</p>
+</div>
+
+<h3>6.3 两大调用模式</h3>
+<table>
+  <tr><th>模式</th><th>函数</th><th>用途</th><th>特点</th></tr>
+  <tr><td>Chat</td><td><code>chat_completion()</code></td><td>路由解析、RAG 生成</td><td>支持 JSON Schema 结构化输出 + Pydantic 校验</td></tr>
+  <tr><td>Agent</td><td><code>agent_completion()</code></td><td>Agent 多轮 tool-use</td><td>统一走 Chat Completions API + tools 参数</td></tr>
+</table>
+
+<!-- 7. 数据层 -->
+<h2 id="data-layer">7. 数据层</h2>
+
+<h3>7.1 数据分层</h3>
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title">Knowledge 层（自动生成，严禁手编）</div>
+    <p><code>server/knowledge/</code></p>
+    <ul>
+      <li><code>effect_schema.json</code> — 效果类型定义（FuncType + BuffType）</li>
+      <li><code>class_mapping.json</code> — 职阶映射</li>
+      <li><code>class_relation.json</code> — 职阶克制关系</li>
+      <li><code>mappings.json</code> — 从者中文名、特性映射</li>
+    </ul>
+    <p style="color: var(--yellow);">来源：<code>sync_chaldea.py</code> 从 Chaldea Dart 源码提取</p>
+  </div>
+  <div class="card">
+    <div class="card-title">Config 层（可运营配置，支持热更新）</div>
+    <p><code>server/config/</code></p>
+    <ul>
+      <li><code>translations.json</code> — 中英文翻译映射</li>
+      <li><code>nicknames.json</code> — 从者昵称映射</li>
+      <li><code>effect_overrides.json</code> — 效果 Overlay（虚拟复合效果）</li>
+      <li><code>coronation/</code> — 戴冠战数据（guide/boss/team JSON）</li>
+      <li><code>uvicorn_log_config.json</code> — 日志配置</li>
+    </ul>
+  </div>
+</div>
+
+<h3>7.2 Materialized View (MV)</h3>
+<div class="card">
+<p><code>server/data/servants_db.json</code> 是运行时查询的核心数据源，由 <code>data_loader.py</code> 从 Atlas Academy API 拉取原始数据后构建。</p>
+<p>MV 内烘焙字段：<code>skillEffects</code>、<code>npEffects</code>、<code>totalCharge</code>、<code>npCharge</code>、<code>skillDetails</code>、<code>npDetails</code>、<code>traits</code> 等，实现 O(1) 筛选匹配。</p>
+<p><strong>Effect Schema Overlay 机制</strong>：<code>merge_effect_overlay()</code> 在 runtime 将 <code>config/effect_overrides.json</code> 合并到 <code>knowledge/effect_schema.json</code>，支持虚拟复合效果（如 <code>damageBoost</code>、<code>damageShield</code>）。</p>
+</div>
+
+<h3>7.3 预消化与翻译</h3>
+<div class="card">
+<p><code>server/translation.py</code> 提供所有翻译映射的统一入口，从 <code>config/translations.json</code> 加载（热更新）。<br>
+<code>server/context_builder.py</code> 将英文枚举值全部预消化为中文后再传给 LLM，杜绝翻译幻觉。</p>
+</div>
+
+<!-- 8. Agent 兜底系统 -->
+<h2 id="agent-fallback">8. Agent 兜底系统</h2>
+
+<div class="card">
+<p><strong>定位</strong>：当 OneShot 路由/执行失败时的最后防线。采用多轮 Tool-Use 循环。</p>
+<pre><code>server/agent/
+├── agent_loop.py     # 多轮循环引擎：LLM → tool_calls → handler → LLM → ...
+├── agent_prompt.py   # Agent System Prompt
+├── tool_defs.py      # Chat Completions tools 定义（3 类 7 个 tool）
+└── tool_handlers.py  # Tool 执行处理器（桥接 SkillExecutor + 数据层）</code></pre>
+</div>
+
+<h3>8.1 可用 Tools</h3>
+<table>
+  <tr><th>类型</th><th>Tool</th><th>延迟</th></tr>
+  <tr><td rowspan="3">核心查询</td><td><code>search_servants</code> — 多条件组合搜索</td><td>~100ms</td></tr>
+  <tr><td><code>lookup_servant</code> — 单从者详情</td><td>~50ms</td></tr>
+  <tr><td><code>compare_servants</code> — 多从者对比</td><td>~50ms</td></tr>
+  <tr><td rowspan="3">本地查表</td><td><code>list_effects</code> — 列出所有效果名及别名</td><td>&lt;1ms</td></tr>
+  <tr><td><code>list_traits</code> — 列出所有特性名</td><td>&lt;1ms</td></tr>
+  <tr><td><code>list_classes</code> — 列出所有职阶</td><td>&lt;1ms</td></tr>
+  <tr><td>外部 API</td><td><code>lookup_skill_detail</code> — Atlas API 技能数值</td><td>~500ms</td></tr>
+</table>
+
+<h3>8.2 触发时机（3 个 Fallback 点位）</h3>
+<ol>
+  <li><strong>Routing Fallback</strong>：LLM 路由返回 <code>no_match</code> / <code>ambiguous</code></li>
+  <li><strong>Empty Routing</strong>：LLM 路由返回空 skill_calls 且无 fallback</li>
+  <li><strong>Execution Fallback</strong>：SkillExecutor 执行结果为空（含 resolve_nickname 也失败后）</li>
+</ol>
+
+<!-- 9. 日志追踪系统 -->
+<h2 id="logging">9. 日志追踪系统</h2>
+<div class="card">
+<p><code>server/logger.py</code> 实现多阶段事件流日志，同一 <code>traceId</code> 下按阶段记录：</p>
+<table>
+  <tr><th>Phase</th><th>记录内容</th></tr>
+  <tr><td><code>routing_input</code></td><td>用户 query、mode、Skill 列表数量</td></tr>
+  <tr><td><code>routing_output</code></td><td>skill_calls、response_skill、fallback、model、usage</td></tr>
+  <tr><td><code>execution</code></td><td>accepted/rejected Skills、total_found、执行耗时</td></tr>
+  <tr><td><code>context_build</code></td><td>applied_filters、context 大小</td></tr>
+  <tr><td><code>generation_input</code></td><td>Generation Prompt 元数据</td></tr>
+  <tr><td><code>generation_output</code></td><td>最终回复、generation_usage</td></tr>
+  <tr><td><code>agent_detail</code></td><td>Agent 轮次、tokens、tool_trace</td></tr>
+  <tr><td><code>final</code></td><td>总耗时、mode、total_tokens</td></tr>
+</table>
+<p>存储格式：JSONL (<code>server/logs/query_trace.jsonl</code>)，异步写入 (<code>asyncio.to_thread</code>) 避免阻塞 Event Loop。</p>
+</div>
+
+<!-- 10. 部署架构 -->
+<h2 id="deploy">10. 部署架构</h2>
+<div class="card">
+<pre><code>用户浏览器
+    │
+    ▼
+Nginx (反向代理，SSL 终止)
+    │
+    ▼  127.0.0.1:8000
+Docker 容器 (laplace:latest)
+    ├── Uvicorn (ASGI Server)
+    │   └── FastAPI App
+    │       ├── /api/chat         → JSON API
+    │       ├── /api/chat/stream  → SSE Stream
+    │       ├── /api/health       → 健康检查
+    │       ├── /api/admin/*      → Admin 路由
+    │       ├── /admin/*          → Admin 静态页
+    │       └── /*                → 前端静态文件 (demo/)
+    ├── Volume: /app/server/logs  → 持久化日志
+    └── Volume: /app/server/data  → 持久化数据库</code></pre>
+<p><strong>BUILD_VERSION</strong>：<code>docker build --build-arg BUILD_VERSION=$(git rev-parse --short HEAD)</code> 写入版本戳，启动时对比数据版本，不一致自动重建。</p>
+</div>
+
+<!-- 11. 目录结构 -->
+<h2 id="file-map">11. 目录结构</h2>
+<div class="card">
+<pre><code>Laplace/
+├── server/                      # 后端核心
+│   ├── main.py                  # FastAPI 应用入口
+│   ├── pipeline.py              # 请求处理管线（路由/执行/生成）
+│   ├── prompts.py               # Prompt 模板（路由 + 生成）
+│   ├── schemas.py               # Pydantic 路由契约
+│   ├── context_builder.py       # RAG Context 构建（预消化）
+│   ├── translation.py           # 翻译与预消化模块
+│   ├── query_executor.py        # 数据加载 + 共享工具函数
+│   ├── data_loader.py           # 从 Atlas API 构建 MV
+│   ├── fallback.py              # Fallback 模板 + Agent 辅助
+│   ├── logger.py                # 结构化 Trace 日志
+│   ├── rate_limiter.py          # IP 速率限制中间件
+│   ├── config_loader.py         # 热更新配置加载器
+│   ├── individuality.py         # 特性名 → ID 解析
+│   ├── sync_chaldea.py          # Schema Mirror 同步
+│   ├── llm/                     # LLM 调度层
+│   │   ├── base.py              # 适配器抽象基类
+│   │   ├── provider.py          # Provider 配置 + 降级调度
+│   │   └── adapters/            # 各供应商适配器
+│   ├── skills/                  # Skill 框架
+│   │   ├── base.py              # 基类 + SKILL_REGISTRY
+│   │   ├── executor.py          # SkillExecutor 调度器
+│   │   ├── presets.py           # Preset 快捷预设
+│   │   ├── query/               # 15 个 QuerySkill 模块
+│   │   └── response/            # 5 个 ResponseSkill 模块
+│   ├── agent/                   # Agent 兜底系统
+│   │   ├── agent_loop.py        # 多轮循环引擎
+│   │   ├── agent_prompt.py      # Agent System Prompt
+│   │   ├── tool_defs.py         # Tool 定义
+│   │   └── tool_handlers.py     # Tool 执行处理器
+│   ├── admin/                   # Admin 后台
+│   ├── knowledge/               # 领域知识（自动生成）
+│   ├── config/                  # 可运营配置
+│   ├── data/                    # 运行时数据（MV）
+│   └── logs/                    # Trace 日志
+├── demo/                        # 前端静态文件
+│   ├── index.html               # 主页面
+│   ├── app.js                   # 前端逻辑
+│   ├── style.css                # 样式
+│   └── logs.html / logs.js      # 日志查看页
+├── admin/                       # Admin 后台前端
+├── tests/                       # 测试套件
+├── docs/                        # 文档
+│   ├── architecture.html        # 架构文档（开发者）
+│   ├── architecture.json        # 架构文档（Agent）
+│   ├── adr/                     # Architecture Decision Records
+│   └── reference/               # 参考资料
+├── AGENTS.md                    # 操作指南与全局约束
+├── MEMORY.md                    # 热层记忆索引
+├── SOUL.md                      # 身份与个性约束
+├── USER.md                      # 用户偏好
+└── 需求描述.md                    # 产品需求文档
+</code></pre>
+</div>
+
+<hr style="border-color: var(--border); margin: 3rem 0 1rem;">
+<p style="color: var(--text-muted); font-size: 0.85rem; text-align: center;">
+  Laplace Architecture Document · Generated for Developers · v0.2.6
+</p>
+
+</body>
+</html>

@@ -1,0 +1,395 @@
+{
+  "version": "0.2.6",
+  "lastUpdated": "2025-05-16",
+  "system": {
+    "name": "Laplace",
+    "description": "AI Native 对话式 FGO（Fate/Grand Order）数据助手。用户通过自然语言提问，系统自动解析意图、检索数据库、生成结构化回答。",
+    "coreDesign": "Two-Step RAG（路由+生成）架构，Skill-Based Architecture 可扩展查询，OneShot 优先 + Agent 兜底混合路由。",
+    "techStack": {
+      "runtime": "Python 3.12",
+      "framework": "FastAPI + Uvicorn (ASGI)",
+      "validation": "Pydantic v2",
+      "llmSDK": ["DashScope SDK", "OpenAI SDK"],
+      "frontend": "Vanilla JS + HTML/CSS + SSE",
+      "deploy": "Docker + Nginx",
+      "dataSource": "Atlas Academy API",
+      "knowledgeSource": "Chaldea Dart (sync_chaldea.py)",
+      "testing": "Pytest + Ruff"
+    }
+  },
+  "architecture": {
+    "layers": [
+      {
+        "name": "API 层",
+        "description": "FastAPI 端点、CORS、Rate Limiter、Admin 路由、静态文件挂载",
+        "files": ["server/main.py"],
+        "endpoints": [
+          {"path": "/api/chat", "method": "POST", "description": "JSON 对话请求"},
+          {"path": "/api/chat/stream", "method": "GET", "description": "SSE 流式对话"},
+          {"path": "/api/health", "method": "GET", "description": "健康检查"},
+          {"path": "/api/admin/*", "method": "GET/POST", "description": "Admin 管理路由（需认证）"},
+          {"path": "/admin/*", "method": "GET", "description": "Admin 后台静态页"},
+          {"path": "/*", "method": "GET", "description": "前端静态文件 (demo/)"}
+        ]
+      },
+      {
+        "name": "路由层",
+        "description": "LLM OneShot 意图路由、Preset 展开、前端直传、Pydantic Schema 校验",
+        "files": ["server/pipeline.py", "server/prompts.py", "server/schemas.py"]
+      },
+      {
+        "name": "执行层",
+        "description": "SkillExecutor 参数校验 → domain 分组 → AND 合并执行 → 结果排序",
+        "files": ["server/skills/executor.py", "server/skills/query/*", "server/skills/response/*"]
+      },
+      {
+        "name": "数据层",
+        "description": "servants_db.json (Materialized View)、knowledge/ (Schema Mirror)、config/ (可运营配置)、翻译预消化",
+        "files": ["server/data_loader.py", "server/query_executor.py", "server/translation.py", "server/individuality.py"]
+      },
+      {
+        "name": "生成层",
+        "description": "Context 预消化构建、ResponseSkill Prompt 模板、LLM RAG 生成",
+        "files": ["server/context_builder.py", "server/llm/"]
+      }
+    ],
+    "requestFlow": [
+      {
+        "step": 1,
+        "name": "请求接收与路由解析",
+        "description": "main.py 接收请求，按优先级确定 skill_calls 来源：Preset > params 直传 > LLM 路由",
+        "details": {
+          "presetPath": "前端传入 preset_name → PRESET_REGISTRY 展开为固定 skill_calls；支持 B1 策略（用户补充文字走 LLM 路由解析额外 Skills 并合并）",
+          "directPath": "前端传入 params（skill_calls 列表），跳过 LLM 路由直接执行",
+          "llmRoutingPath": "build_routing_prompt() → chat_completion(json_mode=True) → parse_routing_response() Pydantic 校验 → 输出 skill_calls + response_skill + fallback"
+        }
+      },
+      {
+        "step": 2,
+        "name": "Fallback 检查",
+        "description": "检查路由结果的 fallback 字段",
+        "rules": {
+          "greeting|out_of_scope": "直接返回 FALLBACK_TEMPLATES 模板回复",
+          "no_match|ambiguous": "进入 Agent 兜底",
+          "emptySkillCalls": "空 skill_calls 且无 fallback → Agent 兜底"
+        }
+      },
+      {
+        "step": 3,
+        "name": "SkillExecutor 执行",
+        "description": "executor.execute(skill_calls, response_skill_name)",
+        "substeps": [
+          "Pydantic params_schema 参数校验（失败跳过并记录 rejected）",
+          "按 domain 分组：servant domain 走 filter AND 合并；coronation 等走 custom_context",
+          "自定义 execute() 的 Skill 分别执行后取交集",
+          "结果按稀有度降序 → collectionNo 升序排序",
+          "空结果 → 尝试 resolve_nickname fallback → 仍空则标记 is_fallback=True"
+        ]
+      },
+      {
+        "step": 4,
+        "name": "Execution Fallback 处理",
+        "description": "执行结果为空时的降级处理",
+        "substeps": [
+          "先尝试异步 resolve_nickname（LLM 昵称识别）",
+          "仍失败 → build_oneshot_context() 构建已尝试条件的中文描述 → 传给 Agent 兜底"
+        ]
+      },
+      {
+        "step": 5,
+        "name": "Context 构建与 RAG 生成",
+        "description": "构建预消化 Context 并调用 LLM 生成最终回复",
+        "substeps": [
+          "build_context()：全中文 key、前 5 条代表从者详情 + 全局统计摘要",
+          "describe_filters()：将 skill_calls 转为人类可读筛选条件",
+          "ResponseSkill.build_prompt()：构建 Generation Prompt",
+          "chat_completion()：LLM 生成最终回复"
+        ]
+      },
+      {
+        "step": 6,
+        "name": "响应返回",
+        "description": "JSON API 返回 ChatResponse；SSE Stream 分阶段推送 thinking/result/complete 事件"
+      }
+    ],
+    "fallbackChain": [
+      {
+        "level": 1,
+        "trigger": "LLM 路由返回 greeting/out_of_scope",
+        "action": "直接返回 FALLBACK_TEMPLATES 模板回复",
+        "module": "server/fallback.py"
+      },
+      {
+        "level": 2,
+        "trigger": "LLM 路由返回 no_match/ambiguous 或空 skill_calls",
+        "action": "进入 Agent 多轮 tool-use 兜底",
+        "module": "server/agent/agent_loop.py"
+      },
+      {
+        "level": 3,
+        "trigger": "SkillExecutor 执行结果为空",
+        "action": "先尝试 resolve_nickname；仍空则 build_oneshot_context → Agent 兜底",
+        "module": "server/skills/executor.py → server/agent/agent_loop.py"
+      }
+    ],
+    "dataFlow": [
+      {
+        "from": "Atlas Academy API",
+        "to": "server/data/servants_db.json",
+        "via": "server/data_loader.py",
+        "description": "拉取全量从者数据 → 构建 Materialized View（烘焙效果/充能/技能详情等字段）"
+      },
+      {
+        "from": "Chaldea Dart 源码",
+        "to": "server/knowledge/*.json",
+        "via": "server/sync_chaldea.py",
+        "description": "提取 FuncType/BuffType/Trait 映射 → 生成 effect_schema.json/mappings.json 等"
+      },
+      {
+        "from": "server/config/effect_overrides.json",
+        "to": "runtime effect schema",
+        "via": "server/data_loader.merge_effect_overlay()",
+        "description": "Overlay 机制：将虚拟复合效果、翻译修正合并到 effect_schema 之上"
+      }
+    ]
+  },
+  "modules": {
+    "api": {
+      "entrypoint": "server/main.py",
+      "description": "FastAPI 应用入口，挂载所有路由和中间件",
+      "middleware": [
+        {"name": "CORSMiddleware", "description": "跨域配置，从 CORS_ORIGINS 环境变量读取白名单"},
+        {"name": "RateLimitMiddleware", "description": "双层速率限制（Per-IP + Global），滑动窗口，仅对 /api/chat 路径生效"}
+      ],
+      "staticMounts": [
+        {"path": "/admin", "directory": "admin/", "description": "Admin 后台静态页面"},
+        {"path": "/", "directory": "demo/", "description": "前端用户界面"}
+      ]
+    },
+    "routing": {
+      "description": "LLM OneShot 路由：将自然语言解析为 SkillCall 列表",
+      "promptBuilder": "server/prompts.py → build_routing_prompt()",
+      "schema": "server/schemas.py → RoutingResponse (Pydantic model)",
+      "outputFormat": {
+        "skill_calls": "[{skill_name, params}]",
+        "response_skill": "respond_servant_list | respond_servant_detail | ...",
+        "fallback": "{code, message} | null"
+      },
+      "routingRules": "18 条路由规则，涵盖效果类查询路由、NP充能精确路由、特性搜索、职阶克制、昵称识别、戴冠战等"
+    },
+    "skills": {
+      "framework": {
+        "baseClasses": "server/skills/base.py → BaseSkill, QuerySkill, ResponseSkill",
+        "registry": "SKILL_REGISTRY: dict[str, BaseSkill] — 全局注册表",
+        "decorator": "@register_skill — 自动实例化并注册",
+        "importTrigger": "server/skills/__init__.py — 导入所有 Skill 模块触发注册"
+      },
+      "querySkills": [
+        {"name": "lookup_servant", "file": "server/skills/query/lookup_servant.py", "domain": "servant", "description": "按名称查询单个从者（支持昵称/模糊匹配）"},
+        {"name": "compare_servants", "file": "server/skills/query/compare_servants.py", "domain": "servant", "description": "对比多个从者的属性和能力"},
+        {"name": "search_by_class", "file": "server/skills/query/search_by_class.py", "domain": "servant", "description": "按职阶筛选"},
+        {"name": "search_by_rarity", "file": "server/skills/query/search_by_rarity.py", "domain": "servant", "description": "按稀有度筛选（支持 eq/gte/lte 等比较）"},
+        {"name": "search_by_effect", "file": "server/skills/query/search_by_effect.py", "domain": "servant", "description": "统一效果搜索（同时搜技能+宝具效果）"},
+        {"name": "search_by_skill_effect", "file": "server/skills/query/search_by_skill_effect.py", "domain": "servant", "description": "仅搜索技能效果"},
+        {"name": "search_by_np_effect", "file": "server/skills/query/search_by_np_effect.py", "domain": "servant", "description": "仅搜索宝具效果"},
+        {"name": "search_by_np_charge", "file": "server/skills/query/search_by_np_charge.py", "domain": "servant", "description": "按 NP 充能量筛选（支持 targetType 区分自充/群充/他充）"},
+        {"name": "search_by_cards", "file": "server/skills/query/search_by_cards.py", "domain": "servant", "description": "按配卡、宝具卡色、宝具目标筛选"},
+        {"name": "search_by_traits", "file": "server/skills/query/search_by_traits.py", "domain": "servant", "description": "按特性筛选（支持灵基阶段精确筛选）"},
+        {"name": "search_by_attribute", "file": "server/skills/query/search_by_attribute.py", "domain": "servant", "description": "按属性筛选（天/地/人/星/兽）"},
+        {"name": "search_by_class_advantage", "file": "server/skills/query/search_by_class_advantage.py", "domain": "servant", "description": "按职阶克制关系查询"},
+        {"name": "resolve_nickname", "file": "server/skills/query/resolve_nickname.py", "domain": "servant", "description": "LLM 驱动的智能昵称识别"},
+        {"name": "coronation_knowledge", "file": "server/skills/query/coronation_knowledge.py", "domain": "coronation", "description": "戴冠战知识查询（机制/星图/礼装/Boss）"},
+        {"name": "coronation_team", "file": "server/skills/query/coronation_team.py", "domain": "coronation", "description": "戴冠战配队推荐（按职阶/流派/角色）"}
+      ],
+      "responseSkills": [
+        {"name": "respond_servant_list", "file": "server/skills/response/respond_servant_list.py", "description": "以列表形式展示筛选到的从者（默认）"},
+        {"name": "respond_servant_detail", "file": "server/skills/response/respond_servant_detail.py", "description": "展示单个从者的详细信息"},
+        {"name": "respond_servant_compare", "file": "server/skills/response/respond_servant_compare.py", "description": "对比多个从者并给出分析"},
+        {"name": "respond_support_analysis", "file": "server/skills/response/respond_support_analysis.py", "description": "分析辅助从者的能力并推荐搭配"},
+        {"name": "respond_coronation", "file": "server/skills/response/respond_coronation.py", "description": "戴冠战相关查询的专属回复"}
+      ],
+      "presets": [
+        {"name": "cycle_farming", "displayName": "周回筛选", "querySkills": ["search_by_np_charge"], "responseSkill": "respond_servant_list"},
+        {"name": "servant_lookup", "displayName": "从者查询", "querySkills": ["lookup_servant"], "responseSkill": "respond_servant_detail"},
+        {"name": "servant_compare", "displayName": "从者对比", "querySkills": ["compare_servants"], "responseSkill": "respond_servant_compare"},
+        {"name": "support_recommend", "displayName": "辅助推荐", "querySkills": ["search_by_effect"], "responseSkill": "respond_support_analysis"},
+        {"name": "coronation_guide", "displayName": "戴冠战攻略", "querySkills": ["coronation_knowledge"], "responseSkill": "respond_coronation"},
+        {"name": "coronation_team", "displayName": "戴冠战配队", "querySkills": ["coronation_team"], "responseSkill": "respond_coronation"}
+      ]
+    },
+    "executor": {
+      "file": "server/skills/executor.py",
+      "class": "SkillExecutor",
+      "description": "执行 SkillCall 列表，按 domain 分组 AND 合并执行",
+      "executionFlow": [
+        "Pydantic params_schema 参数校验（失败跳过并记录 rejected_skills）",
+        "分离 servant domain Skills 和 knowledge domain Skills",
+        "knowledge Skills 执行 → 收集 custom_context + 提取关联从者",
+        "servant domain Skills：filter Skills 一次扫描 AND 合并；custom execute Skills 分别执行取交集",
+        "结果按稀有度降序 → collectionNo 升序排序",
+        "空结果 → 尝试 resolve_nickname fallback（同步 + 异步两阶段）"
+      ],
+      "output": "ExecutionResult(servants, total_found, response_skill, custom_context, accepted_skills, rejected_skills)"
+    },
+    "llm": {
+      "directory": "server/llm/",
+      "description": "LLM 调度层：适配器模式，统一封装多家 LLM 供应商",
+      "components": [
+        {"file": "server/llm/base.py", "description": "BaseLLMAdapter 抽象基类 + 通用重试模板"},
+        {"file": "server/llm/provider.py", "description": "Provider 配置解析 + 两层降级调度（同提供商内 → 跨提供商）"},
+        {"file": "server/llm/adapters/dashscope_adapter.py", "description": "阿里 DashScope SDK 适配器"},
+        {"file": "server/llm/adapters/openai_adapter.py", "description": "OpenAI 兼容 API 适配器"},
+        {"file": "server/llm/adapters/obao_adapter.py", "description": "Obao（Claude 兼容）适配器"}
+      ],
+      "callModes": {
+        "chat_completion": "路由解析 + RAG 生成；支持 JSON Schema 结构化输出 + Pydantic 校验",
+        "agent_completion": "Agent 多轮 tool-use；统一走 Chat Completions API + tools 参数"
+      },
+      "fallbackStrategy": {
+        "level1": "同提供商内按 models 列表顺序降级（如 qwen-max → qwen-plus）",
+        "level2": "同提供商所有模型失败 → 切换下一个 Provider（如 dashscope → obao）"
+      }
+    },
+    "agent": {
+      "directory": "server/agent/",
+      "description": "Agent 兜底系统：当 OneShot 路由/执行失败时的多轮 Tool-Use 循环",
+      "components": [
+        {"file": "server/agent/agent_loop.py", "description": "多轮循环引擎 agent_route()：LLM → tool_calls → handler → LLM → ... → message"},
+        {"file": "server/agent/agent_prompt.py", "description": "Agent System Prompt"},
+        {"file": "server/agent/tool_defs.py", "description": "Chat Completions tools JSON 定义（3 类 7 个 tool）"},
+        {"file": "server/agent/tool_handlers.py", "description": "Tool 执行处理器，桥接 SkillExecutor 和数据层"}
+      ],
+      "tools": [
+        {"name": "search_servants", "type": "核心查询", "latency": "~100ms", "description": "多条件组合搜索从者"},
+        {"name": "lookup_servant", "type": "核心查询", "latency": "~50ms", "description": "单从者详情查询"},
+        {"name": "compare_servants", "type": "核心查询", "latency": "~50ms", "description": "多从者对比"},
+        {"name": "list_effects", "type": "本地查表", "latency": "<1ms", "description": "列出所有效果名及别名"},
+        {"name": "list_traits", "type": "本地查表", "latency": "<1ms", "description": "列出所有特性名"},
+        {"name": "list_classes", "type": "本地查表", "latency": "<1ms", "description": "列出所有职阶"},
+        {"name": "lookup_skill_detail", "type": "外部API", "latency": "~500ms", "description": "Atlas API 技能数值查询"}
+      ],
+      "triggerPoints": [
+        "Routing Fallback：LLM 路由返回 no_match/ambiguous",
+        "Empty Routing：LLM 路由返回空 skill_calls 且无 fallback",
+        "Execution Fallback：SkillExecutor 执行结果为空（含 resolve_nickname 也失败后）"
+      ],
+      "maxRounds": 8,
+      "oneshotContextInjection": "当 OneShot 结果为 0 时，build_oneshot_context() 构建已尝试条件的中文描述注入 Agent system 消息，避免重复搜索"
+    },
+    "data": {
+      "knowledge": {
+        "directory": "server/knowledge/",
+        "description": "领域知识（由 sync_chaldea.py 自动生成，严禁手工编辑）",
+        "files": [
+          {"name": "effect_schema.json", "description": "效果类型定义（FuncType + BuffType + validate 规则）"},
+          {"name": "class_mapping.json", "description": "职阶映射（可玩/NPC/特殊职阶分类）"},
+          {"name": "class_relation.json", "description": "职阶克制关系矩阵（Atlas API 数据源）"},
+          {"name": "mappings.json", "description": "从者中文名翻译 + 特性名映射"}
+        ],
+        "updateMechanism": "运行 sync_chaldea.py → 从 Chaldea Dart 源码提取 → 整体覆盖写入"
+      },
+      "config": {
+        "directory": "server/config/",
+        "description": "可运营配置（支持热更新，CachedConfig 自动检测文件变更）",
+        "files": [
+          {"name": "translations.json", "description": "中英文翻译映射（className/npCard/npTarget/effects）"},
+          {"name": "nicknames.json", "description": "从者昵称映射（中文昵称 → 正式名）"},
+          {"name": "effect_overrides.json", "description": "效果 Overlay（虚拟复合效果、翻译修正）"},
+          {"name": "coronation/guide.json", "description": "戴冠战通用攻略知识"},
+          {"name": "coronation/boss/*.json", "description": "戴冠战各职阶 Boss 数据"},
+          {"name": "coronation/team/*.json", "description": "戴冠战各职阶配队推荐数据"}
+        ]
+      },
+      "materializedView": {
+        "file": "server/data/servants_db.json",
+        "description": "运行时查询的核心数据源，由 data_loader.py 从 Atlas Academy API 构建",
+        "bakedFields": ["skillEffects", "npEffects", "totalCharge", "npCharge", "skillDetails", "npDetails", "traits", "conditionalTraits", "aliasCN"]
+      }
+    },
+    "logging": {
+      "file": "server/logger.py",
+      "description": "多阶段事件流 Trace 日志系统",
+      "storage": "JSONL (server/logs/query_trace.jsonl)",
+      "asyncWrite": "asyncio.to_thread 避免阻塞 Event Loop",
+      "phases": [
+        {"name": "routing_input", "content": "用户 query、mode、Skill 列表数量"},
+        {"name": "routing_output", "content": "skill_calls、response_skill、fallback、model、usage"},
+        {"name": "execution", "content": "accepted/rejected Skills、total_found、执行耗时"},
+        {"name": "context_build", "content": "applied_filters、context 大小"},
+        {"name": "generation_input", "content": "Generation Prompt 元数据"},
+        {"name": "generation_output", "content": "最终回复、generation_usage"},
+        {"name": "agent_detail", "content": "Agent 轮次、tokens、tool_trace"},
+        {"name": "final", "content": "总耗时、mode、total_tokens"}
+      ]
+    }
+  },
+  "businessFlows": [
+    {
+      "name": "自然语言查询",
+      "description": "用户输入自然语言问题，系统自动解析意图并返回结果",
+      "example": "用户问「30自充以上的五星Caster」",
+      "steps": [
+        "用户发送消息到 /api/chat 或 /api/chat/stream",
+        "main.py 检测无 preset_name 和 params，进入 LLM 路由路径",
+        "build_routing_prompt() 构建路由 Prompt（含 18 条规则 + 效果语义参考）",
+        "chat_completion(json_mode=True) 调用 LLM 解析意图",
+        "parse_routing_response() Pydantic 校验输出 → skill_calls: [search_by_np_charge(gte,30), search_by_class(Caster), search_by_rarity(eq,5)]",
+        "SkillExecutor.execute() 一次数据扫描 AND 合并三个 filter",
+        "build_context() 构建预消化 Context（全中文 key）",
+        "respond_servant_list.build_prompt() 构建 Generation Prompt",
+        "chat_completion() LLM 生成最终回复",
+        "返回 ChatResponse(reply, servants, count, query, model, traceId)"
+      ]
+    },
+    {
+      "name": "Preset 快捷查询",
+      "description": "用户通过前端预设按钮发起查询，跳过 LLM 路由直接展开",
+      "example": "用户点击「周回筛选」preset 并输入「五星弓阶」",
+      "steps": [
+        "前端发送 preset_name='cycle_farming' + message='五星弓阶'",
+        "main.py 从 PRESET_REGISTRY 展开 → skill_calls: [search_by_np_charge(gte,30)]",
+        "检测到 user_message 非空 → B1 策略：LLM 路由解析额外 Skills",
+        "LLM 解析出 [search_by_class(Archer), search_by_rarity(eq,5)]",
+        "合并：同名 Skill 补充参数，新 Skill 追加 → 最终 3 个 skill_calls",
+        "SkillExecutor.execute() 执行 → build_context() → Generation → 返回"
+      ]
+    },
+    {
+      "name": "戴冠战配队推荐",
+      "description": "用户查询特定职阶的戴冠战配队推荐",
+      "example": "用户问「剑阶戴冠配队推荐」",
+      "steps": [
+        "LLM 路由解析 → skill_calls: [coronation_team(className='剑')], response_skill: respond_coronation",
+        "SkillExecutor 识别 coronation domain → 调用 coronation_team.execute()",
+        "从 config/coronation/team/saber.json 加载配队数据",
+        "_filter_by_class() 运行时职阶校验：剔除非剑阶从者",
+        "返回 custom_context（含流派、角色分类、推荐从者）+ 关联从者卡片数据",
+        "respond_coronation.build_prompt() 使用 CORONATION_GENERATION_PROMPT",
+        "LLM 生成专属戴冠战配队推荐回复"
+      ]
+    },
+    {
+      "name": "Agent 兜底",
+      "description": "OneShot 路由/执行失败时的多轮 Agent 降级处理",
+      "example": "用户问了一个无法精确路由的复杂问题",
+      "steps": [
+        "OneShot 路由返回 no_match fallback 或执行结果为空",
+        "build_oneshot_context() 构建已尝试条件的中文描述（如有）",
+        "agent_route() 启动多轮循环：messages=[system, user] + tools",
+        "LLM 分析问题 → 决定调用 search_servants/lookup_servant 等 tool",
+        "tool_handlers 执行 tool → 结果追加到 messages → 下一轮 LLM",
+        "LLM 无需更多 tool → 生成最终回复文本",
+        "classify_agent_reply() 检查分类标记 → 返回回复 + servants_data（供卡片渲染）"
+      ]
+    }
+  ],
+  "keyDesignDecisions": [
+    {"id": "ADR-003", "title": "AI Native Architecture", "summary": "以 LLM 为核心路由引擎，而非传统 NLU 规则"},
+    {"id": "ADR-006", "title": "Pre-digestion First", "summary": "后端预消化所有英文枚举为中文，杜绝 LLM 翻译幻觉"},
+    {"id": "ADR-007", "title": "LLM Contract", "summary": "Pydantic 强契约校验 LLM 输出，消除格式漂移"},
+    {"id": "ADR-010", "title": "Knowledge-Config Separation", "summary": "领域知识与可运营配置物理隔离"},
+    {"id": "ADR-018", "title": "Skill-Based Architecture", "summary": "查询逻辑模块化为独立 Skill，@register_skill 自动注册"},
+    {"id": "ADR-020", "title": "Effect Quantitative Filter", "summary": "效果量化筛选（数值/目标/回合数三维过滤）"},
+    {"id": "ADR-021", "title": "Agentic Tool-Use Routing", "summary": "OneShot 优先 + Agent 兜底混合路由策略"}
+  ]
+}
