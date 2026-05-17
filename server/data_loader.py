@@ -10,6 +10,7 @@ Laplace — 通用从者数据加载器
 import json
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 try:
     import requests
@@ -412,12 +413,29 @@ def fetch_normal_servants() -> list[dict]:
     return normal
 
 
-def get_face_url(servant: dict) -> str:
-    """获取从者头像 URL（优先最终再临）。"""
+def get_face_url_absolute(servant: dict) -> str:
+    """获取从者头像的 Atlas CDN 绝对 URL（优先最终再临）。
+
+    供下载脚本使用，保留原始外部 URL。
+    """
     faces = servant.get("extraAssets", {}).get("faces", {}).get("ascension", {})
     if faces:
         return faces.get("4") or faces.get("3") or faces.get("2") or faces.get("1", "")
     return ""
+
+
+def get_face_url(servant: dict) -> str:
+    """获取从者头像的本地相对路径（优先最终再临）。
+
+    返回 /faces/f_xxx.png 格式，前端直接使用该路径请求本域。
+    """
+    absolute_url = get_face_url_absolute(servant)
+    if not absolute_url:
+        return ""
+    # 从 URL 提取文件名，如 https://static.atlasacademy.io/JP/Faces/f_1001003.png → f_1001003.png
+    parsed = urlparse(absolute_url)
+    filename = Path(parsed.path).name
+    return f"/faces/{filename}" if filename else ""
 
 
 def _digest_append_passives(raw_passives: list[dict]) -> list[dict]:
@@ -851,6 +869,7 @@ def build_database(
             "instantDeathChance": svt.get("instantDeathChance", 0),
             "hitsDistribution": svt.get("hitsDistribution", {}),
             "faceUrl": get_face_url(svt),
+            "_faceUrlSource": get_face_url_absolute(svt),
             # Phase 3 新增属性（traits 合并 traitAdd + ascensionAdd.individuality）
             **_merge_traits(svt),
             "gender": svt.get("gender", "unknown"),

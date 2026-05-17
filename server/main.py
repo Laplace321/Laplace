@@ -51,6 +51,11 @@ app = FastAPI(
 app.include_router(auth_router, prefix="/api/admin")
 app.include_router(admin_routes_router, prefix="/api/admin")
 
+# ── 从者头像代理（开发环境替代 Nginx 的 /faces/ 静态服务）──
+from server.face_proxy import router as face_proxy_router
+
+app.include_router(face_proxy_router)
+
 # CORS — 从环境变量读取白名单（默认仅本地开发）
 _default_origins = "http://localhost:8000,http://127.0.0.1:8000"
 cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]

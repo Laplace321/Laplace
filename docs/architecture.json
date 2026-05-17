@@ -29,6 +29,7 @@
           {"path": "/api/health", "method": "GET", "description": "健康检查"},
           {"path": "/api/admin/*", "method": "GET/POST", "description": "Admin 管理路由（需认证）"},
           {"path": "/admin/*", "method": "GET", "description": "Admin 后台静态页"},
+          {"path": "/faces/{filename}", "method": "GET", "description": "从者头像代理（本地优先 + Atlas CDN 回源）"},
           {"path": "/*", "method": "GET", "description": "前端静态文件 (demo/)"}
         ]
       },
@@ -44,8 +45,8 @@
       },
       {
         "name": "数据层",
-        "description": "servants_db.json (Materialized View)、knowledge/ (Schema Mirror)、config/ (可运营配置)、翻译预消化",
-        "files": ["server/data_loader.py", "server/query_executor.py", "server/translation.py", "server/individuality.py"]
+        "description": "servants_db.json (Materialized View)、knowledge/ (Schema Mirror)、config/ (可运营配置)、翻译预消化、头像本地缓存",
+        "files": ["server/data_loader.py", "server/query_executor.py", "server/translation.py", "server/individuality.py", "server/face_proxy.py", "server/download_faces.py"]
       },
       {
         "name": "生成层",

@@ -33,6 +33,15 @@ if [ "$NEED_REBUILD" = "1" ] || [ "${REFRESH_DATA_ON_START}" = "1" ]; then
     echo "[init] Data build complete (version: $BUILD_VER)."
 fi
 
+# ── 从者头像同步（增量下载） ──
+if [ "$NEED_REBUILD" = "1" ] || [ ! -d "server/data/faces" ]; then
+    echo "[init] Downloading servant face images..."
+    python3 -m server.download_faces || echo "[init] WARNING: Some face downloads failed (non-fatal)"
+else
+    echo "[init] Faces directory exists, running incremental sync..."
+    python3 -m server.download_faces || echo "[init] WARNING: Some face downloads failed (non-fatal)"
+fi
+
 # ── 持久化应用日志（防止 docker rm 后丢失） ──
 APP_LOG_DIR="server/logs"
 APP_LOG_FILE="${APP_LOG_DIR}/app.log"

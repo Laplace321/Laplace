@@ -31,8 +31,8 @@ RUN chmod +x /app/docker-entrypoint.sh
 ARG BUILD_VERSION=unknown
 RUN echo "${BUILD_VERSION}" > /app/.build_version
 
-# 确保日志和数据目录存在
-RUN mkdir -p server/logs server/data
+# 确保日志、数据和头像缓存目录存在
+RUN mkdir -p server/logs server/data server/data/faces
 
 EXPOSE 8000
 

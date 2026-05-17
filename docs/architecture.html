@@ -501,7 +501,18 @@ class SearchByClass(QuerySkill):
 <p><strong>Effect Schema Overlay 机制</strong>：<code>merge_effect_overlay()</code> 在 runtime 将 <code>config/effect_overrides.json</code> 合并到 <code>knowledge/effect_schema.json</code>，支持虚拟复合效果（如 <code>damageBoost</code>、<code>damageShield</code>）。</p>
 </div>
 
-<h3>7.3 预消化与翻译</h3>
+<h3>7.3 从者头像本地缓存</h3>
+<div class="card">
+<p>从者头像图片采用"静态化 + 代理兜底"三层策略，解决国内用户直连 Atlas CDN 加载缓慢的问题：</p>
+<ul>
+  <li><strong>Build-time 预下载</strong>：<code>server/download_faces.py</code> 在容器启动时批量下载头像到 <code>server/data/faces/</code></li>
+  <li><strong>Nginx try_files</strong>：生产环境优先从本地静态文件服务，未命中则代理回源 Atlas CDN</li>
+  <li><strong>FastAPI 代理路由</strong>：<code>server/face_proxy.py</code> 开发环境提供相同行为（本地优先 + 回源缓存）</li>
+</ul>
+<p><code>data_loader.py</code> 的 <code>get_face_url()</code> 返回相对路径 <code>/faces/f_xxx.png</code>，前端直接请求本域。</p>
+</div>
+
+<h3>7.4 预消化与翻译</h3>
 <div class="card">
 <p><code>server/translation.py</code> 提供所有翻译映射的统一入口，从 <code>config/translations.json</code> 加载（热更新）。<br>
 <code>server/context_builder.py</code> 将英文枚举值全部预消化为中文后再传给 LLM，杜绝翻译幻觉。</p>
