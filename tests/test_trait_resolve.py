@@ -1,7 +1,8 @@
-"""测试 resolve_trait_names 的别名匹配、子串匹配改进逻辑。"""
+"""测试 resolve_trait_names 的别名匹配、子串匹配改进逻辑，以及 _merge_traits 特性合并。"""
 
 import pytest
 
+from server.data_loader import _merge_traits
 from server.skills.query.search_by_traits import (
     _ensure_trait_name_map,
     _get_trait_aliases,
@@ -101,3 +102,85 @@ class TestExistingBehaviorPreserved:
         """空输入返回空列表"""
         assert resolve_trait_names([]) == []
         assert resolve_trait_names([""]) == []
+
+
+class TestMergeTraitsCostume:
+    """测试 _merge_traits 对 costume individuality 的合并逻辑。"""
+
+    def test_costume_traits_merged_into_union(self):
+        """灵衣阶段携带的特性应被合并到 traits 并集中。"""
+        svt = {
+            "traits": [{"id": 1000}, {"id": 2001}],  # 基础: 从者, humanoid
+            "ascensionAdd": {
+                "individuality": {
+                    "ascension": {},
+                    "costume": {
+                        "301330": [
+                            {"id": 1000},
+                            {"id": 2001},
+                            {"id": 2780},  # 灵衣持有者
+                            {"id": 2821},  # 兽科从者
+                        ]
+                    },
+                }
+            },
+            "traitAdd": [],
+        }
+        result = _merge_traits(svt)
+        assert 2821 in result["traits"], "灵衣特性 2821(兽科从者) 应在 traits 并集中"
+        assert 2780 in result["traits"], "灵衣特性 2780(灵衣持有者) 应在 traits 并集中"
+        assert 1000 in result["traits"]
+
+    def test_costume_creates_traits_by_ascension(self):
+        """灵衣与基础灵基有差异时，应生成 traitsByAscension。"""
+        svt = {
+            "traits": [{"id": 1000}, {"id": 2001}],
+            "ascensionAdd": {
+                "individuality": {
+                    "ascension": {},
+                    "costume": {
+                        "102830": [
+                            {"id": 1000},
+                            {"id": 2001},
+                            {"id": 2821},  # 灵衣独有
+                        ]
+                    },
+                }
+            },
+            "traitAdd": [],
+        }
+        result = _merge_traits(svt)
+        # 灵衣阶段有额外特性，应产生灵基差异
+        assert "traitsByAscension" in result
+        assert "102830" in result["traitsByAscension"]
+        assert 2821 in result["traitsByAscension"]["102830"]
+
+    def test_no_costume_section_no_change(self):
+        """无 costume section 时行为不变。"""
+        svt = {
+            "traits": [{"id": 1000}, {"id": 2821}],
+            "ascensionAdd": {"individuality": {"ascension": {}, "costume": {}}},
+            "traitAdd": [],
+        }
+        result = _merge_traits(svt)
+        assert 1000 in result["traits"]
+        assert 2821 in result["traits"]
+
+    def test_multiple_costumes_all_merged(self):
+        """多件灵衣的特性都应被合并。"""
+        svt = {
+            "traits": [{"id": 1000}],
+            "ascensionAdd": {
+                "individuality": {
+                    "ascension": {},
+                    "costume": {
+                        "102830": [{"id": 1000}, {"id": 2821}],
+                        "102840": [{"id": 1000}, {"id": 2821}, {"id": 9999}],
+                    },
+                }
+            },
+            "traitAdd": [],
+        }
+        result = _merge_traits(svt)
+        assert 2821 in result["traits"]
+        assert 9999 in result["traits"]

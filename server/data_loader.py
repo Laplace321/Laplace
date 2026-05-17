@@ -273,7 +273,9 @@ def _merge_traits(svt: dict) -> dict:
     """合并从者的完整特性数据（对齐 Chaldea equip_bond_bonus.dart 逻辑）。
 
     三层叠加机制：
-    1. ascensionAdd.individuality — 灵基特性覆盖（非空时替代基础 traits）
+    1. ascensionAdd.individuality — 灵基/灵衣特性覆盖（非空时替代基础 traits）
+       - ascension section: 标准灵基 0-4 的特性覆盖
+       - costume section: 灵衣阶段的特性覆盖（key 为大数字如 301330）
     2. traitAdd (condType=none) — 无条件附加特性（按 limitCount 分配到对应灵基）
     3. traitAdd (condType!=none) — 有条件附加特性（存入 conditionalTraits）
 
@@ -291,12 +293,19 @@ def _merge_traits(svt: dict) -> dict:
     indiv_data = asc_add.get("individuality", {})
     asc_indiv: dict[str, list[int]] = {}  # stage_key → trait IDs
 
-    # Atlas API 格式: {"ascension": {"0": [...], "1": [...], ...}, "costume": {...}}
+    # Atlas API 格式: {"ascension": {"0": [...], "1": [...], ...}, "costume": {"301330": [...], ...}}
     asc_section = indiv_data.get("ascension", {})
     if isinstance(asc_section, dict):
         for stage_key, trait_list in asc_section.items():
             if trait_list:  # 只保留非空的灵基覆盖
                 asc_indiv[str(stage_key)] = _trait_ids(trait_list)
+
+    # 灵衣特性覆盖（costume section）— 灵衣阶段可能携带额外特性（如兽科从者 2821）
+    costume_section = indiv_data.get("costume", {})
+    if isinstance(costume_section, dict):
+        for costume_key, trait_list in costume_section.items():
+            if trait_list:
+                asc_indiv[str(costume_key)] = _trait_ids(trait_list)
 
     # 3. 解析 traitAdd
     trait_add_list = svt.get("traitAdd", [])
