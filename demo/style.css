@@ -763,8 +763,10 @@ body {
   /* Chat */
   .chat-messages { padding: var(--space-md); }
   .message-content { max-width: 90%; }
-  .chat-cards-grid { flex-direction: column; }
-  .chat-card { max-width: 100%; }
+  .chat-card { flex: 0 1 calc(50% - 4px); max-width: none; min-width: 0; padding: var(--space-sm); }
+  .chat-card-face { width: 36px; height: 36px; }
+  .chat-card-name { font-size: 11px; }
+  .chat-card-meta { font-size: 9px; }
 
   /* Input */
   #chat-input-area { padding: var(--space-sm) var(--space-md); }
