@@ -10,6 +10,21 @@ from server.skills.base import QuerySkill, register_skill
 
 # ── 中文特性名 → trait ID 反查缓存 ──
 _TRAIT_NAME_TO_ID: dict[str, int] = {}
+_TRAIT_ALIASES: dict[str, str] | None = None
+
+
+def _get_trait_aliases() -> dict[str, str]:
+    """懒加载特性别名映射（config/trait_aliases.json）。"""
+    global _TRAIT_ALIASES
+    if _TRAIT_ALIASES is not None:
+        return _TRAIT_ALIASES
+    aliases_path = Path(__file__).parent.parent.parent / "config" / "trait_aliases.json"
+    if aliases_path.exists():
+        with open(aliases_path, encoding="utf-8") as f:
+            _TRAIT_ALIASES = json.load(f)
+    else:
+        _TRAIT_ALIASES = {}
+    return _TRAIT_ALIASES
 
 
 def _ensure_trait_name_map() -> dict[str, int]:
@@ -79,14 +94,23 @@ def resolve_trait_names(names: list[str]) -> list[int]:
         if alignment_ids:
             result.extend(alignment_ids)
             continue
-        # 子串匹配（原始名称）
-        found = False
+        # 别名匹配（config/trait_aliases.json）
+        aliases = _get_trait_aliases()
+        alias_target = aliases.get(normalized) or aliases.get(name)
+        if alias_target and alias_target in name_map:
+            result.append(name_map[alias_target])
+            continue
+        # 子串匹配（最长优先 + 短名保护）
+        # - name in cn: 用户输入是某个特性名的子串（如输入"龙"匹配"龙"），无长度限制
+        # - cn in name: 特性名是用户输入的子串，要求 len(cn) >= 3 防止超短通用特性误命中
+        best_cn, best_tid = "", -1
         for cn, tid in name_map.items():
-            if name in cn or cn in name:
-                result.append(tid)
-                found = True
-                break
-        if not found:
+            if name in cn or (cn in name and len(cn) >= 3):
+                if len(cn) > len(best_cn):
+                    best_cn, best_tid = cn, tid
+        if best_tid >= 0:
+            result.append(best_tid)
+        else:
             # 尝试直接当 int 解析（兼容 LLM 直传 ID）
             try:
                 result.append(int(name))
