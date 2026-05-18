@@ -1092,6 +1092,10 @@ def _extract_ce_effects(skills: list[dict], cond_limit_count: int, matcher: dict
             # 跳过活动掉落加成
             if func_type == "eventDropUp":
                 continue
+            # 跳过活动绑定效果（funcGroup 含 eventId > 0 表示只对特定活动关卡生效）
+            func_group = func.get("funcGroup", [])
+            if func_group and any(fg.get("eventId", 0) > 0 for fg in func_group):
+                continue
             target_type = func.get("funcTargetType", "")
             matched = _match_func_effects(func, matcher)
 
