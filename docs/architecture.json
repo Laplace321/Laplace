@@ -200,14 +200,20 @@
         {"name": "search_by_class_advantage", "file": "server/skills/query/search_by_class_advantage.py", "domain": "servant", "description": "按职阶克制关系查询"},
         {"name": "resolve_nickname", "file": "server/skills/query/resolve_nickname.py", "domain": "servant", "description": "LLM 驱动的智能昵称识别"},
         {"name": "coronation_knowledge", "file": "server/skills/query/coronation_knowledge.py", "domain": "coronation", "description": "戴冠战知识查询（机制/星图/礼装/Boss）"},
-        {"name": "coronation_team", "file": "server/skills/query/coronation_team.py", "domain": "coronation", "description": "戴冠战配队推荐（按职阶/流派/角色）"}
+        {"name": "coronation_team", "file": "server/skills/query/coronation_team.py", "domain": "coronation", "description": "戴冠战配队推荐（按职阶/流派/角色）"},
+        {"name": "ce_lookup", "file": "server/skills/query/ce_lookup.py", "domain": "ce", "description": "按名称/昵称查找概念礼装"},
+        {"name": "ce_search_by_effect", "file": "server/skills/query/ce_search_by_effect.py", "domain": "ce", "description": "按效果搜索概念礼装（满破/未满破）"},
+        {"name": "ce_search_by_rarity", "file": "server/skills/query/ce_search_by_rarity.py", "domain": "ce", "description": "按稀有度筛选概念礼装"},
+        {"name": "ce_search_by_atk_type", "file": "server/skills/query/ce_search_by_atk_type.py", "domain": "ce", "description": "按ATK/HP类型筛选概念礼装（纯攻/纯血/混合）"},
+        {"name": "ce_search_by_obtain", "file": "server/skills/query/ce_search_by_obtain.py", "domain": "ce", "description": "按获取方式筛选概念礼装（常驻/限定/活动/羁绊/情人节）"}
       ],
       "responseSkills": [
         {"name": "respond_servant_list", "file": "server/skills/response/respond_servant_list.py", "description": "以列表形式展示筛选到的从者（默认）"},
         {"name": "respond_servant_detail", "file": "server/skills/response/respond_servant_detail.py", "description": "展示单个从者的详细信息"},
         {"name": "respond_servant_compare", "file": "server/skills/response/respond_servant_compare.py", "description": "对比多个从者并给出分析"},
         {"name": "respond_support_analysis", "file": "server/skills/response/respond_support_analysis.py", "description": "分析辅助从者的能力并推荐搭配"},
-        {"name": "respond_coronation", "file": "server/skills/response/respond_coronation.py", "description": "戴冠战相关查询的专属回复"}
+        {"name": "respond_coronation", "file": "server/skills/response/respond_coronation.py", "description": "戴冠战相关查询的专属回复"},
+        {"name": "respond_ce_list", "file": "server/skills/response/respond_ce_list.py", "description": "以列表形式展示筛选到的概念礼装"}
       ],
       "presets": [
         {"name": "cycle_farming", "displayName": "周回筛选", "querySkills": ["search_by_np_charge"], "responseSkill": "respond_servant_list"},
@@ -224,9 +230,10 @@
       "description": "执行 SkillCall 列表，按 domain 分组 AND 合并执行",
       "executionFlow": [
         "Pydantic params_schema 参数校验（失败跳过并记录 rejected_skills）",
-        "分离 servant domain Skills 和 knowledge domain Skills",
-        "knowledge Skills 执行 → 收集 custom_context + 提取关联从者",
-        "servant domain Skills：filter Skills 一次扫描 AND 合并；custom execute Skills 分别执行取交集",
+        "按 domain 分组：servant / ce / knowledge（coronation 等）",
+        "CE domain Skills → 从 load_ce_database() 加载礼装数据 → AND 合并执行 → 独立返回",
+        "Knowledge domain Skills → 收集 custom_context + 提取关联从者",
+        "Servant domain Skills：filter Skills 一次扫描 AND 合并；custom execute Skills 分别执行取交集",
         "结果按稀有度降序 → collectionNo 升序排序",
         "空结果 → 尝试 resolve_nickname fallback（同步 + 异步两阶段）"
       ],
@@ -298,14 +305,23 @@
           {"name": "effect_overrides.json", "description": "效果 Overlay（虚拟复合效果、翻译修正）"},
           {"name": "coronation/guide.json", "description": "戴冠战通用攻略知识"},
           {"name": "coronation/boss/*.json", "description": "戴冠战各职阶 Boss 数据"},
-          {"name": "coronation/team/*.json", "description": "戴冠战各职阶配队推荐数据"}
+          {"name": "coronation/team/*.json", "description": "戴冠战各职阶配队推荐数据"},
+          {"name": "ce_nicknames.json", "description": "概念礼装昵称映射（中文昵称 → 英文正式名）"},
+          {"name": "ce_obtain_map.json", "description": "概念礼装获取方式中文映射与分类说明"}
         ]
       },
-      "materializedView": {
-        "file": "server/data/servants_db.json",
-        "description": "运行时查询的核心数据源，由 data_loader.py 从 Atlas Academy API 构建",
-        "bakedFields": ["skillEffects", "npEffects", "totalCharge", "npCharge", "skillDetails", "npDetails", "traits", "conditionalTraits", "aliasCN"]
-      }
+      "materializedViews": [
+        {
+          "file": "server/data/servants_db.json",
+          "description": "从者运行时查询数据源，由 data_loader.py 从 Atlas Academy API 构建",
+          "bakedFields": ["skillEffects", "npEffects", "totalCharge", "npCharge", "skillDetails", "npDetails", "traits", "conditionalTraits", "aliasCN"]
+        },
+        {
+          "file": "server/data/craft_essences_db.json",
+          "description": "概念礼装运行时查询数据源，由 data_loader.py 从 Atlas Academy API 构建（2606条）",
+          "bakedFields": ["effects", "effectsLimitBreak", "effectDetails", "effectDetailsLB", "effectDescCn", "effectDescCnLB", "npChargePercent", "atkType", "obtain", "nameCn", "faceUrl"]
+        }
+      ]
     },
     "logging": {
       "file": "server/logger.py",
@@ -367,6 +383,20 @@
         "返回 custom_context（含流派、角色分类、推荐从者）+ 关联从者卡片数据",
         "respond_coronation.build_prompt() 使用 CORONATION_GENERATION_PROMPT",
         "LLM 生成专属戴冠战配队推荐回复"
+      ]
+    },
+    {
+      "name": "概念礼装查询",
+      "description": "用户查询概念礼装信息，系统从独立 CE 数据库中筛选并返回结果",
+      "example": "用户问「有 NP 充能的五星纯攻礼装」",
+      "steps": [
+        "LLM 路由解析 → skill_calls: [ce_search_by_effect(gainNp), ce_search_by_rarity(eq,5), ce_search_by_atk_type(pure_atk)], response_skill: respond_ce_list",
+        "SkillExecutor 识别 ce domain → 从 load_ce_database() 加载礼装数据",
+        "CE Skills AND 合并执行：效果+稀有度+ATK类型三维筛选",
+        "build_ce_context() 构建礼装专用 context（满破效果优先展示）",
+        "respond_ce_list.build_prompt() 使用 CE_GENERATION_PROMPT",
+        "chat_completion() LLM 生成最终回复",
+        "返回卡片数据（含 atkType 标记，前端自动渲染为礼装卡片样式）"
       ]
     },
     {
