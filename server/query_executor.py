@@ -12,11 +12,15 @@ from pathlib import Path
 from server.config_loader import CachedConfig
 
 DATA_PATH = Path(__file__).parent / "data" / "servants_db.json"
+CE_DATA_PATH = Path(__file__).parent / "data" / "craft_essences_db.json"
 FIXTURE_PATH = Path(__file__).parent.parent / "tests" / "fixtures" / "servants_fixture.json"
+CE_FIXTURE_PATH = Path(__file__).parent.parent / "tests" / "fixtures" / "ce_fixture.json"
 NICKNAMES_PATH = Path(__file__).parent / "config" / "nicknames.json"
+CE_NICKNAMES_PATH = Path(__file__).parent / "config" / "ce_nicknames.json"
 
 # 全局缓存
 _servants_db: list[dict] | None = None
+_ce_db: list[dict] | None = None
 
 _nicknames_cache = CachedConfig(NICKNAMES_PATH)
 
@@ -28,9 +32,21 @@ def _normalize_text(value: str) -> str:
     return text
 
 
+_ce_nicknames_cache = CachedConfig(CE_NICKNAMES_PATH)
+
+
 def load_nicknames() -> dict[str, str]:
-    """加载昵称映射（支持热更新）。"""
+    """加载从者昵称映射（支持热更新）。"""
     return _nicknames_cache.get()
+
+
+def load_ce_nicknames() -> dict[str, str]:
+    """加载礼装昵称映射（支持热更新）。
+
+    Returns:
+        {"万花筒": "Kaleidoscope", "黑杯": "Heaven's Feel", ...}
+    """
+    return _ce_nicknames_cache.get()
 
 
 def load_database() -> list[dict]:
@@ -49,6 +65,31 @@ def load_database() -> list[dict]:
         label = "fixture" if data_path == FIXTURE_PATH else "full"
         print(f"📦 从者数据库已加载: {len(_servants_db)} 条, {has_effects} 个有效果数据 ({label})")
     return _servants_db
+
+
+def load_ce_database() -> list[dict]:
+    """加载概念礼装数据库（带缓存）。
+
+    优先加载真实数据（server/data/craft_essences_db.json），
+    若不存在则 fallback 到测试 fixture 数据（tests/fixtures/ce_fixture.json），
+    确保 CI 环境下测试可正常运行。
+    """
+    global _ce_db
+    if _ce_db is None:
+        if CE_DATA_PATH.exists():
+            data_path = CE_DATA_PATH
+        elif CE_FIXTURE_PATH.exists():
+            data_path = CE_FIXTURE_PATH
+        else:
+            print("⚠️  礼装数据库不存在，CE 查询将返回空结果")
+            _ce_db = []
+            return _ce_db
+        with open(data_path, encoding="utf-8") as f:
+            _ce_db = json.load(f)
+        has_effects = sum(1 for ce in _ce_db if ce.get("effectsLimitBreak"))
+        label = "fixture" if data_path == CE_FIXTURE_PATH else "full"
+        print(f"🎴 礼装数据库已加载: {len(_ce_db)} 条, {has_effects} 个有效果数据 ({label})")
+    return _ce_db
 
 
 def _match_target_type(query_type: str, data_type: str) -> bool:

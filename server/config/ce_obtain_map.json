@@ -1,0 +1,33 @@
+{
+  "_comment": "获取方式中文映射与分类说明",
+  "obtain_types": {
+    "permanent": "常驻池",
+    "limited": "限定",
+    "event": "活动配布",
+    "shop": "稀有棱柱兑换",
+    "bond": "羁绊礼装",
+    "valentine": "情人节礼装",
+    "exp": "经验值礼装"
+  },
+  "obtain_type_aliases": {
+    "常驻": "permanent",
+    "常驻池": "permanent",
+    "池子": "permanent",
+    "限定": "limited",
+    "限定池": "limited",
+    "活动": "event",
+    "配布": "event",
+    "活动配布": "event",
+    "兑换": "shop",
+    "棱柱": "shop",
+    "稀有棱柱": "shop",
+    "魔力棱柱": "shop",
+    "羁绊": "bond",
+    "绊礼装": "bond",
+    "羁绊礼装": "bond",
+    "情人节": "valentine",
+    "巧克力": "valentine",
+    "经验": "exp",
+    "狗粮": "exp"
+  }
+}

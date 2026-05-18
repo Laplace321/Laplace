@@ -20,6 +20,7 @@ except ImportError:
 
 API_BASE = "https://api.atlasacademy.io"
 NICE_SERVANT_URL = f"{API_BASE}/export/JP/nice_servant_lang_en.json"
+NICE_EQUIP_URL = f"{API_BASE}/export/JP/nice_equip_lang_en.json"
 OUTPUT_DIR = Path(__file__).parent / "data"
 KNOWLEDGE_DIR = Path(__file__).parent / "knowledge"
 CONFIG_DIR = Path(__file__).parent / "config"
@@ -104,8 +105,11 @@ def load_svt_names_mapping() -> dict:
 
 # CN 服从者数据 URL（用于获取中文技能名/宝具名）
 CN_SERVANT_URL = f"{API_BASE}/export/CN/nice_servant.json"
+# CN 服礼装数据 URL（用于获取中文礼装名和效果描述）
+CN_EQUIP_URL = f"{API_BASE}/export/CN/nice_equip.json"
 # 缓存文件路径
 SKILL_NAMES_CN_CACHE = OUTPUT_DIR / "skill_names_cn.json"
+CE_NAMES_CN_CACHE = OUTPUT_DIR / "ce_names_cn.json"
 
 
 def load_skill_names_cn() -> dict:
@@ -920,6 +924,563 @@ def build_database(
     return db
 
 
+# ============================================================
+# 概念礼装数据构建
+# ============================================================
+
+
+def fetch_craft_essences() -> list[dict]:
+    """从 Atlas Academy API 拉取全量概念礼装数据（type=servantEquip, collectionNo>0）。"""
+    print("📡 正在从 Atlas Academy API 拉取概念礼装数据...")
+    resp = requests.get(NICE_EQUIP_URL, timeout=180)
+    resp.raise_for_status()
+    equips = resp.json()
+    normal = [e for e in equips if e.get("type") == "servantEquip" and e.get("collectionNo", 0) > 0]
+    print(f"   ✅ 获取到 {len(normal)} 个概念礼装")
+    return normal
+
+
+def load_ce_names_cn() -> dict[str, str]:
+    """从 Atlas API CN 服获取中文礼装名和效果描述映射。
+
+    构建 {ce_id_str: {"name": cn_name, "skills": {skill_id_str: detail_text}}} 映射表。
+    优先使用本地缓存（server/data/ce_names_cn.json）。
+
+    Returns:
+        {"id_str": {"name": "万华镜", "skills": {"990067": "自身以宝具值已达80%...", ...}}}
+    """
+    # 尝试加载缓存
+    if CE_NAMES_CN_CACHE.exists():
+        with open(CE_NAMES_CN_CACHE, encoding="utf-8") as f:
+            cached = json.load(f)
+        if cached:
+            return cached
+
+    # 从远程下载 CN 服礼装数据
+    print("   📥 从 Atlas API CN 服下载中文礼装名映射...")
+    try:
+        resp = requests.get(CN_EQUIP_URL, timeout=180)
+        resp.raise_for_status()
+        cn_equips = resp.json()
+    except (requests.RequestException, ValueError) as e:
+        print(f"   ⚠️  CN 服礼装数据下载失败: {e}，跳过中文名填充")
+        return {}
+
+    # 构建映射表
+    result: dict[str, dict] = {}
+    for ce in cn_equips:
+        ce_id = str(ce.get("id", ""))
+        ce_name = ce.get("name", "")
+        if not ce_id or not ce_name:
+            continue
+        # 提取每个 skill 的中文 detail
+        skills_cn: dict[str, str] = {}
+        for sk in ce.get("skills", []):
+            sk_id = str(sk.get("id", ""))
+            sk_detail = sk.get("detail", "")
+            if sk_id and sk_detail:
+                skills_cn[sk_id] = sk_detail
+        result[ce_id] = {"name": ce_name, "skills": skills_cn}
+
+    # 写入缓存
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    with open(CE_NAMES_CN_CACHE, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    print(f"   ✅ 获取 {len(result)} 个中文礼装名")
+
+    return result
+
+
+def _classify_ce_atk_type(atk_max: int, hp_max: int) -> str:
+    """根据 atkMax/hpMax 判定礼装的 ATK/HP 类型。"""
+    if atk_max > 0 and hp_max == 0:
+        return "pure_atk"
+    if atk_max == 0 and hp_max > 0:
+        return "pure_hp"
+    if atk_max > 0 and hp_max > 0:
+        return "mixed"
+    return "zero"
+
+
+def _classify_ce_obtain(ce: dict) -> str:
+    """推断礼装的获取方式。
+
+    基于 Atlas API 的 flag 字段精确分类：
+    - normal: 常驻池（permanent）
+    - svtEquipFriendShip: 羁绊礼装（bond）
+    - svtEquipChocolate: 情人节礼装（valentine）
+    - svtEquipCampaign: 限定池/付费抽取活动（limited）
+    - svtEquipEvent: 活动限定抽取池（limited）
+    - svtEquipEventReward: 活动配布奖励（event）
+    - svtEquipManaExchange: 稀有棱柱兑换（shop）
+    - svtEquipExp: 经验值礼装（exp）
+    - unknown: 归入 permanent
+    """
+    # 优先使用特征字段（更可靠）
+    if ce.get("bondEquipOwner"):
+        return "bond"
+
+    # 基于 flag 字段精确分类
+    flag = ce.get("flag", "")
+
+    flag_mapping = {
+        "svtEquipFriendShip": "bond",
+        "svtEquipChocolate": "valentine",
+        "svtEquipCampaign": "limited",
+        "svtEquipEvent": "limited",
+        "svtEquipEventReward": "event",
+        "svtEquipManaExchange": "shop",
+        "svtEquipExp": "exp",
+        "normal": "permanent",
+    }
+
+    result = flag_mapping.get(flag)
+    if result:
+        return result
+
+    # valentineScript fallback（少量情人节礼装可能 flag 不是 chocolate）
+    if ce.get("valentineScript"):
+        return "valentine"
+
+    return "permanent"
+
+
+def get_ce_face_url_absolute(ce: dict) -> str:
+    """获取礼装头像的 Atlas CDN 绝对 URL。"""
+    faces = ce.get("extraAssets", {}).get("faces", {}).get("equip", {})
+    if faces:
+        ce_id = str(ce.get("id", ""))
+        return faces.get(ce_id, "")
+    return ""
+
+
+def get_ce_face_url(ce: dict) -> str:
+    """获取礼装头像的本地相对路径。
+
+    返回 /faces/f_xxx.png 格式，前端直接使用该路径请求本域。
+    """
+    absolute_url = get_ce_face_url_absolute(ce)
+    if not absolute_url:
+        return ""
+    parsed = urlparse(absolute_url)
+    filename = Path(parsed.path).name
+    return f"/faces/{filename}" if filename else ""
+
+
+def _fetch_entry_function_skills(craft_essences: list[dict]) -> dict[int, dict]:
+    """扫描所有礼装收集 entryFunction 引用的子 skill id，批量请求 Atlas API 获取实际效果。
+
+    entryFunction 是 FGO 的间接引用机制：buff.type=entryFunction 的 svals[0].Value
+    存储的是一个子 skill id，实际的登场效果（如 gainStar）定义在该子 skill 中。
+
+    Args:
+        craft_essences: Atlas API 返回的全量礼装列表
+
+    Returns:
+        {sub_skill_id: {"funcType": str, "buffType": str, "value": int}}
+        - funcType: 子 skill 的 funcType（如 "gainStar"）
+        - buffType: 如果是 addState/addStateShort 类型，buff 的 type（如 "upAtk"）
+        - value: svals[0].Value 数值
+    """
+    import requests
+
+    # 收集所有 entryFunction 引用的子 skill id
+    sub_skill_ids: set[int] = set()
+    for ce in craft_essences:
+        for skill in ce.get("skills", []):
+            for func in skill.get("functions", []):
+                for buff in func.get("buffs", []):
+                    if buff.get("type") == "entryFunction":
+                        svals = func.get("svals", [])
+                        sval = svals[0] if svals else {}
+                        sub_id = sval.get("Value", 0)
+                        if sub_id > 0:
+                            sub_skill_ids.add(sub_id)
+
+    if not sub_skill_ids:
+        return {}
+
+    print(f"   📡 获取 {len(sub_skill_ids)} 个 entryFunction 子 skill...")
+    entry_map: dict[int, dict] = {}
+    for sid in sub_skill_ids:
+        try:
+            url = f"https://api.atlasacademy.io/nice/JP/skill/{sid}?lang=en"
+            resp = requests.get(url, timeout=10)
+            if resp.status_code != 200:
+                continue
+            sk_data = resp.json()
+            for func in sk_data.get("functions", []):
+                func_type = func.get("funcType", "")
+                svals = func.get("svals", [])
+                sval = svals[0] if svals else {}
+                value = sval.get("Value", 0)
+                # 如果是 addState/addStateShort，取 buff type 作为实际效果名
+                buff_type = ""
+                buffs = func.get("buffs", [])
+                if buffs:
+                    buff_type = buffs[0].get("type", "")
+                entry_map[sid] = {
+                    "funcType": func_type,
+                    "buffType": buff_type,
+                    "value": value,
+                }
+                break  # 只取第一个 function
+        except Exception:
+            continue
+
+    print(f"   ✅ 获取到 {len(entry_map)} 个子 skill 效果")
+    return entry_map
+
+
+def _extract_ce_effects(
+    skills: list[dict], cond_limit_count: int, matcher: dict, entry_skill_map: dict[int, dict] | None = None
+) -> tuple[list[str], list[dict]]:
+    """从礼装 skills 中提取指定满破条件的效果。
+
+    Args:
+        skills: 礼装的 skills 列表（原始 Atlas API 格式）
+        cond_limit_count: 0=未满破, 4=满破
+        matcher: 效果匹配索引
+        entry_skill_map: entryFunction 子 skill 查找表（由 _fetch_entry_function_skills 构建）
+
+    Returns:
+        (效果名列表, 效果详情列表[{name, target, value}])
+    """
+    effects_set: set[str] = set()
+    effects_details: list[dict] = []
+
+    for skill in skills:
+        # 按 condLimitCount 筛选：0=未满破效果, 4=满破效果
+        if skill.get("condLimitCount", 0) != cond_limit_count:
+            continue
+        # 跳过活动限定的 eventDropUp 等效果（skillNum > 1 通常是活动加成）
+        # 但保留 num=1 的核心效果
+        for func in skill.get("functions", []):
+            func_type = func.get("funcType", "")
+            # 跳过活动掉落加成
+            if func_type == "eventDropUp":
+                continue
+            # 跳过活动绑定效果（funcGroup 含 eventId > 0 表示只对特定活动关卡生效）
+            func_group = func.get("funcGroup", [])
+            if func_group and any(fg.get("eventId", 0) > 0 for fg in func_group):
+                continue
+
+            # 处理 entryFunction（登场效果）：间接引用子 skill
+            has_entry_function = False
+            for buff in func.get("buffs", []):
+                if buff.get("type") == "entryFunction" and entry_skill_map:
+                    has_entry_function = True
+                    svals = func.get("svals", [])
+                    sval = svals[0] if svals else {}
+                    sub_skill_id = sval.get("Value", 0)
+                    sub_info = entry_skill_map.get(sub_skill_id)
+                    if sub_info:
+                        # 生成 entry_ 前缀效果名
+                        sub_func_type = sub_info["funcType"]
+                        sub_buff_type = sub_info["buffType"]
+                        sub_value = sub_info["value"]
+                        # 优先用 funcType（如 gainStar），如果是 addState 类则用 buffType
+                        if sub_func_type in ("addState", "addStateShort") and sub_buff_type:
+                            # 首字母大写拼接：entry + UpAtk → entryUpAtk
+                            effect_name = f"entry{sub_buff_type[0].upper()}{sub_buff_type[1:]}"
+                        else:
+                            # 首字母大写拼接：entry + GainStar → entryGainStar
+                            effect_name = f"entry{sub_func_type[0].upper()}{sub_func_type[1:]}"
+                        effects_set.add(effect_name)
+                        effects_details.append(
+                            {
+                                "name": effect_name,
+                                "target": "self",
+                                "value": sub_value,
+                            }
+                        )
+                    break
+
+            if has_entry_function:
+                continue
+
+            target_type = func.get("funcTargetType", "")
+            matched = _match_func_effects(func, matcher)
+
+            # 提取数值（礼装 svals 只有一个元素，不像从者技能有 10 级）
+            svals = func.get("svals", [])
+            sval = svals[0] if isinstance(svals, list) and svals else (svals if isinstance(svals, dict) else {})
+            value = sval.get("Value", 0) if isinstance(sval, dict) else 0
+
+            for effect_name in matched:
+                effects_set.add(effect_name)
+                effects_details.append(
+                    {
+                        "name": effect_name,
+                        "target": classify_target_type(target_type),
+                        "value": value,
+                    }
+                )
+
+    return sorted(effects_set), effects_details
+
+
+def _extract_ce_np_charge(skills: list[dict], cond_limit_count: int) -> int:
+    """提取礼装的 NP 充能百分比（满破/未满破）。
+
+    Returns:
+        NP 充能百分比（如 100 表示 100%），无充能返回 0
+    """
+    for skill in skills:
+        if skill.get("condLimitCount", 0) != cond_limit_count:
+            continue
+        for func in skill.get("functions", []):
+            if func.get("funcType") == "gainNp":
+                svals = func.get("svals", [])
+                sval = svals[0] if isinstance(svals, list) and svals else {}
+                value = sval.get("Value", 0) if isinstance(sval, dict) else 0
+                if value > 0:
+                    return value // 100  # 千分比 → 百分比
+    return 0
+
+
+# ── 效果标签简称映射（用于卡片展示） ──
+_CE_EFFECT_TAG_MAP: dict[str, str] = {
+    "upBuster": "B卡",
+    "upArts": "A卡",
+    "upQuick": "Q卡",
+    "upNpdamage": "宝具威力",
+    "upCriticaldamage": "暴击威力",
+    "upDamage": "特攻",
+    "upDropnp": "NP获得",
+    "regainStar": "每回合星",
+    "regainNp": "每回合NP",
+    "upChagetd": "OC",
+    "upGainHp": "HP回复量",
+    "upStarweight": "集中度",
+    "upCriticalpoint": "掉星",
+    "subSelfdamage": "伤害减免",
+    "avoidState": "回避",
+    "invincible": "无敌",
+    "guts": "毅力",
+    "upAtk": "攻击力",
+    "upDefence": "防御力",
+    "gainHp": "HP",
+    "gainStar": "暴击星",
+    "addDamage": "附加伤害",
+    "upCommandall": "指令卡",
+    "upResistInstantdeath": "即死耐性",
+    "upGrantInstantdeath": "即死率",
+    "breakAvoidance": "必中",
+    "pierceInvincible": "无敌贯通",
+    "upTolerance": "弱化耐性",
+    "upGrantstate": "弱化成功率",
+    # 登场效果（entryFunction 解析）
+    "entryGainStar": "登场暴击星",
+    "entryUpAtk": "登场攻击力",
+    "entryUpCommandall": "登场指令卡",
+}
+
+# NP 相关效果（已有黄色标签单独展示，不重复到 effectTags）
+_CE_NP_EFFECTS = frozenset({"gainNp"})
+
+# 非战斗效果（活动加成等，卡片上不展示）
+_CE_SKIP_EFFECTS = frozenset(
+    {
+        "friendPointUp",
+        "userEquipExpUp",
+        "expUp",
+        "eventDropUp",
+        "servantFriendshipUp",
+        "eventDropRateUp",
+        "eventPointUp",
+    }
+)
+
+# NP 百分比效果（value 是万分比，需 /100）
+_CE_NP_PERCENT_EFFECTS = frozenset({"regainNp"})
+
+# 星/HP 直接数值效果
+_CE_STAR_EFFECTS = frozenset({"regainStar", "gainStar", "entryGainStar"})
+_CE_HP_EFFECTS = frozenset({"gainHp", "guts"})
+
+# 登场效果（entryFunction 解析，使用千分比格式化）
+_CE_ENTRY_PERCENT_EFFECTS = frozenset({"entryUpAtk", "entryUpCommandall"})
+
+
+def _build_ce_effect_tags(effect_details: list[dict]) -> list[str]:
+    """从 effectDetailsLB 构建卡片展示用的效果标签简称。
+
+    规则：
+    - 排除 NP 充能（gainNp）— 已有独立黄色标签
+    - 排除非战斗效果（活动加成等）
+    - 箭头风格：B卡↑15%、宝具威力↑20%
+
+    Args:
+        effect_details: [{"name": "upBuster", "target": "self", "value": 150}, ...]
+
+    Returns:
+        ["B卡↑15%", "宝具威力↑20%"]
+    """
+    tags: list[str] = []
+    for eff in effect_details:
+        eff_name = eff.get("name", "")
+        value = eff.get("value", 0)
+
+        # 跳过 NP 充能和非战斗效果
+        if eff_name in _CE_NP_EFFECTS or eff_name in _CE_SKIP_EFFECTS:
+            continue
+
+        # 获取简称
+        label = _CE_EFFECT_TAG_MAP.get(eff_name, "")
+        if not label:
+            # 未映射的效果，跳过（避免暴露英文原名）
+            continue
+
+        # 格式化数值
+        if value and value > 0:
+            if eff_name in _CE_NP_PERCENT_EFFECTS:
+                # 万分比 → 百分比
+                tags.append(f"{label}↑{value // 100}%")
+            elif eff_name in _CE_ENTRY_PERCENT_EFFECTS:
+                # 登场百分比效果（千分比 → 百分比）
+                pct = value / 10
+                if pct == int(pct):
+                    tags.append(f"{label}↑{int(pct)}%")
+                else:
+                    tags.append(f"{label}↑{pct:.1f}%")
+            elif eff_name == "entryGainStar":
+                # 登场暴击星：特殊格式 "登场 N暴击星"
+                tags.append(f"登场{value}暴击星")
+            elif eff_name in _CE_STAR_EFFECTS:
+                # 每回合星/普通暴击星
+                if eff_name == "regainStar":
+                    tags.append(f"每回合{value}暴击星")
+                else:
+                    tags.append(f"{label}+{value}个")
+            elif eff_name in _CE_HP_EFFECTS:
+                tags.append(f"{label}+{value}")
+            else:
+                # 默认：千分比 → 百分比（/10）
+                pct = value / 10
+                # 整数显示（15.0% → 15%）
+                if pct == int(pct):
+                    tags.append(f"{label}↑{int(pct)}%")
+                else:
+                    tags.append(f"{label}↑{pct:.1f}%")
+        else:
+            # 无数值的效果（如回避、无敌）
+            tags.append(label)
+
+    return tags
+
+
+def _build_ce_entry(ce: dict, cn_data: dict, matcher: dict, entry_skill_map: dict[int, dict] | None = None) -> dict:
+    """构建单条概念礼装 MV 记录。"""
+    ce_id = ce.get("id", 0)
+    ce_id_str = str(ce_id)
+    skills = ce.get("skills", [])
+
+    # 中文名
+    cn_info = cn_data.get(ce_id_str, {})
+    name_cn = cn_info.get("name", "")
+    skills_cn = cn_info.get("skills", {})
+
+    # ATK/HP 类型
+    atk_max = ce.get("atkMax", 0)
+    hp_max = ce.get("hpMax", 0)
+    atk_type = _classify_ce_atk_type(atk_max, hp_max)
+
+    # 获取方式
+    obtain = _classify_ce_obtain(ce)
+
+    # 提取效果（未满破 + 满破）
+    effects_list, effects_details = _extract_ce_effects(skills, 0, matcher, entry_skill_map)
+    effects_lb_list, effects_lb_details = _extract_ce_effects(skills, 4, matcher, entry_skill_map)
+
+    # 如果没有满破独立效果，fallback 到未满破效果
+    if not effects_lb_list and effects_list:
+        effects_lb_list = effects_list
+        effects_lb_details = effects_details
+
+    # 提取 NP 充能百分比（满破优先）
+    np_charge_lb = _extract_ce_np_charge(skills, 4)
+    np_charge = _extract_ce_np_charge(skills, 0)
+    np_charge_percent = np_charge_lb if np_charge_lb > 0 else np_charge
+
+    # 提取中文效果描述（从 CN 服 skill detail 获取）
+    effect_desc_cn = ""
+    effect_desc_cn_lb = ""
+    for skill in skills:
+        sk_id = str(skill.get("id", ""))
+        cond = skill.get("condLimitCount", 0)
+        cn_detail = skills_cn.get(sk_id, "")
+        if cn_detail:
+            if cond == 0 and not effect_desc_cn:
+                effect_desc_cn = cn_detail
+            elif cond == 4 and not effect_desc_cn_lb:
+                effect_desc_cn_lb = cn_detail
+
+    # 满破描述 fallback
+    if not effect_desc_cn_lb and effect_desc_cn:
+        effect_desc_cn_lb = effect_desc_cn
+
+    # 构建效果标签简称（用于前端卡片展示）
+    effect_tags = _build_ce_effect_tags(effects_lb_details)
+
+    return {
+        "id": ce_id,
+        "collectionNo": ce.get("collectionNo", 0),
+        "name": ce.get("name", "Unknown"),
+        "nameCn": name_cn,
+        "rarity": ce.get("rarity", 0),
+        "cost": ce.get("cost", 0),
+        "atkMax": atk_max,
+        "hpMax": hp_max,
+        "atkType": atk_type,
+        "obtain": obtain,
+        "faceUrl": get_ce_face_url(ce),
+        "_faceUrlSource": get_ce_face_url_absolute(ce),
+        "effects": effects_list,
+        "effectsLimitBreak": effects_lb_list,
+        "effectDetails": effects_details,
+        "effectDetailsLB": effects_lb_details,
+        "effectTags": effect_tags,
+        "effectDescCn": effect_desc_cn,
+        "effectDescCnLB": effect_desc_cn_lb,
+        "npChargePercent": np_charge_percent,
+    }
+
+
+def build_ce_database(craft_essences: list[dict], matcher: dict, cn_data: dict) -> list[dict]:
+    """构建概念礼装数据库。
+
+    Args:
+        craft_essences: Atlas API 返回的礼装列表
+        matcher: 效果匹配索引
+        cn_data: 中文礼装名映射
+
+    Returns:
+        礼装 MV 记录列表
+    """
+    # 预获取所有 entryFunction 引用的子 skill 数据
+    entry_skill_map = _fetch_entry_function_skills(craft_essences)
+
+    db = []
+    total_with_effects = 0
+
+    for ce in craft_essences:
+        entry = _build_ce_entry(ce, cn_data, matcher, entry_skill_map)
+        db.append(entry)
+        if entry.get("effectsLimitBreak"):
+            total_with_effects += 1
+
+    # 按稀有度降序 → collectionNo 升序排序
+    db.sort(key=lambda x: (-x.get("rarity", 0), x.get("collectionNo", 0)))
+
+    print(
+        f"   ✅ 构建礼装数据库: {len(db)} 个礼装, "
+        f"{total_with_effects} 个有效果数据, "
+        f"{sum(1 for e in db if e.get('npChargePercent', 0) > 0)} 个有NP充能"
+    )
+    return db
+
+
 def main():
     print("=" * 50)
     print("🔮 Laplace — Data Loader v2.0")
@@ -951,7 +1512,22 @@ def main():
         json.dump(db, f, ensure_ascii=False, indent=2)
 
     print(f"\n📄 输出: {output_path}")
-    print("✨ 完成!")
+
+    # ── 概念礼装数据构建 ──
+    print("\n" + "=" * 50)
+    print("🎴 概念礼装数据构建")
+    print("=" * 50)
+
+    cn_ce_data = load_ce_names_cn()
+    craft_essences = fetch_craft_essences()
+    ce_db = build_ce_database(craft_essences, matcher, cn_ce_data)
+
+    ce_output_path = OUTPUT_DIR / "craft_essences_db.json"
+    with open(ce_output_path, "w", encoding="utf-8") as f:
+        json.dump(ce_db, f, ensure_ascii=False, indent=2)
+
+    print(f"\n📄 输出: {ce_output_path}")
+    print("✨ 全部完成!")
 
 
 if __name__ == "__main__":

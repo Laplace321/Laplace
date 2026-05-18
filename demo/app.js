@@ -106,6 +106,11 @@ const SKILL_DISPLAY_NAMES = {
   resolve_nickname: "昵称识别",
   coronation_knowledge: "戴冠战攻略",
   coronation_team: "戴冠战配队",
+  ce_lookup: "礼装查询",
+  ce_search_by_effect: "礼装效果筛选",
+  ce_search_by_rarity: "礼装稀有度筛选",
+  ce_search_by_atk_type: "礼装类型筛选",
+  ce_search_by_obtain: "礼装获取方式筛选",
 };
 
 function getSkillDisplayName(skillName) {
@@ -652,6 +657,11 @@ function appendAssistantResponse(data) {
 
 // === Create Card HTML ===
 function createCardHtml(servant, index) {
+  // 检测是否为礼装数据（有 atkType 字段，无 className 字段）
+  if (servant.atkType && !servant.className) {
+    return createCECardHtml(servant, index);
+  }
+
   const stars = getStars(servant.rarity);
   const className = CLASS_NAMES[servant.className] || servant.className;
 
@@ -685,6 +695,48 @@ function createCardHtml(servant, index) {
         </div>
       </div>
       ${chargeDisplay ? `<div class="chat-card-charge">${chargeDisplay}</div>` : ""}
+    </div>
+  `;
+}
+
+// === Create CE (Craft Essence) Card HTML ===
+const ATK_TYPE_LABELS = { pure_atk: "纯 ATK", pure_hp: "纯 HP", mixed: "ATK+HP" };
+
+function createCECardHtml(ce, index) {
+  const stars = getStars(ce.rarity);
+  const typeLabel = ATK_TYPE_LABELS[ce.atkType] || "";
+  const displayName = ce.nameCn || ce.name;
+
+  // NP 充能高亮
+  let chargeDisplay = "";
+  if (ce.npChargePercent && ce.npChargePercent > 0) {
+    chargeDisplay = `NP ${ce.npChargePercent}%`;
+  }
+
+  // 效果标签（简称风格：B卡↑15% · 宝具威力↑20%）
+  const effectTags = ce.effectTags || [];
+  const tagsHtml = effectTags.length > 0
+    ? `<div class="chat-card-tags">${effectTags.map(t => `<span class="ce-tag">${escapeHtml(t)}</span>`).join("")}</div>`
+    : "";
+
+  return `
+    <div class="chat-card rarity-${ce.rarity}" style="animation-delay: ${Math.min(index * 20, 400)}ms">
+      <div class="chat-card-row">
+        <div class="chat-card-face">
+          <img src="${ce.faceUrl}" alt="${ce.name}" loading="lazy"
+               onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 42 42%22><rect fill=%22%23191c3a%22 width=%2242%22 height=%2242%22/><text x=%2221%22 y=%2225%22 text-anchor=%22middle%22 fill=%22%235c5a6e%22 font-size=%2212%22>?</text></svg>'">
+          <div class="chat-card-face-border"></div>
+        </div>
+        <div class="chat-card-info">
+          <div class="chat-card-name" title="${displayName}">${displayName}</div>
+          <div class="chat-card-meta">
+            <span class="chat-card-stars">${stars}</span>
+            ${typeLabel ? `<span>${typeLabel}</span>` : ""}
+          </div>
+        </div>
+      </div>
+      ${chargeDisplay ? `<div class="chat-card-charge ce-charge">${chargeDisplay}</div>` : ""}
+      ${tagsHtml}
     </div>
   `;
 }

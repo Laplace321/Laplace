@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from server.agent.agent_loop import AgentResult, agent_route
 from server.agent.tool_handlers import TOOL_HANDLERS
-from server.context_builder import MAX_RESULTS, build_context
+from server.context_builder import MAX_RESULTS, build_ce_context, build_context
 from server.fallback import (
     FALLBACK_TEMPLATES,
     build_oneshot_context,
@@ -392,6 +392,11 @@ async def handle_skill_mode(
                 "已应用的筛选条件": applied_filters,
                 "关联从者数量": total_found,
             }
+        elif response_skill_name == "respond_ce_list":
+            # CE domain：使用礼装专用 context 构建
+            context_data, _ = build_ce_context(servants, skill_calls=skill_calls)
+            context_data["已应用的筛选条件"] = applied_filters
+            context_data["筛选条件"] = applied_filters
         else:
             detail_mode = response_skill_name == "respond_servant_detail"
             context_data, _ = build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
@@ -442,7 +447,13 @@ async def handle_skill_mode(
                 raise ValueError("Empty response from LLM")
         except Exception as e:
             final_reply = (
-                f"为你找到了 {total_found} 位从者。" if not result.custom_context else "暂时无法生成回复，请稍后重试。"
+                f"为你找到了 {total_found} 个礼装。"
+                if response_skill_name == "respond_ce_list"
+                else (
+                    f"为你找到了 {total_found} 位从者。"
+                    if not result.custom_context
+                    else "暂时无法生成回复，请稍后重试。"
+                )
             )
             await log_trace_event(
                 trace_id,
@@ -926,6 +937,11 @@ async def stream_event_generator(message: str, preset_name: str | None = None):
             "已应用的筛选条件": applied_filters,
             "关联从者数量": total_found,
         }
+    elif response_skill_name == "respond_ce_list":
+        # CE domain：使用礼装专用 context 构建
+        context_data, _ = build_ce_context(servants, skill_calls=skill_calls)
+        context_data["已应用的筛选条件"] = applied_filters
+        context_data["筛选条件"] = applied_filters
     else:
         detail_mode = response_skill_name == "respond_servant_detail"
         context_data, _ = build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
@@ -977,7 +993,11 @@ async def stream_event_generator(message: str, preset_name: str | None = None):
             raise ValueError("Empty response from LLM")
     except Exception as e:
         final_reply = (
-            f"为你找到了 {total_found} 位从者。" if not result.custom_context else "暂时无法生成回复，请稍后重试。"
+            f"为你找到了 {total_found} 个礼装。"
+            if response_skill_name == "respond_ce_list"
+            else (
+                f"为你找到了 {total_found} 位从者。" if not result.custom_context else "暂时无法生成回复，请稍后重试。"
+            )
         )
         final_result = "generation_error"
         await log_trace_event(
