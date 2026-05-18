@@ -700,7 +700,7 @@ function createCardHtml(servant, index) {
 }
 
 // === Create CE (Craft Essence) Card HTML ===
-const ATK_TYPE_LABELS = { pure_atk: "纯攻", pure_hp: "纯血", mixed: "混合" };
+const ATK_TYPE_LABELS = { pure_atk: "纯 ATK", pure_hp: "纯 HP", mixed: "ATK+HP" };
 
 function createCECardHtml(ce, index) {
   const stars = getStars(ce.rarity);
