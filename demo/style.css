@@ -402,6 +402,24 @@ body {
   width: fit-content;
 }
 
+.chat-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.ce-tag {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 1px 5px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
 /* --- Typing Indicator --- */
 .typing-indicator {
   display: flex;

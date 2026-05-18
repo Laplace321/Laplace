@@ -713,11 +713,11 @@ function createCECardHtml(ce, index) {
     chargeDisplay = `NP ${ce.npChargePercent}%`;
   }
 
-  // 效果描述（满破优先，截取前30字）
-  let effectDesc = ce.effectDescCnLB || ce.effectDescCn || "";
-  if (effectDesc.length > 30) {
-    effectDesc = effectDesc.slice(0, 30) + "…";
-  }
+  // 效果标签（简称风格：B卡↑15% · 宝具威力↑20%）
+  const effectTags = ce.effectTags || [];
+  const tagsHtml = effectTags.length > 0
+    ? `<div class="chat-card-tags">${effectTags.map(t => `<span class="ce-tag">${escapeHtml(t)}</span>`).join("")}</div>`
+    : "";
 
   return `
     <div class="chat-card rarity-${ce.rarity}" style="animation-delay: ${Math.min(index * 20, 400)}ms">
@@ -736,7 +736,7 @@ function createCECardHtml(ce, index) {
         </div>
       </div>
       ${chargeDisplay ? `<div class="chat-card-charge ce-charge">${chargeDisplay}</div>` : ""}
-      ${effectDesc ? `<div class="chat-card-effect">${escapeHtml(effectDesc)}</div>` : ""}
+      ${tagsHtml}
     </div>
   `;
 }

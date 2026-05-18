@@ -1132,6 +1132,116 @@ def _extract_ce_np_charge(skills: list[dict], cond_limit_count: int) -> int:
     return 0
 
 
+# ── 效果标签简称映射（用于卡片展示） ──
+_CE_EFFECT_TAG_MAP: dict[str, str] = {
+    "upBuster": "B卡",
+    "upArts": "A卡",
+    "upQuick": "Q卡",
+    "upNpdamage": "宝具威力",
+    "upCriticaldamage": "暴击威力",
+    "upDamage": "特攻",
+    "upDropnp": "NP获得",
+    "regainStar": "每回合星",
+    "regainNp": "每回合NP",
+    "upChagetd": "OC",
+    "upGainHp": "HP回复量",
+    "upStarweight": "集中度",
+    "upCriticalpoint": "掉星",
+    "subSelfdamage": "伤害减免",
+    "avoidState": "回避",
+    "invincible": "无敌",
+    "guts": "毅力",
+    "upAtk": "攻击力",
+    "upDefence": "防御力",
+    "gainHp": "HP",
+    "gainStar": "暴击星",
+    "addDamage": "附加伤害",
+    "upCommandall": "指令卡",
+    "upResistInstantdeath": "即死耐性",
+    "upGrantInstantdeath": "即死率",
+    "breakAvoidance": "必中",
+    "pierceInvincible": "无敌贯通",
+    "upTolerance": "弱化耐性",
+    "upGrantstate": "弱化成功率",
+}
+
+# NP 相关效果（已有黄色标签单独展示，不重复到 effectTags）
+_CE_NP_EFFECTS = frozenset({"gainNp"})
+
+# 非战斗效果（活动加成等，卡片上不展示）
+_CE_SKIP_EFFECTS = frozenset(
+    {
+        "friendPointUp",
+        "userEquipExpUp",
+        "expUp",
+        "eventDropUp",
+        "servantFriendshipUp",
+        "eventDropRateUp",
+        "eventPointUp",
+    }
+)
+
+# NP 百分比效果（value 是万分比，需 /100）
+_CE_NP_PERCENT_EFFECTS = frozenset({"regainNp"})
+
+# 星/HP 直接数值效果
+_CE_STAR_EFFECTS = frozenset({"regainStar", "gainStar"})
+_CE_HP_EFFECTS = frozenset({"gainHp", "guts"})
+
+
+def _build_ce_effect_tags(effect_details: list[dict]) -> list[str]:
+    """从 effectDetailsLB 构建卡片展示用的效果标签简称。
+
+    规则：
+    - 排除 NP 充能（gainNp）— 已有独立黄色标签
+    - 排除非战斗效果（活动加成等）
+    - 箭头风格：B卡↑15%、宝具威力↑20%
+
+    Args:
+        effect_details: [{"name": "upBuster", "target": "self", "value": 150}, ...]
+
+    Returns:
+        ["B卡↑15%", "宝具威力↑20%"]
+    """
+    tags: list[str] = []
+    for eff in effect_details:
+        eff_name = eff.get("name", "")
+        value = eff.get("value", 0)
+
+        # 跳过 NP 充能和非战斗效果
+        if eff_name in _CE_NP_EFFECTS or eff_name in _CE_SKIP_EFFECTS:
+            continue
+
+        # 获取简称
+        label = _CE_EFFECT_TAG_MAP.get(eff_name, "")
+        if not label:
+            # 未映射的效果，跳过（避免暴露英文原名）
+            continue
+
+        # 格式化数值
+        if value and value > 0:
+            if eff_name in _CE_NP_PERCENT_EFFECTS:
+                # 万分比 → 百分比
+                tags.append(f"{label}↑{value // 100}%")
+            elif eff_name in _CE_STAR_EFFECTS:
+                tags.append(f"{label}+{value}个")
+            elif eff_name in _CE_HP_EFFECTS:
+                tags.append(f"{label}+{value}")
+            else:
+                # 默认：千分比 → 百分比（/10）
+                pct = value / 10
+                # 整数显示（15.0% → 15%）
+                if pct == int(pct):
+                    tags.append(f"{label}↑{int(pct)}%")
+                else:
+                    tags.append(f"{label}↑{pct:.1f}%")
+        else:
+            # 无数值的效果（如回避、无敌）
+            tags.append(label)
+
+    return tags
+
+
 def _build_ce_entry(ce: dict, cn_data: dict, matcher: dict) -> dict:
     """构建单条概念礼装 MV 记录。"""
     ce_id = ce.get("id", 0)
@@ -1182,6 +1292,9 @@ def _build_ce_entry(ce: dict, cn_data: dict, matcher: dict) -> dict:
     if not effect_desc_cn_lb and effect_desc_cn:
         effect_desc_cn_lb = effect_desc_cn
 
+    # 构建效果标签简称（用于前端卡片展示）
+    effect_tags = _build_ce_effect_tags(effects_lb_details)
+
     return {
         "id": ce_id,
         "collectionNo": ce.get("collectionNo", 0),
@@ -1199,6 +1312,7 @@ def _build_ce_entry(ce: dict, cn_data: dict, matcher: dict) -> dict:
         "effectsLimitBreak": effects_lb_list,
         "effectDetails": effects_details,
         "effectDetailsLB": effects_lb_details,
+        "effectTags": effect_tags,
         "effectDescCn": effect_desc_cn,
         "effectDescCnLB": effect_desc_cn_lb,
         "npChargePercent": np_charge_percent,
