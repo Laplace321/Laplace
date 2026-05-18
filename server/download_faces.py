@@ -25,6 +25,7 @@ except ImportError:
 DATA_DIR = Path(__file__).parent / "data"
 FACES_DIR = DATA_DIR / "faces"
 DB_PATH = DATA_DIR / "servants_db.json"
+CE_DB_PATH = DATA_DIR / "craft_essences_db.json"
 ATLAS_FACE_BASE = "https://static.atlasacademy.io/JP/Faces"
 
 # 并发下载数
@@ -33,22 +34,23 @@ MAX_WORKERS = 10
 TIMEOUT = 30
 
 
-def _extract_face_urls(db_path: Path) -> list[dict[str, str]]:
-    """从 servants_db.json 提取所有头像下载信息。
+def _extract_face_urls_from_db(db_path: Path) -> list[dict[str, str]]:
+    """从数据库文件提取所有头像下载信息。
+
+    支持从者数据库和礼装数据库（共用 _faceUrlSource 字段）。
 
     Returns:
         [{"filename": "f_1001003.png", "url": "https://..."}]
     """
     if not db_path.exists():
-        print(f"[download_faces] 数据库不存在: {db_path}", file=sys.stderr)
         return []
 
     with open(db_path, encoding="utf-8") as f:
         db = json.load(f)
 
     results = []
-    for svt in db:
-        source_url = svt.get("_faceUrlSource", "")
+    for entry in db:
+        source_url = entry.get("_faceUrlSource", "")
         if not source_url:
             continue
         # 从 URL 提取文件名
@@ -57,6 +59,25 @@ def _extract_face_urls(db_path: Path) -> list[dict[str, str]]:
         if filename:
             results.append({"filename": filename, "url": source_url})
 
+    return results
+
+
+def _extract_face_urls(db_path: Path) -> list[dict[str, str]]:
+    """从从者和礼装数据库提取所有头像下载信息。
+
+    Returns:
+        [{"filename": "f_1001003.png", "url": "https://..."}]
+    """
+    results = _extract_face_urls_from_db(db_path)
+    # 同时从礼装数据库提取
+    ce_results = _extract_face_urls_from_db(CE_DB_PATH)
+    if ce_results:
+        # 去重（以 filename 为 key）
+        existing = {r["filename"] for r in results}
+        for item in ce_results:
+            if item["filename"] not in existing:
+                results.append(item)
+                existing.add(item["filename"])
     return results
 
 

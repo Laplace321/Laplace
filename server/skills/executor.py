@@ -11,7 +11,7 @@ import time
 
 from pydantic import ValidationError
 
-from server.query_executor import load_database
+from server.query_executor import load_ce_database, load_database
 from server.skills.base import SKILL_REGISTRY, QuerySkill, ResponseSkill
 
 
@@ -116,11 +116,41 @@ class SkillExecutor:
                 execution_time_ms=elapsed_ms,
             )
 
-        # 分离非 servant domain 的 Skills（如 coronation），它们返回知识/配队数据而非从者列表
+        # 按 domain 分组
         domain_skills = [(s, p) for s, p in query_skills if s.domain == "servant"]
-        knowledge_skills = [(s, p) for s, p in query_skills if s.domain != "servant"]
+        ce_skills = [(s, p) for s, p in query_skills if s.domain == "ce"]
+        knowledge_skills = [(s, p) for s, p in query_skills if s.domain not in ("servant", "ce")]
 
-        # 执行 knowledge_skills，收集 custom_context 和关联从者
+        # ── CE domain 独立执行路径 ──
+        if ce_skills:
+            ce_db = load_ce_database()
+            ce_results = self._execute_and_merge(ce_db, ce_skills)
+            ce_results.sort(key=lambda x: (-x.get("rarity", 0), x.get("collectionNo", 0)))
+            total_found = len(ce_results)
+            elapsed_ms = (time.monotonic() - start_time) * 1000
+
+            if total_found == 0:
+                return ExecutionResult(
+                    servants=[],
+                    total_found=0,
+                    response_skill=response_skill,
+                    fallback_message="未找到匹配的概念礼装，你可以尝试调整查询条件。",
+                    is_fallback=True,
+                    accepted_skills=accepted,
+                    rejected_skills=rejected,
+                    execution_time_ms=elapsed_ms,
+                )
+
+            return ExecutionResult(
+                servants=ce_results,
+                total_found=total_found,
+                response_skill=response_skill,
+                accepted_skills=accepted,
+                rejected_skills=rejected,
+                execution_time_ms=elapsed_ms,
+            )
+
+        # ── Knowledge domain（coronation 等）执行路径 ──
         custom_context: list[dict] = []
         knowledge_servants: list[dict] = []
 
@@ -130,7 +160,7 @@ class SkillExecutor:
             # 从配队数据中提取关联从者（通过 collectionNo 匹配 db）
             knowledge_servants.extend(self._extract_servants_from_context(db, ctx_entries))
 
-        # 按 domain 分组，同 domain AND 合并（一次数据扫描）
+        # ── Servant domain 执行路径 ──
         if domain_skills:
             results = self._execute_and_merge(db, domain_skills)
         elif knowledge_servants:

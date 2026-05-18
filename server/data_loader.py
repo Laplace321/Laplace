@@ -20,6 +20,7 @@ except ImportError:
 
 API_BASE = "https://api.atlasacademy.io"
 NICE_SERVANT_URL = f"{API_BASE}/export/JP/nice_servant_lang_en.json"
+NICE_EQUIP_URL = f"{API_BASE}/export/JP/nice_equip_lang_en.json"
 OUTPUT_DIR = Path(__file__).parent / "data"
 KNOWLEDGE_DIR = Path(__file__).parent / "knowledge"
 CONFIG_DIR = Path(__file__).parent / "config"
@@ -104,8 +105,11 @@ def load_svt_names_mapping() -> dict:
 
 # CN 服从者数据 URL（用于获取中文技能名/宝具名）
 CN_SERVANT_URL = f"{API_BASE}/export/CN/nice_servant.json"
+# CN 服礼装数据 URL（用于获取中文礼装名和效果描述）
+CN_EQUIP_URL = f"{API_BASE}/export/CN/nice_equip.json"
 # 缓存文件路径
 SKILL_NAMES_CN_CACHE = OUTPUT_DIR / "skill_names_cn.json"
+CE_NAMES_CN_CACHE = OUTPUT_DIR / "ce_names_cn.json"
 
 
 def load_skill_names_cn() -> dict:
@@ -920,6 +924,318 @@ def build_database(
     return db
 
 
+# ============================================================
+# 概念礼装数据构建
+# ============================================================
+
+
+def fetch_craft_essences() -> list[dict]:
+    """从 Atlas Academy API 拉取全量概念礼装数据（type=servantEquip, collectionNo>0）。"""
+    print("📡 正在从 Atlas Academy API 拉取概念礼装数据...")
+    resp = requests.get(NICE_EQUIP_URL, timeout=180)
+    resp.raise_for_status()
+    equips = resp.json()
+    normal = [e for e in equips if e.get("type") == "servantEquip" and e.get("collectionNo", 0) > 0]
+    print(f"   ✅ 获取到 {len(normal)} 个概念礼装")
+    return normal
+
+
+def load_ce_names_cn() -> dict[str, str]:
+    """从 Atlas API CN 服获取中文礼装名和效果描述映射。
+
+    构建 {ce_id_str: {"name": cn_name, "skills": {skill_id_str: detail_text}}} 映射表。
+    优先使用本地缓存（server/data/ce_names_cn.json）。
+
+    Returns:
+        {"id_str": {"name": "万华镜", "skills": {"990067": "自身以宝具值已达80%...", ...}}}
+    """
+    # 尝试加载缓存
+    if CE_NAMES_CN_CACHE.exists():
+        with open(CE_NAMES_CN_CACHE, encoding="utf-8") as f:
+            cached = json.load(f)
+        if cached:
+            return cached
+
+    # 从远程下载 CN 服礼装数据
+    print("   📥 从 Atlas API CN 服下载中文礼装名映射...")
+    try:
+        resp = requests.get(CN_EQUIP_URL, timeout=180)
+        resp.raise_for_status()
+        cn_equips = resp.json()
+    except (requests.RequestException, ValueError) as e:
+        print(f"   ⚠️  CN 服礼装数据下载失败: {e}，跳过中文名填充")
+        return {}
+
+    # 构建映射表
+    result: dict[str, dict] = {}
+    for ce in cn_equips:
+        ce_id = str(ce.get("id", ""))
+        ce_name = ce.get("name", "")
+        if not ce_id or not ce_name:
+            continue
+        # 提取每个 skill 的中文 detail
+        skills_cn: dict[str, str] = {}
+        for sk in ce.get("skills", []):
+            sk_id = str(sk.get("id", ""))
+            sk_detail = sk.get("detail", "")
+            if sk_id and sk_detail:
+                skills_cn[sk_id] = sk_detail
+        result[ce_id] = {"name": ce_name, "skills": skills_cn}
+
+    # 写入缓存
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    with open(CE_NAMES_CN_CACHE, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    print(f"   ✅ 获取 {len(result)} 个中文礼装名")
+
+    return result
+
+
+def _classify_ce_atk_type(atk_max: int, hp_max: int) -> str:
+    """根据 atkMax/hpMax 判定礼装的 ATK/HP 类型。"""
+    if atk_max > 0 and hp_max == 0:
+        return "pure_atk"
+    if atk_max == 0 and hp_max > 0:
+        return "pure_hp"
+    if atk_max > 0 and hp_max > 0:
+        return "mixed"
+    return "zero"
+
+
+def _classify_ce_obtain(ce: dict) -> str:
+    """推断礼装的获取方式。
+
+    基于 Atlas API 的 flag 字段精确分类：
+    - normal: 常驻池（permanent）
+    - svtEquipFriendShip: 羁绊礼装（bond）
+    - svtEquipChocolate: 情人节礼装（valentine）
+    - svtEquipCampaign: 限定池/付费抽取活动（limited）
+    - svtEquipEvent: 活动限定抽取池（limited）
+    - svtEquipEventReward: 活动配布奖励（event）
+    - svtEquipManaExchange: 稀有棱柱兑换（shop）
+    - svtEquipExp: 经验值礼装（exp）
+    - unknown: 归入 permanent
+    """
+    # 优先使用特征字段（更可靠）
+    if ce.get("bondEquipOwner"):
+        return "bond"
+
+    # 基于 flag 字段精确分类
+    flag = ce.get("flag", "")
+
+    flag_mapping = {
+        "svtEquipFriendShip": "bond",
+        "svtEquipChocolate": "valentine",
+        "svtEquipCampaign": "limited",
+        "svtEquipEvent": "limited",
+        "svtEquipEventReward": "event",
+        "svtEquipManaExchange": "shop",
+        "svtEquipExp": "exp",
+        "normal": "permanent",
+    }
+
+    result = flag_mapping.get(flag)
+    if result:
+        return result
+
+    # valentineScript fallback（少量情人节礼装可能 flag 不是 chocolate）
+    if ce.get("valentineScript"):
+        return "valentine"
+
+    return "permanent"
+
+
+def get_ce_face_url_absolute(ce: dict) -> str:
+    """获取礼装头像的 Atlas CDN 绝对 URL。"""
+    faces = ce.get("extraAssets", {}).get("faces", {}).get("equip", {})
+    if faces:
+        ce_id = str(ce.get("id", ""))
+        return faces.get(ce_id, "")
+    return ""
+
+
+def get_ce_face_url(ce: dict) -> str:
+    """获取礼装头像的本地相对路径。
+
+    返回 /faces/f_xxx.png 格式，前端直接使用该路径请求本域。
+    """
+    absolute_url = get_ce_face_url_absolute(ce)
+    if not absolute_url:
+        return ""
+    parsed = urlparse(absolute_url)
+    filename = Path(parsed.path).name
+    return f"/faces/{filename}" if filename else ""
+
+
+def _extract_ce_effects(skills: list[dict], cond_limit_count: int, matcher: dict) -> tuple[list[str], list[dict]]:
+    """从礼装 skills 中提取指定满破条件的效果。
+
+    Args:
+        skills: 礼装的 skills 列表（原始 Atlas API 格式）
+        cond_limit_count: 0=未满破, 4=满破
+        matcher: 效果匹配索引
+
+    Returns:
+        (效果名列表, 效果详情列表[{name, target, value}])
+    """
+    effects_set: set[str] = set()
+    effects_details: list[dict] = []
+
+    for skill in skills:
+        # 按 condLimitCount 筛选：0=未满破效果, 4=满破效果
+        if skill.get("condLimitCount", 0) != cond_limit_count:
+            continue
+        # 跳过活动限定的 eventDropUp 等效果（skillNum > 1 通常是活动加成）
+        # 但保留 num=1 的核心效果
+        for func in skill.get("functions", []):
+            func_type = func.get("funcType", "")
+            # 跳过活动掉落加成
+            if func_type == "eventDropUp":
+                continue
+            target_type = func.get("funcTargetType", "")
+            matched = _match_func_effects(func, matcher)
+
+            # 提取数值（礼装 svals 只有一个元素，不像从者技能有 10 级）
+            svals = func.get("svals", [])
+            sval = svals[0] if isinstance(svals, list) and svals else (svals if isinstance(svals, dict) else {})
+            value = sval.get("Value", 0) if isinstance(sval, dict) else 0
+
+            for effect_name in matched:
+                effects_set.add(effect_name)
+                effects_details.append(
+                    {
+                        "name": effect_name,
+                        "target": classify_target_type(target_type),
+                        "value": value,
+                    }
+                )
+
+    return sorted(effects_set), effects_details
+
+
+def _extract_ce_np_charge(skills: list[dict], cond_limit_count: int) -> int:
+    """提取礼装的 NP 充能百分比（满破/未满破）。
+
+    Returns:
+        NP 充能百分比（如 100 表示 100%），无充能返回 0
+    """
+    for skill in skills:
+        if skill.get("condLimitCount", 0) != cond_limit_count:
+            continue
+        for func in skill.get("functions", []):
+            if func.get("funcType") == "gainNp":
+                svals = func.get("svals", [])
+                sval = svals[0] if isinstance(svals, list) and svals else {}
+                value = sval.get("Value", 0) if isinstance(sval, dict) else 0
+                if value > 0:
+                    return value // 100  # 千分比 → 百分比
+    return 0
+
+
+def _build_ce_entry(ce: dict, cn_data: dict, matcher: dict) -> dict:
+    """构建单条概念礼装 MV 记录。"""
+    ce_id = ce.get("id", 0)
+    ce_id_str = str(ce_id)
+    skills = ce.get("skills", [])
+
+    # 中文名
+    cn_info = cn_data.get(ce_id_str, {})
+    name_cn = cn_info.get("name", "")
+    skills_cn = cn_info.get("skills", {})
+
+    # ATK/HP 类型
+    atk_max = ce.get("atkMax", 0)
+    hp_max = ce.get("hpMax", 0)
+    atk_type = _classify_ce_atk_type(atk_max, hp_max)
+
+    # 获取方式
+    obtain = _classify_ce_obtain(ce)
+
+    # 提取效果（未满破 + 满破）
+    effects_list, effects_details = _extract_ce_effects(skills, 0, matcher)
+    effects_lb_list, effects_lb_details = _extract_ce_effects(skills, 4, matcher)
+
+    # 如果没有满破独立效果，fallback 到未满破效果
+    if not effects_lb_list and effects_list:
+        effects_lb_list = effects_list
+        effects_lb_details = effects_details
+
+    # 提取 NP 充能百分比（满破优先）
+    np_charge_lb = _extract_ce_np_charge(skills, 4)
+    np_charge = _extract_ce_np_charge(skills, 0)
+    np_charge_percent = np_charge_lb if np_charge_lb > 0 else np_charge
+
+    # 提取中文效果描述（从 CN 服 skill detail 获取）
+    effect_desc_cn = ""
+    effect_desc_cn_lb = ""
+    for skill in skills:
+        sk_id = str(skill.get("id", ""))
+        cond = skill.get("condLimitCount", 0)
+        cn_detail = skills_cn.get(sk_id, "")
+        if cn_detail:
+            if cond == 0 and not effect_desc_cn:
+                effect_desc_cn = cn_detail
+            elif cond == 4 and not effect_desc_cn_lb:
+                effect_desc_cn_lb = cn_detail
+
+    # 满破描述 fallback
+    if not effect_desc_cn_lb and effect_desc_cn:
+        effect_desc_cn_lb = effect_desc_cn
+
+    return {
+        "id": ce_id,
+        "collectionNo": ce.get("collectionNo", 0),
+        "name": ce.get("name", "Unknown"),
+        "nameCn": name_cn,
+        "rarity": ce.get("rarity", 0),
+        "cost": ce.get("cost", 0),
+        "atkMax": atk_max,
+        "hpMax": hp_max,
+        "atkType": atk_type,
+        "obtain": obtain,
+        "faceUrl": get_ce_face_url(ce),
+        "_faceUrlSource": get_ce_face_url_absolute(ce),
+        "effects": effects_list,
+        "effectsLimitBreak": effects_lb_list,
+        "effectDetails": effects_details,
+        "effectDetailsLB": effects_lb_details,
+        "effectDescCn": effect_desc_cn,
+        "effectDescCnLB": effect_desc_cn_lb,
+        "npChargePercent": np_charge_percent,
+    }
+
+
+def build_ce_database(craft_essences: list[dict], matcher: dict, cn_data: dict) -> list[dict]:
+    """构建概念礼装数据库。
+
+    Args:
+        craft_essences: Atlas API 返回的礼装列表
+        matcher: 效果匹配索引
+        cn_data: 中文礼装名映射
+
+    Returns:
+        礼装 MV 记录列表
+    """
+    db = []
+    total_with_effects = 0
+
+    for ce in craft_essences:
+        entry = _build_ce_entry(ce, cn_data, matcher)
+        db.append(entry)
+        if entry.get("effectsLimitBreak"):
+            total_with_effects += 1
+
+    # 按稀有度降序 → collectionNo 升序排序
+    db.sort(key=lambda x: (-x.get("rarity", 0), x.get("collectionNo", 0)))
+
+    print(
+        f"   ✅ 构建礼装数据库: {len(db)} 个礼装, "
+        f"{total_with_effects} 个有效果数据, "
+        f"{sum(1 for e in db if e.get('npChargePercent', 0) > 0)} 个有NP充能"
+    )
+    return db
+
+
 def main():
     print("=" * 50)
     print("🔮 Laplace — Data Loader v2.0")
@@ -951,7 +1267,22 @@ def main():
         json.dump(db, f, ensure_ascii=False, indent=2)
 
     print(f"\n📄 输出: {output_path}")
-    print("✨ 完成!")
+
+    # ── 概念礼装数据构建 ──
+    print("\n" + "=" * 50)
+    print("🎴 概念礼装数据构建")
+    print("=" * 50)
+
+    cn_ce_data = load_ce_names_cn()
+    craft_essences = fetch_craft_essences()
+    ce_db = build_ce_database(craft_essences, matcher, cn_ce_data)
+
+    ce_output_path = OUTPUT_DIR / "craft_essences_db.json"
+    with open(ce_output_path, "w", encoding="utf-8") as f:
+        json.dump(ce_db, f, ensure_ascii=False, indent=2)
+
+    print(f"\n📄 输出: {ce_output_path}")
+    print("✨ 全部完成!")
 
 
 if __name__ == "__main__":

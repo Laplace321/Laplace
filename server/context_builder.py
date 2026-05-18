@@ -277,3 +277,88 @@ def build_context(
         "全局统计": stats_summary,
         "代表从者详情": top_results,
     }, top_results
+
+
+# ============================================================
+# 概念礼装 Context 构建
+# ============================================================
+
+_ATK_TYPE_CN = {
+    "pure_atk": "纯攻型",
+    "pure_hp": "纯血型",
+    "mixed": "混合型",
+    "zero": "零属性",
+}
+
+_OBTAIN_CN = {
+    "permanent": "常驻池",
+    "limited": "限定",
+    "event": "活动配布",
+    "shop": "稀有棱柱兑换",
+    "bond": "羁绊礼装",
+    "valentine": "情人节礼装",
+    "exp": "经验值礼装",
+}
+
+
+def build_ce_context(
+    craft_essences: list[dict],
+    skill_calls: list[dict] | None = None,
+) -> tuple[dict, list[dict]]:
+    """构建概念礼装的预消化 Context 供 RAG 生成使用。
+
+    Args:
+        craft_essences: 匹配的礼装列表
+        skill_calls: 路由解析的 Skill 调用列表
+
+    Returns:
+        (context_data, top_results)
+    """
+    total_found = len(craft_essences)
+    top_results: list[dict] = []
+
+    for ce in craft_essences[:MAX_CONTEXT_SIZE]:
+        # 翻译效果列表
+        raw_effects_lb = ce.get("effectsLimitBreak") or []
+        translated_effects = [get_effect_translation(e) for e in raw_effects_lb]
+
+        entry: dict = {
+            "名称": ce.get("name"),
+            "中文名": ce.get("nameCn") or ce.get("name"),
+            "稀有度": ce.get("rarity"),
+            "COST": ce.get("cost"),
+            "类型": _ATK_TYPE_CN.get(ce.get("atkType", ""), ce.get("atkType", "")),
+            "ATK": ce.get("atkMax", 0),
+            "HP": ce.get("hpMax", 0),
+            "获取方式": _OBTAIN_CN.get(ce.get("obtain", ""), ce.get("obtain", "")),
+            "满破效果": translated_effects,
+        }
+
+        # NP 充能高亮
+        np_charge = ce.get("npChargePercent", 0)
+        if np_charge > 0:
+            entry["NP充能"] = f"{np_charge}%"
+
+        # 中文效果描述（满破优先）
+        desc = ce.get("effectDescCnLB") or ce.get("effectDescCn", "")
+        if desc:
+            entry["效果描述"] = desc
+
+        top_results.append(entry)
+
+    # 全局统计摘要
+    stats_summary: dict = {}
+    if total_found > MAX_CONTEXT_SIZE:
+        rarity_dist = Counter(ce.get("rarity") for ce in craft_essences)
+        atk_type_dist = Counter(_ATK_TYPE_CN.get(ce.get("atkType", ""), ce.get("atkType", "")) for ce in craft_essences)
+        stats_summary = {
+            "稀有度分布": {f"{k}星": v for k, v in sorted(rarity_dist.items(), reverse=True)},
+            "类型分布": dict(atk_type_dist),
+        }
+
+    return {
+        "匹配总数": total_found,
+        "筛选条件": {},  # 由调用方填充
+        "全局统计": stats_summary,
+        "代表礼装详情": top_results,
+    }, top_results

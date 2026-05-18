@@ -7,7 +7,7 @@ Laplace — Skills Package
 import importlib as _importlib
 
 _SKILL_MODULES = [
-    # Query Skills
+    # Query Skills — Servant domain
     "server.skills.query.compare_servants",
     "server.skills.query.lookup_servant",
     "server.skills.query.search_by_attribute",
@@ -23,12 +23,19 @@ _SKILL_MODULES = [
     "server.skills.query.resolve_nickname",
     "server.skills.query.coronation_knowledge",
     "server.skills.query.coronation_team",
+    # Query Skills — CE domain
+    "server.skills.query.ce_lookup",
+    "server.skills.query.ce_search_by_effect",
+    "server.skills.query.ce_search_by_rarity",
+    "server.skills.query.ce_search_by_atk_type",
+    "server.skills.query.ce_search_by_obtain",
     # Response Skills
     "server.skills.response.respond_servant_compare",
     "server.skills.response.respond_servant_detail",
     "server.skills.response.respond_servant_list",
     "server.skills.response.respond_support_analysis",
     "server.skills.response.respond_coronation",
+    "server.skills.response.respond_ce_list",
 ]
 
 for _mod in _SKILL_MODULES:

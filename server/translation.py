@@ -182,6 +182,36 @@ def describe_filters(skill_calls: list[dict]) -> list[str]:
             if playstyle:
                 desc += f" - {playstyle}流"
             descriptions.append(desc)
+        elif name == "ce_lookup":
+            query = params.get("name", "")
+            descriptions.append(f"查询礼装「{query}」")
+        elif name == "ce_search_by_effect":
+            effect = params.get("effect", "")
+            translated = get_effect_translation(effect) if effect else effect
+            lb = params.get("limit_break", True)
+            lb_label = "满破" if lb else "未满破"
+            descriptions.append(f"礼装效果包含「{translated}」（{lb_label}）")
+        elif name == "ce_search_by_rarity":
+            op = params.get("op", "eq")
+            val = params.get("value", "")
+            op_map = {"eq": "=", "gte": "≥", "lte": "≤", "gt": ">", "lt": "<"}
+            descriptions.append(f"礼装稀有度 {op_map.get(op, op)} {val}星")
+        elif name == "ce_search_by_atk_type":
+            atk_type = params.get("atk_type", "")
+            type_map = {"pure_atk": "纯攻型", "pure_hp": "纯血型", "mixed": "混合型"}
+            descriptions.append(f"礼装类型 = {type_map.get(atk_type, atk_type)}")
+        elif name == "ce_search_by_obtain":
+            obtain = params.get("obtain_type", "")
+            obtain_map = {
+                "permanent": "常驻池",
+                "limited": "限定",
+                "event": "活动配布",
+                "shop": "稀有棱柱兑换",
+                "bond": "羁绊礼装",
+                "valentine": "情人节礼装",
+                "exp": "经验值礼装",
+            }
+            descriptions.append(f"礼装获取方式 = {obtain_map.get(obtain, obtain)}")
         else:
             # 兜底：仅输出 Skill 中文 description，禁止暴露参数结构
             skill_instance = SKILL_REGISTRY.get(name)
