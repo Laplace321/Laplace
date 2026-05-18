@@ -1067,13 +1067,81 @@ def get_ce_face_url(ce: dict) -> str:
     return f"/faces/{filename}" if filename else ""
 
 
-def _extract_ce_effects(skills: list[dict], cond_limit_count: int, matcher: dict) -> tuple[list[str], list[dict]]:
+def _fetch_entry_function_skills(craft_essences: list[dict]) -> dict[int, dict]:
+    """扫描所有礼装收集 entryFunction 引用的子 skill id，批量请求 Atlas API 获取实际效果。
+
+    entryFunction 是 FGO 的间接引用机制：buff.type=entryFunction 的 svals[0].Value
+    存储的是一个子 skill id，实际的登场效果（如 gainStar）定义在该子 skill 中。
+
+    Args:
+        craft_essences: Atlas API 返回的全量礼装列表
+
+    Returns:
+        {sub_skill_id: {"funcType": str, "buffType": str, "value": int}}
+        - funcType: 子 skill 的 funcType（如 "gainStar"）
+        - buffType: 如果是 addState/addStateShort 类型，buff 的 type（如 "upAtk"）
+        - value: svals[0].Value 数值
+    """
+    import requests
+
+    # 收集所有 entryFunction 引用的子 skill id
+    sub_skill_ids: set[int] = set()
+    for ce in craft_essences:
+        for skill in ce.get("skills", []):
+            for func in skill.get("functions", []):
+                for buff in func.get("buffs", []):
+                    if buff.get("type") == "entryFunction":
+                        svals = func.get("svals", [])
+                        sval = svals[0] if svals else {}
+                        sub_id = sval.get("Value", 0)
+                        if sub_id > 0:
+                            sub_skill_ids.add(sub_id)
+
+    if not sub_skill_ids:
+        return {}
+
+    print(f"   📡 获取 {len(sub_skill_ids)} 个 entryFunction 子 skill...")
+    entry_map: dict[int, dict] = {}
+    for sid in sub_skill_ids:
+        try:
+            url = f"https://api.atlasacademy.io/nice/JP/skill/{sid}?lang=en"
+            resp = requests.get(url, timeout=10)
+            if resp.status_code != 200:
+                continue
+            sk_data = resp.json()
+            for func in sk_data.get("functions", []):
+                func_type = func.get("funcType", "")
+                svals = func.get("svals", [])
+                sval = svals[0] if svals else {}
+                value = sval.get("Value", 0)
+                # 如果是 addState/addStateShort，取 buff type 作为实际效果名
+                buff_type = ""
+                buffs = func.get("buffs", [])
+                if buffs:
+                    buff_type = buffs[0].get("type", "")
+                entry_map[sid] = {
+                    "funcType": func_type,
+                    "buffType": buff_type,
+                    "value": value,
+                }
+                break  # 只取第一个 function
+        except Exception:
+            continue
+
+    print(f"   ✅ 获取到 {len(entry_map)} 个子 skill 效果")
+    return entry_map
+
+
+def _extract_ce_effects(
+    skills: list[dict], cond_limit_count: int, matcher: dict, entry_skill_map: dict[int, dict] | None = None
+) -> tuple[list[str], list[dict]]:
     """从礼装 skills 中提取指定满破条件的效果。
 
     Args:
         skills: 礼装的 skills 列表（原始 Atlas API 格式）
         cond_limit_count: 0=未满破, 4=满破
         matcher: 效果匹配索引
+        entry_skill_map: entryFunction 子 skill 查找表（由 _fetch_entry_function_skills 构建）
 
     Returns:
         (效果名列表, 效果详情列表[{name, target, value}])
@@ -1096,6 +1164,41 @@ def _extract_ce_effects(skills: list[dict], cond_limit_count: int, matcher: dict
             func_group = func.get("funcGroup", [])
             if func_group and any(fg.get("eventId", 0) > 0 for fg in func_group):
                 continue
+
+            # 处理 entryFunction（登场效果）：间接引用子 skill
+            has_entry_function = False
+            for buff in func.get("buffs", []):
+                if buff.get("type") == "entryFunction" and entry_skill_map:
+                    has_entry_function = True
+                    svals = func.get("svals", [])
+                    sval = svals[0] if svals else {}
+                    sub_skill_id = sval.get("Value", 0)
+                    sub_info = entry_skill_map.get(sub_skill_id)
+                    if sub_info:
+                        # 生成 entry_ 前缀效果名
+                        sub_func_type = sub_info["funcType"]
+                        sub_buff_type = sub_info["buffType"]
+                        sub_value = sub_info["value"]
+                        # 优先用 funcType（如 gainStar），如果是 addState 类则用 buffType
+                        if sub_func_type in ("addState", "addStateShort") and sub_buff_type:
+                            # 首字母大写拼接：entry + UpAtk → entryUpAtk
+                            effect_name = f"entry{sub_buff_type[0].upper()}{sub_buff_type[1:]}"
+                        else:
+                            # 首字母大写拼接：entry + GainStar → entryGainStar
+                            effect_name = f"entry{sub_func_type[0].upper()}{sub_func_type[1:]}"
+                        effects_set.add(effect_name)
+                        effects_details.append(
+                            {
+                                "name": effect_name,
+                                "target": "self",
+                                "value": sub_value,
+                            }
+                        )
+                    break
+
+            if has_entry_function:
+                continue
+
             target_type = func.get("funcTargetType", "")
             matched = _match_func_effects(func, matcher)
 
@@ -1167,6 +1270,10 @@ _CE_EFFECT_TAG_MAP: dict[str, str] = {
     "pierceInvincible": "无敌贯通",
     "upTolerance": "弱化耐性",
     "upGrantstate": "弱化成功率",
+    # 登场效果（entryFunction 解析）
+    "entryGainStar": "登场暴击星",
+    "entryUpAtk": "登场攻击力",
+    "entryUpCommandall": "登场指令卡",
 }
 
 # NP 相关效果（已有黄色标签单独展示，不重复到 effectTags）
@@ -1189,8 +1296,11 @@ _CE_SKIP_EFFECTS = frozenset(
 _CE_NP_PERCENT_EFFECTS = frozenset({"regainNp"})
 
 # 星/HP 直接数值效果
-_CE_STAR_EFFECTS = frozenset({"regainStar", "gainStar"})
+_CE_STAR_EFFECTS = frozenset({"regainStar", "gainStar", "entryGainStar"})
 _CE_HP_EFFECTS = frozenset({"gainHp", "guts"})
+
+# 登场效果（entryFunction 解析，使用千分比格式化）
+_CE_ENTRY_PERCENT_EFFECTS = frozenset({"entryUpAtk", "entryUpCommandall"})
 
 
 def _build_ce_effect_tags(effect_details: list[dict]) -> list[str]:
@@ -1227,8 +1337,22 @@ def _build_ce_effect_tags(effect_details: list[dict]) -> list[str]:
             if eff_name in _CE_NP_PERCENT_EFFECTS:
                 # 万分比 → 百分比
                 tags.append(f"{label}↑{value // 100}%")
+            elif eff_name in _CE_ENTRY_PERCENT_EFFECTS:
+                # 登场百分比效果（千分比 → 百分比）
+                pct = value / 10
+                if pct == int(pct):
+                    tags.append(f"{label}↑{int(pct)}%")
+                else:
+                    tags.append(f"{label}↑{pct:.1f}%")
+            elif eff_name == "entryGainStar":
+                # 登场暴击星：特殊格式 "登场 N暴击星"
+                tags.append(f"登场{value}暴击星")
             elif eff_name in _CE_STAR_EFFECTS:
-                tags.append(f"{label}+{value}个")
+                # 每回合星/普通暴击星
+                if eff_name == "regainStar":
+                    tags.append(f"每回合{value}暴击星")
+                else:
+                    tags.append(f"{label}+{value}个")
             elif eff_name in _CE_HP_EFFECTS:
                 tags.append(f"{label}+{value}")
             else:
@@ -1246,7 +1370,7 @@ def _build_ce_effect_tags(effect_details: list[dict]) -> list[str]:
     return tags
 
 
-def _build_ce_entry(ce: dict, cn_data: dict, matcher: dict) -> dict:
+def _build_ce_entry(ce: dict, cn_data: dict, matcher: dict, entry_skill_map: dict[int, dict] | None = None) -> dict:
     """构建单条概念礼装 MV 记录。"""
     ce_id = ce.get("id", 0)
     ce_id_str = str(ce_id)
@@ -1266,8 +1390,8 @@ def _build_ce_entry(ce: dict, cn_data: dict, matcher: dict) -> dict:
     obtain = _classify_ce_obtain(ce)
 
     # 提取效果（未满破 + 满破）
-    effects_list, effects_details = _extract_ce_effects(skills, 0, matcher)
-    effects_lb_list, effects_lb_details = _extract_ce_effects(skills, 4, matcher)
+    effects_list, effects_details = _extract_ce_effects(skills, 0, matcher, entry_skill_map)
+    effects_lb_list, effects_lb_details = _extract_ce_effects(skills, 4, matcher, entry_skill_map)
 
     # 如果没有满破独立效果，fallback 到未满破效果
     if not effects_lb_list and effects_list:
@@ -1334,11 +1458,14 @@ def build_ce_database(craft_essences: list[dict], matcher: dict, cn_data: dict) 
     Returns:
         礼装 MV 记录列表
     """
+    # 预获取所有 entryFunction 引用的子 skill 数据
+    entry_skill_map = _fetch_entry_function_skills(craft_essences)
+
     db = []
     total_with_effects = 0
 
     for ce in craft_essences:
-        entry = _build_ce_entry(ce, cn_data, matcher)
+        entry = _build_ce_entry(ce, cn_data, matcher, entry_skill_map)
         db.append(entry)
         if entry.get("effectsLimitBreak"):
             total_with_effects += 1
