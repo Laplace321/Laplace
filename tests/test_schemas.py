@@ -96,10 +96,10 @@ class TestRoutingResponse:
         assert restored.response_skill == "respond_servant_detail"
 
     def test_from_json_string(self):
-        json_str = '{"skill_calls": [{"skill_name": "search_by_np_charge", "params": {"op": "gte", "value": 50}}], "response_skill": "respond_servant_list"}'
+        json_str = '{"skill_calls": [{"skill_name": "search_by_effect", "params": {"effect": "gainNp", "targetType": "self", "minValue": 50}}], "response_skill": "respond_servant_list"}'
         data = json.loads(json_str)
         resp = RoutingResponse.model_validate(data)
-        assert resp.skill_calls[0].params["value"] == 50
+        assert resp.skill_calls[0].params["minValue"] == 50
 
 
 # ============================================================

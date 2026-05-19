@@ -93,10 +93,15 @@ def load_ce_database() -> list[dict]:
 
 
 def _match_target_type(query_type: str, data_type: str) -> bool:
-    """匹配目标类型。party 查询同时匹配 party（全队）和 ptOne（单体队友）。"""
+    """匹配目标类型。
+
+    - party 查询匹配 party + ptOne + partyOther（partyOther 有额外复合判定，在上层处理）
+    - self 查询仅匹配 self
+    - partyOther 查询仅匹配 partyOther
+    """
     if query_type == data_type:
         return True
-    if query_type == "party" and data_type == "ptOne":
+    if query_type == "party" and data_type in ("ptOne", "partyOther"):
         return True
     return False
 
@@ -113,9 +118,14 @@ def _match_effect(
     Args:
         servant: 从者数据
         effect_name: 效果名（如 "invincible"）
-        target_type: 目标类型筛选（如 "party"），None 表示不限
+        target_type: 目标类型筛选（如 "party"/"self"/"partyOther"），None 表示不限
         min_value: 效果最小数值（千分比‰），None 表示不限
         max_value: 效果最大数值（千分比‰），None 表示不限
+
+    partyOther 复合判定：
+        当 targetType="party" 且从者有 partyOther 类效果时，需额外验证自身也能
+        获得足够的同效果值（self + party + ptOne >= min_value），否则 partyOther
+        部分的值不计入全队总量。
     """
     # 快速路径：先检查 skillEffects 集合
     servant_effects = servant.get("skillEffects", [])
@@ -124,16 +134,50 @@ def _match_effect(
 
     # 如果有任何精细条件，遍历 skillDetails 做三维过滤
     if target_type is not None or min_value is not None or max_value is not None:
-        # 累加判定：同效果多条数值相加后与 minValue/maxValue 比较
-        total_value = 0
+        # 分桶累加各类 targetType 的值
+        self_value = 0
+        party_value = 0
+        pt_one_value = 0
+        party_other_value = 0
+
         for skill in servant.get("skillDetails", []):
             for eff in skill.get("effects", []):
                 if eff.get("type") != effect_name:
                     continue
-                if target_type is not None and not _match_target_type(target_type, eff.get("targetType", "")):
-                    continue
-                total_value += eff.get("valueMax", 0)
-        # 必须至少有一条匹配的效果
+                eff_target = eff.get("targetType", "")
+                val = eff.get("valueMax", 0)
+                if eff_target == "self":
+                    self_value += val
+                elif eff_target == "party":
+                    party_value += val
+                elif eff_target == "ptOne":
+                    pt_one_value += val
+                elif eff_target == "partyOther":
+                    party_other_value += val
+
+        # 根据查询 targetType 决定累加策略
+        if target_type == "party":
+            # "全队"查询：party + ptOne + partyOther（partyOther 有附加条件）
+            team_value = party_value + pt_one_value + party_other_value
+            if team_value == 0:
+                return False
+            # partyOther 复合判定：自身也必须满足阈值
+            if party_other_value > 0 and min_value is not None:
+                self_total = self_value + party_value + pt_one_value
+                if self_total < min_value:
+                    return False
+            total_value = team_value
+        elif target_type == "self":
+            # 自身查询：self + party（全队含自己）+ ptOne（可指定自身）
+            total_value = self_value + party_value + pt_one_value
+        elif target_type == "partyOther":
+            total_value = party_other_value
+        elif target_type == "ptOne":
+            total_value = pt_one_value + party_value
+        else:
+            # 不限目标：全部累加
+            total_value = self_value + party_value + pt_one_value + party_other_value
+
         if total_value == 0:
             return False
         if min_value is not None and total_value < min_value:
@@ -157,9 +201,11 @@ def _match_np_effect(
     Args:
         servant: 从者数据
         effect_name: 效果名（如 "upBuster"）
-        target_type: 目标类型筛选（如 "party"），None 表示不限
+        target_type: 目标类型筛选（如 "party"/"self"/"partyOther"），None 表示不限
         min_value: 效果最小数值（千分比‰），None 表示不限
         max_value: 效果最大数值（千分比‰），None 表示不限
+
+    partyOther 复合判定逻辑与 _match_effect 保持一致。
     """
     # 快速路径：先检查 npEffects 集合
     if effect_name not in servant.get("npEffects", []):
@@ -167,16 +213,46 @@ def _match_np_effect(
 
     # 如果有精细条件，遍历 npDetails 做三维过滤
     if target_type is not None or min_value is not None or max_value is not None:
-        # 累加判定：同效果多条数值相加后与 minValue/maxValue 比较
-        total_value = 0
+        # 分桶累加各类 targetType 的值
+        self_value = 0
+        party_value = 0
+        pt_one_value = 0
+        party_other_value = 0
+
         for np_detail in servant.get("npDetails", []):
             for eff in np_detail.get("effects", []):
                 if eff.get("type") != effect_name:
                     continue
-                if target_type is not None and not _match_target_type(target_type, eff.get("targetType", "")):
-                    continue
-                total_value += eff.get("valueLv1", 0)
-        # 必须至少有一条匹配的效果
+                eff_target = eff.get("targetType", "")
+                val = eff.get("valueLv1", 0)
+                if eff_target == "self":
+                    self_value += val
+                elif eff_target == "party":
+                    party_value += val
+                elif eff_target == "ptOne":
+                    pt_one_value += val
+                elif eff_target == "partyOther":
+                    party_other_value += val
+
+        # 根据查询 targetType 决定累加策略
+        if target_type == "party":
+            team_value = party_value + pt_one_value + party_other_value
+            if team_value == 0:
+                return False
+            if party_other_value > 0 and min_value is not None:
+                self_total = self_value + party_value + pt_one_value
+                if self_total < min_value:
+                    return False
+            total_value = team_value
+        elif target_type == "self":
+            total_value = self_value + party_value + pt_one_value
+        elif target_type == "partyOther":
+            total_value = party_other_value
+        elif target_type == "ptOne":
+            total_value = pt_one_value + party_value
+        else:
+            total_value = self_value + party_value + pt_one_value + party_other_value
+
         if total_value == 0:
             return False
         if min_value is not None and total_value < min_value:

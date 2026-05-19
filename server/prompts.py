@@ -195,18 +195,18 @@ def build_routing_prompt(
 10. **宝具目标类型筛选（全体/单体）**：用户提到"全体宝具"/"全体攻击宝具"/"AOE宝具"时，使用 `search_by_cards` 的 `npTarget` 参数：`"all"` = 全体（光炮）、`"one"` = 单体、`"support"` = 辅助。同理，"单体宝具"对应 `npTarget: "one"`。**严禁**将"全体攻击宝具"误解为宝具特攻（`damageNpSP`），它们是完全不同的概念。
     - **FGO 俚语「d类特攻」「D特攻」**：玩家口中的"d类特攻"/"D特攻"是指**宝具附带的特攻效果**（`damageNpSP` 或 `damageNpIndividuality`），即宝具伤害对特定敌方特性有额外倍率。这是**宝具效果**，应使用 `search_by_np_effect(npEffect="damageNpSP")` 或 `search_by_np_effect(npEffect="damageNpIndividuality")`，**严禁**将"d类"误解为特性名称（如"死灵"），也**严禁**使用 `search_by_traits`。类似地，"w类特攻"指 `damageNpIndividualityAll`（全体宝具特攻）
 11. **效果的目标类型和数值条件**：效果类 Skill（`search_by_effect` / `search_by_skill_effect`）支持可选的 `targetType` 和 `minValue` 参数：
-    - `targetType`：效果施加目标。`"self"` = 自身、`"party"` = 队友/全队、`"enemy"` = 敌方。用户说"给队友"/"全队"/"辅助"时传 `"party"`，说"自身"时传 `"self"`
+    - `targetType`：效果施加目标。`"self"` = 自身可获得的（含 self+全队含自己+单体队友）、`"party"` = 全队（含自己）、`"partyOther"` = 仅队友不含自己、`"ptOne"` = 单体队友、`"enemy"` = 敌方。用户说"给队友"/"全队"/"辅助"时传 `"party"`，说"自身"时传 `"self"`
     - `minValue`：效果最小数值（百分比）。用户说"超过50%"/"大于30%"时传对应数值。如 `"minValue": 50` 表示 ≥50%
     - 用户未提及目标或数值时**不要传**这些参数
 12. **特性搜索（search_by_traits）**：当用户查询从者的"特性"/"属性"/"标签"（如"龙特性"、"王特性"、"神性"、"活在当下的人类"、"兽科从者"、"圆桌骑士"、"秩序·善"等）时，使用 `search_by_traits`。参数 `traitNames` 传中文特性名列表（如 `["龙"]`、`["活在当下的人类"]`），系统会自动查表转换为 ID。常见特性举例：龙、王、神性、人类、圆桌骑士、兽科从者、活在当下的人类、夏日模式从者、童话特性从者等
     - 可选参数 `ascension`（整数 0-4）：指定灵基阶段。用户说"第三灵基"/"最终再临"/"泳装形态"时传对应值。灵基映射：0=初始、1=灵基一、2=灵基二、3=灵基三/最终再临、4=最终再临（部分从者）。不传此参数时，默认匹配全灵基并集（即该从者在任意灵基下拥有的所有特性）
     - 注意：61 个从者存在灵基间特性差异（如梅露辛灵基 0-2 有圆桌骑士特性，灵基 3-4 没有），指定灵基时可精确筛选
 13. **不可查效果 — 直接 fallback**：以下效果属于被动/活动/礼装效果，**当前不在从者查询能力范围内**，应直接走 fallback 回复用户"此类效果暂不支持查询"：羁绊加成（`servantFriendshipUp`）、QP 加成（`qpUp`）、素材掉落加成（`eventDropUp`）。**禁止**对这些效果调用任何 Skill，否则一定返回 0 条结果
-14. **NP 充能类型精确路由（重要）**：`search_by_np_charge` 支持可选的 `targetType` 参数，用于区分充能类型：
-    - **用户只说"自充"**（如"50自充"、"自充50以上"）→ **不传** `targetType`，默认查总充能（totalCharge，含自充+他充+群充，因为群充和他充也能给自己充能）
-    - **用户同时提到"自充"和"群充"/"他充"**（如"50自充，30群充"）→ 此时"自充"特指纯自充，必须分别发两个 `search_by_np_charge` 调用：自充用 `targetType: "self"`，群充用 `targetType: "ptAll"`，他充用 `targetType: "ptOne"`
-    - `targetType` 取值：`"self"` = 纯自充（仅给自己）、`"ptAll"` = 群充（全队含自己）、`"ptOne"` = 他充（指定单个队友）
-    - ⚠️ 注意：**禁止**使用 `"party"` 作为 targetType 值，必须使用 `"ptAll"`（群充）或 `"ptOne"`（他充）
+14. **NP 充能路由（重要）**：NP 充能查询统一使用 `search_by_effect(effect="gainNp", ...)`，通过 `targetType` 和 `minValue` 区分场景：
+    - **用户只说"自充"**（如"50自充"、"自充50以上"）→ `search_by_effect(effect="gainNp", targetType="self", minValue=50)`
+    - **用户说"群充"/"全队充能"**（如"30群充"）→ `search_by_effect(effect="gainNp", targetType="party", minValue=30)`（party 含自己，系统会自动做复合判定：全队效果≥30 且自身也能获得≥30 充能才命中）
+    - **用户同时提到"自充"和"群充"**（如"50自充，30群充"）→ 分别发两个 `search_by_effect` 调用
+    - `targetType` 取值：`"self"` = 自身可获得的充能总量、`"party"` = 全队充能（含自己）、`"partyOther"` = 仅队友不含自己、`"ptOne"` = 单体队友
 15. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"、"哪个职阶克制XX"、"什么克制XX"等表达时，**必须**使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"、"月癌"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。**即使用户只问"哪个职阶克制X"这种看似知识性问题，也必须走 `search_by_class_advantage`**，系统会在结果中返回克制关系和对应从者。
 16. **疑似从者名称/昵称一律用 lookup_servant（重要）**：当用户的问题中包含你不确定是否为从者名称的词语（如"红A"、"小太阳"、"花之魔术师"、"老虚"、"CBA"、"XJB"、"呆毛"、"2B"等看起来像昵称/外号/缩写/纯字母组合的表达），**必须**使用 `lookup_servant`，将该词语作为 `name` 参数传入。系统后端支持昵称映射和模糊匹配，会自动处理识别。**绝不要**因为你不认识某个名称就返回 `no_match` 或 `out_of_scope`。只要用户的问题看起来是在查询或询问某个特定角色/从者，就选择 `lookup_servant`。**特别注意**：纯英文字母、数字组合、字母+数字混合（如"CBA"、"X4"、"2B"）在 FGO 社区中是常见的从者昵称缩写形式，绝不能因为看起来不像名字就判定为超出范围。如果用户同时问了从者详情（如"XX技能介绍"、"XX宝具是什么"），response_skill 选 `respond_servant_detail`。
 17. **戴冠战知识查询**：当用户提到"戴冠战"/"冠位"/"剑冠"/"弓冠"等并询问机制/星图/礼装/刷取策略/Boss怎么打时，使用 `coronation_knowledge`。参数 `topic` 从 ["机制","星图","礼装","刷取","boss"] 中选择。如果涉及特定职阶Boss（如"剑冠武藏"、"剑阶戴冠boss"），额外传 `className`（中文职阶名如"剑"/"弓"等）。response_skill 选 `respond_coronation`。
@@ -224,7 +224,7 @@ def build_routing_prompt(
 
 用户："30自充以上的Caster"
 ```json
-{{"skill_calls": [{{"skill_name": "search_by_np_charge", "params": {{"op": "gte", "value": 30}}}}, {{"skill_name": "search_by_class", "params": {{"className": "Caster"}}}}], "response_skill": "respond_servant_list"}}
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "gainNp", "targetType": "self", "minValue": 30}}}}, {{"skill_name": "search_by_class", "params": {{"className": "Caster"}}}}], "response_skill": "respond_servant_list"}}
 ```
 
 用户："查一下梅林"
@@ -279,22 +279,22 @@ def build_routing_prompt(
 
 用户："50%以上充能且带全体攻击宝具的四星从者"（全体宝具 → search_by_cards 的 npTarget）
 ```json
-{{"skill_calls": [{{"skill_name": "search_by_np_charge", "params": {{"op": "gte", "value": 50}}}}, {{"skill_name": "search_by_cards", "params": {{"npTarget": "all"}}}}, {{"skill_name": "search_by_rarity", "params": {{"op": "eq", "value": 4}}}}], "response_skill": "respond_servant_list"}}
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "gainNp", "targetType": "self", "minValue": 50}}}}, {{"skill_name": "search_by_cards", "params": {{"npTarget": "all"}}}}, {{"skill_name": "search_by_rarity", "params": {{"op": "eq", "value": 4}}}}], "response_skill": "respond_servant_list"}}
 ```
 
 用户："50自充，30群充的从者"（同时提到自充和群充 → 分别用 targetType 精确查询）
 ```json
-{{"skill_calls": [{{"skill_name": "search_by_np_charge", "params": {{"op": "gte", "value": 50, "targetType": "self"}}}}, {{"skill_name": "search_by_np_charge", "params": {{"op": "gte", "value": 30, "targetType": "ptAll"}}}}], "response_skill": "respond_servant_list"}}
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "gainNp", "targetType": "self", "minValue": 50}}}}, {{"skill_name": "search_by_effect", "params": {{"effect": "gainNp", "targetType": "party", "minValue": 30}}}}], "response_skill": "respond_servant_list"}}
 ```
 
 用户："有20他充的从者"（单独提到他充 → 用 targetType: ptOne）
 ```json
-{{"skill_calls": [{{"skill_name": "search_by_np_charge", "params": {{"op": "gte", "value": 20, "targetType": "ptOne"}}}}], "response_skill": "respond_servant_list"}}
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "gainNp", "targetType": "ptOne", "minValue": 20}}}}], "response_skill": "respond_servant_list"}}
 ```
 
-用户："30群充以上的术阶"（单独提到群充 → 用 targetType: ptAll）
+用户："30群充以上的术阶"（单独提到群充 → 用 targetType: party）
 ```json
-{{"skill_calls": [{{"skill_name": "search_by_np_charge", "params": {{"op": "gte", "value": 30, "targetType": "ptAll"}}}}, {{"skill_name": "search_by_class", "params": {{"className": "Caster"}}}}], "response_skill": "respond_servant_list"}}
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "gainNp", "targetType": "party", "minValue": 30}}}}, {{"skill_name": "search_by_class", "params": {{"className": "Caster"}}}}], "response_skill": "respond_servant_list"}}
 ```
 
 用户："克制伪装者的蓝卡无敌贯通宝具从者"（职阶克制 → search_by_class_advantage，targetClass 传中文）

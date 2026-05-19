@@ -147,7 +147,7 @@ class TestSkillModePreset:
                         "mode": "skill",
                         "preset_name": "cycle_farming",
                         "params": {
-                            "search_by_np_charge": {"op": "gte", "value": 50},
+                            "search_by_effect": {"effect": "gainNp", "targetType": "self", "minValue": 50},
                             "search_by_class": {"className": "Caster"},
                         },
                     },
@@ -358,8 +358,8 @@ class TestPresetB1SupplementParsing:
         # 合并后的 skill_calls 应包含预设 Skills + 额外的 search_by_skill_effect
         skill_names = [sc["skill_name"] for sc in data["query"]["skill_calls"]]
         assert "search_by_skill_effect" in skill_names
-        # 预设的 search_by_np_charge 也应存在
-        assert "search_by_np_charge" in skill_names
+        # 预设的 search_by_effect (gainNp) 也应存在
+        assert "search_by_effect" in skill_names
 
     @pytest.mark.anyio
     async def test_empty_message_skips_stage2(self, mock_chat_completion_rag):

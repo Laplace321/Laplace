@@ -73,15 +73,16 @@ def handle_search_servants(params: dict) -> dict:
             }
         )
 
-    # 4. NP 充能筛选
+    # 4. NP 充能筛选（统一到 search_by_effect + gainNp）
     np_charge = params.get("np_charge_value")
     if np_charge is not None:
         skill_calls.append(
             {
-                "skill_name": "search_by_np_charge",
+                "skill_name": "search_by_effect",
                 "params": {
-                    "value": np_charge,
-                    "op": params.get("np_charge_op", "gte"),
+                    "effect": "gainNp",
+                    "targetType": "self",
+                    "minValue": np_charge,
                 },
             }
         )

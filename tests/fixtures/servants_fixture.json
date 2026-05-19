@@ -3199,20 +3199,7 @@
         "qp": 3000000
       }
     },
-    "npCharges": [
-      {
-        "skillName": "Shining Path EX",
-        "skillNum": 3,
-        "chargePercent": 30,
-        "chargeValue": 3000,
-        "targetType": "self"
-      }
-    ],
-    "maxSelfCharge": 30,
-    "maxPtOneCharge": 0,
-    "maxPtAllCharge": 0,
-    "totalCharge": 30,
-    "hasNpCharge": true,
+    "totalSelfCharge": 30,
     "skillEffects": [
       "gainNp",
       "gainStar",
@@ -7376,20 +7363,7 @@
       }
     },
     "costumeMaterials": {},
-    "npCharges": [
-      {
-        "skillName": "Stars for the Sky EX",
-        "skillNum": 1,
-        "chargePercent": 30,
-        "chargeValue": 3000,
-        "targetType": "ptOne"
-      }
-    ],
-    "maxSelfCharge": 0,
-    "maxPtOneCharge": 30,
-    "maxPtAllCharge": 0,
-    "totalCharge": 30,
-    "hasNpCharge": true,
+    "totalSelfCharge": 30,
     "skillEffects": [
       "gainHp",
       "gainNp",

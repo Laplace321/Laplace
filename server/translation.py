@@ -114,14 +114,6 @@ def describe_filters(skill_calls: list[dict]) -> list[str]:
             descriptions.append(f"稀有度 {op_map.get(op, op)} {val}星")
         elif name == "search_by_class":
             descriptions.append(f"职阶 = {params.get('className', '')}")
-        elif name == "search_by_np_charge":
-            op = params.get("op", "gte")
-            val = params.get("value", "")
-            op_map = {"eq": "=", "gte": "≥", "lte": "≤", "gt": ">", "lt": "<"}
-            target_type = params.get("targetType")
-            charge_label_map = {"self": "自充", "ptOne": "他充", "ptAll": "群充"}
-            charge_label = charge_label_map.get(target_type, "NP充能")
-            descriptions.append(f"{charge_label} {op_map.get(op, op)} {val}%")
         elif name == "search_by_cards":
             parts = []
             card = params.get("cardType") or params.get("cards")
