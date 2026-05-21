@@ -59,9 +59,13 @@ def effect_qualifier(params: dict) -> str:
     parts: list[str] = []
     target_type = params.get("targetType") or params.get("target_type")
     if target_type == "party":
-        parts.append("给队友的")
+        parts.append("全队的")
+    elif target_type == "partyOther":
+        parts.append("仅队友的")
     elif target_type == "self":
         parts.append("自身的")
+    elif target_type == "ptOne":
+        parts.append("单体队友的")
     elif target_type == "enemy":
         parts.append("对敌方的")
 

@@ -725,13 +725,27 @@ def build_database(
         # self + party（含自己的全队）+ ptOne（可指定自身）都算入自充
         # partyOther（不含自己）不算入自充
         total_self_charge = 0
+        # 同时生成 npCharges（前端卡片展示用，按技能独立条目）
+        # 格式: [{skillNum, chargePercent, targetType}]
+        # targetType 映射: self→self, party→ptAll, ptOne→ptOne, partyOther→ptAll
+        np_charges: list[dict] = []
+        _np_charge_target_map = {"self": "self", "party": "ptAll", "ptOne": "ptOne", "partyOther": "ptAll"}
         for sk in skill_details:
             for eff in sk.get("effects", []):
                 if eff.get("type") != "gainNp":
                     continue
                 tt = eff.get("targetType", "")
+                charge_percent = eff.get("valueMax", 0) // 100  # 千分比→百分比
                 if tt in ("self", "party", "ptOne"):
-                    total_self_charge += eff.get("valueMax", 0) // 100  # 千分比→百分比
+                    total_self_charge += charge_percent
+                if charge_percent > 0:
+                    np_charges.append(
+                        {
+                            "skillNum": sk.get("skillNum", 0),
+                            "chargePercent": charge_percent,
+                            "targetType": _np_charge_target_map.get(tt, "self"),
+                        }
+                    )
 
         # 计算卡色构成
         cards_count = {"arts": 0, "buster": 0, "quick": 0}
@@ -850,6 +864,8 @@ def build_database(
             "costumeMaterials": svt.get("costumeMaterials", {}),
             # Materialized Views（预计算）
             "totalSelfCharge": total_self_charge,
+            "npCharges": np_charges,
+            "maxSelfCharge": total_self_charge,
             "skillEffects": sorted(list(skill_effects)),
             "npEffects": sorted(list(np_effects_set)),
             "skillDetails": skill_details,
