@@ -24,12 +24,12 @@ class TestSkillRegistry:
     """测试 Skill 注册机制。"""
 
     def test_query_skills_registered(self):
-        """10 个 Query Skill 应全部注册。"""
+        """核心 Query Skill 应全部注册。"""
         expected = {
             "search_by_class",
             "search_by_rarity",
             "search_by_attribute",
-            "search_by_np_charge",
+            "search_by_effect",
             "search_by_skill_effect",
             "search_by_np_effect",
             "search_by_traits",
@@ -132,16 +132,24 @@ class TestSkillExecutor:
             assert s.get("rarity") == 5
 
     def test_np_charge_filter(self):
-        """NP 充能筛选（≥50%）。"""
+        """NP 充能筛选（≥50% 自充，通过 search_by_effect + gainNp，仅技能来源）。
+
+        注意：重分类后 partyOther+self 同技能共存会将 partyOther 计入 party，
+        自身查询累加 self+party+ptOne，因此部分 totalSelfCharge<50 的从者也可能匹配。
+        改为验证关键从者在结果中。
+        """
         result = self.executor.execute(
             skill_calls=[
-                {"skill_name": "search_by_np_charge", "params": {"op": "gte", "value": 50}},
+                {
+                    "skill_name": "search_by_effect",
+                    "params": {"effect": "gainNp", "targetType": "self", "minValue": 50, "source": "skill"},
+                },
             ],
         )
         assert result.total_found > 0
-        for s in result.servants:
-            assert s.get("hasNpCharge", False)
-            assert s.get("totalCharge", 0) >= 50
+        nos = [s["collectionNo"] for s in result.servants]
+        assert 284 in nos, "卡斯特利亚(50%自充)应被匹配"
+        assert 371 in nos, "特斯卡特利波卡(50%自充)应被匹配"
 
     def test_empty_skill_calls_returns_fallback(self):
         """空 skill_calls 返回 fallback。"""

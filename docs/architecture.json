@@ -193,7 +193,6 @@
         {"name": "search_by_effect", "file": "server/skills/query/search_by_effect.py", "domain": "servant", "description": "统一效果搜索（同时搜技能+宝具效果）"},
         {"name": "search_by_skill_effect", "file": "server/skills/query/search_by_skill_effect.py", "domain": "servant", "description": "仅搜索技能效果"},
         {"name": "search_by_np_effect", "file": "server/skills/query/search_by_np_effect.py", "domain": "servant", "description": "仅搜索宝具效果"},
-        {"name": "search_by_np_charge", "file": "server/skills/query/search_by_np_charge.py", "domain": "servant", "description": "按 NP 充能量筛选（支持 targetType 区分自充/群充/他充）"},
         {"name": "search_by_cards", "file": "server/skills/query/search_by_cards.py", "domain": "servant", "description": "按配卡、宝具卡色、宝具目标筛选"},
         {"name": "search_by_traits", "file": "server/skills/query/search_by_traits.py", "domain": "servant", "description": "按特性筛选（支持灵基阶段精确筛选）"},
         {"name": "search_by_attribute", "file": "server/skills/query/search_by_attribute.py", "domain": "servant", "description": "按属性筛选（天/地/人/星/兽）"},
@@ -216,7 +215,7 @@
         {"name": "respond_ce_list", "file": "server/skills/response/respond_ce_list.py", "description": "以列表形式展示筛选到的概念礼装"}
       ],
       "presets": [
-        {"name": "cycle_farming", "displayName": "周回筛选", "querySkills": ["search_by_np_charge"], "responseSkill": "respond_servant_list"},
+        {"name": "cycle_farming", "displayName": "周回筛选", "querySkills": ["search_by_effect"], "responseSkill": "respond_servant_list"},
         {"name": "servant_lookup", "displayName": "从者查询", "querySkills": ["lookup_servant"], "responseSkill": "respond_servant_detail"},
         {"name": "servant_compare", "displayName": "从者对比", "querySkills": ["compare_servants"], "responseSkill": "respond_servant_compare"},
         {"name": "support_recommend", "displayName": "辅助推荐", "querySkills": ["search_by_effect"], "responseSkill": "respond_support_analysis"},
@@ -314,7 +313,7 @@
         {
           "file": "server/data/servants_db.json",
           "description": "从者运行时查询数据源，由 data_loader.py 从 Atlas Academy API 构建",
-          "bakedFields": ["skillEffects", "npEffects", "totalCharge", "npCharge", "skillDetails", "npDetails", "traits", "conditionalTraits", "aliasCN"]
+          "bakedFields": ["skillEffects", "npEffects", "totalSelfCharge", "skillDetails", "npDetails", "traits", "conditionalTraits", "aliasCN"]
         },
         {
           "file": "server/data/craft_essences_db.json",
@@ -350,7 +349,7 @@
         "main.py 检测无 preset_name 和 params，进入 LLM 路由路径",
         "build_routing_prompt() 构建路由 Prompt（含 18 条规则 + 效果语义参考）",
         "chat_completion(json_mode=True) 调用 LLM 解析意图",
-        "parse_routing_response() Pydantic 校验输出 → skill_calls: [search_by_np_charge(gte,30), search_by_class(Caster), search_by_rarity(eq,5)]",
+        "parse_routing_response() Pydantic 校验输出 → skill_calls: [search_by_effect(gainNp,self,30), search_by_class(Caster), search_by_rarity(eq,5)]",
         "SkillExecutor.execute() 一次数据扫描 AND 合并三个 filter",
         "build_context() 构建预消化 Context（全中文 key）",
         "respond_servant_list.build_prompt() 构建 Generation Prompt",
@@ -364,7 +363,7 @@
       "example": "用户点击「周回筛选」preset 并输入「五星弓阶」",
       "steps": [
         "前端发送 preset_name='cycle_farming' + message='五星弓阶'",
-        "main.py 从 PRESET_REGISTRY 展开 → skill_calls: [search_by_np_charge(gte,30)]",
+        "main.py 从 PRESET_REGISTRY 展开 → skill_calls: [search_by_effect(gainNp,self,30)]",
         "检测到 user_message 非空 → B1 策略：LLM 路由解析额外 Skills",
         "LLM 解析出 [search_by_class(Archer), search_by_rarity(eq,5)]",
         "合并：同名 Skill 补充参数，新 Skill 追加 → 最终 3 个 skill_calls",

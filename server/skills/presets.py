@@ -27,10 +27,10 @@ def _register_presets() -> None:
         Preset(
             name="cycle_farming",
             display_name="周回筛选",
-            query_skills=["search_by_np_charge"],
+            query_skills=["search_by_effect"],
             response_skill="respond_servant_list",
             param_template={
-                "search_by_np_charge": {"op": "gte", "value": 30},
+                "search_by_effect": {"effect": "gainNp", "targetType": "self", "minValue": 30},
             },
         ),
         Preset(

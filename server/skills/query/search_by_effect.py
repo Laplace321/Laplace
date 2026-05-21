@@ -6,6 +6,13 @@ from server.query_executor import _match_effect, _match_np_effect
 from server.skills.base import QuerySkill, register_skill
 from server.skills.query.search_by_skill_effect import _expand_effect
 
+# 效果类型→percentBase 映射（参考 Chaldea const_data.dart）
+# - base=100: gainNp 系 FuncType（Value÷100=百分比，如 3000=30%）
+# - base=10: Buff 类效果（Value÷10=百分比，如 500=50%）
+# - base=None: 整数值效果（如 gainStar，Value=实际颗数）
+_PERCENT_BASE_100_EFFECTS = frozenset({"gainNp", "regainNp"})
+_NO_PERCENT_EFFECTS = frozenset({"gainStar"})
+
 
 class Params(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -18,10 +25,39 @@ class Params(BaseModel):
         description="搜索来源: skill(仅技能) / np(仅宝具) / both(默认，同时搜)",
     )
     target_type: str | None = Field(
-        default=None, alias="targetType", description="目标类型: self/party(含单体队友)/ptOne(仅单体队友)/enemy"
+        default=None,
+        alias="targetType",
+        description="目标类型: self(自身)/party(全队含自己)/partyOther(队友不含自己)/ptOne(仅单体队友)/enemy",
     )
     min_value: int | None = Field(default=None, alias="minValue", description="效果最小数值（百分比，如50表示≥50%）")
     max_value: int | None = Field(default=None, alias="maxValue", description="效果最大数值（百分比）")
+
+
+def _convert_value(
+    effect_name: str,
+    raw_min: int | None,
+    raw_max: int | None,
+) -> tuple[int | None, int | None]:
+    """将用户传入的百分比数值转换为内部 Value 单位。
+
+    FGO Atlas API 中不同效果类型使用不同的数值基数（参考 Chaldea const_data.dart）：
+    - gainNp/regainNp: base=100（Value÷100=百分比，如 3000=30%）→ 用户传50 × 100 = 5000
+    - gainStar: 整数值（Value=实际颗数）→ 不转换
+    - Buff 类（upAtk/upBuster 等）: base=10（Value÷10=百分比，如 500=50%）→ 用户传50 × 10 = 500
+    """
+    if raw_min is None and raw_max is None:
+        return None, None
+
+    if effect_name in _PERCENT_BASE_100_EFFECTS:
+        multiplier = 100
+    elif effect_name in _NO_PERCENT_EFFECTS:
+        multiplier = 1
+    else:
+        multiplier = 10
+
+    min_value = raw_min * multiplier if raw_min is not None else None
+    max_value = raw_max * multiplier if raw_max is not None else None
+    return min_value, max_value
 
 
 def _check_effect(
@@ -62,17 +98,18 @@ class SearchByEffect(QuerySkill):
         effects = params.get("effects")
         source = params.get("source", "both")
         target_type = params.get("target_type")
-        # 百分比 → 千分比转换（LLM 传 50 表示 50%，内部用 500‰）
         raw_min = params.get("min_value")
         raw_max = params.get("max_value")
-        min_value = raw_min * 10 if raw_min is not None else None
-        max_value = raw_max * 10 if raw_max is not None else None
 
         # 单效果模式（支持复合效果自动展开为 OR）
         if effect is not None:
             expanded = _expand_effect(effect)
             if len(expanded) > 1:
-                return any(_check_effect(servant, eff, source, target_type, min_value, max_value) for eff in expanded)
+                return any(
+                    _check_effect(servant, eff, source, target_type, *_convert_value(eff, raw_min, raw_max))
+                    for eff in expanded
+                )
+            min_value, max_value = _convert_value(expanded[0], raw_min, raw_max)
             return _check_effect(servant, expanded[0], source, target_type, min_value, max_value)
 
         # 多效果模式（每个效果都可能是复合效果，需展开）
@@ -85,9 +122,11 @@ class SearchByEffect(QuerySkill):
                 if len(expanded) > 1:
                     # 复合效果：子效果之间是 OR（任一命中即可）
                     return any(
-                        _check_effect(servant, sub, source, target_type, min_value, max_value) for sub in expanded
+                        _check_effect(servant, sub, source, target_type, *_convert_value(sub, raw_min, raw_max))
+                        for sub in expanded
                     )
-                return _check_effect(servant, expanded[0], source, target_type, min_value, max_value)
+                min_v, max_v = _convert_value(expanded[0], raw_min, raw_max)
+                return _check_effect(servant, expanded[0], source, target_type, min_v, max_v)
 
             if op == "or":
                 return any(_match_one(eff) for eff in effects)

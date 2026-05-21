@@ -93,10 +93,15 @@ def load_ce_database() -> list[dict]:
 
 
 def _match_target_type(query_type: str, data_type: str) -> bool:
-    """匹配目标类型。party 查询同时匹配 party（全队）和 ptOne（单体队友）。"""
+    """匹配目标类型。
+
+    - party 查询匹配 party + partyOther（ptOne 是单体指定，不等于全队效果）
+    - self 查询仅匹配 self
+    - partyOther 查询仅匹配 partyOther
+    """
     if query_type == data_type:
         return True
-    if query_type == "party" and data_type == "ptOne":
+    if query_type == "party" and data_type == "partyOther":
         return True
     return False
 
@@ -113,9 +118,14 @@ def _match_effect(
     Args:
         servant: 从者数据
         effect_name: 效果名（如 "invincible"）
-        target_type: 目标类型筛选（如 "party"），None 表示不限
+        target_type: 目标类型筛选（如 "party"/"self"/"partyOther"），None 表示不限
         min_value: 效果最小数值（千分比‰），None 表示不限
         max_value: 效果最大数值（千分比‰），None 表示不限
+
+    partyOther 复合判定：
+        当 targetType="party" 且从者有 partyOther 类效果时，需额外验证自身也能
+        获得足够的同效果值（self + party + ptOne >= min_value），否则 partyOther
+        部分的值不计入全队总量。
     """
     # 快速路径：先检查 skillEffects 集合
     servant_effects = servant.get("skillEffects", [])
@@ -124,16 +134,66 @@ def _match_effect(
 
     # 如果有任何精细条件，遍历 skillDetails 做三维过滤
     if target_type is not None or min_value is not None or max_value is not None:
-        # 累加判定：同效果多条数值相加后与 minValue/maxValue 比较
-        total_value = 0
+        # 按技能粒度分桶累加，检测 partyOther+self 同效果共存并重分类
+        self_value = 0
+        party_value = 0
+        pt_one_value = 0
+        party_other_value = 0
+
         for skill in servant.get("skillDetails", []):
+            # 按技能粒度收集同效果的各 targetType 值
+            sk_self = 0
+            sk_party = 0
+            sk_ptone = 0
+            sk_partyother = 0
             for eff in skill.get("effects", []):
                 if eff.get("type") != effect_name:
                     continue
-                if target_type is not None and not _match_target_type(target_type, eff.get("targetType", "")):
-                    continue
-                total_value += eff.get("valueMax", 0)
-        # 必须至少有一条匹配的效果
+                eff_target = eff.get("targetType", "")
+                val = eff.get("valueMax", 0)
+                if eff_target == "self":
+                    sk_self += val
+                elif eff_target == "party":
+                    sk_party += val
+                elif eff_target == "ptOne":
+                    sk_ptone += val
+                elif eff_target == "partyOther":
+                    sk_partyother += val
+
+            # partyOther + self 同技能共存 → partyOther 重分类为 party
+            # （FGO 用 partyOther+self 拆分表达"全队效果但自身数值不同"）
+            if sk_partyother > 0 and sk_self > 0:
+                sk_party += sk_partyother
+                sk_partyother = 0
+
+            self_value += sk_self
+            party_value += sk_party
+            pt_one_value += sk_ptone
+            party_other_value += sk_partyother
+
+        # 根据查询 targetType 决定累加策略
+        if target_type == "party":
+            # "全队"查询：party + partyOther（ptOne 是单体指定，不等于全队效果）
+            team_value = party_value + party_other_value
+            if team_value == 0:
+                return False
+            # partyOther 复合判定：自身也必须满足阈值
+            if party_other_value > 0 and min_value is not None:
+                self_total = self_value + party_value + pt_one_value
+                if self_total < min_value:
+                    return False
+            total_value = team_value
+        elif target_type == "self":
+            # 自身查询：self + party（全队含自己）+ ptOne（可指定自身）
+            total_value = self_value + party_value + pt_one_value
+        elif target_type == "partyOther":
+            total_value = party_other_value
+        elif target_type == "ptOne":
+            total_value = pt_one_value + party_value
+        else:
+            # 不限目标：全部累加
+            total_value = self_value + party_value + pt_one_value + party_other_value
+
         if total_value == 0:
             return False
         if min_value is not None and total_value < min_value:
@@ -157,9 +217,11 @@ def _match_np_effect(
     Args:
         servant: 从者数据
         effect_name: 效果名（如 "upBuster"）
-        target_type: 目标类型筛选（如 "party"），None 表示不限
+        target_type: 目标类型筛选（如 "party"/"self"/"partyOther"），None 表示不限
         min_value: 效果最小数值（千分比‰），None 表示不限
         max_value: 效果最大数值（千分比‰），None 表示不限
+
+    partyOther 复合判定逻辑与 _match_effect 保持一致。
     """
     # 快速路径：先检查 npEffects 集合
     if effect_name not in servant.get("npEffects", []):
@@ -167,16 +229,63 @@ def _match_np_effect(
 
     # 如果有精细条件，遍历 npDetails 做三维过滤
     if target_type is not None or min_value is not None or max_value is not None:
-        # 累加判定：同效果多条数值相加后与 minValue/maxValue 比较
-        total_value = 0
+        # 按宝具粒度分桶累加，检测 partyOther+self 同效果共存并重分类
+        self_value = 0
+        party_value = 0
+        pt_one_value = 0
+        party_other_value = 0
+
         for np_detail in servant.get("npDetails", []):
+            # 按宝具粒度收集同效果的各 targetType 值
+            np_self = 0
+            np_party = 0
+            np_ptone = 0
+            np_partyother = 0
             for eff in np_detail.get("effects", []):
                 if eff.get("type") != effect_name:
                     continue
-                if target_type is not None and not _match_target_type(target_type, eff.get("targetType", "")):
-                    continue
-                total_value += eff.get("valueLv1", 0)
-        # 必须至少有一条匹配的效果
+                eff_target = eff.get("targetType", "")
+                val = eff.get("valueLv1", 0)
+                if eff_target == "self":
+                    np_self += val
+                elif eff_target == "party":
+                    np_party += val
+                elif eff_target == "ptOne":
+                    np_ptone += val
+                elif eff_target == "partyOther":
+                    np_partyother += val
+
+            # partyOther + self 同宝具共存 → partyOther 重分类为 party
+            if np_partyother > 0 and np_self > 0:
+                np_party += np_partyother
+                np_partyother = 0
+
+            self_value += np_self
+            party_value += np_party
+            pt_one_value += np_ptone
+            party_other_value += np_partyother
+
+        # 根据查询 targetType 决定累加策略
+        if target_type == "party":
+            # "全队"查询：party + partyOther（ptOne 是单体指定，不等于全队效果）
+            team_value = party_value + party_other_value
+            if team_value == 0:
+                return False
+            # partyOther 复合判定：自身也必须满足阈值
+            if party_other_value > 0 and min_value is not None:
+                self_total = self_value + party_value + pt_one_value
+                if self_total < min_value:
+                    return False
+            total_value = team_value
+        elif target_type == "self":
+            total_value = self_value + party_value + pt_one_value
+        elif target_type == "partyOther":
+            total_value = party_other_value
+        elif target_type == "ptOne":
+            total_value = pt_one_value + party_value
+        else:
+            total_value = self_value + party_value + pt_one_value + party_other_value
+
         if total_value == 0:
             return False
         if min_value is not None and total_value < min_value:

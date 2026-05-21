@@ -3199,20 +3199,7 @@
         "qp": 3000000
       }
     },
-    "npCharges": [
-      {
-        "skillName": "Shining Path EX",
-        "skillNum": 3,
-        "chargePercent": 30,
-        "chargeValue": 3000,
-        "targetType": "self"
-      }
-    ],
-    "maxSelfCharge": 30,
-    "maxPtOneCharge": 0,
-    "maxPtAllCharge": 0,
-    "totalCharge": 30,
-    "hasNpCharge": true,
+    "totalSelfCharge": 30,
     "skillEffects": [
       "gainNp",
       "gainStar",
@@ -7376,20 +7363,7 @@
       }
     },
     "costumeMaterials": {},
-    "npCharges": [
-      {
-        "skillName": "Stars for the Sky EX",
-        "skillNum": 1,
-        "chargePercent": 30,
-        "chargeValue": 3000,
-        "targetType": "ptOne"
-      }
-    ],
-    "maxSelfCharge": 0,
-    "maxPtOneCharge": 30,
-    "maxPtAllCharge": 0,
-    "totalCharge": 30,
-    "hasNpCharge": true,
+    "totalSelfCharge": 30,
     "skillEffects": [
       "gainHp",
       "gainNp",
@@ -34810,6 +34784,237 @@
             "type": "invincible",
             "funcType": "addState",
             "targetType": "party"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 9941460,
+    "collectionNo": 268,
+    "name": "Space Ishtar",
+    "originalName": "スペース・イシュタル",
+    "aliasCN": "太空伊什塔尔",
+    "rarity": 5,
+    "className": "avenger",
+    "type": "normal",
+    "cost": 16,
+    "atkMax": 12252,
+    "hpMax": 13230,
+    "traits": [],
+    "npCharges": [],
+    "maxSelfCharge": 0,
+    "maxPtOneCharge": 0,
+    "maxPtAllCharge": 0,
+    "totalCharge": 0,
+    "hasNpCharge": false,
+    "skillEffects": ["avoidStateNegative", "gainNp", "invincible", "upArts", "upAtk", "upBuster", "upNpdamage", "upQuick"],
+    "npEffects": [],
+    "skillDetails": [
+      {
+        "skillName": "恶魔的砂糖 A",
+        "skillNum": 1,
+        "effects": [
+          {
+            "type": "upAtk",
+            "funcType": "addStateShort",
+            "targetType": "self",
+            "valueMax": 200,
+            "turn": 3,
+            "count": -1
+          },
+          {
+            "type": "upAtk",
+            "funcType": "addStateShort",
+            "targetType": "partyOther",
+            "valueMax": 300,
+            "turn": 3,
+            "count": -1
+          }
+        ]
+      },
+      {
+        "skillName": "金星驱动 B",
+        "skillNum": 2,
+        "effects": [
+          {
+            "type": "gainNp",
+            "funcType": "gainNp",
+            "targetType": "self",
+            "valueMax": 5000
+          }
+        ]
+      },
+      {
+        "skillName": "多重星环 EX",
+        "skillNum": 3,
+        "effects": [
+          {
+            "type": "upBuster",
+            "funcType": "addStateShort",
+            "targetType": "self",
+            "valueMax": 300,
+            "turn": 3,
+            "count": -1
+          },
+          {
+            "type": "upArts",
+            "funcType": "addStateShort",
+            "targetType": "self",
+            "valueMax": 300,
+            "turn": 3,
+            "count": -1
+          },
+          {
+            "type": "upQuick",
+            "funcType": "addStateShort",
+            "targetType": "self",
+            "valueMax": 300,
+            "turn": 3,
+            "count": -1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 9941470,
+    "collectionNo": 269,
+    "name": "Calamity Jane",
+    "originalName": "カラミティ・ジェーン",
+    "aliasCN": "灾星简",
+    "rarity": 5,
+    "className": "archer",
+    "type": "normal",
+    "cost": 16,
+    "atkMax": 11781,
+    "hpMax": 13632,
+    "traits": [],
+    "npCharges": [],
+    "maxSelfCharge": 0,
+    "maxPtOneCharge": 0,
+    "maxPtAllCharge": 0,
+    "totalCharge": 0,
+    "hasNpCharge": false,
+    "skillEffects": ["avoidance", "gainNp", "gainStar", "pierceInvincible", "upAtk", "upCriticaldamage", "upGrantstate", "upGrantstatePositive", "upStarweight"],
+    "npEffects": [],
+    "skillDetails": [
+      {
+        "skillName": "女神的看管者 B",
+        "skillNum": 1,
+        "effects": [
+          {
+            "type": "avoidance",
+            "funcType": "addState",
+            "targetType": "self",
+            "turn": 1,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "skillName": "银河传令 EX",
+        "skillNum": 2,
+        "effects": [
+          {
+            "type": "upAtk",
+            "funcType": "addStateShort",
+            "targetType": "self",
+            "valueMax": 200,
+            "turn": 3,
+            "count": -1
+          },
+          {
+            "type": "upAtk",
+            "funcType": "addStateShort",
+            "targetType": "partyOther",
+            "valueMax": 200,
+            "turn": 3,
+            "count": -1
+          }
+        ]
+      },
+      {
+        "skillName": "极星啊，指明道路吧 B",
+        "skillNum": 3,
+        "effects": [
+          {
+            "type": "upCriticaldamage",
+            "funcType": "addStateShort",
+            "targetType": "ptOne",
+            "valueMax": 500,
+            "turn": 3,
+            "count": -1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 9941560,
+    "collectionNo": 156,
+    "name": "James Moriarty",
+    "originalName": "ジェームズ・モリアーティ",
+    "aliasCN": "莫里亚蒂",
+    "rarity": 5,
+    "className": "archer",
+    "type": "normal",
+    "cost": 16,
+    "atkMax": 11781,
+    "hpMax": 13632,
+    "traits": [],
+    "npCharges": [],
+    "maxSelfCharge": 0,
+    "maxPtOneCharge": 0,
+    "maxPtAllCharge": 0,
+    "totalCharge": 0,
+    "hasNpCharge": false,
+    "skillEffects": ["gainNp", "gainStar", "pierceDefence", "pierceInvincible", "upAtk", "upNpdamage", "upStarweight"],
+    "npEffects": [],
+    "skillDetails": [
+      {
+        "skillName": "魔弹射手 EX",
+        "skillNum": 1,
+        "effects": [
+          {
+            "type": "gainStar",
+            "funcType": "gainStar",
+            "targetType": "self",
+            "valueMax": 200
+          }
+        ]
+      },
+      {
+        "skillName": "蛛丝的尽头 A+++",
+        "skillNum": 2,
+        "effects": [
+          {
+            "type": "gainNp",
+            "funcType": "gainNp",
+            "targetType": "self",
+            "valueMax": 4400
+          }
+        ]
+      },
+      {
+        "skillName": "邪智的魅力 A",
+        "skillNum": 3,
+        "effects": [
+          {
+            "type": "upAtk",
+            "funcType": "addStateShort",
+            "targetType": "party",
+            "valueMax": 200,
+            "turn": 3,
+            "count": -1
+          },
+          {
+            "type": "upAtk",
+            "funcType": "addStateShort",
+            "targetType": "partyOther",
+            "valueMax": 200,
+            "turn": 3,
+            "count": -1
           }
         ]
       }

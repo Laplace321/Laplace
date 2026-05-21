@@ -59,9 +59,13 @@ def effect_qualifier(params: dict) -> str:
     parts: list[str] = []
     target_type = params.get("targetType") or params.get("target_type")
     if target_type == "party":
-        parts.append("给队友的")
+        parts.append("全队的")
+    elif target_type == "partyOther":
+        parts.append("仅队友的")
     elif target_type == "self":
         parts.append("自身的")
+    elif target_type == "ptOne":
+        parts.append("单体队友的")
     elif target_type == "enemy":
         parts.append("对敌方的")
 
@@ -114,14 +118,6 @@ def describe_filters(skill_calls: list[dict]) -> list[str]:
             descriptions.append(f"稀有度 {op_map.get(op, op)} {val}星")
         elif name == "search_by_class":
             descriptions.append(f"职阶 = {params.get('className', '')}")
-        elif name == "search_by_np_charge":
-            op = params.get("op", "gte")
-            val = params.get("value", "")
-            op_map = {"eq": "=", "gte": "≥", "lte": "≤", "gt": ">", "lt": "<"}
-            target_type = params.get("targetType")
-            charge_label_map = {"self": "自充", "ptOne": "他充", "ptAll": "群充"}
-            charge_label = charge_label_map.get(target_type, "NP充能")
-            descriptions.append(f"{charge_label} {op_map.get(op, op)} {val}%")
         elif name == "search_by_cards":
             parts = []
             card = params.get("cardType") or params.get("cards")

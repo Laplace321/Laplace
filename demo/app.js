@@ -74,6 +74,12 @@ const PRESETS = [
     description: "查询戴冠战配队推荐",
     defaultMessage: "剑阶戴冠配队推荐",
   },
+  {
+    name: "ce_query",
+    label: "礼装查询",
+    description: "按效果、稀有度、类型筛选概念礼装",
+    defaultMessage: "有50%NP的礼装有哪些",
+  },
 ];
 
 // === Thinking Step Labels ===

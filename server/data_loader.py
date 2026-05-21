@@ -25,18 +25,6 @@ OUTPUT_DIR = Path(__file__).parent / "data"
 KNOWLEDGE_DIR = Path(__file__).parent / "knowledge"
 CONFIG_DIR = Path(__file__).parent / "config"
 
-# NP 充能相关的 funcType
-GAIN_NP_FUNC_TYPES = {"gainNp"}
-
-# 自充目标类型
-SELF_TARGET_TYPES = {"self"}
-# 全体充能目标类型（包含自身）
-PARTY_TARGET_TYPES = {"ptAll"}
-# 单体他充（可指定自身）
-SINGLE_TARGET_TYPES = {"ptOne"}
-# 所有包含自身的目标类型
-ALL_SELF_TARGETS = SELF_TARGET_TYPES | PARTY_TARGET_TYPES | SINGLE_TARGET_TYPES
-
 SKILL_LV10_INDEX = 9
 
 
@@ -599,51 +587,6 @@ def _digest_noble_phantasms(raw_nps: list[dict]) -> list[dict]:
     return result
 
 
-def extract_np_charges(servant: dict) -> list[dict]:
-    """提取从者所有技能中的 NP 充能效果。
-
-    同一 skillNum 可能因技能强化存在多个版本，仅保留最后出现的
-    （Atlas Academy 数据中强化后版本排在后面）。
-    待办：不同服务器多版本技能的选择逻辑需要产品设计。
-    """
-    # 用 skillNum 作为 key 去重，后出现的覆盖前出现的（即最新版本）
-    charge_by_skill: dict[int, dict] = {}
-    for skill in servant.get("skills", []):
-        if skill.get("type") != "active":
-            continue
-        skill_num = skill.get("num", 0)
-        for func in skill.get("functions", []):
-            if func.get("funcType") not in GAIN_NP_FUNC_TYPES:
-                continue
-            target_type = func.get("funcTargetType", "")
-            if target_type not in ALL_SELF_TARGETS:
-                continue
-            svals = func.get("svals", [])
-            if len(svals) < 10:
-                continue
-            lv10_value = svals[SKILL_LV10_INDEX].get("Value", 0)
-            if lv10_value > 0:
-                charge_by_skill[skill_num] = {
-                    "skillName": skill.get("name", ""),
-                    "skillNum": skill_num,
-                    "chargePercent": lv10_value // 100,
-                    "chargeValue": lv10_value,
-                    "targetType": _classify_charge_target(target_type),
-                }
-    return list(charge_by_skill.values())
-
-
-def _classify_charge_target(func_target_type: str) -> str:
-    """将充能技能的 funcTargetType 分类为三种充能类型。"""
-    if func_target_type in SELF_TARGET_TYPES:
-        return "self"
-    if func_target_type in PARTY_TARGET_TYPES:
-        return "ptAll"
-    if func_target_type in SINGLE_TARGET_TYPES:
-        return "ptOne"
-    return "self"  # fallback
-
-
 def classify_target_type(func_target_type: str) -> str:
     """将 FuncTargetType 分类为简单的目标类型。
 
@@ -661,8 +604,11 @@ def classify_target_type(func_target_type: str) -> str:
     ):
         return "ptOne"
     # 全体队友类（全队含自己）
-    if func_target_type in ("ptAll", "ptFull", "ptOther", "fieldAll"):
+    if func_target_type in ("ptAll", "ptFull", "fieldAll"):
         return "party"
+    # 全体队友（不含自己）
+    if func_target_type == "ptOther":
+        return "partyOther"
     if func_target_type.startswith("pt"):
         return "party"  # 未知 pt* 类型兜底
     if func_target_type.startswith("enemy"):
@@ -767,7 +713,6 @@ def build_database(
     cn_tds = (skill_cn_map or {}).get("tds", {})
 
     for svt in servants:
-        charges = extract_np_charges(svt)
         skill_effects, skill_details = extract_skill_effects(svt, matcher)
 
         # 填充中文技能名（有映射用中文，无映射保留英文原名）
@@ -776,14 +721,31 @@ def build_database(
             if sk_id in cn_skills:
                 sk_detail["skillName"] = cn_skills[sk_id]
 
-        # 计算 NP 充能统计（三分类：self / ptOne / ptAll）
-        self_charges = [c["chargePercent"] for c in charges if c["targetType"] == "self"]
-        pt_one_charges = [c["chargePercent"] for c in charges if c["targetType"] == "ptOne"]
-        pt_all_charges = [c["chargePercent"] for c in charges if c["targetType"] == "ptAll"]
-        max_self_charge = max(self_charges) if self_charges else 0
-        max_pt_one_charge = max(pt_one_charges) if pt_one_charges else 0
-        max_pt_all_charge = max(pt_all_charges) if pt_all_charges else 0
-        total_charge = sum(self_charges) + sum(pt_one_charges) + sum(pt_all_charges)
+        # 从 skillDetails 中计算 totalSelfCharge（自身可获得的 NP 充能总量）
+        # self + party（含自己的全队）+ ptOne（可指定自身）都算入自充
+        # partyOther（不含自己）不算入自充
+        total_self_charge = 0
+        # 同时生成 npCharges（前端卡片展示用，按技能独立条目）
+        # 格式: [{skillNum, chargePercent, targetType}]
+        # targetType 映射: self→self, party→ptAll, ptOne→ptOne, partyOther→ptAll
+        np_charges: list[dict] = []
+        _np_charge_target_map = {"self": "self", "party": "ptAll", "ptOne": "ptOne", "partyOther": "ptAll"}
+        for sk in skill_details:
+            for eff in sk.get("effects", []):
+                if eff.get("type") != "gainNp":
+                    continue
+                tt = eff.get("targetType", "")
+                charge_percent = eff.get("valueMax", 0) // 100  # 千分比→百分比
+                if tt in ("self", "party", "ptOne"):
+                    total_self_charge += charge_percent
+                if charge_percent > 0:
+                    np_charges.append(
+                        {
+                            "skillNum": sk.get("skillNum", 0),
+                            "chargePercent": charge_percent,
+                            "targetType": _np_charge_target_map.get(tt, "self"),
+                        }
+                    )
 
         # 计算卡色构成
         cards_count = {"arts": 0, "buster": 0, "quick": 0}
@@ -901,12 +863,9 @@ def build_database(
             "appendSkillMaterials": svt.get("appendSkillMaterials", {}),
             "costumeMaterials": svt.get("costumeMaterials", {}),
             # Materialized Views（预计算）
-            "npCharges": charges,
-            "maxSelfCharge": max_self_charge,
-            "maxPtOneCharge": max_pt_one_charge,
-            "maxPtAllCharge": max_pt_all_charge,
-            "totalCharge": total_charge,
-            "hasNpCharge": bool(self_charges) or bool(pt_one_charges) or bool(pt_all_charges),
+            "totalSelfCharge": total_self_charge,
+            "npCharges": np_charges,
+            "maxSelfCharge": total_self_charge,
             "skillEffects": sorted(list(skill_effects)),
             "npEffects": sorted(list(np_effects_set)),
             "skillDetails": skill_details,
@@ -918,7 +877,7 @@ def build_database(
 
     print(
         f"   ✅ 构建数据库: {len(db)} 个从者, "
-        f"{sum(1 for s in db if s['hasNpCharge'])} 个有自充, "
+        f"{sum(1 for s in db if s['totalSelfCharge'] > 0)} 个有自充, "
         f"{total_with_effects} 个有效果数据"
     )
     return db
