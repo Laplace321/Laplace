@@ -246,9 +246,18 @@
      ```
      git pull → docker build --build-arg BUILD_VERSION=$(git rev-parse --short HEAD) -t laplace:latest .
      → docker stop laplace → docker rm laplace → docker run（见上方标准命令）
-     → 等待 3s → curl 健康检查 → 确认 200
+     → 健康检查重试（见下方） → 确认 200
      ```
-  5. 如果健康检查失败，立即 `docker logs laplace` 查看错误，禁止无视 502 等异常。
+  5. **健康检查重试机制**：容器启动后可能需要重建数据（从 Atlas API 拉取从者/礼装数据），启动时间 5s~60s 不等。**必须**使用重试而非固定等待：
+     ```bash
+     for i in $(seq 1 12); do
+       STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/health)
+       [ "$STATUS" = "200" ] && echo "✅ Health check passed" && break
+       echo "⏳ Attempt $i: status=$STATUS, waiting 5s..."
+       sleep 5
+     done
+     ```
+     最多重试 12 次（60s）。如果 60s 后仍未 200，立即 `docker logs laplace` 查看错误，禁止无视。
 - **目的**：杜绝因端口映射错误、容器未启动等低级失误导致线上 502 不可用。
 
 ### 12. 前端静态资源部署纪律 (Frontend Asset Deploy Discipline)
