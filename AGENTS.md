@@ -287,6 +287,45 @@
   4. 两个文件的 `version` / 版本信息必须与当前发布版本保持一致。
 - **目的**：确保开发者和 AI Agent 始终能获取到最新的系统架构信息，降低上下文理解成本。
 
+### 14. 更新日志发版流程 (Changelog Release SOP)
+- **准则**：当用户在会话中说"生成本次更新日志"时，AI 必须执行以下标准流程生成面向用户的更新记录。
+- **触发条件**：用户明确表示"生成更新日志"/"发版"/"生成 changelog" 等意图。
+- **执行流程**：
+  1. **确认版本范围**：询问用户本次版本号（如 v0.8），或从 `demo/changelog-data.json` 中读取上一个版本号并自动递增。
+  2. **提取 commit 列表**：执行 `git log --oneline <上次版本最后commit>..HEAD`，获取自上次发版以来的所有 commit。
+     - 如果 `changelog-data.json` 已有记录，通过最近一条记录的日期 + `git log --after` 确定范围。
+     - 如果是首次生成，取所有 commit 或由用户指定起始点。
+  3. **分类汇总**：按 Conventional Commits 前缀分类：
+     - `feat` → features（功能更新）
+     - `fix` → fixes（问题修复）
+     - `docs`/`style`/`refactor`/`test`/`chore` → others（其他）
+     - 忽略纯工程性质的 commit（如 `chore(deploy): bump version`）
+  4. **读取 CHANGELOG.md**：从 `docs/CHANGELOG.md` 最新一行获取概括性标题，作为本次版本的 `title` 字段。
+  5. **LLM 翻译润色**：将分类后的 commit messages 发送给 LLM，要求：
+     - 将英文/技术语言翻译为面向玩家的中文自然语言
+     - 每条生成 `title`（10字以内简称）+ `desc`（一句话描述功能价值）
+     - 合并同一功能的多个 commit 为一条记录
+     - 过滤掉用户不关心的纯工程变更
+  6. **生成 JSON 并追加**：将结果格式化为 JSON 对象，插入到 `demo/changelog-data.json` 的 `versions` 数组头部（最新版本在前）。
+  7. **展示给用户确认**：将生成的 JSON 内容展示给用户，确认无误后写入文件。
+  8. **提交**：`git add demo/changelog-data.json && git commit -m "docs(changelog): add vX.Y release notes" && git push`
+- **LLM 润色 Prompt 模板**：
+  ```
+  你是一个产品更新日志撰写者。请将以下 git commit messages 翻译润色为面向 FGO 玩家的中文更新说明。
+  要求：
+  1. 使用玩家能理解的自然语言，不出现任何技术术语
+  2. 每条生成 title（10字以内）和 desc（一句话说明功能价值）
+  3. 相关联的多个 commit 合并为一条
+  4. 过滤纯工程/部署类变更（用户不关心）
+  
+  Commit 列表：
+  {commits}
+  
+  输出 JSON 格式：
+  {"features": [...], "fixes": [...], "others": [...]}
+  ```
+- **目的**：确保更新日志生成流程标准化、可重复，杜绝手工编写 JSON 的低效和遗漏。
+
 ## 禁止事项
 
 - ❌ 未经确认删除文件或数据

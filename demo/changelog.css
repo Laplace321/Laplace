@@ -1,0 +1,325 @@
+/* ==============================================
+   Laplace — Changelog Page Styles
+   复用主站设计系统（CSS 变量、字体、深色主题）
+   ============================================== */
+
+/* --- CSS Custom Properties (与 style.css 保持一致) --- */
+:root {
+  --bg-primary: #0a0b1a;
+  --bg-secondary: #12142b;
+  --bg-card: #191c3a;
+  --bg-card-hover: #222550;
+  --bg-glass: rgba(25, 28, 58, 0.85);
+
+  --accent-gold: #d4a843;
+  --accent-gold-dim: #9a7a30;
+  --accent-blue: #4a7dff;
+  --accent-purple: #8b5cf6;
+  --accent-cyan: #22d3ee;
+  --accent-green: #34d399;
+
+  --text-primary: #e8e6f0;
+  --text-secondary: #9896a8;
+  --text-muted: #5c5a6e;
+  --text-gold: #f0d78c;
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-gold: rgba(212, 168, 67, 0.3);
+
+  --font-body: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Orbitron', sans-serif;
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 20px rgba(212, 168, 67, 0.15);
+}
+
+/* --- Reset --- */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(138, 92, 246, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(74, 125, 255, 0.06) 0%, transparent 50%);
+}
+
+/* --- Header --- */
+.cl-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-md) var(--space-xl);
+}
+
+.cl-header-content {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.cl-back-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.2s;
+}
+
+.cl-back-link:hover {
+  color: var(--accent-gold);
+}
+
+.cl-logo-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.cl-logo-icon {
+  font-size: 20px;
+  color: var(--accent-gold);
+}
+
+.cl-logo-text h1 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 2px;
+}
+
+.cl-tagline {
+  font-size: 11px;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+}
+
+.cl-header-spacer {
+  flex: 1;
+}
+
+/* --- Main Layout --- */
+.cl-main {
+  flex: 1;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: var(--space-2xl) var(--space-xl);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+/* --- Version Navigation --- */
+.cl-version-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.cl-version-btn {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cl-version-btn:hover {
+  border-color: var(--border-gold);
+  color: var(--text-gold);
+}
+
+.cl-version-btn.active {
+  background: linear-gradient(135deg, rgba(212, 168, 67, 0.15), rgba(212, 168, 67, 0.05));
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+  font-weight: 500;
+}
+
+/* --- Version Content --- */
+.cl-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.cl-loading {
+  text-align: center;
+  color: var(--text-muted);
+  padding: var(--space-2xl);
+}
+
+/* --- Version Header --- */
+.cl-version-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cl-version-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.cl-version-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.cl-version-badge {
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--accent-gold);
+  background: rgba(212, 168, 67, 0.1);
+  border: 1px solid var(--border-gold);
+  padding: 2px 10px;
+  border-radius: var(--radius-sm);
+}
+
+/* --- Section (features / fixes / others) --- */
+.cl-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.cl-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cl-section-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.cl-section--features .cl-section-icon {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--accent-green);
+}
+
+.cl-section--features .cl-section-header {
+  color: var(--accent-green);
+}
+
+.cl-section--fixes .cl-section-icon {
+  background: rgba(251, 146, 60, 0.15);
+  color: #fb923c;
+}
+
+.cl-section--fixes .cl-section-header {
+  color: #fb923c;
+}
+
+.cl-section--others .cl-section-icon {
+  background: rgba(74, 125, 255, 0.15);
+  color: var(--accent-blue);
+}
+
+.cl-section--others .cl-section-header {
+  color: var(--accent-blue);
+}
+
+/* --- Item Card --- */
+.cl-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-md) var(--space-lg);
+  transition: all 0.2s;
+}
+
+.cl-item:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-gold);
+  box-shadow: var(--shadow-glow);
+}
+
+.cl-item-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.cl-item-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* --- Footer --- */
+.cl-footer {
+  text-align: center;
+  padding: var(--space-xl);
+  color: var(--text-muted);
+  font-size: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .cl-main {
+    padding: var(--space-lg) var(--space-md);
+  }
+
+  .cl-version-title {
+    font-size: 20px;
+  }
+
+  .cl-header-content {
+    padding: 0 var(--space-md);
+  }
+}
