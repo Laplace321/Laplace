@@ -13,6 +13,7 @@ Phase 枚举：
   generation_input  → 生成 Prompt 元数据
   generation_output → 生成结果（reply、generation_usage）
   agent_detail   → Agent 兜底详情（rounds、agent_tokens、tool_trace）
+  rating         → 用户评分（bad/ok/good）
   final          → 请求结束（总耗时、mode、total_tokens）
 """
 
@@ -343,3 +344,143 @@ def read_trace_summaries(
     items = summaries[offset : offset + limit]
 
     return {"total": total, "items": items}
+
+
+# ============================================================
+# 统计汇总（BI 面板用）
+# ============================================================
+
+
+def compute_log_stats(days: int = 7) -> dict:
+    """计算最近 N 天的日志统计数据。
+
+    Returns:
+        {
+            "pv": int,              # 总请求数
+            "uv": int,              # 独立 IP 数
+            "paths": [{"path": str, "count": int}, ...],  # 路径分布 Top 10
+            "daily": [{"date": str, "pv": int, "uv": int}, ...],  # 每日趋势
+            "ratings": {"bad": int, "ok": int, "good": int},  # 评分分布
+            "modes": [{"mode": str, "count": int}, ...],  # 模式分布
+        }
+    """
+    from collections import defaultdict
+
+    if not LOG_FILE.exists():
+        return {
+            "pv": 0,
+            "uv": 0,
+            "paths": [],
+            "daily": [],
+            "ratings": {"bad": 0, "ok": 0, "good": 0},
+            "modes": [],
+        }
+
+    cutoff = datetime.now(_BEIJING_TZ) - timedelta(days=days)
+    cutoff_str = cutoff.isoformat()
+
+    # 按 traceId 分组
+    trace_data: dict[str, dict] = {}  # traceId -> aggregated info
+    ratings = {"bad": 0, "ok": 0, "good": 0}
+
+    with open(LOG_FILE, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            timestamp = entry.get("timestamp", "")
+            if timestamp < cutoff_str:
+                continue
+
+            tid = entry.get("traceId")
+            if not tid:
+                continue
+
+            phase = entry.get("phase", "")
+
+            # 评分事件单独计数
+            if phase == "rating":
+                rating_value = entry.get("data", {}).get("rating", "")
+                if rating_value in ratings:
+                    ratings[rating_value] += 1
+                continue
+
+            # 首次出现的 trace 初始化
+            if tid not in trace_data:
+                trace_data[tid] = {
+                    "date": timestamp[:10],  # YYYY-MM-DD
+                    "ip": "",
+                    "query": "",
+                    "mode": "",
+                }
+
+            data = entry.get("data", {})
+            if phase == "routing_input":
+                trace_data[tid]["query"] = data.get("query", "")
+                trace_data[tid]["ip"] = data.get("client_ip", "")
+            elif phase == "final":
+                trace_data[tid]["mode"] = data.get("mode", "")
+
+            # 旧模式兼容
+            if not trace_data[tid]["query"] and "query" in entry:
+                trace_data[tid]["query"] = entry["query"]
+
+    # 统计汇总
+    daily_pv: dict[str, int] = defaultdict(int)
+    daily_ips: dict[str, set] = defaultdict(set)
+    mode_counts: dict[str, int] = defaultdict(int)
+    path_counts: dict[str, int] = defaultdict(int)
+    all_ips: set = set()
+
+    for tid, info in trace_data.items():
+        date = info["date"]
+        ip = info["ip"] or tid[:8]  # 无 IP 时用 traceId 前缀模拟
+        query = info["query"]
+        mode = info["mode"] or "unknown"
+
+        daily_pv[date] += 1
+        daily_ips[date].add(ip)
+        all_ips.add(ip)
+        mode_counts[mode] += 1
+
+        # 路径统计：使用 query 的前 20 字符作为"路径"
+        path_key = query[:20] if query else "(empty)"
+        path_counts[path_key] += 1
+
+    # 组装结果
+    pv = len(trace_data)
+    uv = len(all_ips)
+
+    # 日期趋势（按日期排序）
+    daily = sorted(
+        [{"date": d, "pv": daily_pv[d], "uv": len(daily_ips[d])} for d in daily_pv],
+        key=lambda x: x["date"],
+    )
+
+    # 路径分布 Top 10
+    paths = sorted(
+        [{"path": p, "count": c} for p, c in path_counts.items()],
+        key=lambda x: x["count"],
+        reverse=True,
+    )[:10]
+
+    # 模式分布
+    modes = sorted(
+        [{"mode": m, "count": c} for m, c in mode_counts.items()],
+        key=lambda x: x["count"],
+        reverse=True,
+    )
+
+    return {
+        "pv": pv,
+        "uv": uv,
+        "paths": paths,
+        "daily": daily,
+        "ratings": ratings,
+        "modes": modes,
+    }

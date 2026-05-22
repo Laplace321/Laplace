@@ -544,6 +544,10 @@ function handleDone(data, els) {
     lastTraceId = data.traceId;
     updateDebugPanel();
   }
+  // 追加评分按钮组
+  if (els && data.traceId) {
+    appendRatingButtons(els.container, data.traceId);
+  }
   // 追踪助手回复到历史（保存完整 HTML 快照以保留样式）
   if (els) {
     const bubbleEl = els.container.querySelector(".message-bubble");
@@ -551,6 +555,44 @@ function handleDone(data, els) {
     chatHistory.push({ role: "assistant", html });
     saveSession();
   }
+}
+
+// === Rating Buttons ===
+function appendRatingButtons(messageEl, traceId) {
+  const bubble = messageEl.querySelector(".message-bubble");
+  if (!bubble) return;
+
+  const group = document.createElement("div");
+  group.className = "rating-group";
+  group.innerHTML = `
+    <span class="rating-label">这个回答对你有帮助吗？</span>
+    <button class="rating-btn" data-rating="bad" title="糟糕">👎 糟糕</button>
+    <button class="rating-btn" data-rating="ok" title="一般">👌 一般</button>
+    <button class="rating-btn" data-rating="good" title="优秀">👍 优秀</button>
+  `;
+
+  group.querySelectorAll(".rating-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const rating = btn.dataset.rating;
+      // Disable all buttons and highlight selected
+      group.querySelectorAll(".rating-btn").forEach((b) => {
+        b.disabled = true;
+        b.classList.toggle("active", b === btn);
+      });
+      group.querySelector(".rating-label").textContent = "感谢反馈！";
+      try {
+        await fetch("/api/rate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trace_id: traceId, rating }),
+        });
+      } catch (err) {
+        console.error("Rating failed:", err);
+      }
+    });
+  });
+
+  bubble.appendChild(group);
 }
 
 // === Handle Error Event ===

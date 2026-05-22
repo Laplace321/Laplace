@@ -117,6 +117,14 @@ async def admin_list_logs(
     return read_trace_summaries(limit=limit, offset=offset, keyword=keyword)
 
 
+@app.get("/api/admin/logs/stats")
+async def admin_logs_stats(days: int = 7, _=Depends(require_admin)):
+    """日志统计汇总（PV/UV/路径分布/日期趋势/评分分布）。"""
+    from server.logger import compute_log_stats
+
+    return compute_log_stats(days=days)
+
+
 @app.get("/api/admin/logs/{trace_id}")
 async def admin_get_log(trace_id: str, _=Depends(require_admin)):
     """单条 trace 的完整多阶段详情（需要 Admin 登录）。"""
@@ -124,6 +132,27 @@ async def admin_get_log(trace_id: str, _=Depends(require_admin)):
     if trace is None:
         return JSONResponse(status_code=404, content={"error": f"trace {trace_id} 未找到"})
     return trace
+
+
+# ── 评分 API（无需鉴权，用户侧操作）──
+
+
+class RateRequest(BaseModel):
+    """用户评分请求。"""
+
+    trace_id: str
+    rating: str  # "bad" | "ok" | "good"
+
+
+@app.post("/api/rate")
+async def rate_response(body: RateRequest):
+    """记录用户对 AI 回复的评分（糟糕/一般/优秀）。"""
+    if body.rating not in ("bad", "ok", "good"):
+        return JSONResponse(status_code=400, content={"error": "rating 必须为 bad/ok/good"})
+    from server.logger import log_trace_event
+
+    await log_trace_event(body.trace_id, "rating", {"rating": body.rating})
+    return {"ok": True}
 
 
 def _validate_translations():

@@ -90,12 +90,13 @@ class TestEnvAPI:
             f.write("TEST_VAR=hello\n")
             tmp_path = Path(f.name)
         try:
-            with patch("server.admin.routes._get_env_path", return_value=tmp_path):
+            with patch("server.admin.routes._LOCAL_ENV_PATH", tmp_path):
                 cookies = _login()
                 resp = client.get("/api/admin/env", cookies=cookies)
                 assert resp.status_code == 200
                 data = resp.json()
                 assert "content" in data
+                assert data["source"] == "file"
         finally:
             tmp_path.unlink(missing_ok=True)
 
