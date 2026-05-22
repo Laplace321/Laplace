@@ -9,6 +9,7 @@ const PAGE_SIZE = 50;
 let currentOffset = 0;
 let currentTotal = 0;
 let currentKeyword = "";
+let currentRating = "";
 
 // === DOM Refs ===
 const searchInput = document.getElementById("search-input");
@@ -61,6 +62,16 @@ function getModeClass(mode) {
   return "mode-fallback";
 }
 
+function getRatingLabel(rating) {
+  const map = { good: "优秀", ok: "一般", bad: "糟糕" };
+  return map[rating] || "-";
+}
+
+function getRatingClass(rating) {
+  if (!rating) return "";
+  return `rating-${rating}`;
+}
+
 function formatTokens(tokens) {
   if (tokens == null || tokens === 0) return "-";
   return tokens.toLocaleString();
@@ -78,11 +89,11 @@ async function fetchLogs() {
       offset: currentOffset,
     });
     if (currentKeyword) params.set("keyword", currentKeyword);
+    if (currentRating) params.set("rating", currentRating);
 
     const resp = await fetch(`${API_BASE}?${params}`);
     if (resp.status === 401) {
-      // 未登录，跳转到 admin 登录页
-      window.location.href = "/admin/";
+      window.location.href = "/admin/?redirect=/logs.html";
       return;
     }
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -122,12 +133,16 @@ function renderLogs(items) {
     const modeClass = getModeClass(item.mode);
     const tokens = formatTokens(item.total_tokens);
 
+    const ratingLabel = getRatingLabel(item.rating);
+    const ratingClass = getRatingClass(item.rating);
+
     return `<tr data-trace-id="${escapeHtml(item.traceId)}">
       <td class="time-cell">${time}</td>
       <td><span class="trace-id">${escapeHtml(item.traceId)}</span></td>
       <td><span class="query-text" title="${query}">${query}</span></td>
       <td style="text-align:center"><span class="status-badge ${statusClass}">${statusLabel}</span></td>
       <td style="text-align:center"><span class="mode-badge ${modeClass}">${modeLabel}</span></td>
+      <td style="text-align:center"><span class="rating-badge ${ratingClass}">${ratingLabel}</span></td>
       <td style="text-align:right"><span class="tokens">${tokens}</span></td>
       <td style="text-align:right"><span class="duration">${duration}</span></td>
     </tr>`;
@@ -199,7 +214,7 @@ async function showDetail(traceId) {
   try {
     const resp = await fetch(`${API_BASE}/${encodeURIComponent(traceId)}`);
     if (resp.status === 401) {
-      window.location.href = "/admin/";
+      window.location.href = "/admin/?redirect=/logs.html";
       return;
     }
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -271,9 +286,22 @@ searchInput.addEventListener("keydown", e => {
 clearSearchBtn.addEventListener("click", () => {
   searchInput.value = "";
   currentKeyword = "";
+  currentRating = "";
+  const ratingFilter = document.getElementById("rating-filter");
+  if (ratingFilter) ratingFilter.value = "";
   currentOffset = 0;
   fetchLogs();
 });
+
+// Rating filter
+const ratingFilter = document.getElementById("rating-filter");
+if (ratingFilter) {
+  ratingFilter.addEventListener("change", () => {
+    currentRating = ratingFilter.value;
+    currentOffset = 0;
+    fetchLogs();
+  });
+}
 
 // Pagination
 prevBtn.addEventListener("click", () => {
@@ -338,7 +366,7 @@ async function fetchStats() {
   try {
     const resp = await fetch(`${API_BASE}/stats?days=${days}`);
     if (resp.status === 401) {
-      window.location.href = "/admin/";
+      window.location.href = "/admin/?redirect=/logs.html";
       return;
     }
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -354,6 +382,7 @@ function renderStats(data) {
   document.getElementById("kpi-pv").textContent = data.pv.toLocaleString();
   document.getElementById("kpi-uv").textContent = data.uv.toLocaleString();
   document.getElementById("kpi-rating-good").textContent = data.ratings.good.toLocaleString();
+  document.getElementById("kpi-rating-ok").textContent = data.ratings.ok.toLocaleString();
   document.getElementById("kpi-rating-bad").textContent = data.ratings.bad.toLocaleString();
 
   // Daily Trend Chart (CSS bar chart)

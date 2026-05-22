@@ -252,8 +252,12 @@ def read_trace_summaries(
     limit: int = 50,
     offset: int = 0,
     keyword: str | None = None,
+    rating: str | None = None,
 ) -> dict:
-    """按 traceId 聚合日志，返回摘要列表（分页 + 可选关键词过滤）。
+    """按 traceId 聚合日志，返回摘要列表（分页 + 可选关键词/评分过滤）。
+
+    Args:
+        rating: 可选评分筛选，值为 "good" / "ok" / "bad"
 
     Returns:
         {"total": int, "items": [{"traceId", "timestamp", "query", "status", "duration_ms"}, ...]}
@@ -290,12 +294,16 @@ def read_trace_summaries(
         mode = None
         total_tokens = None
 
+        trace_rating = None
+
         for e in events:
             phase = e.get("phase", "")
             data = e.get("data", {})
             if phase == "routing_input":
                 query = data.get("query", "")
                 timestamp = e.get("timestamp", timestamp)
+            elif phase == "rating":
+                trace_rating = data.get("rating")
             elif phase == "final":
                 status = data.get("result", "unknown")
                 duration_ms = data.get("total_time_ms")
@@ -323,6 +331,7 @@ def read_trace_summaries(
                 "error": error_msg,
                 "mode": mode,
                 "total_tokens": total_tokens,
+                "rating": trace_rating,
             }
         )
 
@@ -339,6 +348,10 @@ def read_trace_summaries(
             or kw in s.get("traceId", "").lower()
             or kw in (s.get("error") or "").lower()
         ]
+
+    # 5. 评分过滤
+    if rating:
+        summaries = [s for s in summaries if s.get("rating") == rating]
 
     total = len(summaries)
     items = summaries[offset : offset + limit]
@@ -439,7 +452,7 @@ def compute_log_stats(days: int = 7) -> dict:
 
     for tid, info in trace_data.items():
         date = info["date"]
-        ip = info["ip"] or tid[:8]  # 无 IP 时用 traceId 前缀模拟
+        ip = info["ip"] or "unknown"  # 无 IP 时统一归为同一未知用户
         query = info["query"]
         mode = info["mode"] or "unknown"
 

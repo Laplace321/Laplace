@@ -566,9 +566,9 @@ function appendRatingButtons(messageEl, traceId) {
   group.className = "rating-group";
   group.innerHTML = `
     <span class="rating-label">这个回答对你有帮助吗？</span>
-    <button class="rating-btn" data-rating="bad" title="糟糕">👎 糟糕</button>
-    <button class="rating-btn" data-rating="ok" title="一般">👌 一般</button>
-    <button class="rating-btn" data-rating="good" title="优秀">👍 优秀</button>
+    <button class="rating-btn" data-rating="bad" title="糟糕"><span class="rating-emoji">👎</span> 糟糕</button>
+    <button class="rating-btn" data-rating="ok" title="一般"><span class="rating-emoji">👌</span> 一般</button>
+    <button class="rating-btn" data-rating="good" title="优秀"><span class="rating-emoji">👍</span> 优秀</button>
   `;
 
   group.querySelectorAll(".rating-btn").forEach((btn) => {

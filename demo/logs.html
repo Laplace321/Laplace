@@ -21,6 +21,7 @@
         </div>
       </div>
       <div class="header-actions">
+        <a href="/admin/" class="back-link">管理后台</a>
         <a href="/" class="back-link">← 返回主页</a>
       </div>
     </div>
@@ -60,6 +61,10 @@
         <div class="kpi-label">优秀评分</div>
       </div>
       <div class="kpi-card">
+        <div class="kpi-value" id="kpi-rating-ok">-</div>
+        <div class="kpi-label">一般评分</div>
+      </div>
+      <div class="kpi-card">
         <div class="kpi-value" id="kpi-rating-bad">-</div>
         <div class="kpi-label">糟糕评分</div>
       </div>
@@ -93,6 +98,12 @@
   <div id="search-area">
     <div class="search-wrapper">
       <input type="text" id="search-input" placeholder="输入 traceId 或关键词搜索..." autocomplete="off">
+      <select id="rating-filter">
+        <option value="">全部评分</option>
+        <option value="good">优秀</option>
+        <option value="ok">一般</option>
+        <option value="bad">糟糕</option>
+      </select>
       <button id="search-btn" title="搜索">搜索</button>
       <button id="clear-search-btn" class="secondary-btn" title="清空">清空</button>
     </div>
@@ -109,6 +120,7 @@
           <th class="col-query">用户查询</th>
           <th class="col-status">状态</th>
           <th class="col-mode">模式</th>
+          <th class="col-rating">评分</th>
           <th class="col-tokens">Tokens</th>
           <th class="col-duration">耗时</th>
         </tr>

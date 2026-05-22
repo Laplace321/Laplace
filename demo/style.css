@@ -1288,44 +1288,69 @@ body {
 .rating-group {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border-subtle);
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .rating-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
-  margin-right: 4px;
+  margin-right: 6px;
+  letter-spacing: 0.02em;
 }
 
 .rating-btn {
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
-  background: transparent;
-  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
   font-size: 12px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  line-height: 1;
+}
+
+.rating-btn .rating-emoji {
+  font-size: 13px;
+  transition: transform 0.25s;
 }
 
 .rating-btn:hover:not(:disabled) {
-  border-color: var(--accent-gold-dim);
+  border-color: rgba(212, 168, 67, 0.4);
   color: var(--text-primary);
-  background: rgba(212, 168, 67, 0.08);
+  background: rgba(212, 168, 67, 0.06);
+  transform: translateY(-1px);
+}
+
+.rating-btn:hover:not(:disabled) .rating-emoji {
+  transform: scale(1.15);
+}
+
+.rating-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .rating-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
 }
 
 .rating-btn.active {
   opacity: 1;
   border-color: var(--accent-gold);
   color: var(--accent-gold);
-  background: rgba(212, 168, 67, 0.12);
+  background: rgba(212, 168, 67, 0.1);
+  box-shadow: 0 0 8px rgba(212, 168, 67, 0.15);
 }
-EOF; __aone_exit=$?; pwd -P > '/var/folders/_j/vgh5x4fx2w7db322q0g8_0s40000gp/T/aone-copilot-cwd-1779442785799-9fdbemxhl5.txt' 2>/dev/null; exit $__aone_exit
+
+.rating-btn.active .rating-emoji {
+  transform: scale(1.1);
+}

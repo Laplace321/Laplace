@@ -50,6 +50,7 @@ async def handle_skill_mode(
     trace_id: str,
     skill_calls: list[dict] | None = None,
     response_skill_name: str = "respond_servant_list",
+    client_ip: str = "unknown",
 ) -> ChatResponse:
     """Skill 模式的核心处理逻辑。
 
@@ -72,6 +73,7 @@ async def handle_skill_mode(
                 "source": "direct",
                 "mode": "oneshot_direct",
                 "skill_count": len(skill_calls),
+                "client_ip": client_ip,
             },
         )
         await log_trace_event(
@@ -101,6 +103,7 @@ async def handle_skill_mode(
                 "mode": "oneshot_llm",
                 "routing_prompt_length": len(routing_prompt),
                 "skill_count": len(skill_descriptions),
+                "client_ip": client_ip,
             },
         )
 
@@ -498,7 +501,7 @@ async def handle_skill_mode(
     )
 
 
-async def stream_event_generator(message: str, preset_name: str | None = None):
+async def stream_event_generator(message: str, preset_name: str | None = None, *, client_ip: str = "unknown"):
     """SSE 流式事件生成器 — 分阶段推送思考过程和结果。
 
     从 main.py chat_stream() 内部的 event_generator() 抽取。
@@ -584,6 +587,7 @@ async def stream_event_generator(message: str, preset_name: str | None = None):
                 "source": "preset",
                 "preset_name": preset_name,
                 "skill_count": len(skill_calls),
+                "client_ip": client_ip,
             },
         )
 
@@ -627,6 +631,7 @@ async def stream_event_generator(message: str, preset_name: str | None = None):
                 "mode": "oneshot_llm",
                 "routing_prompt_length": len(routing_prompt),
                 "skill_count": len(skill_descriptions),
+                "client_ip": client_ip,
             },
         )
 

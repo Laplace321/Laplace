@@ -15,6 +15,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const res = await fetch(`${API}/me`);
     const data = await res.json();
     if (data.logged_in) {
+        const redirect = new URLSearchParams(window.location.search).get('redirect');
+        if (redirect && redirect.startsWith('/')) {
+            window.location.href = redirect;
+            return;
+        }
         showAdminPage();
     }
 
@@ -51,6 +56,11 @@ async function handleLogin(e) {
         });
         const data = await res.json();
         if (res.ok) {
+            const redirect = new URLSearchParams(window.location.search).get('redirect');
+            if (redirect && redirect.startsWith('/')) {
+                window.location.href = redirect;
+                return;
+            }
             showAdminPage();
         } else {
             errorEl.textContent = data.detail || '登录失败';
@@ -230,4 +240,3 @@ function setStatus(elId, msg, type) {
     el.textContent = msg;
     el.className = 'status-msg' + (type ? ` ${type}` : '');
 }
-EOF; __aone_exit=$?; pwd -P > '/var/folders/_j/vgh5x4fx2w7db322q0g8_0s40000gp/T/aone-copilot-cwd-1779442469214-h8vgs5y13ow.txt' 2>/dev/null; exit $__aone_exit
