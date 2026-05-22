@@ -27,7 +27,7 @@ MAX_RESULTS = 50
 TARGET_TYPE_MAP = {
     "self": "自身",
     "party": "全队",
-    "ptOne": "单体队友",
+    "ptOne": "单体（含自身）",
     "enemy": "敌方",
     "other": "其他",
 }
@@ -224,7 +224,7 @@ def build_context(
             "职阶": class_map.get(str(raw_class_name).lower(), raw_class_name),
             "稀有度": s.get("rarity"),
             "配卡": s.get("cards"),
-            "总充能": s.get("totalCharge"),
+            "总充能": s.get("totalSelfCharge"),
             "宝具卡色": np_card_map.get(str(raw_np_card).lower(), raw_np_card),
             "宝具目标": np_target_map.get(str(raw_np_target).lower(), raw_np_target),
             "技能效果": translated_effects,

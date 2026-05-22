@@ -409,7 +409,7 @@ def fetch_normal_servants() -> list[dict]:
     resp = requests.get(NICE_SERVANT_URL, timeout=120)
     resp.raise_for_status()
     servants = resp.json()
-    normal = [s for s in servants if s.get("type") == "normal" and s.get("collectionNo", 0) > 0]
+    normal = [s for s in servants if s.get("type") in ("normal", "heroine") and s.get("collectionNo", 0) > 0]
     print(f"   ✅ 获取到 {len(normal)} 个从者")
     return normal
 
