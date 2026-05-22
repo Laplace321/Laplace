@@ -1283,3 +1283,74 @@ body {
   font-size: 10px;
   color: var(--text-muted);
 }
+
+/* --- Rating Buttons --- */
+.rating-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rating-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-right: 6px;
+  letter-spacing: 0.02em;
+}
+
+.rating-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  line-height: 1;
+}
+
+.rating-btn .rating-emoji {
+  font-size: 13px;
+  transition: transform 0.25s;
+}
+
+.rating-btn:hover:not(:disabled) {
+  border-color: rgba(212, 168, 67, 0.4);
+  color: var(--text-primary);
+  background: rgba(212, 168, 67, 0.06);
+  transform: translateY(-1px);
+}
+
+.rating-btn:hover:not(:disabled) .rating-emoji {
+  transform: scale(1.15);
+}
+
+.rating-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.rating-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+
+.rating-btn.active {
+  opacity: 1;
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+  background: rgba(212, 168, 67, 0.1);
+  box-shadow: 0 0 8px rgba(212, 168, 67, 0.15);
+}
+
+.rating-btn.active .rating-emoji {
+  transform: scale(1.1);
+}

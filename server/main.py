@@ -111,10 +111,19 @@ async def admin_list_logs(
     limit: int = 50,
     offset: int = 0,
     keyword: str | None = None,
+    rating: str | None = None,
     _=Depends(require_admin),
 ):
-    """日志列表（分页 + 关键词搜索，需要 Admin 登录）。"""
-    return read_trace_summaries(limit=limit, offset=offset, keyword=keyword)
+    """日志列表（分页 + 关键词搜索 + 评分筛选，需要 Admin 登录）。"""
+    return read_trace_summaries(limit=limit, offset=offset, keyword=keyword, rating=rating)
+
+
+@app.get("/api/admin/logs/stats")
+async def admin_logs_stats(days: int = 7, _=Depends(require_admin)):
+    """日志统计汇总（PV/UV/路径分布/日期趋势/评分分布）。"""
+    from server.logger import compute_log_stats
+
+    return compute_log_stats(days=days)
 
 
 @app.get("/api/admin/logs/{trace_id}")
@@ -124,6 +133,27 @@ async def admin_get_log(trace_id: str, _=Depends(require_admin)):
     if trace is None:
         return JSONResponse(status_code=404, content={"error": f"trace {trace_id} 未找到"})
     return trace
+
+
+# ── 评分 API（无需鉴权，用户侧操作）──
+
+
+class RateRequest(BaseModel):
+    """用户评分请求。"""
+
+    trace_id: str
+    rating: str  # "bad" | "ok" | "good"
+
+
+@app.post("/api/rate")
+async def rate_response(body: RateRequest):
+    """记录用户对 AI 回复的评分（糟糕/一般/优秀）。"""
+    if body.rating not in ("bad", "ok", "good"):
+        return JSONResponse(status_code=400, content={"error": "rating 必须为 bad/ok/good"})
+    from server.logger import log_trace_event
+
+    await log_trace_event(body.trace_id, "rating", {"rating": body.rating})
+    return {"ok": True}
 
 
 def _validate_translations():
@@ -165,10 +195,13 @@ async def startup():
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, raw_request: Request):
     """处理用户对话请求（Skill-Based Architecture）。"""
     user_message = request.message
     trace_id = uuid.uuid4().hex[:8]
+    client_ip = raw_request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
+        raw_request.client.host if raw_request.client else "unknown"
+    )
 
     # 确定 skill_calls 来源：preset > params > LLM 路由
     resolved_skill_calls: list[dict] | None = None
@@ -261,19 +294,25 @@ async def chat(request: ChatRequest):
         trace_id=trace_id,
         skill_calls=resolved_skill_calls,  # None 则走 LLM 路由
         response_skill_name=resolved_response_skill,
+        client_ip=client_ip,
     )
 
 
 @app.get("/api/chat/stream")
-async def chat_stream(message: str, preset_name: str | None = None):
+async def chat_stream(request: Request, message: str, preset_name: str | None = None):
     """SSE 流式对话端点 — 分阶段推送思考过程和结果。
 
     使用 Skill-Based Architecture：Stage 1 LLM 路由 → SkillExecutor → RAG 生成。
     支持 preset_name 参数：有值时跳过 LLM 路由，直接展开预设 skill_calls。
     """
+    client_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip() or request.client.host
+        if request.client
+        else "unknown"
+    )
 
     async def event_generator():
-        async for event in stream_event_generator(message, preset_name):
+        async for event in stream_event_generator(message, preset_name, client_ip=client_ip):
             yield event
 
     return StreamingResponse(

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Laplace — 日志查看</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Orbitron:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+  <link href="https://fonts.loli.net/css2?family=Noto+Sans+SC:wght@400;500;700&family=Orbitron:wght@600;700&display=swap" rel="stylesheet" crossorigin>
   <link rel="stylesheet" href="logs.css">
 </head>
 <body>
@@ -21,15 +21,89 @@
         </div>
       </div>
       <div class="header-actions">
+        <a href="/admin/" class="back-link">管理后台</a>
         <a href="/" class="back-link">← 返回主页</a>
       </div>
     </div>
   </header>
 
+  <!-- View Tabs -->
+  <nav id="view-tabs">
+    <button class="view-tab active" data-view="detail">明细查询</button>
+    <button class="view-tab" data-view="stats">统计面板</button>
+  </nav>
+
+  <!-- BI Stats Panel -->
+  <section id="stats-panel" class="view-section hidden">
+    <div class="stats-header">
+      <h2>数据概览</h2>
+      <div class="stats-period">
+        <select id="stats-days">
+          <option value="7">近 7 天</option>
+          <option value="14">近 14 天</option>
+          <option value="30">近 30 天</option>
+        </select>
+        <button id="stats-refresh-btn" class="secondary-btn">刷新</button>
+      </div>
+    </div>
+    <!-- KPI Cards -->
+    <div class="stats-kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpi-pv">-</div>
+        <div class="kpi-label">总请求 (PV)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpi-uv">-</div>
+        <div class="kpi-label">独立用户 (UV)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpi-rating-good">-</div>
+        <div class="kpi-label">优秀评分</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpi-rating-ok">-</div>
+        <div class="kpi-label">一般评分</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpi-rating-bad">-</div>
+        <div class="kpi-label">糟糕评分</div>
+      </div>
+    </div>
+    <!-- Charts Row -->
+    <div class="stats-charts-row">
+      <div class="chart-card">
+        <h3>每日趋势</h3>
+        <div class="chart-body" id="chart-daily"></div>
+      </div>
+      <div class="chart-card">
+        <h3>评分分布</h3>
+        <div class="chart-body" id="chart-ratings"></div>
+      </div>
+    </div>
+    <div class="stats-charts-row">
+      <div class="chart-card">
+        <h3>路径 Top 10</h3>
+        <div class="chart-body" id="chart-paths"></div>
+      </div>
+      <div class="chart-card">
+        <h3>模式分布</h3>
+        <div class="chart-body" id="chart-modes"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Detail View (existing) -->
+  <section id="detail-view" class="view-section">
   <!-- Search Bar -->
   <div id="search-area">
     <div class="search-wrapper">
       <input type="text" id="search-input" placeholder="输入 traceId 或关键词搜索..." autocomplete="off">
+      <select id="rating-filter">
+        <option value="">全部评分</option>
+        <option value="good">优秀</option>
+        <option value="ok">一般</option>
+        <option value="bad">糟糕</option>
+      </select>
       <button id="search-btn" title="搜索">搜索</button>
       <button id="clear-search-btn" class="secondary-btn" title="清空">清空</button>
     </div>
@@ -46,6 +120,7 @@
           <th class="col-query">用户查询</th>
           <th class="col-status">状态</th>
           <th class="col-mode">模式</th>
+          <th class="col-rating">评分</th>
           <th class="col-tokens">Tokens</th>
           <th class="col-duration">耗时</th>
         </tr>
@@ -64,6 +139,7 @@
     <span id="page-info"></span>
     <button id="next-btn" disabled>下一页</button>
   </div>
+  </section><!-- /detail-view -->
 
   <!-- Detail Modal -->
   <div id="detail-modal" class="modal hidden">

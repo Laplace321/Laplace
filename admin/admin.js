@@ -1,13 +1,13 @@
 /**
  * Laplace Admin — 后台管理前端逻辑
+ * 深色主题版，仅保留环境变量 + 配置文件管理
  */
 
 const API = '/api/admin';
 
 // ── 页面状态 ──
 let currentConfigFile = null;
-let logsPage = 0;
-const LOGS_PER_PAGE = 50;
+let envSource = 'file'; // "file" or "environ"
 
 // ── 初始化 ──
 document.addEventListener('DOMContentLoaded', async () => {
@@ -15,6 +15,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const res = await fetch(`${API}/me`);
     const data = await res.json();
     if (data.logged_in) {
+        const redirect = new URLSearchParams(window.location.search).get('redirect');
+        if (redirect && redirect.startsWith('/')) {
+            window.location.href = redirect;
+            return;
+        }
         showAdminPage();
     }
 
@@ -33,17 +38,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 配置文件
     document.getElementById('config-save-btn').addEventListener('click', saveConfig);
-
-    // 日志
-    document.getElementById('logs-search-btn').addEventListener('click', () => { logsPage = 0; loadLogs(); });
-    document.getElementById('logs-refresh-btn').addEventListener('click', () => { logsPage = 0; loadLogs(); });
-    document.getElementById('logs-prev').addEventListener('click', () => { if (logsPage > 0) { logsPage--; loadLogs(); } });
-    document.getElementById('logs-next').addEventListener('click', () => { logsPage++; loadLogs(); });
-    document.getElementById('logs-keyword').addEventListener('keydown', (e) => { if (e.key === 'Enter') { logsPage = 0; loadLogs(); } });
-
-    // 弹窗关闭
-    document.querySelector('.modal-close').addEventListener('click', closeModal);
-    document.getElementById('log-detail-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeModal(); });
 });
 
 // ── 登录/登出 ──
@@ -62,6 +56,11 @@ async function handleLogin(e) {
         });
         const data = await res.json();
         if (res.ok) {
+            const redirect = new URLSearchParams(window.location.search).get('redirect');
+            if (redirect && redirect.startsWith('/')) {
+                window.location.href = redirect;
+                return;
+            }
             showAdminPage();
         } else {
             errorEl.textContent = data.detail || '登录失败';
@@ -83,7 +82,6 @@ function showAdminPage() {
     document.getElementById('admin-page').style.display = 'block';
     loadEnv();
     loadConfigList();
-    loadLogs();
 }
 
 // ── Tab 切换 ──
@@ -100,13 +98,34 @@ async function loadEnv() {
         const res = await fetch(`${API}/env`);
         if (res.status === 401) { handleLogout(); return; }
         const data = await res.json();
-        document.getElementById('env-editor').value = data.content;
+        const editor = document.getElementById('env-editor');
+        const hintEl = document.getElementById('env-source-hint');
+        const saveBtn = document.getElementById('env-save-btn');
+
+        editor.value = data.content;
+        envSource = data.source || 'file';
+
+        if (envSource === 'environ') {
+            // 环境变量注入模式：只读
+            editor.readOnly = true;
+            saveBtn.disabled = true;
+            hintEl.textContent = '⚠ 当前为 --env-file 注入模式（无 .env 文件实体），环境变量只读。如需编辑，请在部署时挂载 volume。';
+            hintEl.style.display = 'block';
+        } else {
+            editor.readOnly = false;
+            saveBtn.disabled = false;
+            hintEl.style.display = 'none';
+        }
     } catch (err) {
         setStatus('env-status', '加载失败: ' + err.message, 'error');
     }
 }
 
 async function saveEnv() {
+    if (envSource === 'environ') {
+        setStatus('env-status', '当前为注入模式，无法保存', 'error');
+        return;
+    }
     const content = document.getElementById('env-editor').value;
     try {
         const res = await fetch(`${API}/env`, {
@@ -174,7 +193,6 @@ async function loadConfig(filename, liEl) {
     try {
         const res = await fetch(`${API}/config/${filename}`);
         const data = await res.json();
-        // 格式化 JSON 显示
         try {
             const parsed = JSON.parse(data.content);
             document.getElementById('config-editor').value = JSON.stringify(parsed, null, 2);
@@ -191,7 +209,6 @@ async function saveConfig() {
     if (!currentConfigFile) return;
     const content = document.getElementById('config-editor').value;
 
-    // 前端 JSON 校验
     try {
         JSON.parse(content);
     } catch (e) {
@@ -216,79 +233,10 @@ async function saveConfig() {
     }
 }
 
-// ── 日志查看 ──
-
-async function loadLogs() {
-    const keyword = document.getElementById('logs-keyword').value;
-    const offset = logsPage * LOGS_PER_PAGE;
-
-    try {
-        let url = `${API}/logs?limit=${LOGS_PER_PAGE}&offset=${offset}`;
-        if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
-        const res = await fetch(url);
-        if (res.status === 401) { handleLogout(); return; }
-        const data = await res.json();
-        const traces = data.traces || data;
-
-        const tbody = document.getElementById('logs-tbody');
-        tbody.innerHTML = '';
-
-        if (Array.isArray(traces)) {
-            traces.forEach(t => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${formatTime(t.timestamp)}</td>
-                    <td><code>${(t.traceId || '').substring(0, 8)}</code></td>
-                    <td>${escapeHtml(t.query || t.message || '-')}</td>
-                    <td>${t.mode || '-'}</td>
-                    <td>${t.total_tokens || '-'}</td>
-                `;
-                tr.addEventListener('click', () => showLogDetail(t.traceId));
-                tbody.appendChild(tr);
-            });
-        }
-
-        document.getElementById('logs-prev').disabled = logsPage === 0;
-        document.getElementById('logs-page-info').textContent = `第 ${logsPage + 1} 页`;
-        document.getElementById('logs-next').disabled = !Array.isArray(traces) || traces.length < LOGS_PER_PAGE;
-    } catch (err) {
-        console.error('加载日志失败:', err);
-    }
-}
-
-async function showLogDetail(traceId) {
-    if (!traceId) return;
-    try {
-        const res = await fetch(`${API}/logs/${traceId}`);
-        const data = await res.json();
-        document.getElementById('log-detail-content').textContent = JSON.stringify(data, null, 2);
-        document.getElementById('log-detail-modal').style.display = 'flex';
-    } catch (err) {
-        alert('加载详情失败: ' + err.message);
-    }
-}
-
-function closeModal() {
-    document.getElementById('log-detail-modal').style.display = 'none';
-}
-
 // ── 工具函数 ──
 
 function setStatus(elId, msg, type) {
     const el = document.getElementById(elId);
     el.textContent = msg;
     el.className = 'status-msg' + (type ? ` ${type}` : '');
-}
-
-function formatTime(ts) {
-    if (!ts) return '-';
-    try {
-        const d = new Date(ts);
-        return d.toLocaleString('zh-CN', { hour12: false });
-    } catch { return ts; }
-}
-
-function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

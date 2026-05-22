@@ -22,11 +22,49 @@ _LOCAL_ENV_PATH = Path(__file__).parent.parent.parent / ".env"  # 本地开发�
 _CONFIG_DIR = Path(__file__).parent.parent / "config"
 
 
-def _get_env_path() -> Path:
-    """获取 .env 文件路径（Docker 内优先，否则本地）。"""
+# 需要从 os.environ 展示的关键环境变量（过滤掉系统级噪音）
+_DISPLAY_ENV_KEYS = [
+    "DASHSCOPE_API_KEY",
+    "OPENAI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "ADMIN_PASSWORD",
+    "CONTAINER_NAME",
+    "REFRESH_DATA_ON_START",
+    "UVICORN_WORKERS",
+    "CHALDEA_SRC_PATH",
+    "LLM_PROVIDER",
+    "LLM_MODEL",
+]
+
+
+def _read_env_content() -> tuple[str, str]:
+    """读取环境变量内容。优先从文件读取，文件不存在时从 os.environ 格式化输出。
+
+    Returns:
+        (content, source): content 为文本内容，source 为 "file" 或 "environ"
+    """
+    # 优先 Docker 内挂载文件
     if _ENV_PATH.exists():
-        return _ENV_PATH
-    return _LOCAL_ENV_PATH
+        return _ENV_PATH.read_text(encoding="utf-8"), "file"
+    # 本地开发 .env 文件
+    if _LOCAL_ENV_PATH.exists():
+        return _LOCAL_ENV_PATH.read_text(encoding="utf-8"), "file"
+    # 文件不存在（--env-file 注入模式），从 os.environ 读取
+    lines = []
+    for key in _DISPLAY_ENV_KEYS:
+        value = os.environ.get(key)
+        if value:
+            # 敏感字段脱敏：只显示前4位 + 星号
+            if "KEY" in key or "PASSWORD" in key:
+                display_value = value[:4] + "****" if len(value) > 4 else "****"
+            else:
+                display_value = value
+            lines.append(f"{key}={display_value}")
+    # 补充其他以 LAPLACE_ 开头的自定义变量
+    for key, value in sorted(os.environ.items()):
+        if key.startswith("LAPLACE_") and key not in _DISPLAY_ENV_KEYS:
+            lines.append(f"{key}={value}")
+    return "\n".join(lines) if lines else "# 未检测到已配置的环境变量", "environ"
 
 
 # ── 环境变量管理 ──
@@ -34,12 +72,9 @@ def _get_env_path() -> Path:
 
 @router.get("/env")
 async def get_env():
-    """读取 .env 文件内容。"""
-    env_path = _get_env_path()
-    if not env_path.exists():
-        raise HTTPException(status_code=404, detail=".env 文件不存在")
-    content = env_path.read_text(encoding="utf-8")
-    return {"content": content, "path": str(env_path)}
+    """读取环境变量内容。文件优先，文件不存在时从 os.environ 获取。"""
+    content, source = _read_env_content()
+    return {"content": content, "source": source}
 
 
 class EnvUpdateRequest(BaseModel):
@@ -48,8 +83,18 @@ class EnvUpdateRequest(BaseModel):
 
 @router.put("/env")
 async def update_env(body: EnvUpdateRequest):
-    """更新 .env 文件内容。"""
-    env_path = _get_env_path()
+    """更新 .env 文件内容。仅文件模式下可写入。"""
+    # 确定写入路径
+    if _ENV_PATH.exists():
+        env_path = _ENV_PATH
+    elif _LOCAL_ENV_PATH.exists():
+        env_path = _LOCAL_ENV_PATH
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="当前为 --env-file 注入模式，无 .env 文件实体可写入。"
+            "如需持久化修改，请在部署时挂载 volume：-v /opt/laplace/.env:/app/.env",
+        )
     env_path.write_text(body.content, encoding="utf-8")
     return {"ok": True, "message": ".env 已更新，需重启容器生效"}
 
