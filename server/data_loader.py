@@ -9,6 +9,7 @@ Laplace — 通用从者数据加载器
 
 import json
 import sys
+from datetime import UTC
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -21,9 +22,17 @@ except ImportError:
 API_BASE = "https://api.atlasacademy.io"
 NICE_SERVANT_URL = f"{API_BASE}/export/JP/nice_servant_lang_en.json"
 NICE_EQUIP_URL = f"{API_BASE}/export/JP/nice_equip_lang_en.json"
+
+# Atlas CN 数据端点（链路 B：活动/关卡/卡池/素材）
+CN_EVENT_URL = f"{API_BASE}/export/CN/nice_event.json"
+CN_WAR_URL = f"{API_BASE}/export/CN/nice_war.json"
+CN_GACHA_URL = f"{API_BASE}/export/CN/nice_gacha.json"
+CN_ITEM_URL = f"{API_BASE}/export/CN/nice_item.json"
+
 OUTPUT_DIR = Path(__file__).parent / "data"
 KNOWLEDGE_DIR = Path(__file__).parent / "knowledge"
 CONFIG_DIR = Path(__file__).parent / "config"
+ATLAS_CN_DIR = OUTPUT_DIR / "atlas_cn"
 
 SKILL_LV10_INDEX = 9
 
@@ -98,6 +107,243 @@ CN_EQUIP_URL = f"{API_BASE}/export/CN/nice_equip.json"
 # 缓存文件路径
 SKILL_NAMES_CN_CACHE = OUTPUT_DIR / "skill_names_cn.json"
 CE_NAMES_CN_CACHE = OUTPUT_DIR / "ce_names_cn.json"
+
+
+def _fetch_atlas_cn() -> dict[str, list[dict]]:
+    """拉取 Atlas CN 数据（活动/关卡/卡池/素材），带本地文件缓存。
+
+    Returns:
+        {"events": [...], "wars": [...], "gachas": [...], "items": [...]}
+    """
+    ATLAS_CN_DIR.mkdir(parents=True, exist_ok=True)
+
+    endpoints = {
+        "events": CN_EVENT_URL,
+        "wars": CN_WAR_URL,
+        "gachas": CN_GACHA_URL,
+        "items": CN_ITEM_URL,
+    }
+    result: dict[str, list[dict]] = {}
+
+    for key, url in endpoints.items():
+        cache_file = ATLAS_CN_DIR / f"{key}.json"
+        if cache_file.exists():
+            with open(cache_file, encoding="utf-8") as f:
+                result[key] = json.load(f)
+            print(f"   📦 Atlas CN {key}: 从缓存加载 ({len(result[key])} 条)")
+            continue
+
+        print(f"   📥 从 Atlas API 下载 CN {key}...")
+        try:
+            resp = requests.get(url, timeout=120)
+            resp.raise_for_status()
+            data = resp.json()
+        except (requests.RequestException, ValueError) as e:
+            print(f"   ⚠️  Atlas CN {key} 下载失败: {e}，跳过")
+            result[key] = []
+            continue
+
+        with open(cache_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+        result[key] = data
+        print(f"   ✅ Atlas CN {key}: {len(data)} 条")
+
+    return result
+
+
+def _clean_text(text: str, max_length: int = 200) -> str:
+    """清洗文本：去除 HTML 标签、多余换行，截断到指定长度。"""
+    import re
+
+    cleaned = re.sub(r"<[^>]+>", "", text or "")
+    cleaned = re.sub(r"\n+", " ", cleaned).strip()
+    if len(cleaned) > max_length:
+        cleaned = cleaned[:max_length] + "…"
+    return cleaned
+
+
+def _ts_to_ym(timestamp: int) -> str | None:
+    """将 Unix 时间戳转为 YYYY-MM 格式字符串。"""
+    if not timestamp or timestamp <= 0:
+        return None
+    try:
+        from datetime import datetime
+
+        dt = datetime.fromtimestamp(timestamp, tz=UTC)
+        return dt.strftime("%Y-%m")
+    except (OSError, ValueError):
+        return None
+
+
+def build_atlas_index(atlas_data: dict[str, list[dict]]) -> dict:
+    """构建 Atlas CN 数据倒排索引。
+
+    Args:
+        atlas_data: _fetch_atlas_cn() 返回的数据字典
+
+    Returns:
+        可序列化为 JSON 的索引结构，包含 name_index/tag_index/time_index/
+        servant_event_index/servant_gacha_index/summary_map
+    """
+    name_index: dict[str, list[str]] = {}
+    tag_index: dict[str, list[str]] = {}
+    time_index: dict[str, list[str]] = {}
+    servant_event_index: dict[str, list[int]] = {}
+    servant_gacha_index: dict[str, list[int]] = {}
+    summary_map: dict[str, dict] = {}
+
+    def _add_name(name: str, entry_key: str) -> None:
+        if not name:
+            return
+        for token in name.replace("\n", " ").split():
+            token = token.strip()
+            if token and len(token) >= 2:
+                name_index.setdefault(token, []).append(entry_key)
+        # 完整名称也加入索引
+        clean_name = name.replace("\n", " ").strip()
+        if clean_name:
+            name_index.setdefault(clean_name, []).append(entry_key)
+
+    def _add_time(timestamp: int, entry_key: str) -> None:
+        ym = _ts_to_ym(timestamp)
+        if ym:
+            time_index.setdefault(ym, []).append(entry_key)
+
+    # ── Events ──
+    for event in atlas_data.get("events", []):
+        eid = event.get("id")
+        if not eid:
+            continue
+        entry_key = f"event:{eid}"
+        ename = event.get("name", "")
+        _add_name(ename, entry_key)
+
+        etype = event.get("type", "")
+        if etype:
+            tag_index.setdefault(f"event_type:{etype}", []).append(entry_key)
+
+        _add_time(event.get("startedAt", 0), entry_key)
+        _add_time(event.get("endedAt", 0), entry_key)
+
+        # 关联从者反查
+        for svt_ref in event.get("svts", []):
+            svt_id = svt_ref if isinstance(svt_ref, int) else svt_ref.get("svtId", 0)
+            if svt_id:
+                servant_event_index.setdefault(str(svt_id), []).append(eid)
+
+        detail = _clean_text(event.get("detail", ""))
+        summary_map[entry_key] = {
+            "类型": "活动",
+            "名称": ename.replace("\n", " "),
+            "详情": detail,
+            "开始时间": _ts_to_ym(event.get("startedAt", 0)),
+            "结束时间": _ts_to_ym(event.get("endedAt", 0)),
+        }
+
+    # ── Wars (主线关卡) ──
+    for war in atlas_data.get("wars", []):
+        wid = war.get("id")
+        if not wid:
+            continue
+        entry_key = f"war:{wid}"
+        wname = war.get("name", "")
+        long_name = war.get("longName", "")
+        _add_name(wname, entry_key)
+        if long_name and long_name != wname:
+            _add_name(long_name, entry_key)
+
+        for flag in war.get("flags", []):
+            tag_index.setdefault(f"war_flag:{flag}", []).append(entry_key)
+
+        age = war.get("age", "")
+        if age:
+            tag_index.setdefault(f"war_age:{age}", []).append(entry_key)
+
+        summary_map[entry_key] = {
+            "类型": "关卡",
+            "名称": wname.replace("\n", " "),
+            "全名": long_name.replace("\n", " ") if long_name else "",
+            "年代": age,
+        }
+
+    # ── Gachas (卡池) ──
+    for gacha in atlas_data.get("gachas", []):
+        gid = gacha.get("id")
+        if not gid:
+            continue
+        entry_key = f"gacha:{gid}"
+        gname = gacha.get("name", "")
+        _add_name(gname, entry_key)
+
+        gtype = gacha.get("type", "")
+        if gtype:
+            tag_index.setdefault(f"gacha_type:{gtype}", []).append(entry_key)
+
+        _add_time(gacha.get("openedAt", 0), entry_key)
+        _add_time(gacha.get("closedAt", 0), entry_key)
+
+        # 从 gachaSubs 提取 pickup 从者
+        for sub in gacha.get("gachaSubs", []):
+            for cond in sub.get("releaseConditions", []):
+                if cond.get("type") == "svt":
+                    svt_id = cond.get("value", 0)
+                    if svt_id:
+                        servant_gacha_index.setdefault(str(svt_id), []).append(gid)
+
+        summary_map[entry_key] = {
+            "类型": "卡池",
+            "名称": gname.replace("\n", " "),
+            "开始时间": _ts_to_ym(gacha.get("openedAt", 0)),
+            "结束时间": _ts_to_ym(gacha.get("closedAt", 0)),
+        }
+
+    # ── Items (素材) ──
+    for item in atlas_data.get("items", []):
+        iid = item.get("id")
+        if not iid:
+            continue
+        entry_key = f"item:{iid}"
+        iname = item.get("name", "")
+        _add_name(iname, entry_key)
+
+        itype = item.get("type", "")
+        if itype:
+            tag_index.setdefault(f"item_type:{itype}", []).append(entry_key)
+
+        detail = _clean_text(item.get("detail", ""))
+        summary_map[entry_key] = {
+            "类型": "素材",
+            "名称": iname,
+            "详情": detail,
+        }
+
+    # 去重索引值
+    for idx in (name_index, tag_index, time_index):
+        for key in idx:
+            idx[key] = sorted(set(idx[key]))
+    for key in servant_event_index:
+        servant_event_index[key] = sorted(set(servant_event_index[key]))
+    for key in servant_gacha_index:
+        servant_gacha_index[key] = sorted(set(servant_gacha_index[key]))
+
+    index = {
+        "name_index": name_index,
+        "tag_index": tag_index,
+        "time_index": time_index,
+        "servant_event_index": servant_event_index,
+        "servant_gacha_index": servant_gacha_index,
+        "summary_map": summary_map,
+    }
+
+    # 序列化到文件
+    index_path = OUTPUT_DIR / "atlas_index.json"
+    with open(index_path, "w", encoding="utf-8") as f:
+        json.dump(index, f, ensure_ascii=False)
+
+    total_entries = len(summary_map)
+    print(f"   ✅ Atlas 索引构建完成: {total_entries} 条条目, {len(name_index)} 个名称词, {len(tag_index)} 个标签")
+
+    return index
 
 
 def load_skill_names_cn() -> dict:
@@ -1486,6 +1732,21 @@ def main():
         json.dump(ce_db, f, ensure_ascii=False, indent=2)
 
     print(f"\n📄 输出: {ce_output_path}")
+
+    # ── Atlas CN 数据拉取与索引构建（链路 B） ──
+    print("\n" + "=" * 50)
+    print("🗺️  Atlas CN 数据拉取与索引构建")
+    print("=" * 50)
+
+    atlas_data = _fetch_atlas_cn()
+    index_data = build_atlas_index(atlas_data)
+
+    atlas_index_path = OUTPUT_DIR / "atlas_index.json"
+    with open(atlas_index_path, "w", encoding="utf-8") as f:
+        json.dump(index_data, f, ensure_ascii=False)
+
+    total_entries = sum(len(v) for v in atlas_data.values())
+    print(f"\n📄 输出: {atlas_index_path} ({total_entries} 条原始数据)")
     print("✨ 全部完成!")
 
 

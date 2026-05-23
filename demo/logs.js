@@ -37,6 +37,11 @@ const PHASE_NAMES = {
   generation_output: "生成输出",
   agent_detail: "Agent 详情",
   final: "请求完成",
+  // 链路 B：Atlas 知识问答
+  atlas_search: "Atlas 检索",
+  fact_verify: "事实校验",
+  // 链路 C：攻略知识问答
+  guide_search: "攻略检索",
 };
 
 // === Mode Display ===
@@ -51,6 +56,12 @@ function getModeLabel(mode) {
     fallback_no_match: "无匹配",
     routing_error: "错误",
     execution_fallback: "降级",
+    // 链路 B：Atlas 知识问答
+    atlas_pipeline: "Atlas 知识问答",
+    atlas_no_match: "Atlas 无结果",
+    // 链路 C：攻略知识问答
+    guide_pipeline: "攻略知识问答",
+    guide_no_match: "攻略无结果",
   };
   return map[mode] || mode || "-";
 }
