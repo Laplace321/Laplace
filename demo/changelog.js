@@ -80,9 +80,15 @@ function renderVersionContent(version) {
     </div>
   `;
 
+  // 兼容两种 JSON 结构：扁平（v0.3.7+）和嵌套 sections（v0.3.6 及之前）
+  const getSection = (version, key) => version[key] || (version.sections && version.sections[key]);
+
   const sectionsHtml = Object.entries(SECTION_CONFIG)
-    .filter(([key]) => version[key] && version[key].length > 0)
-    .map(([key, config]) => renderSection(key, config, version[key]))
+    .filter(([key]) => {
+      const items = getSection(version, key);
+      return items && items.length > 0;
+    })
+    .map(([key, config]) => renderSection(key, config, getSection(version, key)))
     .join('');
 
   container.innerHTML = headerHtml + sectionsHtml;
