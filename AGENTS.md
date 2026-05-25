@@ -325,8 +325,7 @@
      - 过滤掉用户不关心的纯工程变更
   6. **生成 JSON 并追加**：将结果格式化为 JSON 对象，插入到 `demo/changelog-data.json` 的 `versions` 数组头部（最新版本在前）。
   7. **展示给用户确认**：将生成的 JSON 内容展示给用户，确认无误后写入文件。
-  8. **提交**：`git add demo/changelog-data.json && git commit -m "docs(changelog): add vX.Y release notes" && git push`
-- **LLM 润色 Prompt 模板**：
+  8. **提交**：`git add demo/changelog-data.json && git commit -m "docs(changelog): add vX.Y release notes" && git push`- **LLM 润色 Prompt 模板**：
   ```
   你是一个产品更新日志撰写者。请将以下 git commit messages 翻译润色为面向 FGO 玩家的中文更新说明。
   要求：
@@ -338,10 +337,14 @@
   Commit 列表：
   {commits}
   
-  输出 JSON 格式：
-  {"features": [...], "fixes": [...], "others": [...]}
+  输出 JSON 格式（必须使用嵌套 sections 结构，与 changelog.js 的 renderVersionContent 保持一致）：
+  {"sections": {"features": [...], "fixes": [...], "others": [...]}}
   ```
-- **目的**：确保更新日志生成流程标准化、可重复，杜绝手工编写 JSON 的低效和遗漏。
+- **JSON 数据结构契约（绝对纪律）**：
+  - `changelog-data.json` 中每个版本对象**必须**使用嵌套 `sections` 结构：`{"version", "date", "title", "sections": {"features": [], "fixes": [], "others": []}}`
+  - **严禁**使用扁平结构（如 `{"version", "date", "title", "features": [], "fixes": [], "others": []}`），这会导致 `changelog.js` 无法渲染
+  - 新增版本时，先读取 `changelog-data.json` 中已有版本的实际结构作为参照，确保格式完全一致
+  - 写入 JSON 后，**必须**在本地浏览器打开 `demo/changelog.html` 验证最新版本渲染正确（features/fixes/others 各分区均有内容显示），确认无误后再提交- **目的**：确保更新日志生成流程标准化、可重复，杜绝手工编写 JSON 的低效和遗漏。
 
 ## 禁止事项
 
