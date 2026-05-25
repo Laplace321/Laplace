@@ -1,7 +1,8 @@
 ---
 title: "戴冠战 Saber 职阶攻略"
 tags: [coronation, saber, 攻略, 配队, 星图]
-author: "Laplace 攻略组"
+author: "怀旧大金"
+author_url: "https://space.bilibili.com/1620123701"
 updated: "2026-05-23"
 ---
 

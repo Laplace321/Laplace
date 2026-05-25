@@ -1246,6 +1246,7 @@ async def _handle_guide_pipeline(
     # 构建上下文（传给 LLM 的内容不包含文件名等内部标识）
     context_lines = []
     source_labels: set[str] = set()
+    source_authors: dict[str, str] = {}  # title → author
     for chunk in chunks:
         title = chunk.metadata.get("title", "攻略")
         section = chunk.metadata.get("section", "")
@@ -1254,6 +1255,9 @@ async def _handle_guide_pipeline(
         # 使用 title 作为泛化来源标签，而非文件名
         if title and title != "攻略":
             source_labels.add(title)
+            author = chunk.metadata.get("author", "")
+            if author:
+                source_authors[title] = author
     guide_context = "\n\n---\n\n".join(context_lines)
 
     generation_prompt = (
@@ -1280,10 +1284,16 @@ async def _handle_guide_pipeline(
     trace_total_tokens += gen_usage.get("total_tokens", 0)
     model_used = gen_result.get("_model", model_used)
 
-    # 追加泛化来源标签（使用 title 而非文件名）
+    # 追加泛化来源标签（使用 title 而非文件名），并展示作者信息
     if source_labels:
-        label_list = ", ".join(sorted(source_labels))
-        reply += f"\n\n📖 参考：{label_list}"
+        labels_with_author = []
+        for title in sorted(source_labels):
+            author = source_authors.get(title)
+            if author:
+                labels_with_author.append(f"{title}（作者：{author}）")
+            else:
+                labels_with_author.append(title)
+        reply += "\n\n📖 参考：" + ", ".join(labels_with_author)
 
     await log_trace_event(
         trace_id,

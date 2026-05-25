@@ -731,6 +731,24 @@ body {
   color: var(--accent-cyan);
 }
 
+.input-footer .credit-line {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--text-secondary, #aaa);
+}
+
+.input-footer .credit-link {
+  color: #FB7299;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.input-footer .credit-link:hover {
+  color: #ff8fab;
+  text-decoration: underline;
+}
+
 .input-footer .disclaimer {
   display: block;
   margin-top: 6px;
