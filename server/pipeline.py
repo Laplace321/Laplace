@@ -1290,7 +1290,7 @@ async def _handle_guide_pipeline(
         for title in sorted(source_labels):
             author = source_authors.get(title)
             if author:
-                labels_with_author.append(f"{title}（作者：{author}）")
+                labels_with_author.append(f"{title}（作者：**{author}**）")
             else:
                 labels_with_author.append(title)
         reply += "\n\n📖 参考：" + ", ".join(labels_with_author)
