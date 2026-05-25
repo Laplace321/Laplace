@@ -28,4 +28,68 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r server/requirements.txt anyio
+      - name: Dependency completeness check
+        run: |
+          # 扫描 server/ 下所有 Python 文件的顶层 import，提取第三方包名
+          # 与 server/requirements.txt 中声明的包名交叉比对
+          python3 -c "
+          import re, sys
+          from pathlib import Path
+
+          # 从 requirements.txt 提取已声明的包名（统一小写，去掉版本约束）
+          req_file = Path('server/requirements.txt')
+          declared = set()
+          for line in req_file.read_text().splitlines():
+              line = line.strip()
+              if not line or line.startswith('#'):
+                  continue
+              pkg = re.split(r'[>=<!\[]', line)[0].strip().lower().replace('-', '_')
+              declared.add(pkg)
+
+          # 标准库 + 已知内置模块白名单（不需要在 requirements.txt 中声明）
+          STDLIB = {
+              'os', 'sys', 're', 'json', 'time', 'uuid', 'pathlib', 'typing',
+              'dataclasses', 'enum', 'abc', 'collections', 'functools', 'itertools',
+              'logging', 'hashlib', 'math', 'datetime', 'copy', 'io', 'textwrap',
+              'contextlib', 'asyncio', 'concurrent', 'threading', 'multiprocessing',
+              'importlib', 'inspect', 'traceback', 'warnings', 'unittest', 'string',
+              'struct', 'socket', 'http', 'urllib', 'email', 'html', 'xml',
+              'csv', 'sqlite3', 'gzip', 'zipfile', 'tarfile', 'tempfile', 'shutil',
+              'glob', 'fnmatch', 'stat', 'platform', 'subprocess', 'signal',
+              'argparse', 'configparser', 'secrets', 'base64', 'binascii',
+              'pprint', 'dis', 'ast', 'token', 'tokenize', 'types', 'weakref',
+              'array', 'bisect', 'heapq', 'queue', 'decimal', 'fractions',
+              'random', 'statistics', 'operator', 'pickle', 'shelve', 'marshal',
+              'dbm', 'codecs', 'unicodedata', 'locale', 'gettext', 'difflib',
+          }
+
+          # 项目内部模块前缀
+          INTERNAL_PREFIXES = ('server', 'tests', 'extractor', 'admin')
+
+          # 扫描 server/ 下所有 .py 文件的顶层 import
+          imported_pkgs = set()
+          for py_file in Path('server').rglob('*.py'):
+              for line in py_file.read_text(encoding='utf-8').splitlines():
+                  line = line.strip()
+                  m = re.match(r'^(?:import|from)\s+([a-zA-Z_][a-zA-Z0-9_]*)', line)
+                  if m:
+                      pkg = m.group(1).lower()
+                      if pkg not in STDLIB and not any(pkg.startswith(p) for p in INTERNAL_PREFIXES):
+                          imported_pkgs.add(pkg)
+
+          # 特殊映射：import yaml → 包名 pyyaml
+          ALIAS_MAP = {'yaml': 'pyyaml', 'cv2': 'opencv_python', 'PIL': 'pillow', 'bs4': 'beautifulsoup4'}
+          normalized_imported = set()
+          for pkg in imported_pkgs:
+              normalized_imported.add(ALIAS_MAP.get(pkg, pkg))
+
+          missing = normalized_imported - declared
+          if missing:
+              print(f'ERROR: 以下第三方依赖在 server/ 中被 import 但未在 server/requirements.txt 中声明:')
+              for m in sorted(missing):
+                  print(f'  - {m}')
+              sys.exit(1)
+          else:
+              print(f'OK: 所有 {len(normalized_imported)} 个第三方依赖均已在 requirements.txt 中声明')
+          "
       - run: python -m pytest -v

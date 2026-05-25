@@ -39,6 +39,12 @@
 3. **强制同步远程代码库**：
 > **[非常重要]** 所有的本地 `git commit` 动作完成后，必须立即执行 `git push`（或 `git push origin main`）将代码推送到 GitHub 远程仓库，除非当时明确处于断网或实验性分支。不要只把代码留在本地！
 
+4. **依赖变更纪律**：
+> **[绝对纪律]** 新增第三方依赖时，**必须**同步更新 `server/requirements.txt`（Dockerfile 和 CI 的唯一依赖源）。
+> - **严禁**仅修改 `pyproject.toml` 的 dependencies（该文件已废弃作为运行时依赖源）
+> - 本地验证：修改 `server/requirements.txt` 后，执行 `pip install -r server/requirements.txt` 再运行 `python -c "from server.<module> import <Class>"` 确认无 ImportError
+> - CI 会自动校验 `server/` 下所有 import 的第三方库是否均在 `server/requirements.txt` 中声明，未声明则 CI 失败
+
 ## 工作流程
 
 ### 会话启动时
@@ -138,6 +144,15 @@
   - 新增了数据构建逻辑（如 `data_loader.py`）并需要重新生成数据
   - 任何"改了代码但还没看到效果"的情况
 - **目的**：保证测试反馈的一致性，避免因缓存或未重载代码导致的"修复无效"假象；确保 AI 完成端到端的修复-验证闭环，而非把验证工作推给用户。
+
+### 2. 依赖完整性校验 (Dependency Completeness Check)
+- **准则**：**[绝对纪律]** 每次新增 import 第三方库后，必须确认该库已在 `server/requirements.txt` 中声明。CI 会自动校验，未声明则构建失败。
+- **执行**：
+  1. 新增第三方 import 后，立即检查 `server/requirements.txt` 是否包含对应包名。
+  2. 注意包名与 import 名的映射差异（如 `import yaml` → 包名 `pyyaml`，`from rank_bm25` → 包名 `rank-bm25`）。
+  3. 快速审查命令：`grep -rh "^import\|^from" server/ | sort -u` 查看所有顶层 import。
+  4. `pyproject.toml` 的 `[project] dependencies` 已废弃作为运行时依赖源，**严禁**仅在该处添加依赖。
+- **目的**：杜绝本地开发环境碰巧安装了某个包导致"本地能跑但 CI/Docker 报错"的依赖幽灵问题。
 ## 架构约束与长期维护标准
 
 为了保证项目的长期健壮性，后续开发必须严格遵守以下架构准则：
