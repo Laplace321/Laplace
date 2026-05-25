@@ -19,11 +19,14 @@ DATA_VER=$(cat server/data/.data_build_version 2>/dev/null || echo "")
 if [ ! -f "server/data/servants_db.json" ]; then
     echo "[init] servants_db.json not found, will build..."
     NEED_REBUILD=1
+elif [ ! -f "server/data/atlas_index.json" ]; then
+    echo "[init] atlas_index.json not found, will build..."
+    NEED_REBUILD=1
 elif [ "$BUILD_VER" != "$DATA_VER" ]; then
     echo "[init] Build version changed ($DATA_VER -> $BUILD_VER), rebuilding data..."
     NEED_REBUILD=1
 else
-    echo "[init] servants_db.json up-to-date (version: $DATA_VER), skipping."
+    echo "[init] Data files up-to-date (version: $DATA_VER), skipping."
 fi
 
 # REFRESH_DATA_ON_START=1 可手动强制刷新

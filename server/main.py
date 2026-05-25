@@ -206,6 +206,7 @@ async def chat(request: ChatRequest, raw_request: Request):
     # 确定 skill_calls 来源：preset > params > LLM 路由
     resolved_skill_calls: list[dict] | None = None
     resolved_response_skill = request.response_skill or "respond_servant_list"
+    resolved_target_pipeline = "A"
 
     if request.preset_name:
         # 从 Preset Registry 展开为 skill_calls
@@ -295,6 +296,7 @@ async def chat(request: ChatRequest, raw_request: Request):
         skill_calls=resolved_skill_calls,  # None 则走 LLM 路由
         response_skill_name=resolved_response_skill,
         client_ip=client_ip,
+        target_pipeline=resolved_target_pipeline,
     )
 
 

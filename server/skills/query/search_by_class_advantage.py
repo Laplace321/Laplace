@@ -68,6 +68,13 @@ _CLASS_ALIASES: dict[str, str] = {
     "Moon Cancer": "mooncancer",
     "Alter Ego": "alterego",
     "alter ego": "alterego",
+    "狂战士": "berserker",
+    "剑士": "saber",
+    "弓兵": "archer",
+    "枪兵": "lancer",
+    "骑兵": "rider",
+    "魔术师": "caster",
+    "暗杀者": "assassin",
 }
 
 

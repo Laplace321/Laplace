@@ -160,9 +160,9 @@ def _match_effect(
                 elif eff_target == "partyOther":
                     sk_partyother += val
 
-            # partyOther + self 同技能共存 → partyOther 重分类为 party
-            # （FGO 用 partyOther+self 拆分表达"全队效果但自身数值不同"）
-            if sk_partyother > 0 and sk_self > 0:
+            # partyOther 重分类仅在非 self 查询时生效
+            # self 查询时 partyOther 明确排除自身，不应计入自充
+            if target_type != "self" and sk_partyother > 0 and sk_self > 0:
                 sk_party += sk_partyother
                 sk_partyother = 0
 
@@ -255,8 +255,9 @@ def _match_np_effect(
                 elif eff_target == "partyOther":
                     np_partyother += val
 
-            # partyOther + self 同宝具共存 → partyOther 重分类为 party
-            if np_partyother > 0 and np_self > 0:
+            # partyOther 重分类仅在非 self 查询时生效
+            # self 查询时 partyOther 明确排除自身，不应计入自充
+            if target_type != "self" and np_partyother > 0 and np_self > 0:
                 np_party += np_partyother
                 np_partyother = 0
 

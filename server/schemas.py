@@ -6,7 +6,9 @@ Pydantic models for the Skill-Based Architecture routing contract (ADR-018).
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from server.atlas_index import AtlasQueryParams
 
 # ============================================================
 # Stage 1 Routing Schema（Skill-Based Architecture, ADR-018）
@@ -27,7 +29,7 @@ class FallbackReason(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    code: Literal["no_match", "ambiguous", "out_of_scope", "greeting"] = "no_match"
+    code: Literal["no_match", "ambiguous", "out_of_scope", "greeting", "atlas_domain", "guide_domain"] = "no_match"
     message: str = ""
 
 
@@ -39,6 +41,21 @@ class RoutingResponse(BaseModel):
     skill_calls: list[SkillCall] = Field(default_factory=list, description="要执行的 Skill 调用列表")
     response_skill: str = Field(default="respond_servant_list", description="回复 Skill 名称")
     fallback: FallbackReason | None = Field(default=None, description="降级原因（无匹配时填写）")
+    target_pipeline: Literal["A", "B", "C"] | None = Field(
+        default=None,
+        description="目标链路：A=Skill精确查询, B=Atlas知识问答, C=攻略知识问答。None 表示默认走 A",
+    )
+    atlas_query: AtlasQueryParams | None = Field(
+        default=None,
+        description="链路 B 结构化查询参数。仅当 target_pipeline='B' 时填写。从用户问题中提取活动名/从者名/时间/类型等结构化信息。",
+    )
+
+    @model_validator(mode="after")
+    def validate_atlas_query_required(self) -> "RoutingResponse":
+        """当 target_pipeline='B' 时，atlas_query 必须填写。"""
+        if self.target_pipeline == "B" and not self.atlas_query:
+            raise ValueError("target_pipeline='B' 时 atlas_query 必须填写，不能为 null")
+        return self
 
 
 def routing_response_json_schema() -> dict:

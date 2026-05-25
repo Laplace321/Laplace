@@ -66,13 +66,15 @@ const PRESETS = [
     name: "coronation_guide",
     label: "戴冠战攻略",
     description: "查询戴冠战机制、星图、礼装等知识",
-    defaultMessage: "戴冠战机制是什么",
+    defaultMessage: "戴冠战剑介职阶攻略",
+    sendAsText: true,
   },
   {
     name: "coronation_team",
     label: "戴冠战配队",
     description: "查询戴冠战配队推荐",
-    defaultMessage: "剑阶戴冠配队推荐",
+    defaultMessage: "剑阶戴冠战配队推荐",
+    sendAsText: true,
   },
   {
     name: "ce_query",
@@ -89,6 +91,13 @@ const THINKING_LABELS = {
   routed: "意图识别完成",
   executing: "正在检索从者数据...",
   generating: "正在生成分析...",
+  // 链路 B：Atlas 知识问答
+  atlas_search: "正在检索活动/卡池数据...",
+  fact_verify: "正在校验事实准确性...",
+  atlas_pipeline: "Atlas 知识问答",
+  // 链路 C：攻略知识问答
+  guide_search: "正在检索攻略文档...",
+  guide_pipeline: "攻略知识问答",
   // 旧阶段名兼容映射
   parsing: "正在理解你的问题...",
   parsed: "意图识别完成",
@@ -292,9 +301,57 @@ async function sendMessage() {
   // If preset is active, route to preset mode
   if (activePreset) {
     const presetName = activePreset;
+    const preset = PRESETS.find(p => p.name === presetName);
     const userText = text; // may be empty — uses preset defaults
     chatInput.value = "";
     deactivatePreset();
+
+    // sendAsText presets: concatenate defaultMessage + user input
+    if (preset && preset.sendAsText) {
+      const parts = [preset.defaultMessage, userText].filter(Boolean);
+      const effectiveMessage = parts.join(" ");
+      if (!effectiveMessage) return;
+      isProcessing = true;
+      setSendButtonToStop();
+      appendMessage("user", effectiveMessage);
+      chatHistory.push({ role: "user", text: effectiveMessage });
+      saveSession();
+      const els = createStreamingContainer();
+      currentAbortController = new AbortController();
+      try {
+        const url = `${STREAM_API_URL}?message=${encodeURIComponent(effectiveMessage)}`;
+        const resp = await fetch(url, { signal: currentAbortController.signal });
+        if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const events = parseSSE(buffer);
+          buffer = events.remainder;
+          for (const ev of events.parsed) {
+            handleStreamEvent(ev.event, ev.data, els);
+          }
+        }
+        const cursor = els.replyBody.querySelector(".stream-cursor");
+        if (cursor) cursor.remove();
+      } catch (err) {
+        if (err.name === "AbortError") {
+          finalizeStreamingContainer(els);
+        } else {
+          els.container.remove();
+          showToast(`请求失败: ${err.message}`);
+        }
+      } finally {
+        currentAbortController = null;
+        isProcessing = false;
+        setSendButtonToSend();
+      }
+      return;
+    }
+
     sendPresetQuery(presetName, userText);
     return;
   }

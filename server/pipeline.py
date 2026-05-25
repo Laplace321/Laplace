@@ -51,6 +51,7 @@ async def handle_skill_mode(
     skill_calls: list[dict] | None = None,
     response_skill_name: str = "respond_servant_list",
     client_ip: str = "unknown",
+    target_pipeline: str = "A",
 ) -> ChatResponse:
     """Skill 模式的核心处理逻辑。
 
@@ -74,6 +75,7 @@ async def handle_skill_mode(
                 "mode": "oneshot_direct",
                 "skill_count": len(skill_calls),
                 "client_ip": client_ip,
+                "target_pipeline": target_pipeline,
             },
         )
         await log_trace_event(
@@ -84,6 +86,7 @@ async def handle_skill_mode(
                 "response_skill": response_skill_name,
                 "fallback": None,
                 "model": model_used,
+                "target_pipeline": target_pipeline,
             },
         )
 
@@ -135,8 +138,25 @@ async def handle_skill_mode(
                     "fallback": routing_result.get("fallback"),
                     "model": model_used,
                     "routing_usage": routing_usage,
+                    "target_pipeline": routing_result.get("target_pipeline"),
                 },
             )
+
+            # ── 链路 B/C 分发 ──
+            target_pipeline = routing_result.get("target_pipeline")
+            if target_pipeline == "B":
+                return await _handle_atlas_pipeline(
+                    user_message,
+                    trace_id,
+                    model_used,
+                    request_start,
+                    trace_total_tokens,
+                    routing_result.get("atlas_query"),
+                )
+            if target_pipeline == "C":
+                return await _handle_guide_pipeline(
+                    user_message, trace_id, model_used, request_start, trace_total_tokens
+                )
 
             # 检查 fallback
             fallback = routing_result.get("fallback")
@@ -600,6 +620,7 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
                 "response_skill": response_skill_name,
                 "fallback": None,
                 "model": model_used,
+                "target_pipeline": "A",
             },
         )
 
@@ -679,8 +700,34 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
                 "fallback": routing_result.get("fallback"),
                 "model": model_used,
                 "routing_usage": routing_usage,
+                "target_pipeline": routing_result.get("target_pipeline"),
             },
         )
+
+        # ── 链路 B/C 分发（SSE 流式） ──
+        target_pipeline = routing_result.get("target_pipeline")
+        if target_pipeline in ("B", "C"):
+            pipeline_label = "Atlas 知识检索" if target_pipeline == "B" else "攻略文档检索"
+            yield sse_event("thinking", {"phase": "routing", "message": f"识别为{pipeline_label}，正在检索..."})
+            if target_pipeline == "B":
+                atlas_response = await _handle_atlas_pipeline(
+                    message,
+                    trace_id,
+                    model_used,
+                    stream_start,
+                    trace_total_tokens,
+                    routing_result.get("atlas_query"),
+                )
+            else:
+                atlas_response = await _handle_guide_pipeline(
+                    message, trace_id, model_used, stream_start, trace_total_tokens
+                )
+            try:
+                yield sse_event("delta", {"text": atlas_response.reply})
+            except Exception:
+                pass
+            yield sse_event("done", {"model": atlas_response.model, "traceId": trace_id})
+            return
 
         # 推送路由结果（预消化：中文描述替代原始英文 skill_name）
         yield sse_event(
@@ -1045,3 +1092,241 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
 
     # ── 完成 ──
     yield sse_event("done", {"model": model_used, "traceId": trace_id})
+
+
+# ============================================================
+# 链路 B/C 处理函数
+# ============================================================
+
+
+async def _handle_atlas_pipeline(
+    user_message: str,
+    trace_id: str,
+    model_used: str,
+    request_start: float,
+    trace_total_tokens: int,
+    atlas_query: dict | None = None,
+) -> ChatResponse:
+    """链路 B：Atlas 知识问答。检索 Atlas CN 索引 → LLM 生成回复 → 事实校验。"""
+    from server.atlas_index import AtlasQueryParams, get_atlas_index
+
+    atlas = get_atlas_index()
+
+    # 优先使用路由 LLM 提取的结构化参数
+    query_source = "structured"
+    if atlas_query:
+        params = AtlasQueryParams(**atlas_query)
+    else:
+        query_source = "raw_fallback"
+        params = AtlasQueryParams(name=user_message)
+
+    results = atlas.search(params)
+
+    await log_trace_event(
+        trace_id,
+        "atlas_search",
+        {"query": user_message, "result_count": len(results), "query_source": query_source, "atlas_query": atlas_query},
+    )
+
+    # 结构化搜索无结果时，降级到原始消息匹配
+    if not results and query_source == "structured":
+        query_source = "raw_fallback"
+        params = AtlasQueryParams(name=user_message)
+        results = atlas.search(params)
+        await log_trace_event(
+            trace_id,
+            "atlas_search_fallback",
+            {"query": user_message, "result_count": len(results), "query_source": query_source},
+        )
+
+    if not results:
+        reply = "抱歉，我在活动/卡池/主线数据库中未找到相关信息。你可以尝试更具体的关键词，如活动名称或时间段。"
+        await log_trace_event(
+            trace_id,
+            "final",
+            {
+                "total_time_ms": round((time.monotonic() - request_start) * 1000, 2),
+                "result": "atlas_no_match",
+                "mode": "atlas_pipeline",
+                "total_tokens": trace_total_tokens,
+            },
+        )
+        return ChatResponse(
+            reply=reply, servants=[], count=0, query={"mode": "atlas_pipeline"}, model=model_used, traceId=trace_id
+        )
+
+    # 构建上下文摘要供 LLM 参考
+    context_lines = []
+    for item in results[:10]:
+        summary_parts = [f"{k}: {v}" for k, v in item.items() if k != "entry_key"]
+        context_lines.append("- " + ", ".join(summary_parts))
+    atlas_context = "\n".join(context_lines)
+
+    generation_prompt = (
+        "你是 FGO 知识助手。根据以下 Atlas 数据库检索结果回答用户问题。\n"
+        "要求：\n"
+        "1. 仅基于提供的数据回答，不要编造信息\n"
+        "2. 使用中文自然语言，面向玩家\n"
+        "3. 如果数据不足以完整回答，明确告知哪些信息缺失\n\n"
+        f"检索结果：\n{atlas_context}\n\n"
+        f"用户问题：{user_message}"
+    )
+
+    gen_result = await chat_completion(
+        system_prompt="You are a helpful AI assistant.",
+        user_message=generation_prompt,
+        temperature=0.3,
+        json_mode=False,
+    )
+    reply = gen_result.get("text", "").strip()
+    gen_usage = gen_result.get("_usage", {})
+    trace_total_tokens += gen_usage.get("total_tokens", 0)
+    model_used = gen_result.get("_model", model_used)
+
+    # 轻量级事实校验
+    verified = _verify_atlas_facts(reply, atlas)
+    await log_trace_event(
+        trace_id,
+        "fact_verify",
+        {"verified": verified},
+    )
+
+    await log_trace_event(
+        trace_id,
+        "final",
+        {
+            "total_time_ms": round((time.monotonic() - request_start) * 1000, 2),
+            "result": "atlas_pipeline",
+            "mode": "atlas_pipeline",
+            "atlas_results": len(results),
+            "total_tokens": trace_total_tokens,
+        },
+    )
+
+    return ChatResponse(
+        reply=reply, servants=[], count=0, query={"mode": "atlas_pipeline"}, model=model_used, traceId=trace_id
+    )
+
+
+async def _handle_guide_pipeline(
+    user_message: str,
+    trace_id: str,
+    model_used: str,
+    request_start: float,
+    trace_total_tokens: int,
+) -> ChatResponse:
+    """链路 C：攻略知识问答。BM25 检索攻略文档 → LLM 生成回复 → 来源标注。"""
+    from server.guide_retriever import GuideRetriever
+
+    retriever = GuideRetriever()
+    chunks = retriever.search(user_message, top_k=3)
+
+    await log_trace_event(
+        trace_id,
+        "guide_search",
+        {"query": user_message, "result_count": len(chunks)},
+    )
+
+    if not chunks:
+        reply = "抱歉，我在攻略库中未找到相关内容。你可以尝试更具体的关键词，如职阶名或关卡名。"
+        await log_trace_event(
+            trace_id,
+            "final",
+            {
+                "total_time_ms": round((time.monotonic() - request_start) * 1000, 2),
+                "result": "guide_no_match",
+                "mode": "guide_pipeline",
+                "total_tokens": trace_total_tokens,
+            },
+        )
+        return ChatResponse(
+            reply=reply, servants=[], count=0, query={"mode": "guide_pipeline"}, model=model_used, traceId=trace_id
+        )
+
+    # 构建上下文（传给 LLM 的内容不包含文件名等内部标识）
+    context_lines = []
+    source_labels: set[str] = set()
+    for chunk in chunks:
+        title = chunk.metadata.get("title", "攻略")
+        section = chunk.metadata.get("section", "")
+        header = f"【{title}】" + (f" {section}" if section else "")
+        context_lines.append(f"{header}\n{chunk.content}")
+        # 使用 title 作为泛化来源标签，而非文件名
+        if title and title != "攻略":
+            source_labels.add(title)
+    guide_context = "\n\n---\n\n".join(context_lines)
+
+    generation_prompt = (
+        "你是 FGO 攻略助手。根据以下攻略文档内容回答用户问题。\n"
+        "要求：\n"
+        "1. 仅基于提供的攻略内容回答，不要编造信息\n"
+        "2. 使用中文自然语言，面向玩家，语气亲切专业\n"
+        "3. 如果攻略内容不足以完整回答问题，明确告知哪些部分缺少资料\n"
+        "4. **[绝对禁止]** 不要在回复中出现任何文件名、文件路径、内部标题格式（如 [xxx] > yyy）、"
+        "markdown 标记、技术术语或系统实现细节。回复必须完全是面向玩家的自然语言\n"
+        "5. 不要自行添加来源标注，系统会自动处理\n\n"
+        f"攻略内容：\n{guide_context}\n\n"
+        f"用户问题：{user_message}"
+    )
+
+    gen_result = await chat_completion(
+        system_prompt=generation_prompt,
+        user_message=user_message,
+        temperature=0.3,
+        json_mode=False,
+    )
+    reply = gen_result.get("text", "").strip()
+    gen_usage = gen_result.get("_usage", {})
+    trace_total_tokens += gen_usage.get("total_tokens", 0)
+    model_used = gen_result.get("_model", model_used)
+
+    # 追加泛化来源标签（使用 title 而非文件名）
+    if source_labels:
+        label_list = ", ".join(sorted(source_labels))
+        reply += f"\n\n📖 参考：{label_list}"
+
+    await log_trace_event(
+        trace_id,
+        "final",
+        {
+            "total_time_ms": round((time.monotonic() - request_start) * 1000, 2),
+            "result": "guide_pipeline",
+            "mode": "guide_pipeline",
+            "guide_chunks": len(chunks),
+            "sources": list(source_labels),
+            "total_tokens": trace_total_tokens,
+        },
+    )
+
+    return ChatResponse(
+        reply=reply, servants=[], count=0, query={"mode": "guide_pipeline"}, model=model_used, traceId=trace_id
+    )
+
+
+def _verify_atlas_facts(reply: str, atlas) -> bool:
+    """轻量级事实验证：检查回复中提到的实体是否存在于 Atlas 索引中。
+
+    提取回复中的引号内容和专有名词，验证其在索引中存在。
+    返回 True 表示验证通过或未检测到可验证实体。
+    """
+    import re
+
+    # 提取中文引号内的内容作为待验证实体
+    quoted_entities = re.findall(r"[\u201c\u201d](.*?)[\u201c\u201d]", reply)
+    if not quoted_entities:
+        return True
+
+    verified_count = 0
+    total_count = 0
+    for entity in quoted_entities:
+        if len(entity) < 2:
+            continue
+        total_count += 1
+        if atlas.verify_fact("name", entity):
+            verified_count += 1
+
+    if total_count == 0:
+        return True
+
+    # 超过 70% 的实体可验证即通过
+    return verified_count / total_count >= 0.7

@@ -54,9 +54,17 @@ server/data/servants_db.json
 server/data/craft_essences_db.json
 server/data/ce_names_cn.json
 
+# Atlas CN data (fetched at deploy time by data_loader, not committed)
+server/data/atlas_cn/
+server/data/atlas_index.json
+
 # Face images cache (downloaded at deploy time, not committed)
 server/data/faces/
 .qoder/
 
 # Deploy scripts (server-specific)
 deploy/deploy.sh
+
+# Temp test/debug scripts
+server/test.py
+CLAUDE.md

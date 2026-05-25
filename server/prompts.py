@@ -78,6 +78,7 @@ def get_generation_prompt(user_query: str, context_json: str) -> str:
     *   **信任系统筛选结果（绝对纪律）**：上下文中的「已应用的筛选条件」说明了系统实际使用的筛选条件。你**必须以此为准**描述筛选逻辑，**严禁**自行添加任何额外过滤条件。上下文中列出的每一位从者都已满足所有筛选条件，不需要你二次验证或排除。
     *   **禁止以偏概全（绝对纪律）**：「代表从者详情」只是按稀有度排序的前几位**代表**，不代表全部匹配从者。**严禁**将这几位代表的共同特征概括为所有匹配从者的共性。总结共性时**只能使用「已应用的筛选条件」**。
 4. **简洁明快**：保持对话简短，不需要列出所有从者的每一个属性，只需要回答用户关心的问题即可。
+    *   **技能/宝具详情完整性（绝对纪律）**：当用户询问某个从者的技能或宝具时，上下文中「技能详情」/「宝具详情」的每个技能的「效果」列表中的**每一条效果都必须完整列出**，严禁遗漏、合并或省略任何一条。即使多条效果名称相同（如两个"攻击力提升"），只要目标类型或数值不同，就必须分别列出。
 5. **格式规范**：优先使用 Markdown 列表和粗体突出关键数据。
 6. **合理分类**：
    - 「技能效果」: 从者的主动技能效果。
@@ -158,14 +159,23 @@ def build_routing_prompt(
 
 ```json
 {{
-  "skill_calls": [
-    {{"skill_name": "search_by_class", "params": {{"className": "Caster"}}}},
-    {{"skill_name": "search_by_rarity", "params": {{"op": "eq", "value": 5}}}}
-  ],
+  "skill_calls": [],
   "response_skill": "respond_servant_list",
-  "fallback": null
+  "fallback": null,
+  "target_pipeline": null,
+  "atlas_query": null
 }}
 ```
+
+**重要说明**：
+- `target_pipeline` 取值：`null` = 默认走链路 A，`"B"` = Atlas 知识问答，`"C"` = 攻略知识问答
+- **当 `target_pipeline` 为 `"B"` 时，`atlas_query` 必须填写为一个对象（不能为 null）**，包含以下字段：
+  - `name`: 具体的活动名/卡池名/关卡名/素材名/从者名（字符串）
+  - `entry_type`: 条目类型（字符串，可选值：event/war/gacha/item）
+  - `tag`: 标签（字符串，可选）
+  - `year_month`: 时间（字符串，格式 YYYY-MM，可选）
+  - `linked_servant_id`: 关联从者 ID（整数，暂不填）
+- 如果无法提取具体信息，至少填写空对象 `{{}}`
 
 ## 路由规则
 1. **skill_name 必须严格从「可用 Skills」列表中选择，禁止编造任何不在列表中的 Skill 名称**
@@ -194,9 +204,11 @@ def build_routing_prompt(
 9. **禁止同 Skill 多次调用表达 OR**：当用户的查询涉及"任意一种"效果时（如"能挡伤害"、"能辅助"），**禁止**对同一个 Skill 发起多次调用。应使用单次调用的 `effects` + `effectsOp: "or"` 参数，或使用虚拟复合效果名（如 `damageBoost`、`damageShield`）。多个 skill_call 之间是 AND 关系，重复调用同一 Skill 会变成"必须同时满足所有条件"，导致结果为空。
 10. **宝具目标类型筛选（全体/单体）**：用户提到"全体宝具"/"全体攻击宝具"/"AOE宝具"时，使用 `search_by_cards` 的 `npTarget` 参数：`"all"` = 全体（光炮）、`"one"` = 单体、`"support"` = 辅助。同理，"单体宝具"对应 `npTarget: "one"`。**严禁**将"全体攻击宝具"误解为宝具特攻（`damageNpSP`），它们是完全不同的概念。
     - **FGO 俚语「d类特攻」「D特攻」**：玩家口中的"d类特攻"/"D特攻"是指**宝具附带的特攻效果**（`damageNpSP` 或 `damageNpIndividuality`），即宝具伤害对特定敌方特性有额外倍率。这是**宝具效果**，应使用 `search_by_np_effect(npEffect="damageNpSP")` 或 `search_by_np_effect(npEffect="damageNpIndividuality")`，**严禁**将"d类"误解为特性名称（如"死灵"），也**严禁**使用 `search_by_traits`。类似地，"w类特攻"指 `damageNpIndividualityAll`（全体宝具特攻）
-11. **效果的目标类型和数值条件**：效果类 Skill（`search_by_effect` / `search_by_skill_effect`）支持可选的 `targetType` 和 `minValue` 参数：
+11. **效果的目标类型和数值条件**：效果类 Skill（`search_by_effect` / `search_by_skill_effect`）支持可选的 `targetType`、`minValue`、`maxValue` 参数：
     - `targetType`：效果施加目标。`"self"` = 自身可获得的（含 self+全队含自己+单体队友）、`"party"` = 全队（含自己）、`"partyOther"` = 仅队友不含自己、`"ptOne"` = 单体队友、`"enemy"` = 敌方。用户说"给队友"/"全队"/"辅助"时传 `"party"`，说"自身"时传 `"self"`
-    - `minValue`：效果最小数值（百分比）。用户说"超过50%"/"大于30%"时传对应数值。如 `"minValue": 50` 表示 ≥50%
+    - `minValue`：效果最小数值（百分比）。用户说"超过50%"/"大于30%"/"50以上"时传对应数值。如 `"minValue": 50` 表示 ≥50%
+    - `maxValue`：效果最大数值（百分比）。用户说"不超过50%"/"小于30%"/"50以下"时传对应数值。如 `"maxValue": 50` 表示 ≤50%
+    - **精确匹配**：用户说"刚好"/"恰好"/"正好"/"等于"某个数值时，**同时传 `minValue` 和 `maxValue` 为相同值**。如"刚好50%"→ `"minValue": 50, "maxValue": 50`
     - 用户未提及目标或数值时**不要传**这些参数
 12. **特性搜索（search_by_traits）**：当用户查询从者的"特性"/"属性"/"标签"（如"龙特性"、"王特性"、"神性"、"活在当下的人类"、"兽科从者"、"圆桌骑士"、"秩序·善"等）时，使用 `search_by_traits`。参数 `traitNames` 传中文特性名列表（如 `["龙"]`、`["活在当下的人类"]`），系统会自动查表转换为 ID。常见特性举例：龙、王、神性、人类、圆桌骑士、兽科从者、活在当下的人类、夏日模式从者、童话特性从者等
     - 可选参数 `ascension`（整数 0-4）：指定灵基阶段。用户说"第三灵基"/"最终再临"/"泳装形态"时传对应值。灵基映射：0=初始、1=灵基一、2=灵基二、3=灵基三/最终再临、4=最终再临（部分从者）。不传此参数时，默认匹配全灵基并集（即该从者在任意灵基下拥有的所有特性）
@@ -209,8 +221,7 @@ def build_routing_prompt(
     - `targetType` 取值：`"self"` = 自身可获得的充能总量、`"party"` = 全队充能（含自己）、`"partyOther"` = 仅队友不含自己、`"ptOne"` = 单体队友
 15. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"、"哪个职阶克制XX"、"什么克制XX"等表达时，**必须**使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"、"月癌"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。**即使用户只问"哪个职阶克制X"这种看似知识性问题，也必须走 `search_by_class_advantage`**，系统会在结果中返回克制关系和对应从者。
 16. **疑似从者名称/昵称一律用 lookup_servant（重要）**：当用户的问题中包含你不确定是否为从者名称的词语（如"红A"、"小太阳"、"花之魔术师"、"老虚"、"CBA"、"XJB"、"呆毛"、"2B"等看起来像昵称/外号/缩写/纯字母组合的表达），**必须**使用 `lookup_servant`，将该词语作为 `name` 参数传入。系统后端支持昵称映射和模糊匹配，会自动处理识别。**绝不要**因为你不认识某个名称就返回 `no_match` 或 `out_of_scope`。只要用户的问题看起来是在查询或询问某个特定角色/从者，就选择 `lookup_servant`。**特别注意**：纯英文字母、数字组合、字母+数字混合（如"CBA"、"X4"、"2B"）在 FGO 社区中是常见的从者昵称缩写形式，绝不能因为看起来不像名字就判定为超出范围。如果用户同时问了从者详情（如"XX技能介绍"、"XX宝具是什么"），response_skill 选 `respond_servant_detail`。
-17. **戴冠战知识查询**：当用户提到"戴冠战"/"冠位"/"剑冠"/"弓冠"等并询问机制/星图/礼装/刷取策略/Boss怎么打时，使用 `coronation_knowledge`。参数 `topic` 从 ["机制","星图","礼装","刷取","boss"] 中选择。如果涉及特定职阶Boss（如"剑冠武藏"、"剑阶戴冠boss"），额外传 `className`（中文职阶名如"剑"/"弓"等）。response_skill 选 `respond_coronation`。
-18. **戴冠战配队推荐**：当用户提到"戴冠战"/"冠位"/"剑冠"等并询问"带谁"/"配队"/"推荐"/"XX辅助"/"打手"时，使用 `coronation_team`。`className` 必填（中文职阶名如"剑"/"弓"等）。可选 `playstyle`（流派名如"双宝具爆破"/"EX连击"）和 `role`（角色分类名如"出星辅助"/"充能辅助"/"增伤辅助"/"打手"）。用户未指定role时不传此参数（返回全部分类）。response_skill 选 `respond_coronation`。
+17. **戴冠战知识问答**：当用户提到"戴冠战"/"冠位"/"剑冠"/"弓冠"等并询问任何相关问题（机制/星图/礼装/刷取/Boss/配队/打手/条件/攻略等）时，设置 `"target_pipeline": "C"`，skill_calls 留空。
 19. **概念礼装查询（重要）**：当用户提到"礼装"/"概念礼装"/"CE"/"带XX效果的礼装"/"推荐礼装"时，必须使用 CE domain 的 Skills，response_skill 选 `respond_ce_list`：
     - **按名称/昵称查找**：`ce_lookup`，参数 `name`（如"万花筒"、"黑杯"、"2030"）
     - **按效果搜索**：`ce_search_by_effect`，参数 `effect`（效果名同从者效果体系，如 `gainNp`、`upBuster`、`invincible`）、可选 `limit_break`（默认 true 搜满破效果）
@@ -219,6 +230,30 @@ def build_routing_prompt(
     - **按获取方式筛选**：`ce_search_by_obtain`，参数 `obtain_type`（`permanent`=常驻、`limited`=限定、`event`=活动配布、`bond`=羁绊、`valentine`=情人节）
     - 多个 CE Skills 可组合使用（AND 关系），如"有NP充能效果的五星纯攻礼装"
     - ⚠️ **严禁**将礼装查询路由到从者 domain 的 Skills（如 `search_by_effect`），也**严禁**将从者查询路由到 CE Skills
+20. **Atlas 知识问答（链路 B）**：当用户询问以下内容时，设置 `"target_pipeline": "B"`，skill_calls 留空，**同时填写 `atlas_query` 字段提取结构化参数**：
+    - 活动相关："最近有什么活动"、"XX活动什么时候"、"去年周年庆"、"圣诞活动奖励"
+    - 卡池相关："XX第一次up"、"什么时候复刻"、"限定卡池"
+    - 主线关卡："特异点F"、"冬木"、"第二部第六章"、"主线进度"
+    - 素材掉落："XX在哪里掉"、"刷什么本效率高"
+    - 版本历史："去年出了什么新从者"、"XX年有哪些活动"
+    关键词参考：活动、卡池、up、复刻、主线、特异点、章节、素材、掉落、版本、周年、联动
+
+    **CRITICAL**: 当设置 target_pipeline="B" 时，atlas_query 字段必须填写且不能为 null！LLM 必须从用户问题中提取结构化参数填入 atlas_query。如果无法提取任何信息，至少填写空对象。**严禁将 atlas_query 留空或省略**！
+
+    **`atlas_query` 字段提取规则**：
+    - `name`：提取具体的活动名/卡池名/关卡名/素材名/从者名（如"圣诞祭"、"梅林"、"特异点F"、"龙之牙"），**不要填入整个问句**
+    - `entry_type`：根据问题类型推断（event=活动/war=主线关卡/gacha=卡池/item=素材）
+    - `tag`：如果能识别出具体标签则填写（如 event_type:campaign）
+    - `year_month`：如果用户提到具体时间（如"去年"、"2024年"、"周年庆"），尝试转换为 YYYY-MM 格式
+    - `linked_servant_id`：暂不填（留给后续迭代）
+
+21. **攻略知识问答（链路 C）**：当用户询问以下内容时，设置 `"target_pipeline": "C"`，skill_calls 留空：
+    - 关卡攻略："XX怎么打"、"Boss机制"、"通关阵容"
+    - 配队推荐："高难配队"、"周回队伍"、"泛用组队"、"戴冠战配队"
+    - 玩法分析："值不值得练"、"强度评价"、"对比分析"
+    - 主观评价："哪个好用"、"推荐优先度"
+    - 戴冠战相关：机制/星图/礼装/刷取/Boss/配队/打手/条件/攻略等所有戴冠战问题
+    关键词参考：攻略、打法、配队、阵容、推荐、评价、值得、强度、tier、节奏榜、戴冠、冠位、剑冠、弓冠、星图、Boss
 
 ## 示例
 
@@ -330,6 +365,21 @@ def build_routing_prompt(
 用户："有红魔放效果的礼装"（礼装效果查询）
 ```json
 {{"skill_calls": [{{"skill_name": "ce_search_by_effect", "params": {{"effect": "upBuster"}}}}], "response_skill": "respond_ce_list"}}
+```
+
+用户："什么时候复刻过梅林"（Atlas 卡池查询 → 链路 B，提取结构化参数）
+```json
+{{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": null, "target_pipeline": "B", "atlas_query": {{"name": "梅林", "entry_type": "gacha"}}}}
+```
+
+用户："特异点F是什么"（Atlas 主线关卡查询 → 链路 B）
+```json
+{{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": null, "target_pipeline": "B", "atlas_query": {{"name": "特异点F", "entry_type": "war"}}}}
+```
+
+用户："最近有什么活动"（Atlas 活动查询 → 链路 B）
+```json
+{{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": null, "target_pipeline": "B", "atlas_query": {{"entry_type": "event"}}}}
 ```
 """
 
