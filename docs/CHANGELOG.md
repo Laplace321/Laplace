@@ -4,6 +4,7 @@
 
 | 日期 | 事件 | 备注 |
 | :--- | :--- | :--- |
+| 2026-05-25 | v0.3.7 知识问答链路与查询精度提升 | A→B→C 三级知识问答链路（攻略文档 BM25 检索）；自充精确匹配/计算修正、技能效果完整展示、职阶别名识别、从者昵称扩展、日志页面样式修复 |
 | 2026-05-13 | LLM 昵称识别 + 路由层修复 | 新增 `resolve_nickname` Skill（异步 LLM 识别 + LRU 缓存 + DB 校验），修复路由 Prompt 对疑似从者名称的处理（规则 16），扩充高频昵称映射（红A/红弓/弓凛/枪凛/狮子王等），完整异步 fallback 链集成 |
 | 2026-05-12 | 职阶克制查询 + 空结果明示 | 新增 `search_by_class_advantage` Skill（基于 Atlas API 克制关系数据）；OneShot 结果为 0 时传递上下文给 Agent fallback，明确告知空结果+条件列表+放宽建议（Agent tokens 降低 85%） |
 | 2026-05-11 | OneShot优先+Agent兜底混合路由 | 回滚 OneShot 路由为主路径，3 个 fallback 点位最小侵入接入 Agent 兜底；llm_client.py 双 SDK 统一封装（dashscope SDK + openai SDK），移除 httpx 手动调用 |
