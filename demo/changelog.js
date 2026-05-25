@@ -81,8 +81,8 @@ function renderVersionContent(version) {
   `;
 
   const sectionsHtml = Object.entries(SECTION_CONFIG)
-    .filter(([key]) => version.sections[key] && version.sections[key].length > 0)
-    .map(([key, config]) => renderSection(key, config, version.sections[key]))
+    .filter(([key]) => version[key] && version[key].length > 0)
+    .map(([key, config]) => renderSection(key, config, version[key]))
     .join('');
 
   container.innerHTML = headerHtml + sectionsHtml;
