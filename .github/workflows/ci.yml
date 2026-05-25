@@ -48,6 +48,7 @@ jobs:
 
           # 标准库 + 已知内置模块白名单（不需要在 requirements.txt 中声明）
           STDLIB = {
+              '__future__',
               'os', 'sys', 're', 'json', 'time', 'uuid', 'pathlib', 'typing',
               'dataclasses', 'enum', 'abc', 'collections', 'functools', 'itertools',
               'logging', 'hashlib', 'math', 'datetime', 'copy', 'io', 'textwrap',
@@ -66,6 +67,21 @@ jobs:
           # 项目内部模块前缀
           INTERNAL_PREFIXES = ('server', 'tests', 'extractor', 'admin')
 
+          # 传递依赖白名单：这些包由已声明的依赖自动安装，无需单独声明
+          TRANSITIVE_DEPS = {
+              'starlette',       # fastapi 的底层依赖
+              'anyio',           # starlette/fastapi 的异步依赖
+              'sniffio',         # anyio 的依赖
+              'h11',             # uvicorn/httpx 的 HTTP 解析依赖
+              'certifi',         # requests/httpx 的 CA 证书
+              'charset_normalizer', 'chardet',  # requests 的编码检测
+              'idna',            # requests/httpx 的域名编码
+              'annotated_types', 'typing_extensions',  # pydantic 的依赖
+              'jiter',           # openai SDK 的 JSON 解析依赖
+              'distro',          # openai SDK 的系统信息依赖
+              'tqdm',            # dashscope 的进度条依赖
+          }
+
           # 扫描 server/ 下所有 .py 文件的顶层 import
           imported_pkgs = set()
           for py_file in Path('server').rglob('*.py'):
@@ -77,11 +93,20 @@ jobs:
                       if pkg not in STDLIB and not any(pkg.startswith(p) for p in INTERNAL_PREFIXES):
                           imported_pkgs.add(pkg)
 
-          # 特殊映射：import yaml → 包名 pyyaml
-          ALIAS_MAP = {'yaml': 'pyyaml', 'cv2': 'opencv_python', 'PIL': 'pillow', 'bs4': 'beautifulsoup4'}
+          # 特殊映射：import 名 → requirements.txt 中的包名
+          ALIAS_MAP = {
+              'yaml': 'pyyaml',
+              'dotenv': 'python_dotenv',
+              'cv2': 'opencv_python',
+              'PIL': 'pillow',
+              'bs4': 'beautifulsoup4',
+          }
           normalized_imported = set()
           for pkg in imported_pkgs:
-              normalized_imported.add(ALIAS_MAP.get(pkg, pkg))
+              normalized = ALIAS_MAP.get(pkg, pkg)
+              # 排除传递依赖（由已声明包自动安装）
+              if normalized not in TRANSITIVE_DEPS:
+                  normalized_imported.add(normalized)
 
           missing = normalized_imported - declared
           if missing:
