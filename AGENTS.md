@@ -126,10 +126,12 @@
 - **准则**：**[绝对纪律]** 任何涉及 `server/` 目录下 Python 代码、Prompt 模板或配置文件（JSON）的修改，以及任何本地 Bug 修复后需要重启服务才能生效验证的场景，**必须由 AI 主动执行服务重启和验证**，禁止要求用户手动重启或手动验证。
 - **执行**：
   1. 确认虚拟环境已激活（参见上方第 0 条）。
-  2. 使用 `pkill -f uvicorn` 或类似命令清理旧进程。
-  3. 使用后台方式启动服务：`nohup python3 -m uvicorn server.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &`
-  4. 等待 3 秒后执行健康检查：`curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/health`，确认返回 200。
-  5. 如果健康检查失败，查看 `/tmp/uvicorn.log` 排查错误。
+  2. 使用 `pkill -9 -f uvicorn` 强制清理旧进程（必须用 `-9` SIGKILL，避免优雅关闭超时导致端口未释放）。
+  3. 等待 2 秒后确认端口已释放：`lsof -ti:8000`。如果仍有输出，再次 `lsof -ti:8000 | xargs kill -9` 并等待 1 秒。**严禁在端口未释放时启动新进程**，否则新进程绑定失败但健康检查可能误连旧进程，导致"修复无效"假象。
+  4. 清除 Python 字节码缓存：`find server/ -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null`。
+  5. 使用后台方式启动服务：`nohup python3 -m uvicorn server.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &`
+  6. 等待 3 秒后执行健康检查：`curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/health`，确认返回 200。
+  7. 如果健康检查失败，查看 `/tmp/uvicorn.log` 排查错误。**特别注意 `address already in use` 错误**，这表示旧进程未完全退出，需回到步骤 2 重新清理。
 - **适用场景**：
   - 修改了 `server/` 下的 Python 代码、Prompt、配置文件
   - 修复了 Bug 且修复效果需要服务重启后才能验证

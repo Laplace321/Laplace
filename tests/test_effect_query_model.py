@@ -272,3 +272,107 @@ class TestTotalSelfChargeCalculation:
                 if tt in ("self", "party", "ptOne"):
                     total += eff.get("valueMax", 0) // 100
         assert total == 50  # 只有 self 的 50%，partyOther 的 30% 不算入
+
+
+# ============================================================
+# 测试: partyOther 重分类不应污染 self 查询（fix-self-target-partyother-contamination）
+# ============================================================
+
+
+@pytest.fixture
+def louhi_like():
+    """模拟娄希：self 80% + partyOther 20%（同技能）。
+
+    自充应为 80%，partyOther 给队友的 20% 不应计入自充。
+    """
+    return {
+        "skillEffects": ["gainNp"],
+        "skillDetails": [
+            {
+                "skillNum": 3,
+                "skillName": "Rune of Wisdom",
+                "effects": [
+                    {
+                        "type": "gainNp",
+                        "funcType": "gainNp",
+                        "targetType": "self",
+                        "valueMax": 8000,
+                        "turn": 0,
+                        "count": 0,
+                    },
+                    {
+                        "type": "gainNp",
+                        "funcType": "gainNp",
+                        "targetType": "partyOther",
+                        "valueMax": 2000,
+                        "turn": 0,
+                        "count": 0,
+                    },
+                ],
+            },
+        ],
+    }
+
+
+@pytest.fixture
+def moriarty_like():
+    """模拟莫里亚蒂技能三：全队加攻20% + 队友加攻20%（同技能）。
+
+    party 查询时 partyOther 应重分类为 party，合计 40%。
+    self 查询时只算 party 的 20%（自身获得的），partyOther 不计入。
+    """
+    return {
+        "skillEffects": ["upAtk"],
+        "skillDetails": [
+            {
+                "skillNum": 3,
+                "skillName": "Evil Charisma A",
+                "effects": [
+                    {
+                        "type": "upAtk",
+                        "funcType": "addStateShort",
+                        "targetType": "party",
+                        "valueMax": 2000,
+                        "turn": 3,
+                        "count": -1,
+                    },
+                    {
+                        "type": "upAtk",
+                        "funcType": "addStateShort",
+                        "targetType": "partyOther",
+                        "valueMax": 2000,
+                        "turn": 3,
+                        "count": -1,
+                    },
+                ],
+            },
+        ],
+    }
+
+
+class TestPartyOtherReclassificationSelfGuard:
+    """验证 partyOther 重分类不会污染 self 查询结果。"""
+
+    def test_louhi_self_100_miss(self, louhi_like):
+        """娄希 self=80 + partyOther=20 → 查 self≥100 不命中（自充仅80%）。"""
+        assert _match_effect(louhi_like, "gainNp", target_type="self", min_value=10000) is False
+
+    def test_louhi_self_80_hit(self, louhi_like):
+        """娄希 self=80 → 查 self≥80 命中。"""
+        assert _match_effect(louhi_like, "gainNp", target_type="self", min_value=8000) is True
+
+    def test_moriarty_party_20_hit(self, moriarty_like):
+        """莫里亚蒂 party=20 + partyOther=20 → 查 party≥20 命中（重分类生效）。"""
+        assert _match_effect(moriarty_like, "upAtk", target_type="party", min_value=2000) is True
+
+    def test_moriarty_party_40_miss(self, moriarty_like):
+        """莫里亚蒂 party+partyOther=40 但自身仅获得20 → 查 party≥40 不命中（复合判定：自身需≥40）。"""
+        assert _match_effect(moriarty_like, "upAtk", target_type="party", min_value=4000) is False
+
+    def test_moriarty_self_20_hit(self, moriarty_like):
+        """莫里亚蒂 party=20（自身可获得）→ 查 self≥20 命中。"""
+        assert _match_effect(moriarty_like, "upAtk", target_type="self", min_value=2000) is True
+
+    def test_moriarty_self_40_miss(self, moriarty_like):
+        """莫里亚蒂 self 查询不含 partyOther → 查 self≥40 不命中。"""
+        assert _match_effect(moriarty_like, "upAtk", target_type="self", min_value=4000) is False

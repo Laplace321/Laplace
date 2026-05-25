@@ -27,6 +27,7 @@ MAX_RESULTS = 50
 TARGET_TYPE_MAP = {
     "self": "自身",
     "party": "全队",
+    "partyOther": "队友",
     "ptOne": "单体（含自身）",
     "enemy": "敌方",
     "other": "其他",
