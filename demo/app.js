@@ -501,6 +501,9 @@ function handleStreamEvent(eventType, data, els) {
     case "servants":
       handleServants(data, els);
       break;
+    case "clarification":
+      handleClarification(data, els);
+      break;
     case "delta":
       handleDelta(data, els);
       break;
@@ -547,6 +550,123 @@ function handleThinking(data, els) {
       detail.className = "thinking-step-detail";
       detail.textContent = JSON.stringify(data.conditions);
       els.thinkingSteps.appendChild(detail);
+    }
+  }
+}
+
+// === Handle Clarification Event ===
+function handleClarification(data, els) {
+  // 移除骨架屏
+  const skel = els.container.querySelector(".skeleton-placeholder");
+  if (skel) skel.remove();
+
+  // 完成当前活跃的 thinking step
+  const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
+  if (activeStep) completeThinkingStep(activeStep);
+
+  // 渲染确认问题
+  const group = document.createElement("div");
+  group.className = "clarification-group";
+
+  const question = document.createElement("div");
+  question.className = "clarification-question";
+  question.textContent = data.question || "请确认你的查询条件：";
+  group.appendChild(question);
+
+  // 渲染选项按钮
+  const btnRow = document.createElement("div");
+  btnRow.className = "clarification-btn-row";
+  (data.options || []).forEach((opt) => {
+    const btn = document.createElement("button");
+    btn.className = "clarification-btn";
+    btn.textContent = opt.label;
+    btn.dataset.optionId = opt.id;
+    btn.addEventListener("click", () => {
+      // 禁用所有按钮，高亮选中
+      group.querySelectorAll(".clarification-btn").forEach((b) => {
+        b.disabled = true;
+        b.classList.toggle("selected", b === btn);
+      });
+      const inputEl = group.querySelector(".clarification-input");
+      if (inputEl) inputEl.disabled = true;
+      // 发起确认后的精确查询
+      sendWithConfirmation(opt.label);
+    });
+    btnRow.appendChild(btn);
+  });
+  group.appendChild(btnRow);
+
+  // 渲染自定义输入框
+  const inputRow = document.createElement("div");
+  inputRow.className = "clarification-input-row";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "clarification-input";
+  input.placeholder = "或输入自定义回复...";
+  const submitBtn = document.createElement("button");
+  submitBtn.className = "clarification-btn clarification-submit-btn";
+  submitBtn.textContent = "确认";
+  submitBtn.addEventListener("click", () => {
+    const customText = input.value.trim();
+    if (!customText) return;
+    group.querySelectorAll(".clarification-btn").forEach((b) => (b.disabled = true));
+    input.disabled = true;
+    sendWithConfirmation(customText);
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submitBtn.click();
+  });
+  inputRow.appendChild(input);
+  inputRow.appendChild(submitBtn);
+  group.appendChild(inputRow);
+
+  els.replyBody.innerHTML = "";
+  els.replyBody.appendChild(group);
+  els.replyBody.classList.remove("stream-hidden");
+}
+
+// === Send query with confirmation context ===
+async function sendWithConfirmation(confirmationText) {
+  // 获取最后一条用户消息作为原始查询
+  const lastUserMsg = chatHistory.filter((m) => m.role === "user").pop();
+  const originalQuery = lastUserMsg ? lastUserMsg.text || lastUserMsg.html?.replace(/<[^>]*>/g, "") || "" : "";
+
+  // 复用现有的 stream 发送逻辑，携带 confirmation_context
+  const query = originalQuery || chatInput.value.trim();
+  if (!query) return;
+
+  // 创建新的助手消息容器（复用 createStreamingContainer）
+  const els = createStreamingContainer();
+  _streamAccumulatedText = "";
+
+  try {
+    const url = `${STREAM_API_URL}?message=${encodeURIComponent(query)}&confirmation_context=${encodeURIComponent(confirmationText)}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = parseSSE(buffer);
+      buffer = events.remainder;
+
+      for (const ev of events.parsed) {
+        handleStreamEvent(ev.event, ev.data, els);
+      }
+    }
+
+    // Finalize: remove cursor if present
+    const cursor = els.replyBody.querySelector(".stream-cursor");
+    if (cursor) cursor.remove();
+  } catch (err) {
+    if (err.name !== "AbortError") {
+      handleError({ message: `确认请求失败: ${err.message}` }, els);
     }
   }
 }

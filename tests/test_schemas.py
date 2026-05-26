@@ -169,3 +169,122 @@ class TestRoutingResponseValidation:
         data = {"intent": "query_servants", "conditions": {"className": "Saber"}}
         resp = RoutingResponse.model_validate(data)
         assert resp.skill_calls == []
+
+
+# ============================================================
+# Clarification 机制测试
+# ============================================================
+
+
+class TestClarification:
+    """用户确认机制（clarification）相关测试。"""
+
+    def test_clarification_option_creation(self):
+        from server.schemas import ClarificationOption
+
+        opt = ClarificationOption(id="party", label="全队暴击伤害UP")
+        assert opt.id == "party"
+        assert opt.label == "全队暴击伤害UP"
+
+    def test_clarification_request_creation(self):
+        from server.schemas import ClarificationOption, ClarificationRequest
+
+        req = ClarificationRequest(
+            question="你想查哪种类型的暴击拐？",
+            options=[
+                ClarificationOption(id="party", label="全队暴击伤害UP"),
+                ClarificationOption(id="self", label="自身暴击伤害UP"),
+            ],
+            ambiguous_field="targetType",
+        )
+        assert req.question == "你想查哪种类型的暴击拐？"
+        assert len(req.options) == 2
+        assert req.ambiguous_field == "targetType"
+
+    def test_clarification_request_default_ambiguous_field(self):
+        from server.schemas import ClarificationOption, ClarificationRequest
+
+        req = ClarificationRequest(
+            question="确认问题",
+            options=[ClarificationOption(id="a", label="选项A")],
+        )
+        assert req.ambiguous_field == ""
+
+    def test_routing_response_with_clarification(self):
+        """RoutingResponse 含 clarification 时 skill_calls 应为空。"""
+        data = {
+            "skill_calls": [],
+            "response_skill": "respond_servant_list",
+            "clarification": {
+                "question": "你想查哪种类型的暴击拐？",
+                "options": [
+                    {"id": "party", "label": "全队暴击伤害UP"},
+                    {"id": "self", "label": "自身暴击伤害UP"},
+                    {"id": "ptOne", "label": "给单个队友暴击伤害UP"},
+                ],
+                "ambiguous_field": "targetType",
+            },
+        }
+        resp = RoutingResponse.model_validate(data)
+        assert resp.skill_calls == []
+        assert resp.clarification is not None
+        assert resp.clarification.question == "你想查哪种类型的暴击拐？"
+        assert len(resp.clarification.options) == 3
+        assert resp.clarification.options[0].id == "party"
+
+    def test_routing_response_without_clarification(self):
+        """无 clarification 时字段为 None，原有流程不受影响。"""
+        data = {
+            "skill_calls": [{"skill_name": "search_by_effect", "params": {"effect": "gainNp"}}],
+            "response_skill": "respond_servant_list",
+        }
+        resp = RoutingResponse.model_validate(data)
+        assert resp.clarification is None
+        assert len(resp.skill_calls) == 1
+
+    def test_parse_routing_response_with_clarification(self):
+        """parse_routing_response 正确解析含 clarification 的 JSON。"""
+        json_str = json.dumps(
+            {
+                "skill_calls": [],
+                "response_skill": "respond_servant_list",
+                "fallback": None,
+                "target_pipeline": None,
+                "clarification": {
+                    "question": "你想查哪种暴击拐？",
+                    "options": [{"id": "party", "label": "全队暴击UP"}],
+                    "ambiguous_field": "targetType",
+                },
+            }
+        )
+        result = parse_routing_response(json_str)
+        assert result["clarification"] is not None
+        assert result["clarification"]["question"] == "你想查哪种暴击拐？"
+        assert result["skill_calls"] == []
+
+    def test_parse_routing_response_without_clarification_unchanged(self):
+        """无 clarification 时 parse_routing_response 行为与之前完全一致。"""
+        json_str = '{"skill_calls": [{"skill_name": "search_by_class", "params": {"className": "Archer"}}], "response_skill": "respond_servant_list"}'
+        result = parse_routing_response(json_str)
+        assert result.get("clarification") is None
+        assert len(result["skill_calls"]) == 1
+
+    def test_json_schema_includes_clarification(self):
+        """routing_response_json_schema 输出中包含 clarification 字段定义。"""
+        schema = routing_response_json_schema()
+        props = schema.get("properties", {})
+        assert "clarification" in props
+
+    def test_clarification_extra_fields_ignored(self):
+        """ClarificationOption/Request 的 extra 字段被忽略。"""
+        from server.schemas import ClarificationOption, ClarificationRequest
+
+        opt = ClarificationOption(id="x", label="test", unknown_field="ignored")
+        assert opt.id == "x"
+
+        req = ClarificationRequest(
+            question="q",
+            options=[ClarificationOption(id="a", label="A")],
+            extra="ignored",
+        )
+        assert req.question == "q"

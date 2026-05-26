@@ -85,6 +85,7 @@ class ChatRequest(BaseModel):
     preset_name: str | None = None
     params: dict | list | None = None
     response_skill: str | None = None
+    confirmation_context: str | None = None
 
 
 @app.get("/api/traces")
@@ -297,15 +298,22 @@ async def chat(request: ChatRequest, raw_request: Request):
         response_skill_name=resolved_response_skill,
         client_ip=client_ip,
         target_pipeline=resolved_target_pipeline,
+        confirmation_context=request.confirmation_context,
     )
 
 
 @app.get("/api/chat/stream")
-async def chat_stream(request: Request, message: str, preset_name: str | None = None):
+async def chat_stream(
+    request: Request,
+    message: str,
+    preset_name: str | None = None,
+    confirmation_context: str | None = None,
+):
     """SSE 流式对话端点 — 分阶段推送思考过程和结果。
 
     使用 Skill-Based Architecture：Stage 1 LLM 路由 → SkillExecutor → RAG 生成。
     支持 preset_name 参数：有值时跳过 LLM 路由，直接展开预设 skill_calls。
+    支持 confirmation_context 参数：用户确认选择后携带的上下文，用于精确路由。
     """
     client_ip = (
         request.headers.get("x-forwarded-for", "").split(",")[0].strip() or request.client.host
@@ -314,7 +322,9 @@ async def chat_stream(request: Request, message: str, preset_name: str | None = 
     )
 
     async def event_generator():
-        async for event in stream_event_generator(message, preset_name, client_ip=client_ip):
+        async for event in stream_event_generator(
+            message, preset_name, client_ip=client_ip, confirmation_context=confirmation_context
+        ):
             yield event
 
     return StreamingResponse(

@@ -1372,3 +1372,90 @@ body {
 .rating-btn.active .rating-emoji {
   transform: scale(1.1);
 }
+
+/* ══════════════════════════════════════════════════════════
+   Clarification（用户确认）组件
+   ══════════════════════════════════════════════════════════ */
+
+.clarification-group {
+  padding: 12px 0;
+  animation: fadeIn 0.3s ease;
+}
+
+.clarification-question {
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.clarification-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.clarification-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.clarification-btn:hover:not(:disabled) {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+  background: rgba(212, 168, 67, 0.08);
+}
+
+.clarification-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clarification-btn.selected {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+  background: rgba(212, 168, 67, 0.15);
+  font-weight: 500;
+}
+
+.clarification-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.clarification-input {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.clarification-input:focus {
+  border-color: var(--accent-gold);
+}
+
+.clarification-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clarification-submit-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 12px;
+}

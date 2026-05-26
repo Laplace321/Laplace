@@ -174,9 +174,17 @@
       "outputFormat": {
         "skill_calls": "[{skill_name, params}]",
         "response_skill": "respond_servant_list | respond_servant_detail | ...",
-        "fallback": "{code, message} | null"
+        "fallback": "{code, message} | null",
+        "clarification": "{question, options: [{id, label}], ambiguous_field} | null — 参数歧义时暂停流程请求用户确认"
       },
-      "routingRules": "18 条路由规则，涵盖效果类查询路由、NP充能精确路由、特性搜索、职阶克制、昵称识别、戴冠战等"
+      "routingRules": "23 条路由规则，涵盖效果类查询路由、NP充能精确路由、特性搜索、职阶克制、昵称识别、戴冠战、参数完整性检查（用户确认机制）等",
+      "clarificationMechanism": {
+        "description": "两阶段路由：LLM 先识别 Skill + 提取实体，判断参数是否完整/无歧义；不完整时输出 clarification 暂停流程",
+        "triggerScenarios": ["targetType 歧义（全队/自身/单体）", "从者名多候选", "语义歧义（Skill/效果不明确）"],
+        "skipScenarios": ["rarity/className/minValue 未指定时用默认值", "效果仅有单一合理 targetType"],
+        "frontendFlow": "SSE clarification 事件 → 渲染选项按钮 → 用户选择 → 携带 confirmation_context 重新路由",
+        "tokenCost": "无歧义时零额外成本；有歧义时多一次路由调用（约 300-500 tokens）"
+      }
     },
     "skills": {
       "framework": {
@@ -334,6 +342,7 @@
         {"name": "context_build", "content": "applied_filters、context 大小"},
         {"name": "generation_input", "content": "Generation Prompt 元数据"},
         {"name": "generation_output", "content": "最终回复、generation_usage"},
+        {"name": "clarification_requested", "content": "确认问题、选项列表、歧义参数名"},
         {"name": "agent_detail", "content": "Agent 轮次、tokens、tool_trace"},
         {"name": "final", "content": "总耗时、mode、total_tokens"}
       ]
@@ -420,6 +429,7 @@
     {"id": "ADR-010", "title": "Knowledge-Config Separation", "summary": "领域知识与可运营配置物理隔离"},
     {"id": "ADR-018", "title": "Skill-Based Architecture", "summary": "查询逻辑模块化为独立 Skill，@register_skill 自动注册"},
     {"id": "ADR-020", "title": "Effect Quantitative Filter", "summary": "效果量化筛选（数值/目标/回合数三维过滤）"},
-    {"id": "ADR-021", "title": "Agentic Tool-Use Routing", "summary": "OneShot 优先 + Agent 兜底混合路由策略"}
+    {"id": "ADR-021", "title": "Agentic Tool-Use Routing", "summary": "OneShot 优先 + Agent 兜底混合路由策略"},
+    {"id": "ADR-023", "title": "Link-A Clarification Mechanism", "summary": "链路 A 两阶段路由：LLM 参数完整性检查 + 用户确认机制，解决歧义查询问题"}
   ]
 }

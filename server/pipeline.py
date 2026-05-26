@@ -52,12 +52,19 @@ async def handle_skill_mode(
     response_skill_name: str = "respond_servant_list",
     client_ip: str = "unknown",
     target_pipeline: str = "A",
+    confirmation_context: str | None = None,
 ) -> ChatResponse:
     """Skill 模式的核心处理逻辑。
 
     接收已确定的 skill_calls（来自 LLM 路由或前端直传），
     执行 SkillExecutor 并生成 RAG 回复。
+
+    Args:
+        confirmation_context: 用户确认选择后回传的上下文，拼接到 user_message 进行精确路由。
     """
+    # 用户确认后的第二次请求：将选择上下文拼接到消息
+    if confirmation_context:
+        user_message = f"{user_message}\n[用户确认：{confirmation_context}]"
     request_start = time.monotonic()
     executor = SkillExecutor()
     model_used = "skill_mode"
@@ -156,6 +163,40 @@ async def handle_skill_mode(
             if target_pipeline == "C":
                 return await _handle_guide_pipeline(
                     user_message, trace_id, model_used, request_start, trace_total_tokens
+                )
+
+            # ── 用户确认机制：检测 clarification ──
+            clarification = routing_result.get("clarification")
+            if clarification:
+                await log_trace_event(
+                    trace_id,
+                    "clarification_requested",
+                    {
+                        "question": clarification.get("question", ""),
+                        "options": clarification.get("options", []),
+                        "ambiguous_field": clarification.get("ambiguous_field", ""),
+                    },
+                )
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": (time.monotonic() - request_start) * 1000,
+                        "result": "clarification_requested",
+                        "mode": "clarification",
+                        "total_tokens": trace_total_tokens,
+                    },
+                )
+                return ChatResponse(
+                    reply="",
+                    servants=[],
+                    count=0,
+                    query={
+                        "mode": "clarification",
+                        "clarification": clarification,
+                    },
+                    model=model_used,
+                    traceId=trace_id,
                 )
 
             # 检查 fallback
@@ -521,15 +562,28 @@ async def handle_skill_mode(
     )
 
 
-async def stream_event_generator(message: str, preset_name: str | None = None, *, client_ip: str = "unknown"):
+async def stream_event_generator(
+    message: str,
+    preset_name: str | None = None,
+    *,
+    client_ip: str = "unknown",
+    confirmation_context: str | None = None,
+):
     """SSE 流式事件生成器 — 分阶段推送思考过程和结果。
 
     从 main.py chat_stream() 内部的 event_generator() 抽取。
+
+    Args:
+        confirmation_context: 用户确认选择后回传的上下文，拼接到 message 进行精确路由。
     """
     trace_id = uuid.uuid4().hex[:8]
     stream_start = time.monotonic()
     model_used = "unknown"
     trace_total_tokens = 0  # 累计 token 消耗
+
+    # 用户确认后的第二次请求：将选择上下文拼接到消息
+    if confirmation_context:
+        message = f"{message}\n[用户确认：{confirmation_context}]"
 
     # ── 阶段 1: Skill 路由（或 Preset 展开） ──
     if preset_name:
@@ -784,6 +838,29 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
                 )
                 yield sse_event("done", {"model": model_used, "traceId": trace_id})
                 return
+
+        # ── 用户确认机制：检测 clarification ──
+        clarification = routing_result.get("clarification")
+        if clarification:
+            await log_trace_event(
+                trace_id,
+                "clarification_requested",
+                {
+                    "question": clarification.get("question", ""),
+                    "options": clarification.get("options", []),
+                    "ambiguous_field": clarification.get("ambiguous_field", ""),
+                },
+            )
+            yield sse_event(
+                "clarification",
+                {
+                    "question": clarification["question"],
+                    "options": clarification["options"],
+                    "trace_id": trace_id,
+                },
+            )
+            yield sse_event("done", {"model": model_used, "traceId": trace_id, "needs_confirmation": True})
+            return
 
         # 推送路由结果（预消化：中文描述替代原始英文 skill_name）
         yield sse_event(
