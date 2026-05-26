@@ -447,6 +447,10 @@ function parseSSE(text) {
 
 // === Create Streaming Container ===
 function createStreamingContainer() {
+  // 重置流式文本累积变量，确保每次新请求不拼接上一次的内容
+  // A 链路推送完整回复（累积后即完整内容），C 链路推送增量片段（需逐次追加）
+  _streamAccumulatedText = "";
+
   const msg = document.createElement("div");
   msg.className = "message assistant-message";
 
@@ -581,12 +585,17 @@ function renderMarkdown(text) {
 }
 
 // === Handle Delta Event ===
+// 累积流式文本片段，每次 delta 追加后整体渲染 markdown
+let _streamAccumulatedText = "";
+
 function handleDelta(data, els) {
   // Complete generating step
   const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
   if (activeStep) completeThinkingStep(activeStep);
 
-  const replyHtml = renderMarkdown(data.text);
+  // 追加增量文本片段（而非替换）
+  _streamAccumulatedText += data.text || "";
+  const replyHtml = renderMarkdown(_streamAccumulatedText);
   els.replyBody.innerHTML = replyHtml + '<span class="stream-cursor"></span>';
   void els.replyBody.offsetHeight;
   els.replyBody.classList.remove("stream-hidden");

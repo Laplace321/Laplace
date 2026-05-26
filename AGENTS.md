@@ -26,7 +26,15 @@
 ```
 类型包括：`feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
-2. **Push 前必须通过三步本地验证**：
+2. **[绝对纪律] 禁止直接在 main 分支上开发**：
+   > 每次新增功能、修复 Bug、重构或任何非文档性质的代码变更，**必须**在新分支上进行，严禁直接在 `main` 分支上 commit。
+   - **分支命名规范**：`feat/<slug>`（新功能）、`fix/<slug>`（Bug 修复）、`refactor/<slug>`（重构）、`chore/<slug>`（工程改进）
+   - **工作流程**：`git checkout -b feat/xxx` → 开发 → 本地三步验证通过 → commit + push → 用户确认无误后 merge 回 main
+   - **例外情况**：仅纯文档更新（如 CHANGELOG、README 错别字修正）可直接在 main 上提交，但仍建议走分支流程
+   - **违规后果**：直接在 main 上开发会导致未验证代码污染主线，CI 失败影响所有人，且无法安全回滚
+   - **AI 执行要求**：接到开发任务时，AI 必须主动创建新分支再开始编码，不得等待用户提醒。如果当前已在 main 分支且有未提交变更，必须先 stash 或创建分支后再操作
+
+3. **Push 前必须通过三步本地验证**：
 > **[非常重要]** 每次 `git commit` 前，必须依次执行以下三步验证，全部通过后才能 commit + push：
 > ```bash
 > source .venv/bin/activate                   # 先激活虚拟环境！
@@ -360,6 +368,21 @@
   - **严禁**使用扁平结构（如 `{"version", "date", "title", "features": [], "fixes": [], "others": []}`），这会导致 `changelog.js` 无法渲染
   - 新增版本时，先读取 `changelog-data.json` 中已有版本的实际结构作为参照，确保格式完全一致
   - 写入 JSON 后，**必须**在本地浏览器打开 `demo/changelog.html` 验证最新版本渲染正确（features/fixes/others 各分区均有内容显示），确认无误后再提交- **目的**：确保更新日志生成流程标准化、可重复，杜绝手工编写 JSON 的低效和遗漏。
+
+### 15. LLM Streaming 接口一致性 (Streaming Interface Consistency)
+- **准则**：**[绝对纪律]** `chat_completion_stream()` 与 `chat_completion()` 的参数语义和行为约束需保持一致。所有 LLM 调用（流式与非流式）统一经过 `server/llm/provider.py` 调度，禁止在 pipeline 层绕过 provider 直接调用 SDK。
+- **执行**：
+  1. **新增/修改 Adapter** → 必须同时实现 `chat_completion()` 和 `chat_completion_stream()` 两个接口
+  2. **修改 Provider 调度逻辑**（降级策略、模型选择、错误处理）→ 需同时覆盖 streaming 和非 streaming 两条路径
+  3. **变更 Prompt / temperature / max_tokens 等参数** → 检查 `_build_guide_generation_prompt()` 和 `_handle_guide_pipeline()` 是否需要同步更新
+  4. **升级 OpenAI SDK / DashScope SDK** → 同时验证 `chat_completion()` 和 `chat_completion_stream()` 两处兼容性
+- **关键文件对照表**：
+  | 非流式接口 | 流式接口 |
+  |:---|:---|
+  | `server/llm/base.py` → `chat_completion()` | `server/llm/base.py` → `chat_completion_stream()` |
+  | `server/llm/provider.py` → `chat_completion()` | `server/llm/provider.py` → `chat_completion_stream()` |
+  | `server/pipeline.py` → `_handle_guide_pipeline()` | `server/pipeline.py` → `stream_event_generator()` 链路 C 分支 |
+- **目的**：确保流式与非流式路径行为一致，避免功能漂移。此约束已同步记录到记忆系统 `feedback_bc_generation_adapter_decoupling.md`。
 
 ## 禁止事项
 

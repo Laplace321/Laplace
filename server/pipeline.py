@@ -24,7 +24,7 @@ from server.fallback import (
     classify_agent_reply,
     sse_event,
 )
-from server.llm import chat_completion
+from server.llm import StreamMetadata, chat_completion, chat_completion_stream
 from server.logger import log_trace_event
 from server.prompts import build_routing_prompt, get_generation_prompt
 from server.schemas import parse_routing_response, routing_response_json_schema
@@ -718,16 +718,72 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
                     trace_total_tokens,
                     routing_result.get("atlas_query"),
                 )
+                try:
+                    yield sse_event("delta", {"text": atlas_response.reply})
+                except Exception:
+                    pass
+                yield sse_event("done", {"model": atlas_response.model, "traceId": trace_id})
+                return
             else:
-                atlas_response = await _handle_guide_pipeline(
-                    message, trace_id, model_used, stream_start, trace_total_tokens
+                # 链路 C：流式 generation
+                guide_result = _prepare_guide_context(message)
+
+                await log_trace_event(
+                    trace_id,
+                    "guide_search",
+                    {"query": message, "result_count": len(guide_result[0]) if guide_result else 0},
                 )
-            try:
-                yield sse_event("delta", {"text": atlas_response.reply})
-            except Exception:
-                pass
-            yield sse_event("done", {"model": atlas_response.model, "traceId": trace_id})
-            return
+
+                if guide_result is None:
+                    no_match_reply = "抱歉，我在攻略库中未找到相关内容。你可以尝试更具体的关键词，如职阶名或关卡名。"
+                    yield sse_event("delta", {"text": no_match_reply})
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
+                            "result": "guide_no_match",
+                            "mode": "guide_pipeline",
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                    yield sse_event("done", {"model": model_used, "traceId": trace_id})
+                    return
+
+                chunks, source_labels, source_authors = guide_result
+                guide_context = _build_guide_context_text(chunks)
+                generation_prompt = _build_guide_generation_prompt(guide_context, message)
+
+                full_reply_parts: list[str] = []
+                async for chunk in chat_completion_stream(
+                    system_prompt=generation_prompt,
+                    user_message=message,
+                    temperature=0.3,
+                    max_tokens=2048,
+                ):
+                    full_reply_parts.append(chunk)
+                    yield sse_event("delta", {"text": chunk})
+
+                # 流式结束后追加来源标注
+                source_suffix = _format_source_suffix(source_labels, source_authors)
+                if source_suffix:
+                    full_reply_parts.append(source_suffix)
+                    yield sse_event("delta", {"text": source_suffix})
+
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
+                        "result": "guide_pipeline",
+                        "mode": "guide_pipeline",
+                        "guide_chunks": len(chunks),
+                        "sources": list(source_labels),
+                        "total_tokens": "streaming",
+                    },
+                )
+                yield sse_event("done", {"model": model_used, "traceId": trace_id})
+                return
 
         # 推送路由结果（预消化：中文描述替代原始英文 skill_name）
         yield sse_event(
@@ -1028,18 +1084,26 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
     )
 
     final_result = "success"
+    gen_usage: dict = {}
+    full_reply_parts: list[str] = []
+
     try:
-        generation_response = await chat_completion(
+        stream_metadata = StreamMetadata()
+        async for chunk in chat_completion_stream(
             system_prompt=(
                 "You are a helpful AI assistant. You MUST strictly follow "
                 "the provided data and NEVER use your internal knowledge about FGO."
             ),
             user_message=gen_prompt,
             temperature=0.1,
-            json_mode=False,
-        )
-        final_reply = generation_response.get("text", "").strip()
-        gen_usage = generation_response.get("_usage", {})
+            max_tokens=2048,
+            metadata=stream_metadata,
+        ):
+            full_reply_parts.append(chunk)
+            yield sse_event("delta", {"text": chunk})
+
+        final_reply = "".join(full_reply_parts).strip()
+        gen_usage = stream_metadata.usage
         trace_total_tokens += gen_usage.get("total_tokens", 0)
         if not final_reply:
             raise ValueError("Empty response from LLM")
@@ -1052,6 +1116,15 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
             )
         )
         final_result = "generation_error"
+        # 如果流式过程中已推送了部分内容，不再重复推送 fallback
+        if full_reply_parts:
+            final_reply = "".join(full_reply_parts).strip()
+            final_result = "success"
+        else:
+            try:
+                yield sse_event("delta", {"text": final_reply})
+            except Exception:
+                final_result = "client_disconnected"
         await log_trace_event(
             trace_id,
             "generation_output",
@@ -1070,12 +1143,6 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
                 "generation_usage": gen_usage,
             },
         )
-
-    # 推送生成的文本（客户端可能已断连，捕获异常确保 final trace 写入）
-    try:
-        yield sse_event("delta", {"text": final_reply})
-    except Exception:
-        final_result = "client_disconnected"
 
     # ── Trace: final ──
     await log_trace_event(
@@ -1208,6 +1275,74 @@ async def _handle_atlas_pipeline(
     )
 
 
+def _prepare_guide_context(user_message: str) -> tuple[list, set[str], dict[str, str]] | None:
+    """BM25 检索攻略文档并构建上下文。
+
+    Returns:
+        (chunks, source_labels, source_authors) 或 None（无结果时）
+    """
+    from server.guide_retriever import GuideRetriever
+
+    retriever = GuideRetriever()
+    chunks = retriever.search(user_message, top_k=3)
+
+    if not chunks:
+        return None
+
+    source_labels: set[str] = set()
+    source_authors: dict[str, str] = {}
+    for chunk in chunks:
+        title = chunk.metadata.get("title", "攻略")
+        if title and title != "攻略":
+            source_labels.add(title)
+            author = chunk.metadata.get("author", "")
+            if author:
+                source_authors[title] = author
+
+    return chunks, source_labels, source_authors
+
+
+def _build_guide_context_text(chunks: list) -> str:
+    """将 BM25 检索结果拼接为 LLM 上下文字符串。"""
+    context_lines = []
+    for chunk in chunks:
+        title = chunk.metadata.get("title", "攻略")
+        section = chunk.metadata.get("section", "")
+        header = f"【{title}】" + (f" {section}" if section else "")
+        context_lines.append(f"{header}\n{chunk.content}")
+    return "\n\n---\n\n".join(context_lines)
+
+
+def _build_guide_generation_prompt(guide_context: str, user_message: str) -> str:
+    """构建链路 C generation 阶段的 system prompt。"""
+    return (
+        "你是 FGO 攻略助手。根据以下攻略文档内容回答用户问题。\n"
+        "要求：\n"
+        "1. 仅基于提供的攻略内容回答，不要编造信息\n"
+        "2. 使用中文自然语言，面向玩家，语气亲切专业\n"
+        "3. 如果攻略内容不足以完整回答问题，明确告知哪些部分缺少资料\n"
+        "4. **[绝对禁止]** 不要在回复中出现任何文件名、文件路径、内部标题格式（如 [xxx] > yyy）、"
+        "markdown 标记、技术术语或系统实现细节。回复必须完全是面向玩家的自然语言\n"
+        "5. 不要自行添加来源标注，系统会自动处理\n\n"
+        f"攻略内容：\n{guide_context}\n\n"
+        f"用户问题：{user_message}"
+    )
+
+
+def _format_source_suffix(source_labels: set[str], source_authors: dict[str, str]) -> str:
+    """格式化来源标注后缀。"""
+    if not source_labels:
+        return ""
+    labels_with_author = []
+    for title in sorted(source_labels):
+        author = source_authors.get(title)
+        if author:
+            labels_with_author.append(f"{title}（作者：**{author}**）")
+        else:
+            labels_with_author.append(title)
+    return "\n\n📖 参考：" + ", ".join(labels_with_author)
+
+
 async def _handle_guide_pipeline(
     user_message: str,
     trace_id: str,
@@ -1216,18 +1351,15 @@ async def _handle_guide_pipeline(
     trace_total_tokens: int,
 ) -> ChatResponse:
     """链路 C：攻略知识问答。BM25 检索攻略文档 → LLM 生成回复 → 来源标注。"""
-    from server.guide_retriever import GuideRetriever
-
-    retriever = GuideRetriever()
-    chunks = retriever.search(user_message, top_k=3)
+    result = _prepare_guide_context(user_message)
 
     await log_trace_event(
         trace_id,
         "guide_search",
-        {"query": user_message, "result_count": len(chunks)},
+        {"query": user_message, "result_count": len(result[0]) if result else 0},
     )
 
-    if not chunks:
+    if result is None:
         reply = "抱歉，我在攻略库中未找到相关内容。你可以尝试更具体的关键词，如职阶名或关卡名。"
         await log_trace_event(
             trace_id,
@@ -1243,35 +1375,9 @@ async def _handle_guide_pipeline(
             reply=reply, servants=[], count=0, query={"mode": "guide_pipeline"}, model=model_used, traceId=trace_id
         )
 
-    # 构建上下文（传给 LLM 的内容不包含文件名等内部标识）
-    context_lines = []
-    source_labels: set[str] = set()
-    source_authors: dict[str, str] = {}  # title → author
-    for chunk in chunks:
-        title = chunk.metadata.get("title", "攻略")
-        section = chunk.metadata.get("section", "")
-        header = f"【{title}】" + (f" {section}" if section else "")
-        context_lines.append(f"{header}\n{chunk.content}")
-        # 使用 title 作为泛化来源标签，而非文件名
-        if title and title != "攻略":
-            source_labels.add(title)
-            author = chunk.metadata.get("author", "")
-            if author:
-                source_authors[title] = author
-    guide_context = "\n\n---\n\n".join(context_lines)
-
-    generation_prompt = (
-        "你是 FGO 攻略助手。根据以下攻略文档内容回答用户问题。\n"
-        "要求：\n"
-        "1. 仅基于提供的攻略内容回答，不要编造信息\n"
-        "2. 使用中文自然语言，面向玩家，语气亲切专业\n"
-        "3. 如果攻略内容不足以完整回答问题，明确告知哪些部分缺少资料\n"
-        "4. **[绝对禁止]** 不要在回复中出现任何文件名、文件路径、内部标题格式（如 [xxx] > yyy）、"
-        "markdown 标记、技术术语或系统实现细节。回复必须完全是面向玩家的自然语言\n"
-        "5. 不要自行添加来源标注，系统会自动处理\n\n"
-        f"攻略内容：\n{guide_context}\n\n"
-        f"用户问题：{user_message}"
-    )
+    chunks, source_labels, source_authors = result
+    guide_context = _build_guide_context_text(chunks)
+    generation_prompt = _build_guide_generation_prompt(guide_context, user_message)
 
     gen_result = await chat_completion(
         system_prompt=generation_prompt,
@@ -1284,16 +1390,7 @@ async def _handle_guide_pipeline(
     trace_total_tokens += gen_usage.get("total_tokens", 0)
     model_used = gen_result.get("_model", model_used)
 
-    # 追加泛化来源标签（使用 title 而非文件名），并展示作者信息
-    if source_labels:
-        labels_with_author = []
-        for title in sorted(source_labels):
-            author = source_authors.get(title)
-            if author:
-                labels_with_author.append(f"{title}（作者：**{author}**）")
-            else:
-                labels_with_author.append(title)
-        reply += "\n\n📖 参考：" + ", ".join(labels_with_author)
+    reply += _format_source_suffix(source_labels, source_authors)
 
     await log_trace_event(
         trace_id,
