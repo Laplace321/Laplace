@@ -1378,53 +1378,109 @@ body {
    ══════════════════════════════════════════════════════════ */
 
 .clarification-group {
-  padding: 12px 0;
-  animation: fadeIn 0.3s ease;
+  margin-top: 4px;
+  padding: 16px 18px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  animation: fadeIn 0.35s ease;
 }
 
 .clarification-question {
-  font-size: 14px;
-  color: var(--text-primary);
-  margin-bottom: 12px;
-  font-weight: 500;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+  font-weight: 400;
   line-height: 1.5;
+  letter-spacing: 0.01em;
 }
 
 .clarification-btn-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
 }
 
-.clarification-btn {
-  padding: 8px 16px;
-  border-radius: 20px;
-  border: 1px solid var(--border-color);
-  background: var(--card-bg);
+.clarification-option-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
   color: var(--text-primary);
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  line-height: 1.4;
 }
 
-.clarification-btn:hover:not(:disabled) {
-  border-color: var(--accent-gold);
-  color: var(--accent-gold);
+.clarification-option-btn .option-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clarification-option-btn .option-label {
+  flex: 1;
+}
+
+.clarification-option-btn:hover:not(:disabled) {
+  border-color: rgba(212, 168, 67, 0.35);
+  background: rgba(212, 168, 67, 0.05);
+}
+
+.clarification-option-btn:hover:not(:disabled) .option-indicator {
+  border-color: rgba(212, 168, 67, 0.5);
+}
+
+.clarification-option-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.clarification-option-btn.selected {
+  border-color: rgba(212, 168, 67, 0.5);
   background: rgba(212, 168, 67, 0.08);
 }
 
-.clarification-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.clarification-option-btn.selected .option-indicator {
+  border-color: var(--accent-gold);
+  background: var(--accent-gold);
 }
 
-.clarification-btn.selected {
-  border-color: var(--accent-gold);
-  color: var(--accent-gold);
-  background: rgba(212, 168, 67, 0.15);
-  font-weight: 500;
+.clarification-option-btn.selected .option-indicator::after {
+  content: "✓";
+  font-size: 10px;
+  color: var(--bg-primary);
+  font-weight: 700;
+}
+
+.clarification-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.clarification-divider::before,
+.clarification-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
 }
 
 .clarification-input-row {
@@ -1435,10 +1491,10 @@ body {
 
 .clarification-input {
   flex: 1;
-  padding: 8px 12px;
-  border-radius: 20px;
-  border: 1px solid var(--border-color);
-  background: var(--card-bg);
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
   color: var(--text-primary);
   font-size: 13px;
   outline: none;
@@ -1446,16 +1502,38 @@ body {
 }
 
 .clarification-input:focus {
-  border-color: var(--accent-gold);
+  border-color: rgba(212, 168, 67, 0.4);
+}
+
+.clarification-input::placeholder {
+  color: var(--text-muted);
 }
 
 .clarification-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  opacity: 0.4;
+  cursor: default;
 }
 
 .clarification-submit-btn {
   flex-shrink: 0;
-  padding: 8px 14px;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(212, 168, 67, 0.3);
+  background: rgba(212, 168, 67, 0.08);
+  color: var(--accent-gold);
   font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.02em;
+}
+
+.clarification-submit-btn:hover:not(:disabled) {
+  background: rgba(212, 168, 67, 0.15);
+  border-color: rgba(212, 168, 67, 0.5);
+}
+
+.clarification-submit-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }

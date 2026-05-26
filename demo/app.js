@@ -564,7 +564,7 @@ function handleClarification(data, els) {
   const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
   if (activeStep) completeThinkingStep(activeStep);
 
-  // 渲染确认问题
+  // 渲染确认卡片
   const group = document.createElement("div");
   group.className = "clarification-group";
 
@@ -573,44 +573,51 @@ function handleClarification(data, els) {
   question.textContent = data.question || "请确认你的查询条件：";
   group.appendChild(question);
 
-  // 渲染选项按钮
+  // 渲染纵向选项列表
   const btnRow = document.createElement("div");
   btnRow.className = "clarification-btn-row";
   (data.options || []).forEach((opt) => {
     const btn = document.createElement("button");
-    btn.className = "clarification-btn";
-    btn.textContent = opt.label;
+    btn.className = "clarification-option-btn";
     btn.dataset.optionId = opt.id;
+    btn.innerHTML = `<span class="option-indicator"></span><span class="option-label">${escapeHtml(opt.label)}</span>`;
     btn.addEventListener("click", () => {
-      // 禁用所有按钮，高亮选中
-      group.querySelectorAll(".clarification-btn").forEach((b) => {
+      group.querySelectorAll(".clarification-option-btn").forEach((b) => {
         b.disabled = true;
         b.classList.toggle("selected", b === btn);
       });
       const inputEl = group.querySelector(".clarification-input");
       if (inputEl) inputEl.disabled = true;
-      // 发起确认后的精确查询
+      const submitEl = group.querySelector(".clarification-submit-btn");
+      if (submitEl) submitEl.disabled = true;
       sendWithConfirmation(opt.label);
     });
     btnRow.appendChild(btn);
   });
   group.appendChild(btnRow);
 
-  // 渲染自定义输入框
+  // 分隔线
+  const divider = document.createElement("div");
+  divider.className = "clarification-divider";
+  divider.textContent = "或自定义";
+  group.appendChild(divider);
+
+  // 自定义输入行
   const inputRow = document.createElement("div");
   inputRow.className = "clarification-input-row";
   const input = document.createElement("input");
   input.type = "text";
   input.className = "clarification-input";
-  input.placeholder = "或输入自定义回复...";
+  input.placeholder = "输入你的回复...";
   const submitBtn = document.createElement("button");
-  submitBtn.className = "clarification-btn clarification-submit-btn";
+  submitBtn.className = "clarification-submit-btn";
   submitBtn.textContent = "确认";
   submitBtn.addEventListener("click", () => {
     const customText = input.value.trim();
     if (!customText) return;
-    group.querySelectorAll(".clarification-btn").forEach((b) => (b.disabled = true));
+    group.querySelectorAll(".clarification-option-btn").forEach((b) => (b.disabled = true));
     input.disabled = true;
+    submitBtn.disabled = true;
     sendWithConfirmation(customText);
   });
   input.addEventListener("keydown", (e) => {
@@ -730,12 +737,13 @@ function handleDone(data, els) {
     lastTraceId = data.traceId;
     updateDebugPanel();
   }
-  // 追加评分按钮组
-  if (els && data.traceId) {
+  // clarification 是中间询问步骤，不追加评分按钮
+  const isClarification = data.needs_confirmation === true;
+  if (els && data.traceId && !isClarification) {
     appendRatingButtons(els.container, data.traceId);
   }
   // 追踪助手回复到历史（保存完整 HTML 快照以保留样式）
-  if (els) {
+  if (els && !isClarification) {
     const bubbleEl = els.container.querySelector(".message-bubble");
     const html = bubbleEl ? bubbleEl.innerHTML : "";
     chatHistory.push({ role: "assistant", html });
