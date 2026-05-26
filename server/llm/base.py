@@ -6,7 +6,7 @@ Laplace — LLM 适配器基类
 
 import asyncio
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from typing import Any
 
 # Retry 配置
@@ -85,6 +85,30 @@ class BaseLLMAdapter(ABC):
                 "raw_message": dict,
                 "usage": {...},
             }
+        """
+
+    @abstractmethod
+    async def chat_completion_stream(
+        self,
+        model: str,
+        system_prompt: str,
+        user_message: str,
+        max_tokens: int = 2048,
+        temperature: float = 0.3,
+    ) -> AsyncGenerator[str, None]:
+        """流式文本生成 — 逐 chunk yield 文本内容。
+
+        仅支持纯文本模式（json_mode=False），用于 SSE streaming 场景。
+
+        Args:
+            model: 模型名称
+            system_prompt: 系统指令
+            user_message: 用户消息
+            max_tokens: 最大 token 数
+            temperature: 温度
+
+        Yields:
+            文本片段（str），调用方负责拼接和推送
         """
 
     # ── 通用工具方法 ──

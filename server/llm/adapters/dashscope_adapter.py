@@ -5,7 +5,7 @@ Laplace — 百炼 Dashscope 原生 SDK 适配器
 """
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from http import HTTPStatus
 from typing import Any
 
@@ -37,16 +37,19 @@ class DashscopeAdapter(BaseLLMAdapter):
         temperature: float,
         response_format: dict | None = None,
         tools: list[dict] | None = None,
+        stream: bool = False,
     ) -> Any:
         """同步调用 dashscope Generation.call()，返回原始响应。
 
         dashscope SDK 仅提供同步接口，由调用方通过 asyncio.to_thread() 包装。
+        当 stream=True 时，返回 generator 而非单次响应。
         """
         kwargs: dict[str, Any] = {
             "result_format": "message",
             "max_tokens": max_tokens,
             "temperature": temperature,
             "enable_thinking": False,
+            "stream": stream,
         }
         if response_format is not None:
             kwargs["response_format"] = response_format
@@ -60,6 +63,10 @@ class DashscopeAdapter(BaseLLMAdapter):
             messages=messages,
             **kwargs,
         )
+
+        # stream=True 时返回 generator，不做状态检查（由调用方逐 chunk 处理）
+        if stream:
+            return response
 
         # 检查返回状态
         if response.status_code != HTTPStatus.OK:
@@ -244,3 +251,47 @@ class DashscopeAdapter(BaseLLMAdapter):
                     await asyncio.sleep(wait)
 
         raise last_error  # type: ignore[misc]
+
+    # ── chat_completion_stream: 流式文本生成 ──
+
+    async def chat_completion_stream(
+        self,
+        model: str,
+        system_prompt: str,
+        user_message: str,
+        max_tokens: int = 2048,
+        temperature: float = 0.3,
+    ) -> AsyncGenerator[str, None]:
+        """DashScope 流式 generation — Generation.call(stream=True)。
+
+        连接阶段异常直接 re-raise，由 provider 层触发降级；
+        流式传输中途异常才 yield 错误提示。
+        """
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ]
+        # 连接阶段：异常 re-raise 给 provider 层降级
+        responses = await asyncio.to_thread(
+            self._call_sync,
+            self.api_key,
+            model,
+            messages,
+            max_tokens,
+            temperature,
+            None,  # response_format
+            None,  # tools
+            True,  # stream
+        )
+        # 流式传输阶段：异常 yield 错误提示
+        try:
+            for chunk in responses:
+                if hasattr(chunk, "output") and chunk.output:
+                    choices = getattr(chunk.output, "choices", [])
+                    if choices and hasattr(choices[0], "message"):
+                        content = getattr(choices[0].message, "content", "")
+                        if content:
+                            yield content
+        except Exception as exc:
+            print(f"  ✗ [dashscope] stream mid-transfer error: {exc}")
+            yield "\n\n（生成过程中出现异常，请重试）"

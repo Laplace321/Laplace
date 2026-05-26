@@ -361,6 +361,21 @@
   - 新增版本时，先读取 `changelog-data.json` 中已有版本的实际结构作为参照，确保格式完全一致
   - 写入 JSON 后，**必须**在本地浏览器打开 `demo/changelog.html` 验证最新版本渲染正确（features/fixes/others 各分区均有内容显示），确认无误后再提交- **目的**：确保更新日志生成流程标准化、可重复，杜绝手工编写 JSON 的低效和遗漏。
 
+### 15. LLM Streaming 接口一致性 (Streaming Interface Consistency)
+- **准则**：**[绝对纪律]** `chat_completion_stream()` 与 `chat_completion()` 的参数语义和行为约束需保持一致。所有 LLM 调用（流式与非流式）统一经过 `server/llm/provider.py` 调度，禁止在 pipeline 层绕过 provider 直接调用 SDK。
+- **执行**：
+  1. **新增/修改 Adapter** → 必须同时实现 `chat_completion()` 和 `chat_completion_stream()` 两个接口
+  2. **修改 Provider 调度逻辑**（降级策略、模型选择、错误处理）→ 需同时覆盖 streaming 和非 streaming 两条路径
+  3. **变更 Prompt / temperature / max_tokens 等参数** → 检查 `_build_guide_generation_prompt()` 和 `_handle_guide_pipeline()` 是否需要同步更新
+  4. **升级 OpenAI SDK / DashScope SDK** → 同时验证 `chat_completion()` 和 `chat_completion_stream()` 两处兼容性
+- **关键文件对照表**：
+  | 非流式接口 | 流式接口 |
+  |:---|:---|
+  | `server/llm/base.py` → `chat_completion()` | `server/llm/base.py` → `chat_completion_stream()` |
+  | `server/llm/provider.py` → `chat_completion()` | `server/llm/provider.py` → `chat_completion_stream()` |
+  | `server/pipeline.py` → `_handle_guide_pipeline()` | `server/pipeline.py` → `stream_event_generator()` 链路 C 分支 |
+- **目的**：确保流式与非流式路径行为一致，避免功能漂移。此约束已同步记录到记忆系统 `feedback_bc_generation_adapter_decoupling.md`。
+
 ## 禁止事项
 
 - ❌ 未经确认删除文件或数据

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 
 from server.llm.base import BaseLLMAdapter
@@ -300,3 +300,44 @@ async def agent_completion(
                 continue
 
     raise Exception(f"[agent] 所有模型都调用失败。尝试记录: {attempts_log}")
+
+
+async def chat_completion_stream(
+    system_prompt: str,
+    user_message: str,
+    model: str | None = None,
+    max_tokens: int = 2048,
+    temperature: float = 0.3,
+) -> AsyncGenerator[str, None]:
+    """流式 LLM 调用 — 两层降级调度。
+
+    降级策略与 chat_completion() 一致：
+    1. 同提供商内按 models 列表顺序降级
+    2. 同提供商所有模型失败后，切换下一个提供商
+
+    注意：一旦某个 provider/model 开始产出 chunk，就不再降级（避免中途切换导致回复断裂）。
+    只有在连接阶段就失败时才尝试下一个。
+
+    Yields:
+        文本片段（str）
+    """
+    for provider in PROVIDERS:
+        if provider.adapter is None:
+            continue
+        models_to_try = [model] if model else provider.models
+        for m in models_to_try:
+            try:
+                async for chunk in provider.adapter.chat_completion_stream(
+                    model=m,
+                    system_prompt=system_prompt,
+                    user_message=user_message,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                ):
+                    yield chunk
+                return  # 成功完成，退出
+            except Exception as e:
+                print(f"⚠️  [{provider.name}] 模型 {m} stream 失败: {e}")
+                continue
+
+    yield "抱歉，生成服务暂时不可用。"

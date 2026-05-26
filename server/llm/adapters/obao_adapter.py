@@ -6,7 +6,7 @@ obao 不支持 Responses API，但 agent_completion（Chat Completions + tools�
 """
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from typing import Any
 
 from openai import AsyncOpenAI
@@ -237,3 +237,40 @@ class ObaoAdapter(OpenAIAdapter):
                     await asyncio.sleep(wait)
 
         raise last_error  # type: ignore[misc]
+
+    # ── chat_completion_stream: 流式文本生成 ──
+
+    async def chat_completion_stream(
+        self,
+        model: str,
+        system_prompt: str,
+        user_message: str,
+        max_tokens: int = 2048,
+        temperature: float = 0.3,
+    ) -> AsyncGenerator[str, None]:
+        """Obao Cloud 流式 generation — Chat Completions API stream=True。
+
+        连接阶段异常直接 re-raise，由 provider 层触发降级；
+        流式传输中途异常才 yield 错误提示。
+        """
+        client = self._get_client()
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ]
+        # 连接阶段：异常 re-raise 给 provider 层降级
+        stream = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            stream=True,
+        )
+        # 流式传输阶段：异常 yield 错误提示
+        try:
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except Exception as exc:
+            print(f"  ✗ [{self.name}] stream mid-transfer error: {exc}")
+            yield "\n\n（生成过程中出现异常，请重试）"
