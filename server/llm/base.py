@@ -7,6 +7,7 @@ Laplace — LLM 适配器基类
 import asyncio
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, Callable
+from dataclasses import dataclass, field
 from typing import Any
 
 # Retry 配置
@@ -16,6 +17,19 @@ RETRY_BACKOFF = [1.0, 2.0, 4.0]  # exponential backoff 秒数
 
 class LLMResponseFormatUnsupported(Exception):
     """Raised when a model gateway rejects structured text.format."""
+
+
+@dataclass
+class StreamMetadata:
+    """流式调用的元数据容器 — 通过引用传递，流结束后由 adapter 填充。
+
+    调用方创建实例后传入 chat_completion_stream()，流结束后读取 usage/model/provider。
+    不传 metadata 时行为不变（向后兼容）。
+    """
+
+    usage: dict = field(default_factory=dict)
+    model: str = ""
+    provider: str = ""
 
 
 class BaseLLMAdapter(ABC):
@@ -95,6 +109,7 @@ class BaseLLMAdapter(ABC):
         user_message: str,
         max_tokens: int = 2048,
         temperature: float = 0.3,
+        metadata: StreamMetadata | None = None,
     ) -> AsyncGenerator[str, None]:
         """流式文本生成 — 逐 chunk yield 文本内容。
 
@@ -106,6 +121,7 @@ class BaseLLMAdapter(ABC):
             user_message: 用户消息
             max_tokens: 最大 token 数
             temperature: 温度
+            metadata: 可选的元数据容器，流结束后由 adapter 填充 usage/model/provider
 
         Yields:
             文本片段（str），调用方负责拼接和推送

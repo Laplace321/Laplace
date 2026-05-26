@@ -12,7 +12,7 @@ import os
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 
-from server.llm.base import BaseLLMAdapter
+from server.llm.base import BaseLLMAdapter, StreamMetadata
 
 
 @dataclass
@@ -308,6 +308,7 @@ async def chat_completion_stream(
     model: str | None = None,
     max_tokens: int = 2048,
     temperature: float = 0.3,
+    metadata: StreamMetadata | None = None,
 ) -> AsyncGenerator[str, None]:
     """流式 LLM 调用 — 两层降级调度。
 
@@ -317,6 +318,9 @@ async def chat_completion_stream(
 
     注意：一旦某个 provider/model 开始产出 chunk，就不再降级（避免中途切换导致回复断裂）。
     只有在连接阶段就失败时才尝试下一个。
+
+    Args:
+        metadata: 可选的元数据容器，流结束后由 adapter 填充 usage/model/provider
 
     Yields:
         文本片段（str）
@@ -333,6 +337,7 @@ async def chat_completion_stream(
                     user_message=user_message,
                     max_tokens=max_tokens,
                     temperature=temperature,
+                    metadata=metadata,
                 ):
                     yield chunk
                 return  # 成功完成，退出

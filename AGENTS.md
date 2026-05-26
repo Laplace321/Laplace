@@ -26,7 +26,15 @@
 ```
 类型包括：`feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
-2. **Push 前必须通过三步本地验证**：
+2. **[绝对纪律] 禁止直接在 main 分支上开发**：
+   > 每次新增功能、修复 Bug、重构或任何非文档性质的代码变更，**必须**在新分支上进行，严禁直接在 `main` 分支上 commit。
+   - **分支命名规范**：`feat/<slug>`（新功能）、`fix/<slug>`（Bug 修复）、`refactor/<slug>`（重构）、`chore/<slug>`（工程改进）
+   - **工作流程**：`git checkout -b feat/xxx` → 开发 → 本地三步验证通过 → commit + push → 用户确认无误后 merge 回 main
+   - **例外情况**：仅纯文档更新（如 CHANGELOG、README 错别字修正）可直接在 main 上提交，但仍建议走分支流程
+   - **违规后果**：直接在 main 上开发会导致未验证代码污染主线，CI 失败影响所有人，且无法安全回滚
+   - **AI 执行要求**：接到开发任务时，AI 必须主动创建新分支再开始编码，不得等待用户提醒。如果当前已在 main 分支且有未提交变更，必须先 stash 或创建分支后再操作
+
+3. **Push 前必须通过三步本地验证**：
 > **[非常重要]** 每次 `git commit` 前，必须依次执行以下三步验证，全部通过后才能 commit + push：
 > ```bash
 > source .venv/bin/activate                   # 先激活虚拟环境！

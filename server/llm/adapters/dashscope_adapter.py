@@ -16,6 +16,7 @@ from server.llm.base import (
     RETRY_BACKOFF,
     BaseLLMAdapter,
     LLMResponseFormatUnsupported,
+    StreamMetadata,
 )
 
 
@@ -38,6 +39,7 @@ class DashscopeAdapter(BaseLLMAdapter):
         response_format: dict | None = None,
         tools: list[dict] | None = None,
         stream: bool = False,
+        stream_options: dict | None = None,
     ) -> Any:
         """同步调用 dashscope Generation.call()，返回原始响应。
 
@@ -56,6 +58,8 @@ class DashscopeAdapter(BaseLLMAdapter):
         if tools is not None:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = "auto"
+        if stream_options is not None:
+            kwargs["stream_options"] = stream_options
 
         response = Generation.call(
             model=model,
@@ -261,9 +265,12 @@ class DashscopeAdapter(BaseLLMAdapter):
         user_message: str,
         max_tokens: int = 2048,
         temperature: float = 0.3,
+        metadata: StreamMetadata | None = None,
     ) -> AsyncGenerator[str, None]:
         """DashScope 流式 generation — Generation.call(stream=True)。
 
+        启用 stream_options={"include_usage": True} 以获取 token 统计。
+        如果 SDK 不支持 stream_options，自动回退到不带该参数的调用。
         连接阶段异常直接 re-raise，由 provider 层触发降级；
         流式传输中途异常才 yield 错误提示。
         """
@@ -271,21 +278,43 @@ class DashscopeAdapter(BaseLLMAdapter):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
         ]
-        # 连接阶段：异常 re-raise 给 provider 层降级
-        responses = await asyncio.to_thread(
-            self._call_sync,
-            self.api_key,
-            model,
-            messages,
-            max_tokens,
-            temperature,
-            None,  # response_format
-            None,  # tools
-            True,  # stream
-        )
+
+        # 尝试带 stream_options 的调用
+        try:
+            responses = await asyncio.to_thread(
+                self._call_sync,
+                self.api_key,
+                model,
+                messages,
+                max_tokens,
+                temperature,
+                None,  # response_format
+                None,  # tools
+                True,  # stream
+                {"include_usage": True},  # stream_options
+            )
+        except Exception as stream_opt_err:
+            print(f"  ↻ [dashscope] stream_options 不支持，回退: {stream_opt_err}")
+            responses = await asyncio.to_thread(
+                self._call_sync,
+                self.api_key,
+                model,
+                messages,
+                max_tokens,
+                temperature,
+                None,  # response_format
+                None,  # tools
+                True,  # stream
+                None,  # stream_options
+            )
+
         # 流式传输阶段：异常 yield 错误提示
         try:
             for chunk in responses:
+                if metadata is not None and hasattr(chunk, "usage") and chunk.usage:
+                    metadata.usage = dict(chunk.usage)
+                    metadata.model = model
+                    metadata.provider = self.name
                 if hasattr(chunk, "output") and chunk.output:
                     choices = getattr(chunk.output, "choices", [])
                     if choices and hasattr(choices[0], "message"):

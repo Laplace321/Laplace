@@ -5,7 +5,7 @@ Laplace — LLM 模块公共 API
     from server.llm import chat_completion, agent_completion, chat_completion_stream, extract_json_object
 """
 
-from server.llm.base import extract_json_object  # noqa: F401
+from server.llm.base import StreamMetadata, extract_json_object  # noqa: F401
 from server.llm.provider import (  # noqa: F401
     PROVIDERS,
     LLMProvider,

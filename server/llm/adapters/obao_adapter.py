@@ -12,7 +12,7 @@ from typing import Any
 from openai import AsyncOpenAI
 
 from server.llm.adapters.openai_adapter import OpenAIAdapter
-from server.llm.base import MAX_RETRIES, RETRY_BACKOFF
+from server.llm.base import MAX_RETRIES, RETRY_BACKOFF, StreamMetadata
 
 
 class ObaoAdapter(OpenAIAdapter):
@@ -247,9 +247,12 @@ class ObaoAdapter(OpenAIAdapter):
         user_message: str,
         max_tokens: int = 2048,
         temperature: float = 0.3,
+        metadata: StreamMetadata | None = None,
     ) -> AsyncGenerator[str, None]:
         """Obao Cloud 流式 generation — Chat Completions API stream=True。
 
+        启用 stream_options={"include_usage": True} 以获取 token 统计。
+        如果网关不支持 stream_options，自动回退到不带该参数的调用。
         连接阶段异常直接 re-raise，由 provider 层触发降级；
         流式传输中途异常才 yield 错误提示。
         """
@@ -258,17 +261,34 @@ class ObaoAdapter(OpenAIAdapter):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
         ]
-        # 连接阶段：异常 re-raise 给 provider 层降级
-        stream = await client.chat.completions.create(
-            model=model,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            stream=True,
-        )
+
+        # 尝试带 stream_options 的调用（支持 usage 统计）
+        try:
+            stream = await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+        except Exception as stream_opt_err:
+            print(f"  ↻ [{self.name}] stream_options 不支持，回退: {stream_opt_err}")
+            stream = await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                stream=True,
+            )
+
         # 流式传输阶段：异常 yield 错误提示
         try:
             async for chunk in stream:
+                if metadata is not None and hasattr(chunk, "usage") and chunk.usage:
+                    metadata.usage = chunk.usage.model_dump()
+                    metadata.model = model
+                    metadata.provider = self.name
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
         except Exception as exc:

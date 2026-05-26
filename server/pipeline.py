@@ -24,7 +24,7 @@ from server.fallback import (
     classify_agent_reply,
     sse_event,
 )
-from server.llm import chat_completion, chat_completion_stream
+from server.llm import StreamMetadata, chat_completion, chat_completion_stream
 from server.logger import log_trace_event
 from server.prompts import build_routing_prompt, get_generation_prompt
 from server.schemas import parse_routing_response, routing_response_json_schema
@@ -1084,18 +1084,26 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
     )
 
     final_result = "success"
+    gen_usage: dict = {}
+    full_reply_parts: list[str] = []
+
     try:
-        generation_response = await chat_completion(
+        stream_metadata = StreamMetadata()
+        async for chunk in chat_completion_stream(
             system_prompt=(
                 "You are a helpful AI assistant. You MUST strictly follow "
                 "the provided data and NEVER use your internal knowledge about FGO."
             ),
             user_message=gen_prompt,
             temperature=0.1,
-            json_mode=False,
-        )
-        final_reply = generation_response.get("text", "").strip()
-        gen_usage = generation_response.get("_usage", {})
+            max_tokens=2048,
+            metadata=stream_metadata,
+        ):
+            full_reply_parts.append(chunk)
+            yield sse_event("delta", {"text": chunk})
+
+        final_reply = "".join(full_reply_parts).strip()
+        gen_usage = stream_metadata.usage
         trace_total_tokens += gen_usage.get("total_tokens", 0)
         if not final_reply:
             raise ValueError("Empty response from LLM")
@@ -1108,6 +1116,15 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
             )
         )
         final_result = "generation_error"
+        # 如果流式过程中已推送了部分内容，不再重复推送 fallback
+        if full_reply_parts:
+            final_reply = "".join(full_reply_parts).strip()
+            final_result = "success"
+        else:
+            try:
+                yield sse_event("delta", {"text": final_reply})
+            except Exception:
+                final_result = "client_disconnected"
         await log_trace_event(
             trace_id,
             "generation_output",
@@ -1126,12 +1143,6 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
                 "generation_usage": gen_usage,
             },
         )
-
-    # 推送生成的文本（客户端可能已断连，捕获异常确保 final trace 写入）
-    try:
-        yield sse_event("delta", {"text": final_reply})
-    except Exception:
-        final_result = "client_disconnected"
 
     # ── Trace: final ──
     await log_trace_event(
