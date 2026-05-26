@@ -157,6 +157,33 @@ async def rate_response(body: RateRequest):
     return {"ok": True}
 
 
+class TrackEvent(BaseModel):
+    """前端埋点事件。"""
+
+    event: str
+    properties: dict = {}
+    timestamp: str | None = None
+    session_id: str | None = None
+
+
+@app.post("/api/track")
+async def track_event(body: TrackEvent):
+    """接收前端埋点事件，写入日志系统。"""
+    from server.logger import log_trace_event
+
+    trace_id = body.properties.get("trace_id", "unknown")
+    await log_trace_event(
+        trace_id,
+        f"frontend_{body.event}",
+        {
+            "event": body.event,
+            "properties": body.properties,
+            "session_id": body.session_id,
+        },
+    )
+    return {"ok": True}
+
+
 def _validate_translations():
     """校验 config/translations.json 与 knowledge/class_mapping.json 的一致性。
 

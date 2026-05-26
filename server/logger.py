@@ -234,6 +234,25 @@ def find_trace(trace_id: str) -> dict | None:
             if e.get("phase") == "routing_input":
                 result["mode"] = e.get("data", {}).get("mode", "")
                 break
+        # 从 clarification_requested 提取 clarification 信息
+        for e in phased_events:
+            if e.get("phase") == "clarification_requested":
+                result["clarification"] = {
+                    "question": e.get("data", {}).get("question", ""),
+                    "options": e.get("data", {}).get("options", []),
+                    "ambiguous_field": e.get("data", {}).get("ambiguous_field", ""),
+                }
+                # clarification 模式下 reply 是问题本身
+                if "reply" not in result:
+                    result["reply"] = e.get("data", {}).get("question", "")
+                break
+        # 从 routing_input 提取 is_confirmation 标记
+        for e in phased_events:
+            if e.get("phase") == "routing_input":
+                if e.get("data", {}).get("is_confirmation"):
+                    result["is_confirmation"] = True
+                    result["confirmation_context"] = e.get("data", {}).get("confirmation_context", "")
+                break
         # 从 final 提取 mode（优先）和 total_tokens
         for e in phased_events:
             if e.get("phase") == "final":
@@ -293,8 +312,9 @@ def read_trace_summaries(
         error_msg = None
         mode = None
         total_tokens = None
-
         trace_rating = None
+        is_confirmation = False
+        clarification_question = ""
 
         for e in events:
             phase = e.get("phase", "")
@@ -302,8 +322,12 @@ def read_trace_summaries(
             if phase == "routing_input":
                 query = data.get("query", "")
                 timestamp = e.get("timestamp", timestamp)
+                if data.get("is_confirmation"):
+                    is_confirmation = True
             elif phase == "rating":
                 trace_rating = data.get("rating")
+            elif phase == "clarification_requested":
+                clarification_question = data.get("question", "")
             elif phase == "final":
                 status = data.get("result", "unknown")
                 duration_ms = data.get("total_time_ms")
@@ -321,19 +345,22 @@ def read_trace_summaries(
         if status == "unknown" and not error_msg:
             status = "success"
 
-        summaries.append(
-            {
-                "traceId": tid,
-                "timestamp": timestamp,
-                "query": query,
-                "status": status,
-                "duration_ms": round(duration_ms, 1) if duration_ms else None,
-                "error": error_msg,
-                "mode": mode,
-                "total_tokens": total_tokens,
-                "rating": trace_rating,
-            }
-        )
+        summary: dict = {
+            "traceId": tid,
+            "timestamp": timestamp,
+            "query": query,
+            "status": status,
+            "duration_ms": round(duration_ms, 1) if duration_ms else None,
+            "error": error_msg,
+            "mode": mode,
+            "total_tokens": total_tokens,
+            "rating": trace_rating,
+        }
+        if is_confirmation:
+            summary["is_confirmation"] = True
+        if clarification_question:
+            summary["clarification_question"] = clarification_question
+        summaries.append(summary)
 
     # 3. 按时间倒序（最新在前）
     summaries.reverse()

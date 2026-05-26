@@ -136,6 +136,21 @@ function getSkillDisplayName(skillName) {
 // Tag Pill mode: userText is the natural language supplement typed after the pill.
 // If empty, uses preset defaults only. Backend handles B1 supplement parsing.
 // Uses the same SSE streaming pipeline as manual input for consistent thinking steps UX.
+// === Frontend Tracking ===
+function trackEvent(eventName, properties = {}) {
+  try {
+    const payload = {
+      event: eventName,
+      properties,
+      timestamp: new Date().toISOString(),
+      session_id: currentSessionId,
+    };
+    navigator.sendBeacon("/api/track", JSON.stringify(payload));
+  } catch (err) {
+    // 埋点不应影响正常功能
+  }
+}
+
 // === Send Button State Helpers ===
 const SEND_ICON_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
   <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -582,6 +597,11 @@ function handleClarification(data, els) {
     btn.dataset.optionId = opt.id;
     btn.innerHTML = `<span class="option-indicator"></span><span class="option-label">${escapeHtml(opt.label)}</span>`;
     btn.addEventListener("click", () => {
+      trackEvent("clarification_option_selected", {
+        trace_id: data.trace_id,
+        option_id: opt.id,
+        option_label: opt.label,
+      });
       group.querySelectorAll(".clarification-option-btn").forEach((b) => {
         b.disabled = true;
         b.classList.toggle("selected", b === btn);
@@ -590,6 +610,11 @@ function handleClarification(data, els) {
       if (inputEl) inputEl.disabled = true;
       const submitEl = group.querySelector(".clarification-submit-btn");
       if (submitEl) submitEl.disabled = true;
+      trackEvent("clarification_confirmed", {
+        trace_id: data.trace_id,
+        confirmed_value: opt.id,
+        input_type: "option",
+      });
       sendWithConfirmation(opt.label);
     });
     btnRow.appendChild(btn);
@@ -615,6 +640,11 @@ function handleClarification(data, els) {
   submitBtn.addEventListener("click", () => {
     const customText = input.value.trim();
     if (!customText) return;
+    trackEvent("clarification_confirmed", {
+      trace_id: data.trace_id,
+      confirmed_value: customText,
+      input_type: "custom",
+    });
     group.querySelectorAll(".clarification-option-btn").forEach((b) => (b.disabled = true));
     input.disabled = true;
     submitBtn.disabled = true;
@@ -630,6 +660,13 @@ function handleClarification(data, els) {
   els.replyBody.innerHTML = "";
   els.replyBody.appendChild(group);
   els.replyBody.classList.remove("stream-hidden");
+
+  // 埋点：clarification 面板展示
+  trackEvent("clarification_shown", {
+    trace_id: data.trace_id,
+    question: data.question,
+    option_count: (data.options || []).length,
+  });
 }
 
 // === Send query with confirmation context ===

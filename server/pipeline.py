@@ -114,6 +114,8 @@ async def handle_skill_mode(
                 "routing_prompt_length": len(routing_prompt),
                 "skill_count": len(skill_descriptions),
                 "client_ip": client_ip,
+                "is_confirmation": confirmation_context is not None,
+                "confirmation_context": confirmation_context[:200] if confirmation_context else None,
             },
         )
 
@@ -707,6 +709,8 @@ async def stream_event_generator(
                 "routing_prompt_length": len(routing_prompt),
                 "skill_count": len(skill_descriptions),
                 "client_ip": client_ip,
+                "is_confirmation": confirmation_context is not None,
+                "confirmation_context": confirmation_context[:200] if confirmation_context else None,
             },
         )
 
@@ -849,6 +853,16 @@ async def stream_event_generator(
                     "question": clarification.get("question", ""),
                     "options": clarification.get("options", []),
                     "ambiguous_field": clarification.get("ambiguous_field", ""),
+                },
+            )
+            await log_trace_event(
+                trace_id,
+                "final",
+                {
+                    "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                    "result": "clarification_requested",
+                    "mode": "clarification",
+                    "total_tokens": trace_total_tokens,
                 },
             )
             yield sse_event(
