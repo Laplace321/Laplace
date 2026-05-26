@@ -679,13 +679,17 @@ async function sendWithConfirmation(confirmationText) {
   const query = originalQuery || chatInput.value.trim();
   if (!query) return;
 
+  isProcessing = true;
+  setSendButtonToStop();
+
   // 创建新的助手消息容器（复用 createStreamingContainer）
   const els = createStreamingContainer();
   _streamAccumulatedText = "";
 
+  currentAbortController = new AbortController();
   try {
     const url = `${STREAM_API_URL}?message=${encodeURIComponent(query)}&confirmation_context=${encodeURIComponent(confirmationText)}`;
-    const resp = await fetch(url);
+    const resp = await fetch(url, { signal: currentAbortController.signal });
     if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
 
     const reader = resp.body.getReader();
@@ -709,9 +713,16 @@ async function sendWithConfirmation(confirmationText) {
     const cursor = els.replyBody.querySelector(".stream-cursor");
     if (cursor) cursor.remove();
   } catch (err) {
-    if (err.name !== "AbortError") {
+    if (err.name === "AbortError") {
+      finalizeStreamingContainer(els);
+    } else {
       handleError({ message: `确认请求失败: ${err.message}` }, els);
     }
+  } finally {
+    currentAbortController = null;
+    isProcessing = false;
+    setSendButtonToSend();
+    chatInput.focus();
   }
 }
 
