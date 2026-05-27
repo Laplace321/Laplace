@@ -335,12 +335,14 @@ async def chat_stream(
     message: str,
     preset_name: str | None = None,
     confirmation_context: str | None = None,
+    confirmation_id: str | None = None,
 ):
     """SSE 流式对话端点 — 分阶段推送思考过程和结果。
 
     使用 Skill-Based Architecture：Stage 1 LLM 路由 → SkillExecutor → RAG 生成。
     支持 preset_name 参数：有值时跳过 LLM 路由，直接展开预设 skill_calls。
     支持 confirmation_context 参数：用户确认选择后携带的上下文，用于精确路由。
+    支持 confirmation_id 参数：用户选择的选项 ID（collectionNo），用于精确定位实体。
     """
     client_ip = (
         request.headers.get("x-forwarded-for", "").split(",")[0].strip() or request.client.host
@@ -350,7 +352,11 @@ async def chat_stream(
 
     async def event_generator():
         async for event in stream_event_generator(
-            message, preset_name, client_ip=client_ip, confirmation_context=confirmation_context
+            message,
+            preset_name,
+            client_ip=client_ip,
+            confirmation_context=confirmation_context,
+            confirmation_id=confirmation_id,
         ):
             yield event
 

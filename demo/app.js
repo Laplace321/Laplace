@@ -615,7 +615,7 @@ function handleClarification(data, els) {
         confirmed_value: opt.id,
         input_type: "option",
       });
-      sendWithConfirmation(opt.label);
+      sendWithConfirmation(opt.label, opt.id);
     });
     btnRow.appendChild(btn);
   });
@@ -648,7 +648,7 @@ function handleClarification(data, els) {
     group.querySelectorAll(".clarification-option-btn").forEach((b) => (b.disabled = true));
     input.disabled = true;
     submitBtn.disabled = true;
-    sendWithConfirmation(customText);
+    sendWithConfirmation(customText, null);
   });
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") submitBtn.click();
@@ -670,12 +670,12 @@ function handleClarification(data, els) {
 }
 
 // === Send query with confirmation context ===
-async function sendWithConfirmation(confirmationText) {
+async function sendWithConfirmation(confirmationText, confirmationId) {
   // 获取最后一条用户消息作为原始查询
   const lastUserMsg = chatHistory.filter((m) => m.role === "user").pop();
   const originalQuery = lastUserMsg ? lastUserMsg.text || lastUserMsg.html?.replace(/<[^>]*>/g, "") || "" : "";
 
-  // 复用现有的 stream 发送逻辑，携带 confirmation_context
+  // 复用现有的 stream 发送逻辑，携带 confirmation_context + confirmation_id
   const query = originalQuery || chatInput.value.trim();
   if (!query) return;
 
@@ -688,7 +688,10 @@ async function sendWithConfirmation(confirmationText) {
 
   currentAbortController = new AbortController();
   try {
-    const url = `${STREAM_API_URL}?message=${encodeURIComponent(query)}&confirmation_context=${encodeURIComponent(confirmationText)}`;
+    let url = `${STREAM_API_URL}?message=${encodeURIComponent(query)}&confirmation_context=${encodeURIComponent(confirmationText)}`;
+    if (confirmationId) {
+      url += `&confirmation_id=${encodeURIComponent(confirmationId)}`;
+    }
     const resp = await fetch(url, { signal: currentAbortController.signal });
     if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
 

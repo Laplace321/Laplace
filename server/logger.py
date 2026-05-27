@@ -234,13 +234,14 @@ def find_trace(trace_id: str) -> dict | None:
             if e.get("phase") == "routing_input":
                 result["mode"] = e.get("data", {}).get("mode", "")
                 break
-        # 从 clarification_requested 提取 clarification 信息
+        # 从 clarification_requested / execution_clarification_requested 提取 clarification 信息
         for e in phased_events:
-            if e.get("phase") == "clarification_requested":
+            if e.get("phase") in ("clarification_requested", "execution_clarification_requested"):
                 result["clarification"] = {
                     "question": e.get("data", {}).get("question", ""),
                     "options": e.get("data", {}).get("options", []),
                     "ambiguous_field": e.get("data", {}).get("ambiguous_field", ""),
+                    "source": "execution" if e.get("phase") == "execution_clarification_requested" else "routing",
                 }
                 # clarification 模式下 reply 是问题本身
                 if "reply" not in result:
@@ -326,7 +327,7 @@ def read_trace_summaries(
                     is_confirmation = True
             elif phase == "rating":
                 trace_rating = data.get("rating")
-            elif phase == "clarification_requested":
+            elif phase in ("clarification_requested", "execution_clarification_requested"):
                 clarification_question = data.get("question", "")
             elif phase == "final":
                 status = data.get("result", "unknown")

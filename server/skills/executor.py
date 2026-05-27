@@ -14,6 +14,11 @@ from pydantic import ValidationError
 from server.query_executor import load_ce_database, load_database
 from server.skills.base import SKILL_REGISTRY, QuerySkill, ResponseSkill
 
+# ── 执行层 Clarification 类型常量 ──
+CLARIFICATION_MULTI_CANDIDATE = "multi_candidate"
+CLARIFICATION_EMPTY_NAME = "empty_result_name"
+CLARIFICATION_EMPTY_FILTER = "empty_result_filter"
+
 
 class ExecutionResult:
     """Skill 执行结果（含诊断信息）。"""
@@ -29,6 +34,7 @@ class ExecutionResult:
         rejected_skills: list[dict] | None = None,
         execution_time_ms: float = 0.0,
         custom_context: list[dict] | None = None,
+        clarification: dict | None = None,
     ):
         self.servants = servants
         self.total_found = total_found
@@ -39,6 +45,7 @@ class ExecutionResult:
         self.rejected_skills = rejected_skills or []
         self.execution_time_ms = execution_time_ms
         self.custom_context = custom_context
+        self.clarification = clarification
 
 
 class SkillExecutor:
@@ -129,7 +136,33 @@ class SkillExecutor:
             total_found = len(ce_results)
             elapsed_ms = (time.monotonic() - start_time) * 1000
 
+            # 多候选检测（ce_lookup 单名称查询且 >1 结果）
+            if self._is_single_name_lookup(accepted, domain="ce") and total_found > 1:
+                clarification = self._build_multi_candidate_clarification(ce_results, accepted, domain="ce")
+                if clarification:
+                    return ExecutionResult(
+                        servants=ce_results,
+                        total_found=total_found,
+                        response_skill=response_skill,
+                        accepted_skills=accepted,
+                        rejected_skills=rejected,
+                        execution_time_ms=elapsed_ms,
+                        clarification=clarification,
+                    )
+
             if total_found == 0:
+                # 空结果 clarification 引导
+                clarification = self._build_empty_result_clarification(accepted, domain="ce")
+                if clarification:
+                    return ExecutionResult(
+                        servants=[],
+                        total_found=0,
+                        response_skill=response_skill,
+                        accepted_skills=accepted,
+                        rejected_skills=rejected,
+                        execution_time_ms=elapsed_ms,
+                        clarification=clarification,
+                    )
                 return ExecutionResult(
                     servants=[],
                     total_found=0,
@@ -195,13 +228,40 @@ class SkillExecutor:
                 custom_context=custom_context,
             )
 
+        # ── 多候选检测（lookup_servant / compare_servants 单名称查询且 >1 结果） ──
+        if self._is_single_name_lookup(accepted, domain="servant") and total_found > 1:
+            clarification = self._build_multi_candidate_clarification(results, accepted, domain="servant")
+            if clarification:
+                return ExecutionResult(
+                    servants=results,
+                    total_found=total_found,
+                    response_skill=response_skill,
+                    accepted_skills=accepted,
+                    rejected_skills=rejected,
+                    execution_time_ms=elapsed_ms,
+                    clarification=clarification,
+                )
+
         # 执行阶段兜底：结果为空
         if total_found == 0:
-            # Skill Fallback: lookup_servant 空结果 → resolve_nickname
+            # Skill Fallback: lookup_servant 空结果 → resolve_nickname（同步缓存路径）
             if self._should_try_nickname_resolve(accepted):
                 resolve_result = self._try_resolve_nickname(db, accepted, response_skill, rejected, start_time)
                 if resolve_result:
                     return resolve_result
+
+            # 空结果 clarification 引导（筛选类→放宽条件，名称类→等待异步 LLM 猜测）
+            clarification = self._build_empty_result_clarification(accepted, domain="servant")
+            if clarification:
+                return ExecutionResult(
+                    servants=[],
+                    total_found=0,
+                    response_skill=response_skill,
+                    accepted_skills=accepted,
+                    rejected_skills=rejected,
+                    execution_time_ms=elapsed_ms,
+                    clarification=clarification,
+                )
 
             return ExecutionResult(
                 servants=[],
@@ -397,3 +457,279 @@ class SkillExecutor:
         if default is not None and isinstance(default, ResponseSkill):
             return default
         return None
+
+    # ── 执行层 Clarification 辅助方法 ──
+
+    def _is_single_name_lookup(self, accepted_skills: list[dict], *, domain: str = "servant") -> bool:
+        """判断是否为单名称查询场景（可能触发多候选 clarification）。
+
+        触发条件：accepted_skills 中仅有一个名称查询 Skill（不与其他筛选条件组合）。
+        """
+        if len(accepted_skills) != 1:
+            return False
+        skill_name = accepted_skills[0].get("skill_name", "")
+        if domain == "servant":
+            return skill_name in ("lookup_servant", "compare_servants")
+        if domain == "ce":
+            return skill_name == "ce_lookup"
+        return False
+
+    def _build_multi_candidate_clarification(
+        self,
+        results: list[dict],
+        accepted_skills: list[dict],
+        *,
+        domain: str = "servant",
+    ) -> dict | None:
+        """从匹配结果构建多候选 clarification 选项。
+
+        返回 ClarificationRequest 兼容的 dict，或 None（不需要 clarification）。
+        """
+        if len(results) <= 1:
+            return None
+
+        from server.translation import get_class_map
+
+        class_map = get_class_map()
+
+        # 提取查询名称
+        query_name = ""
+        if accepted_skills:
+            params = accepted_skills[0].get("params", {})
+            query_name = params.get("name", "") or ""
+            if not query_name and "names" in params:
+                # compare_servants: 暂不对多 name 触发（复杂度高）
+                return None
+
+        if domain == "servant":
+            options = []
+            for servant in results[:8]:  # 最多 8 个选项
+                cn_name = servant.get("aliasCN", "")
+                rarity = servant.get("rarity", 0)
+                class_name = servant.get("className", "")
+                class_cn = class_map.get(class_name.lower(), class_name)
+                collection_no = servant.get("collectionNo", 0)
+                label = f"{'★' * rarity} {cn_name}（{class_cn}）" if class_cn else f"{'★' * rarity} {cn_name}"
+                options.append({"id": str(collection_no), "label": label})
+        elif domain == "ce":
+            options = []
+            for ce_item in results[:8]:
+                ce_name_cn = ce_item.get("nameCn", "") or ce_item.get("name", "")
+                rarity = ce_item.get("rarity", 0)
+                collection_no = ce_item.get("collectionNo", 0)
+                label = f"{'★' * rarity} {ce_name_cn}"
+                options.append({"id": str(collection_no), "label": label})
+        else:
+            return None
+
+        if len(options) <= 1:
+            return None
+
+        return {
+            "type": CLARIFICATION_MULTI_CANDIDATE,
+            "question": f"「{query_name}」匹配到多个结果，请选择你要查询的：",
+            "options": options,
+            "ambiguous_field": "name",
+        }
+
+    def _build_empty_result_clarification(
+        self,
+        accepted_skills: list[dict],
+        *,
+        domain: str = "servant",
+    ) -> dict | None:
+        """根据 Skill 类型构建空结果 clarification 引导。
+
+        名称查询空结果 → 标记为 empty_result_name（pipeline 层异步 LLM 猜测）
+        筛选查询空结果 → 纯规则生成放宽条件选项
+        """
+        if not accepted_skills:
+            return None
+
+        # 判断是否为名称查询
+        name_skills = {"lookup_servant", "ce_lookup", "compare_servants"}
+        is_name_query = any(s.get("skill_name") in name_skills for s in accepted_skills)
+
+        if is_name_query:
+            # 名称查询空结果：标记为需要 LLM 猜测（由 pipeline 层异步处理）
+            query_name = ""
+            for skill_data in accepted_skills:
+                params = skill_data.get("params", {})
+                query_name = params.get("name", "") or ""
+                if query_name:
+                    break
+                names = params.get("names", [])
+                if names:
+                    query_name = "、".join(names)
+                    break
+
+            return {
+                "type": CLARIFICATION_EMPTY_NAME,
+                "question": f"未找到「{query_name}」，正在智能识别...",
+                "options": [],  # 由 pipeline 层异步填充
+                "ambiguous_field": "name",
+                "query_name": query_name,  # 供 pipeline 层 LLM 猜测使用
+                "domain": domain,
+            }
+
+        # 筛选查询空结果：生成放宽条件选项
+        return self._build_filter_relaxation_clarification(accepted_skills, domain=domain)
+
+    def _build_filter_relaxation_clarification(
+        self,
+        accepted_skills: list[dict],
+        *,
+        domain: str = "servant",
+    ) -> dict | None:
+        """分析当前筛选条件，生成放宽建议选项。纯规则逻辑，不需要 LLM。"""
+        from server.translation import describe_filters
+
+        options: list[dict] = []
+        condition_descriptions = describe_filters(accepted_skills)
+        conditions_text = "、".join(f"「{d}」" for d in condition_descriptions)
+
+        for skill_data in accepted_skills:
+            skill_name = skill_data.get("skill_name", "")
+            params = skill_data.get("params", {})
+
+            # 稀有度限制
+            if skill_name in ("search_by_rarity", "ce_search_by_rarity"):
+                val = params.get("value", "")
+                options.append({"id": f"drop:{skill_name}", "label": f"去掉{val}星限制"})
+
+            # 职阶限制
+            elif skill_name == "search_by_class":
+                class_name = params.get("className", "")
+                options.append({"id": f"drop:{skill_name}", "label": f"去掉{class_name}职阶限制"})
+
+            # 效果数值条件
+            elif skill_name in (
+                "search_by_effect",
+                "search_by_skill_effect",
+                "search_by_np_effect",
+                "ce_search_by_effect",
+            ):
+                if params.get("minValue") or params.get("min_value"):
+                    options.append({"id": f"drop_min:{skill_name}", "label": "去掉数值下限"})
+                if params.get("targetType") or params.get("target_type"):
+                    options.append({"id": f"drop_target:{skill_name}", "label": "不限目标类型"})
+
+            # 礼装获取方式
+            elif skill_name == "ce_search_by_obtain":
+                options.append({"id": f"drop:{skill_name}", "label": "不限获取方式"})
+
+            # 礼装攻击类型
+            elif skill_name == "ce_search_by_atk_type":
+                options.append({"id": f"drop:{skill_name}", "label": "不限攻击类型"})
+
+        if not options:
+            return None
+
+        entity_label = "从者" if domain == "servant" else "概念礼装"
+        question = f"未找到同时满足{conditions_text}的{entity_label}，你可以放宽条件："
+
+        return {
+            "type": CLARIFICATION_EMPTY_FILTER,
+            "question": question,
+            "options": options,
+            "ambiguous_field": "filter_relaxation",
+        }
+
+    async def guess_candidates_async(
+        self,
+        result: ExecutionResult,
+    ) -> ExecutionResult:
+        """异步 LLM 猜测候选（名称查询空结果时调用）。
+
+        当 ExecutionResult.clarification.type == CLARIFICATION_EMPTY_NAME 时，
+        由 pipeline 层调用此方法进行 LLM 猜测并填充候选选项。
+        同时兼容原有的 resolve_nickname 异步路径。
+        """
+        clarification = result.clarification
+        if not clarification or clarification.get("type") != CLARIFICATION_EMPTY_NAME:
+            # 非名称空结果场景：尝试旧的 resolve_nickname 异步路径
+            if result.is_fallback and self._should_try_nickname_resolve(result.accepted_skills):
+                return await self._try_resolve_nickname_async_internal(result)
+            return result
+
+        query_name = clarification.get("query_name", "")
+        domain = clarification.get("domain", "servant")
+        if not query_name:
+            return result
+
+        # 调用 LLM 猜测候选
+        resolve_skill = SKILL_REGISTRY.get("resolve_nickname")
+        if resolve_skill is None or not hasattr(resolve_skill, "execute_async"):
+            return result
+
+        db = load_database() if domain == "servant" else load_ce_database()
+        resolve_params = {"name": query_name}
+        candidates = await resolve_skill.execute_async(db, resolve_params)
+
+        if not candidates:
+            # LLM 猜测失败，保留 clarification 但标记为 fallback
+            result.is_fallback = True
+            result.fallback_message = f"未找到「{query_name}」相关的结果，请尝试更具体的名称。"
+            result.clarification = None
+            return result
+
+        if len(candidates) == 1:
+            # 唯一候选：直接返回结果，不触发 clarification
+            candidates.sort(key=lambda x: (-x.get("rarity", 0), x.get("collectionNo", 0)))
+            return ExecutionResult(
+                servants=candidates,
+                total_found=len(candidates),
+                response_skill=result.response_skill,
+                accepted_skills=result.accepted_skills + [{"skill_name": "resolve_nickname", "params": resolve_params}],
+                rejected_skills=result.rejected_skills,
+                execution_time_ms=result.execution_time_ms,
+            )
+
+        # 多候选：构建 clarification 选项
+        multi_clarification = self._build_multi_candidate_clarification(
+            candidates, result.accepted_skills, domain=domain
+        )
+        if multi_clarification:
+            multi_clarification["question"] = f"「{query_name}」可能是以下之一，请选择："
+            result.clarification = multi_clarification
+            result.servants = candidates
+            result.total_found = len(candidates)
+        else:
+            # 构建失败，直接返回所有候选
+            result.servants = candidates
+            result.total_found = len(candidates)
+            result.clarification = None
+
+        return result
+
+    async def _try_resolve_nickname_async_internal(self, result: ExecutionResult) -> ExecutionResult:
+        """内部异步昵称识别（从 try_resolve_nickname_async 提取）。"""
+        resolve_skill = SKILL_REGISTRY.get("resolve_nickname")
+        if resolve_skill is None or not hasattr(resolve_skill, "execute_async"):
+            return result
+
+        name_param = result.accepted_skills[0].get("params", {}).get("name", "")
+        if not name_param:
+            return result
+
+        db = load_database()
+        resolve_params = {"name": name_param}
+        results = await resolve_skill.execute_async(db, resolve_params)
+
+        if not results:
+            return result
+
+        results.sort(key=lambda x: (-x.get("rarity", 0), x.get("collectionNo", 0)))
+
+        accepted_with_resolve = list(result.accepted_skills) + [
+            {"skill_name": "resolve_nickname", "params": resolve_params}
+        ]
+
+        return ExecutionResult(
+            servants=results,
+            total_found=len(results),
+            response_skill=result.response_skill,
+            accepted_skills=accepted_with_resolve,
+            rejected_skills=result.rejected_skills,
+            execution_time_ms=result.execution_time_ms,
+        )

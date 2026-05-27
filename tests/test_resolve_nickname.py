@@ -235,23 +235,25 @@ class TestExecutorFallbackChain:
     @pytest.mark.asyncio
     @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_async", new_callable=AsyncMock)
     async def test_async_fallback_triggers_on_lookup_empty(self, mock_llm):
-        """异步 fallback：lookup_servant 单独查空时应通过 LLM 识别成功。"""
+        """异步 fallback：lookup_servant 单独查空时应触发 clarification，
+        然后通过 guess_candidates_async LLM 识别成功。"""
         mock_llm.return_value = "梅林"
 
         # 使用一个不在 nicknames.json 中的昵称，确保 lookup_servant 查不到
         result = self.executor.execute(
             skill_calls=[{"skill_name": "lookup_servant", "params": {"name": "花魔术"}}],
         )
-        assert result.is_fallback
+        # 新行为：名称查询空结果返回 clarification（EMPTY_NAME），而非 is_fallback
+        from server.skills.executor import CLARIFICATION_EMPTY_NAME
 
-        # 异步 fallback
-        result = await self.executor.try_resolve_nickname_async(
-            result,
-            [{"skill_name": "lookup_servant", "params": {"name": "花魔术"}}],
-        )
+        assert result.clarification is not None
+        assert result.clarification["type"] == CLARIFICATION_EMPTY_NAME
+
+        # pipeline 层调用 guess_candidates_async 进行 LLM 猜测
+        result = await self.executor.guess_candidates_async(result)
 
         assert result.total_found >= 1
-        assert not result.is_fallback
+        assert result.clarification is None  # 唯一候选，clarification 被清除
         skill_names = [s["skill_name"] for s in result.accepted_skills]
         assert "resolve_nickname" in skill_names
 
@@ -283,19 +285,21 @@ class TestExecutorFallbackChain:
     @pytest.mark.asyncio
     @patch("server.skills.query.resolve_nickname.ResolveNickname._call_llm_async", new_callable=AsyncMock)
     async def test_async_fallback_returns_empty_when_llm_fails(self, mock_llm):
-        """LLM 识别失败时，异步 fallback 应返回原始 fallback 结果。"""
+        """LLM 识别失败时，guess_candidates_async 应清除 clarification 并标记 fallback。"""
         mock_llm.return_value = None
 
         result = self.executor.execute(
             skill_calls=[{"skill_name": "lookup_servant", "params": {"name": "完全不存在"}}],
         )
-        assert result.is_fallback
+        # 新行为：名称查询空结果返回 clarification（EMPTY_NAME）
+        from server.skills.executor import CLARIFICATION_EMPTY_NAME
 
-        # 异步 fallback 也失败
-        result = await self.executor.try_resolve_nickname_async(
-            result,
-            [{"skill_name": "lookup_servant", "params": {"name": "完全不存在"}}],
-        )
+        assert result.clarification is not None
+        assert result.clarification["type"] == CLARIFICATION_EMPTY_NAME
+
+        # pipeline 层调用 guess_candidates_async，LLM 猜测也失败
+        result = await self.executor.guess_candidates_async(result)
 
         assert result.total_found == 0
         assert result.is_fallback
+        assert result.clarification is None  # clarification 被清除，降级为 fallback

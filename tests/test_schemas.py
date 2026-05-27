@@ -288,3 +288,166 @@ class TestClarification:
             extra="ignored",
         )
         assert req.question == "q"
+
+
+# ============================================================
+# 执行层 Clarification 测试
+# ============================================================
+
+
+class TestExecutionClarification:
+    """执行层 clarification（多候选/空结果引导）相关测试。"""
+
+    def test_execution_result_with_clarification(self):
+        """ExecutionResult 可携带 clarification 字段。"""
+        from server.skills.executor import (
+            CLARIFICATION_MULTI_CANDIDATE,
+            ExecutionResult,
+        )
+
+        clarification = {
+            "type": CLARIFICATION_MULTI_CANDIDATE,
+            "question": "「伊吹」匹配到多个结果，请选择你要查询的：",
+            "options": [
+                {"id": "268", "label": "★★★★★ 伊吹童子（Saber）"},
+                {"id": "316", "label": "★★★★★ 水着伊吹童子（Berserker）"},
+            ],
+            "ambiguous_field": "name",
+        }
+        result = ExecutionResult(
+            servants=[{"id": 1}, {"id": 2}],
+            total_found=2,
+            response_skill=None,
+            accepted_skills=[{"skill_name": "lookup_servant", "params": {"name": "伊吹"}}],
+            rejected_skills=[],
+            execution_time_ms=10.5,
+            clarification=clarification,
+        )
+        assert result.clarification is not None
+        assert result.clarification["type"] == CLARIFICATION_MULTI_CANDIDATE
+        assert len(result.clarification["options"]) == 2
+
+    def test_execution_result_without_clarification(self):
+        """默认 clarification 为 None，不影响现有流程。"""
+        from server.skills.executor import ExecutionResult
+
+        result = ExecutionResult(
+            servants=[{"id": 1}],
+            total_found=1,
+            response_skill=None,
+            accepted_skills=[],
+            rejected_skills=[],
+            execution_time_ms=5.0,
+        )
+        assert result.clarification is None
+
+    def test_clarification_type_constants(self):
+        """验证 clarification 类型常量已正确定义。"""
+        from server.skills.executor import (
+            CLARIFICATION_EMPTY_FILTER,
+            CLARIFICATION_EMPTY_NAME,
+            CLARIFICATION_MULTI_CANDIDATE,
+        )
+
+        assert CLARIFICATION_MULTI_CANDIDATE == "multi_candidate"
+        assert CLARIFICATION_EMPTY_NAME == "empty_result_name"
+        assert CLARIFICATION_EMPTY_FILTER == "empty_result_filter"
+
+    def test_is_single_name_lookup_servant(self):
+        """_is_single_name_lookup 正确判断 servant 单名称查询。"""
+        from server.skills.executor import SkillExecutor
+
+        executor = SkillExecutor()
+        assert executor._is_single_name_lookup(
+            [{"skill_name": "lookup_servant", "params": {"name": "梅林"}}],
+            domain="servant",
+        )
+        assert not executor._is_single_name_lookup(
+            [
+                {"skill_name": "lookup_servant", "params": {"name": "梅林"}},
+                {"skill_name": "search_by_rarity", "params": {"value": 5}},
+            ],
+            domain="servant",
+        )
+
+    def test_is_single_name_lookup_ce(self):
+        """_is_single_name_lookup 正确判断 CE 单名称查询。"""
+        from server.skills.executor import SkillExecutor
+
+        executor = SkillExecutor()
+        assert executor._is_single_name_lookup(
+            [{"skill_name": "ce_lookup", "params": {"name": "黑杯"}}],
+            domain="ce",
+        )
+        assert not executor._is_single_name_lookup(
+            [{"skill_name": "lookup_servant", "params": {"name": "梅林"}}],
+            domain="ce",
+        )
+
+    def test_build_multi_candidate_clarification(self):
+        """_build_multi_candidate_clarification 正确构建多候选选项。"""
+        from server.skills.executor import SkillExecutor
+
+        executor = SkillExecutor()
+        results = [
+            {"collectionNo": 268, "aliasCN": "伊吹童子", "rarity": 5, "className": "saber"},
+            {"collectionNo": 316, "aliasCN": "伊吹童子〔夏〕", "rarity": 5, "className": "berserker"},
+        ]
+        accepted = [{"skill_name": "lookup_servant", "params": {"name": "伊吹"}}]
+        clarification = executor._build_multi_candidate_clarification(results, accepted, domain="servant")
+        assert clarification is not None
+        assert clarification["type"] == "multi_candidate"
+        assert len(clarification["options"]) == 2
+        assert "伊吹童子" in clarification["options"][0]["label"]
+        assert "268" == clarification["options"][0]["id"]
+
+    def test_build_multi_candidate_returns_none_for_single(self):
+        """单个结果时不触发 clarification。"""
+        from server.skills.executor import SkillExecutor
+
+        executor = SkillExecutor()
+        results = [{"collectionNo": 150, "aliasCN": "梅林", "rarity": 5, "className": "caster"}]
+        accepted = [{"skill_name": "lookup_servant", "params": {"name": "梅林"}}]
+        clarification = executor._build_multi_candidate_clarification(results, accepted, domain="servant")
+        assert clarification is None
+
+    def test_build_filter_relaxation_clarification(self):
+        """_build_filter_relaxation_clarification 正确生成放宽条件选项。"""
+        from server.skills.executor import SkillExecutor
+
+        executor = SkillExecutor()
+        accepted = [
+            {"skill_name": "search_by_rarity", "params": {"op": "eq", "value": 5}},
+            {"skill_name": "search_by_class", "params": {"className": "Caster"}},
+            {"skill_name": "search_by_effect", "params": {"effect": "npCharge", "minValue": 50}},
+        ]
+        clarification = executor._build_filter_relaxation_clarification(accepted, domain="servant")
+        assert clarification is not None
+        assert clarification["type"] == "empty_result_filter"
+        option_ids = [o["id"] for o in clarification["options"]]
+        assert "drop:search_by_rarity" in option_ids
+        assert "drop:search_by_class" in option_ids
+        assert "drop_min:search_by_effect" in option_ids
+
+    def test_build_empty_result_clarification_name_query(self):
+        """名称查询空结果返回 CLARIFICATION_EMPTY_NAME 类型。"""
+        from server.skills.executor import CLARIFICATION_EMPTY_NAME, SkillExecutor
+
+        executor = SkillExecutor()
+        accepted = [{"skill_name": "lookup_servant", "params": {"name": "不存在的从者"}}]
+        clarification = executor._build_empty_result_clarification(accepted, domain="servant")
+        assert clarification is not None
+        assert clarification["type"] == CLARIFICATION_EMPTY_NAME
+        assert clarification["query_name"] == "不存在的从者"
+
+    def test_build_empty_result_clarification_filter_query(self):
+        """筛选查询空结果返回 CLARIFICATION_EMPTY_FILTER 类型。"""
+        from server.skills.executor import CLARIFICATION_EMPTY_FILTER, SkillExecutor
+
+        executor = SkillExecutor()
+        accepted = [
+            {"skill_name": "search_by_rarity", "params": {"op": "eq", "value": 5}},
+        ]
+        clarification = executor._build_empty_result_clarification(accepted, domain="servant")
+        assert clarification is not None
+        assert clarification["type"] == CLARIFICATION_EMPTY_FILTER
