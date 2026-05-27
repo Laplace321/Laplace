@@ -4,6 +4,7 @@
 
 | 日期 | 事件 | 备注 |
 | :--- | :--- | :--- |
+| 2026-05-27 | v0.3.8 用户确认机制（Clarification） | 执行层反馈式 Clarification — 多候选/空结果/筛选空结果三场景触发选项确认；confirmation_id 精确直达避免死循环；前端 clarification 组件视觉重设计 |
 | 2026-05-25 | v0.3.7 知识问答链路与查询精度提升 | A→B→C 三级知识问答链路（攻略文档 BM25 检索）；自充精确匹配/计算修正、技能效果完整展示、职阶别名识别、从者昵称扩展、日志页面样式修复 |
 | 2026-05-13 | LLM 昵称识别 + 路由层修复 | 新增 `resolve_nickname` Skill（异步 LLM 识别 + LRU 缓存 + DB 校验），修复路由 Prompt 对疑似从者名称的处理（规则 16），扩充高频昵称映射（红A/红弓/弓凛/枪凛/狮子王等），完整异步 fallback 链集成 |
 | 2026-05-12 | 职阶克制查询 + 空结果明示 | 新增 `search_by_class_advantage` Skill（基于 Atlas API 克制关系数据）；OneShot 结果为 0 时传递上下文给 Agent fallback，明确告知空结果+条件列表+放宽建议（Agent tokens 降低 85%） |
