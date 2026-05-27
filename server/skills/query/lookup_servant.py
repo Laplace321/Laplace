@@ -1,4 +1,8 @@
-"""Skill: 按名称查询单个从者（精确/模糊/昵称）。"""
+"""Skill: 按名称查询单个从者（精确/模糊/昵称）。
+
+改为自定义 execute() 实现，保留所有匹配候选（而非 filter 只返回 bool），
+以支持执行层多候选 Clarification 检测。
+"""
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -11,47 +15,60 @@ class Params(BaseModel):
     name: str = Field(description="从者名称（支持中/英/日/昵称）")
 
 
-@register_skill
-class LookupServant(QuerySkill):
-    name = "lookup_servant"
-    description = "按名称查询单个从者（支持中英日名和昵称）"
-    domain = "servant"
+def _resolve_nickname(query_name: str) -> tuple[str | None, dict]:
+    """解析昵称映射，返回 (映射后的名称, 额外过滤器)。"""
+    normalized_query = _normalize_text(query_name)
+    nicknames = load_nicknames()
 
-    @property
-    def params_schema(self) -> type[BaseModel]:
-        return Params
+    mapped_data = None
+    for nick, data in nicknames.items():
+        if _normalize_text(nick) == normalized_query:
+            mapped_data = data
+            break
 
-    def filter(self, servant: dict, params: dict) -> bool:
-        query_name = params.get("name")
-        if query_name is None or not isinstance(query_name, str) or not query_name.strip():
-            return True
+    mapped_name = None
+    extra_filters = {}
+    if isinstance(mapped_data, str):
+        mapped_name = mapped_data.lower()
+    elif isinstance(mapped_data, dict):
+        mapped_name = mapped_data.get("name", "").lower()
+        for key, val in mapped_data.items():
+            if key != "name":
+                extra_filters[key] = val
 
-        query_name = query_name.strip()
-        normalized_query = _normalize_text(query_name)
+    return mapped_name, extra_filters
 
-        # 昵称映射
-        nicknames = load_nicknames()
-        mapped_data = None
-        for nick, data in nicknames.items():
-            if _normalize_text(nick) == normalized_query:
-                mapped_data = data
-                break
 
-        mapped_name = None
-        extra_filters = {}
-        if isinstance(mapped_data, str):
-            mapped_name = mapped_data.lower()
-        elif isinstance(mapped_data, dict):
-            mapped_name = mapped_data.get("name", "").lower()
-            for k, v in mapped_data.items():
-                if k != "name":
-                    extra_filters[k] = v
+def find_servant_candidates(db: list[dict], query_name: str) -> list[dict]:
+    """在数据库中按名称查找所有匹配的从者候选。
 
-        # 额外过滤器（如职阶）
+    三阶段匹配（精确→子串→反向子串），保留所有匹配结果。
+    公开函数，供 lookup_servant 和 compare_servants 共用。
+    """
+    query_name = query_name.strip()
+    if not query_name:
+        return []
+
+    normalized_query = _normalize_text(query_name)
+    mapped_name, extra_filters = _resolve_nickname(query_name)
+
+    # 阶段 1: 精确匹配（昵称映射后）
+    exact_matches: list[dict] = []
+    # 阶段 2: 子串模糊匹配
+    substring_matches: list[dict] = []
+    # 阶段 3: 反向子串匹配
+    reverse_matches: list[dict] = []
+
+    for servant in db:
+        # 额外过滤器（如职阶限制）
+        skip = False
         for attr, val in extra_filters.items():
             if attr == "className":
                 if servant.get("className", "").lower() != val.lower():
-                    return False
+                    skip = True
+                    break
+        if skip:
+            continue
 
         en_name = servant.get("name", "").lower()
         cn_name = servant.get("aliasCN", "").lower()
@@ -64,12 +81,14 @@ class LookupServant(QuerySkill):
         if mapped_name:
             norm_mapped = _normalize_text(mapped_name)
             if norm_mapped in (norm_en, norm_cn, norm_jp):
-                return True
+                exact_matches.append(servant)
+                continue
 
         # 阶段 2: 子串模糊匹配
         if len(normalized_query) >= 2:
             if normalized_query in norm_en or normalized_query in norm_cn or normalized_query in norm_jp:
-                return True
+                substring_matches.append(servant)
+                continue
 
         # 阶段 3: 反向子串匹配
         if (
@@ -77,6 +96,30 @@ class LookupServant(QuerySkill):
             or (norm_cn and norm_cn in normalized_query)
             or (norm_jp and norm_jp in normalized_query)
         ):
-            return True
+            reverse_matches.append(servant)
 
-        return False
+    # 优先返回精确匹配，其次子串，最后反向子串
+    if exact_matches:
+        return exact_matches
+    if substring_matches:
+        return substring_matches
+    return reverse_matches
+
+
+@register_skill
+class LookupServant(QuerySkill):
+    name = "lookup_servant"
+    description = "按名称查询单个从者（支持中英日名和昵称）"
+    domain = "servant"
+
+    @property
+    def params_schema(self) -> type[BaseModel]:
+        return Params
+
+    def execute(self, db: list[dict], params: dict) -> list[dict]:
+        """按名称查找所有匹配的从者候选。"""
+        query_name = params.get("name")
+        if query_name is None or not isinstance(query_name, str) or not query_name.strip():
+            return list(db)
+
+        return find_servant_candidates(db, query_name)

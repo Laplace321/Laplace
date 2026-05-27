@@ -24,6 +24,25 @@ class SkillCall(BaseModel):
     params: dict = Field(default_factory=dict, description="Skill 参数")
 
 
+class ClarificationOption(BaseModel):
+    """单个确认选项。"""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(description="选项标识符，用于回传给后端")
+    label: str = Field(description="面向用户的中文选项文本")
+
+
+class ClarificationRequest(BaseModel):
+    """当 LLM 判断参数存在歧义/缺失时输出的确认请求。"""
+
+    model_config = ConfigDict(extra="ignore")
+
+    question: str = Field(description="面向用户的确认问题")
+    options: list[ClarificationOption] = Field(description="供用户选择的选项列表")
+    ambiguous_field: str = Field(default="", description="歧义参数名称（内部追踪用）")
+
+
 class FallbackReason(BaseModel):
     """当路由无法匹配任何 Skill 时的降级原因。"""
 
@@ -48,6 +67,10 @@ class RoutingResponse(BaseModel):
     atlas_query: AtlasQueryParams | None = Field(
         default=None,
         description="链路 B 结构化查询参数。仅当 target_pipeline='B' 时填写。从用户问题中提取活动名/从者名/时间/类型等结构化信息。",
+    )
+    clarification: ClarificationRequest | None = Field(
+        default=None,
+        description="当参数存在歧义或缺失时输出确认请求。此时 skill_calls 应为空数组。",
     )
 
     @model_validator(mode="after")

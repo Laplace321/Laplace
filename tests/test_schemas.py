@@ -169,3 +169,285 @@ class TestRoutingResponseValidation:
         data = {"intent": "query_servants", "conditions": {"className": "Saber"}}
         resp = RoutingResponse.model_validate(data)
         assert resp.skill_calls == []
+
+
+# ============================================================
+# Clarification 机制测试
+# ============================================================
+
+
+class TestClarification:
+    """用户确认机制（clarification）相关测试。"""
+
+    def test_clarification_option_creation(self):
+        from server.schemas import ClarificationOption
+
+        opt = ClarificationOption(id="party", label="全队暴击伤害UP")
+        assert opt.id == "party"
+        assert opt.label == "全队暴击伤害UP"
+
+    def test_clarification_request_creation(self):
+        from server.schemas import ClarificationOption, ClarificationRequest
+
+        req = ClarificationRequest(
+            question="你想查哪种类型的暴击拐？",
+            options=[
+                ClarificationOption(id="party", label="全队暴击伤害UP"),
+                ClarificationOption(id="self", label="自身暴击伤害UP"),
+            ],
+            ambiguous_field="targetType",
+        )
+        assert req.question == "你想查哪种类型的暴击拐？"
+        assert len(req.options) == 2
+        assert req.ambiguous_field == "targetType"
+
+    def test_clarification_request_default_ambiguous_field(self):
+        from server.schemas import ClarificationOption, ClarificationRequest
+
+        req = ClarificationRequest(
+            question="确认问题",
+            options=[ClarificationOption(id="a", label="选项A")],
+        )
+        assert req.ambiguous_field == ""
+
+    def test_routing_response_with_clarification(self):
+        """RoutingResponse 含 clarification 时 skill_calls 应为空。"""
+        data = {
+            "skill_calls": [],
+            "response_skill": "respond_servant_list",
+            "clarification": {
+                "question": "你想查哪种类型的暴击拐？",
+                "options": [
+                    {"id": "party", "label": "全队暴击伤害UP"},
+                    {"id": "self", "label": "自身暴击伤害UP"},
+                    {"id": "ptOne", "label": "给单个队友暴击伤害UP"},
+                ],
+                "ambiguous_field": "targetType",
+            },
+        }
+        resp = RoutingResponse.model_validate(data)
+        assert resp.skill_calls == []
+        assert resp.clarification is not None
+        assert resp.clarification.question == "你想查哪种类型的暴击拐？"
+        assert len(resp.clarification.options) == 3
+        assert resp.clarification.options[0].id == "party"
+
+    def test_routing_response_without_clarification(self):
+        """无 clarification 时字段为 None，原有流程不受影响。"""
+        data = {
+            "skill_calls": [{"skill_name": "search_by_effect", "params": {"effect": "gainNp"}}],
+            "response_skill": "respond_servant_list",
+        }
+        resp = RoutingResponse.model_validate(data)
+        assert resp.clarification is None
+        assert len(resp.skill_calls) == 1
+
+    def test_parse_routing_response_with_clarification(self):
+        """parse_routing_response 正确解析含 clarification 的 JSON。"""
+        json_str = json.dumps(
+            {
+                "skill_calls": [],
+                "response_skill": "respond_servant_list",
+                "fallback": None,
+                "target_pipeline": None,
+                "clarification": {
+                    "question": "你想查哪种暴击拐？",
+                    "options": [{"id": "party", "label": "全队暴击UP"}],
+                    "ambiguous_field": "targetType",
+                },
+            }
+        )
+        result = parse_routing_response(json_str)
+        assert result["clarification"] is not None
+        assert result["clarification"]["question"] == "你想查哪种暴击拐？"
+        assert result["skill_calls"] == []
+
+    def test_parse_routing_response_without_clarification_unchanged(self):
+        """无 clarification 时 parse_routing_response 行为与之前完全一致。"""
+        json_str = '{"skill_calls": [{"skill_name": "search_by_class", "params": {"className": "Archer"}}], "response_skill": "respond_servant_list"}'
+        result = parse_routing_response(json_str)
+        assert result.get("clarification") is None
+        assert len(result["skill_calls"]) == 1
+
+    def test_json_schema_includes_clarification(self):
+        """routing_response_json_schema 输出中包含 clarification 字段定义。"""
+        schema = routing_response_json_schema()
+        props = schema.get("properties", {})
+        assert "clarification" in props
+
+    def test_clarification_extra_fields_ignored(self):
+        """ClarificationOption/Request 的 extra 字段被忽略。"""
+        from server.schemas import ClarificationOption, ClarificationRequest
+
+        opt = ClarificationOption(id="x", label="test", unknown_field="ignored")
+        assert opt.id == "x"
+
+        req = ClarificationRequest(
+            question="q",
+            options=[ClarificationOption(id="a", label="A")],
+            extra="ignored",
+        )
+        assert req.question == "q"
+
+
+# ============================================================
+# 执行层 Clarification 测试
+# ============================================================
+
+
+class TestExecutionClarification:
+    """执行层 clarification（多候选/空结果引导）相关测试。"""
+
+    def test_execution_result_with_clarification(self):
+        """ExecutionResult 可携带 clarification 字段。"""
+        from server.skills.executor import (
+            CLARIFICATION_MULTI_CANDIDATE,
+            ExecutionResult,
+        )
+
+        clarification = {
+            "type": CLARIFICATION_MULTI_CANDIDATE,
+            "question": "「伊吹」匹配到多个结果，请选择你要查询的：",
+            "options": [
+                {"id": "268", "label": "★★★★★ 伊吹童子（Saber）"},
+                {"id": "316", "label": "★★★★★ 水着伊吹童子（Berserker）"},
+            ],
+            "ambiguous_field": "name",
+        }
+        result = ExecutionResult(
+            servants=[{"id": 1}, {"id": 2}],
+            total_found=2,
+            response_skill=None,
+            accepted_skills=[{"skill_name": "lookup_servant", "params": {"name": "伊吹"}}],
+            rejected_skills=[],
+            execution_time_ms=10.5,
+            clarification=clarification,
+        )
+        assert result.clarification is not None
+        assert result.clarification["type"] == CLARIFICATION_MULTI_CANDIDATE
+        assert len(result.clarification["options"]) == 2
+
+    def test_execution_result_without_clarification(self):
+        """默认 clarification 为 None，不影响现有流程。"""
+        from server.skills.executor import ExecutionResult
+
+        result = ExecutionResult(
+            servants=[{"id": 1}],
+            total_found=1,
+            response_skill=None,
+            accepted_skills=[],
+            rejected_skills=[],
+            execution_time_ms=5.0,
+        )
+        assert result.clarification is None
+
+    def test_clarification_type_constants(self):
+        """验证 clarification 类型常量已正确定义。"""
+        from server.skills.executor import (
+            CLARIFICATION_EMPTY_FILTER,
+            CLARIFICATION_EMPTY_NAME,
+            CLARIFICATION_MULTI_CANDIDATE,
+        )
+
+        assert CLARIFICATION_MULTI_CANDIDATE == "multi_candidate"
+        assert CLARIFICATION_EMPTY_NAME == "empty_result_name"
+        assert CLARIFICATION_EMPTY_FILTER == "empty_result_filter"
+
+    def test_is_single_name_lookup_servant(self):
+        """_is_single_name_lookup 正确判断 servant 单名称查询。"""
+        from server.skills.executor import SkillExecutor
+
+        executor = SkillExecutor()
+        assert executor._is_single_name_lookup(
+            [{"skill_name": "lookup_servant", "params": {"name": "梅林"}}],
+            domain="servant",
+        )
+        assert not executor._is_single_name_lookup(
+            [
+                {"skill_name": "lookup_servant", "params": {"name": "梅林"}},
+                {"skill_name": "search_by_rarity", "params": {"value": 5}},
+            ],
+            domain="servant",
+        )
+
+    def test_is_single_name_lookup_ce(self):
+        """_is_single_name_lookup 正确判断 CE 单名称查询。"""
+        from server.skills.executor import SkillExecutor
+
+        executor = SkillExecutor()
+        assert executor._is_single_name_lookup(
+            [{"skill_name": "ce_lookup", "params": {"name": "黑杯"}}],
+            domain="ce",
+        )
+        assert not executor._is_single_name_lookup(
+            [{"skill_name": "lookup_servant", "params": {"name": "梅林"}}],
+            domain="ce",
+        )
+
+    def test_build_multi_candidate_clarification(self):
+        """_build_multi_candidate_clarification 正确构建多候选选项。"""
+        from server.skills.executor import SkillExecutor
+
+        executor = SkillExecutor()
+        results = [
+            {"collectionNo": 268, "aliasCN": "伊吹童子", "rarity": 5, "className": "saber"},
+            {"collectionNo": 316, "aliasCN": "伊吹童子〔夏〕", "rarity": 5, "className": "berserker"},
+        ]
+        accepted = [{"skill_name": "lookup_servant", "params": {"name": "伊吹"}}]
+        clarification = executor._build_multi_candidate_clarification(results, accepted, domain="servant")
+        assert clarification is not None
+        assert clarification["type"] == "multi_candidate"
+        assert len(clarification["options"]) == 2
+        assert "伊吹童子" in clarification["options"][0]["label"]
+        assert "268" == clarification["options"][0]["id"]
+
+    def test_build_multi_candidate_returns_none_for_single(self):
+        """单个结果时不触发 clarification。"""
+        from server.skills.executor import SkillExecutor
+
+        executor = SkillExecutor()
+        results = [{"collectionNo": 150, "aliasCN": "梅林", "rarity": 5, "className": "caster"}]
+        accepted = [{"skill_name": "lookup_servant", "params": {"name": "梅林"}}]
+        clarification = executor._build_multi_candidate_clarification(results, accepted, domain="servant")
+        assert clarification is None
+
+    def test_build_filter_relaxation_clarification(self):
+        """_build_filter_relaxation_clarification 正确生成放宽条件选项。"""
+        from server.skills.executor import SkillExecutor
+
+        executor = SkillExecutor()
+        accepted = [
+            {"skill_name": "search_by_rarity", "params": {"op": "eq", "value": 5}},
+            {"skill_name": "search_by_class", "params": {"className": "Caster"}},
+            {"skill_name": "search_by_effect", "params": {"effect": "npCharge", "minValue": 50}},
+        ]
+        clarification = executor._build_filter_relaxation_clarification(accepted, domain="servant")
+        assert clarification is not None
+        assert clarification["type"] == "empty_result_filter"
+        option_ids = [o["id"] for o in clarification["options"]]
+        assert "drop:search_by_rarity" in option_ids
+        assert "drop:search_by_class" in option_ids
+        assert "drop_min:search_by_effect" in option_ids
+
+    def test_build_empty_result_clarification_name_query(self):
+        """名称查询空结果返回 CLARIFICATION_EMPTY_NAME 类型。"""
+        from server.skills.executor import CLARIFICATION_EMPTY_NAME, SkillExecutor
+
+        executor = SkillExecutor()
+        accepted = [{"skill_name": "lookup_servant", "params": {"name": "不存在的从者"}}]
+        clarification = executor._build_empty_result_clarification(accepted, domain="servant")
+        assert clarification is not None
+        assert clarification["type"] == CLARIFICATION_EMPTY_NAME
+        assert clarification["query_name"] == "不存在的从者"
+
+    def test_build_empty_result_clarification_filter_query(self):
+        """筛选查询空结果返回 CLARIFICATION_EMPTY_FILTER 类型。"""
+        from server.skills.executor import CLARIFICATION_EMPTY_FILTER, SkillExecutor
+
+        executor = SkillExecutor()
+        accepted = [
+            {"skill_name": "search_by_rarity", "params": {"op": "eq", "value": 5}},
+        ]
+        clarification = executor._build_empty_result_clarification(accepted, domain="servant")
+        assert clarification is not None
+        assert clarification["type"] == CLARIFICATION_EMPTY_FILTER

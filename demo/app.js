@@ -136,6 +136,21 @@ function getSkillDisplayName(skillName) {
 // Tag Pill mode: userText is the natural language supplement typed after the pill.
 // If empty, uses preset defaults only. Backend handles B1 supplement parsing.
 // Uses the same SSE streaming pipeline as manual input for consistent thinking steps UX.
+// === Frontend Tracking ===
+function trackEvent(eventName, properties = {}) {
+  try {
+    const payload = {
+      event: eventName,
+      properties,
+      timestamp: new Date().toISOString(),
+      session_id: currentSessionId,
+    };
+    navigator.sendBeacon("/api/track", JSON.stringify(payload));
+  } catch (err) {
+    // 埋点不应影响正常功能
+  }
+}
+
 // === Send Button State Helpers ===
 const SEND_ICON_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
   <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -501,6 +516,9 @@ function handleStreamEvent(eventType, data, els) {
     case "servants":
       handleServants(data, els);
       break;
+    case "clarification":
+      handleClarification(data, els);
+      break;
     case "delta":
       handleDelta(data, els);
       break;
@@ -548,6 +566,166 @@ function handleThinking(data, els) {
       detail.textContent = JSON.stringify(data.conditions);
       els.thinkingSteps.appendChild(detail);
     }
+  }
+}
+
+// === Handle Clarification Event ===
+function handleClarification(data, els) {
+  // 移除骨架屏
+  const skel = els.container.querySelector(".skeleton-placeholder");
+  if (skel) skel.remove();
+
+  // 完成当前活跃的 thinking step
+  const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
+  if (activeStep) completeThinkingStep(activeStep);
+
+  // 渲染确认卡片
+  const group = document.createElement("div");
+  group.className = "clarification-group";
+
+  const question = document.createElement("div");
+  question.className = "clarification-question";
+  question.textContent = data.question || "请确认你的查询条件：";
+  group.appendChild(question);
+
+  // 渲染纵向选项列表
+  const btnRow = document.createElement("div");
+  btnRow.className = "clarification-btn-row";
+  (data.options || []).forEach((opt) => {
+    const btn = document.createElement("button");
+    btn.className = "clarification-option-btn";
+    btn.dataset.optionId = opt.id;
+    btn.innerHTML = `<span class="option-indicator"></span><span class="option-label">${escapeHtml(opt.label)}</span>`;
+    btn.addEventListener("click", () => {
+      trackEvent("clarification_option_selected", {
+        trace_id: data.trace_id,
+        option_id: opt.id,
+        option_label: opt.label,
+      });
+      group.querySelectorAll(".clarification-option-btn").forEach((b) => {
+        b.disabled = true;
+        b.classList.toggle("selected", b === btn);
+      });
+      const inputEl = group.querySelector(".clarification-input");
+      if (inputEl) inputEl.disabled = true;
+      const submitEl = group.querySelector(".clarification-submit-btn");
+      if (submitEl) submitEl.disabled = true;
+      trackEvent("clarification_confirmed", {
+        trace_id: data.trace_id,
+        confirmed_value: opt.id,
+        input_type: "option",
+      });
+      sendWithConfirmation(opt.label, opt.id);
+    });
+    btnRow.appendChild(btn);
+  });
+  group.appendChild(btnRow);
+
+  // 分隔线
+  const divider = document.createElement("div");
+  divider.className = "clarification-divider";
+  divider.textContent = "或自定义";
+  group.appendChild(divider);
+
+  // 自定义输入行
+  const inputRow = document.createElement("div");
+  inputRow.className = "clarification-input-row";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "clarification-input";
+  input.placeholder = "输入你的回复...";
+  const submitBtn = document.createElement("button");
+  submitBtn.className = "clarification-submit-btn";
+  submitBtn.textContent = "确认";
+  submitBtn.addEventListener("click", () => {
+    const customText = input.value.trim();
+    if (!customText) return;
+    trackEvent("clarification_confirmed", {
+      trace_id: data.trace_id,
+      confirmed_value: customText,
+      input_type: "custom",
+    });
+    group.querySelectorAll(".clarification-option-btn").forEach((b) => (b.disabled = true));
+    input.disabled = true;
+    submitBtn.disabled = true;
+    sendWithConfirmation(customText, null);
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submitBtn.click();
+  });
+  inputRow.appendChild(input);
+  inputRow.appendChild(submitBtn);
+  group.appendChild(inputRow);
+
+  els.replyBody.innerHTML = "";
+  els.replyBody.appendChild(group);
+  els.replyBody.classList.remove("stream-hidden");
+
+  // 埋点：clarification 面板展示
+  trackEvent("clarification_shown", {
+    trace_id: data.trace_id,
+    question: data.question,
+    option_count: (data.options || []).length,
+  });
+}
+
+// === Send query with confirmation context ===
+async function sendWithConfirmation(confirmationText, confirmationId) {
+  // 获取最后一条用户消息作为原始查询
+  const lastUserMsg = chatHistory.filter((m) => m.role === "user").pop();
+  const originalQuery = lastUserMsg ? lastUserMsg.text || lastUserMsg.html?.replace(/<[^>]*>/g, "") || "" : "";
+
+  // 复用现有的 stream 发送逻辑，携带 confirmation_context + confirmation_id
+  const query = originalQuery || chatInput.value.trim();
+  if (!query) return;
+
+  isProcessing = true;
+  setSendButtonToStop();
+
+  // 创建新的助手消息容器（复用 createStreamingContainer）
+  const els = createStreamingContainer();
+  _streamAccumulatedText = "";
+
+  currentAbortController = new AbortController();
+  try {
+    let url = `${STREAM_API_URL}?message=${encodeURIComponent(query)}&confirmation_context=${encodeURIComponent(confirmationText)}`;
+    if (confirmationId) {
+      url += `&confirmation_id=${encodeURIComponent(confirmationId)}`;
+    }
+    const resp = await fetch(url, { signal: currentAbortController.signal });
+    if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = parseSSE(buffer);
+      buffer = events.remainder;
+
+      for (const ev of events.parsed) {
+        handleStreamEvent(ev.event, ev.data, els);
+      }
+    }
+
+    // Finalize: remove cursor if present
+    const cursor = els.replyBody.querySelector(".stream-cursor");
+    if (cursor) cursor.remove();
+  } catch (err) {
+    if (err.name === "AbortError") {
+      finalizeStreamingContainer(els);
+    } else {
+      handleError({ message: `确认请求失败: ${err.message}` }, els);
+    }
+  } finally {
+    currentAbortController = null;
+    isProcessing = false;
+    setSendButtonToSend();
+    chatInput.focus();
   }
 }
 
@@ -610,12 +788,13 @@ function handleDone(data, els) {
     lastTraceId = data.traceId;
     updateDebugPanel();
   }
-  // 追加评分按钮组
-  if (els && data.traceId) {
+  // clarification 是中间询问步骤，不追加评分按钮
+  const isClarification = data.needs_confirmation === true;
+  if (els && data.traceId && !isClarification) {
     appendRatingButtons(els.container, data.traceId);
   }
   // 追踪助手回复到历史（保存完整 HTML 快照以保留样式）
-  if (els) {
+  if (els && !isClarification) {
     const bubbleEl = els.container.querySelector(".message-bubble");
     const html = bubbleEl ? bubbleEl.innerHTML : "";
     chatHistory.push({ role: "assistant", html });

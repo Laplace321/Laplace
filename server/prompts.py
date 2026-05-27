@@ -107,6 +107,7 @@ def get_generation_prompt(user_query: str, context_json: str) -> str:
 - 回复中是否猜测了未在上下文中出现的从者？→ 有则删除，严禁脑补。
 - 回复中是否包含"以实际游戏数据为准"等免责声明？→ 有则删除。
 - 回复中是否包含任何英文字段名、代码片段、元说明？→ 有则删除。
+- 回复中是否包含"异常"、"错误"、"请重试"、"生成失败"、"数据截断"等伪系统提示？→ 有则删除。你是聊天助手，不是程序，绝不输出任何看起来像系统错误的文字。
 """
 
 
@@ -169,6 +170,7 @@ def build_routing_prompt(
 
 **重要说明**：
 - `target_pipeline` 取值：`null` = 默认走链路 A，`"B"` = Atlas 知识问答，`"C"` = 攻略知识问答
+- `clarification`：当参数存在歧义/缺失时输出确认请求对象（含 question、options、ambiguous_field），此时 skill_calls 必须为空
 - **当 `target_pipeline` 为 `"B"` 时，`atlas_query` 必须填写为一个对象（不能为 null）**，包含以下字段：
   - `name`: 具体的活动名/卡池名/关卡名/素材名/从者名（字符串）
   - `entry_type`: 条目类型（字符串，可选值：event/war/gacha/item）
@@ -254,6 +256,29 @@ def build_routing_prompt(
     - 主观评价："哪个好用"、"推荐优先度"
     - 戴冠战相关：机制/星图/礼装/刷取/Boss/配队/打手/条件/攻略等所有戴冠战问题
     关键词参考：攻略、打法、配队、阵容、推荐、评价、值得、强度、tier、节奏榜、戴冠、冠位、剑冠、弓冠、星图、Boss
+
+22. **参数完整性检查（用户确认机制）**：确定 Skill 后，检查必要参数是否可从用户问题中无歧义推断：
+    - 所有参数都能确定 → 正常输出 skill_calls
+    - 某个参数存在多种合理解释且差异显著 → 输出 `clarification`，skill_calls 留空
+    **需要确认的场景**：
+    a) `targetType` 歧义：效果类查询用户未指定"全队/单体/自身"，且该效果确实存在多种 targetType（如暴击伤害UP、攻击力UP等辅助效果）
+    b) 从者名多候选：用户提到的名称可能对应多个不同版本从者（如"伊吹"可能指多个灵衣/泳装版本）
+    c) 语义歧义：用户措辞可解读为不同的 Skill 或不同的效果（如"辅助"可能指 Caster 职阶或 supportSkill 效果）
+    **不需要确认的场景（直接用默认值或查全部）**：
+    - rarity 未指定 → 默认查全部
+    - className 未指定 → 默认查全部
+    - minValue/maxValue 未指定 → 默认不限
+    - 用户明确说了"自充"/"群充"/"全队" → 已有明确 targetType，无需确认
+    - 用户查询的效果仅有单一合理 targetType（如"无敌"默认是自身）→ 无需确认
+
+23. **clarification 输出格式**：触发确认时，输出 `clarification` 对象，skill_calls 必须为空数组：
+    ```json
+    {{"skill_calls": [], "clarification": {{"question": "你想查哪种类型的暴击拐？", "options": [{{"id": "party", "label": "全队暴击伤害UP"}}, {{"id": "self", "label": "自身暴击伤害UP"}}, {{"id": "ptOne", "label": "给单个队友暴击伤害UP"}}], "ambiguous_field": "targetType"}}, "response_skill": "respond_servant_list", "fallback": null, "target_pipeline": null}}
+    ```
+    - `options[].id` 为参数实际值（回传给系统用）
+    - `options[].label` 为面向玩家的中文描述
+    - `question` 使用自然语言问句
+    - `ambiguous_field` 标注歧义参数名称（内部追踪用）
 
 ## 示例
 

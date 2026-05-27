@@ -52,12 +52,19 @@ async def handle_skill_mode(
     response_skill_name: str = "respond_servant_list",
     client_ip: str = "unknown",
     target_pipeline: str = "A",
+    confirmation_context: str | None = None,
 ) -> ChatResponse:
     """Skill 模式的核心处理逻辑。
 
     接收已确定的 skill_calls（来自 LLM 路由或前端直传），
     执行 SkillExecutor 并生成 RAG 回复。
+
+    Args:
+        confirmation_context: 用户确认选择后回传的上下文，拼接到 user_message 进行精确路由。
     """
+    # 用户确认后的第二次请求：将选择上下文拼接到消息
+    if confirmation_context:
+        user_message = f"{user_message}\n[用户确认：{confirmation_context}]"
     request_start = time.monotonic()
     executor = SkillExecutor()
     model_used = "skill_mode"
@@ -107,6 +114,8 @@ async def handle_skill_mode(
                 "routing_prompt_length": len(routing_prompt),
                 "skill_count": len(skill_descriptions),
                 "client_ip": client_ip,
+                "is_confirmation": confirmation_context is not None,
+                "confirmation_context": confirmation_context[:200] if confirmation_context else None,
             },
         )
 
@@ -156,6 +165,40 @@ async def handle_skill_mode(
             if target_pipeline == "C":
                 return await _handle_guide_pipeline(
                     user_message, trace_id, model_used, request_start, trace_total_tokens
+                )
+
+            # ── 用户确认机制：检测 clarification ──
+            clarification = routing_result.get("clarification")
+            if clarification:
+                await log_trace_event(
+                    trace_id,
+                    "clarification_requested",
+                    {
+                        "question": clarification.get("question", ""),
+                        "options": clarification.get("options", []),
+                        "ambiguous_field": clarification.get("ambiguous_field", ""),
+                    },
+                )
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": (time.monotonic() - request_start) * 1000,
+                        "result": "clarification_requested",
+                        "mode": "clarification",
+                        "total_tokens": trace_total_tokens,
+                    },
+                )
+                return ChatResponse(
+                    reply="",
+                    servants=[],
+                    count=0,
+                    query={
+                        "mode": "clarification",
+                        "clarification": clarification,
+                    },
+                    model=model_used,
+                    traceId=trace_id,
                 )
 
             # 检查 fallback
@@ -339,8 +382,60 @@ async def handle_skill_mode(
             "total_found": total_found,
             "execution_time_ms": round(result.execution_time_ms, 2),
             "is_fallback": result.is_fallback,
+            "has_clarification": result.clarification is not None,
         },
     )
+
+    # ── 执行层 clarification 检测 ──
+    if result.clarification:
+        from server.skills.executor import CLARIFICATION_EMPTY_NAME
+
+        # 名称查询空结果：异步 LLM 猜测填充候选
+        if result.clarification.get("type") == CLARIFICATION_EMPTY_NAME:
+            result = await executor.guess_candidates_async(result)
+
+        # 猜测后仍有 clarification → 推送给前端
+        if result.clarification:
+            await log_trace_event(
+                trace_id,
+                "execution_clarification_requested",
+                {
+                    "type": result.clarification.get("type", ""),
+                    "question": result.clarification.get("question", ""),
+                    "options": result.clarification.get("options", []),
+                    "ambiguous_field": result.clarification.get("ambiguous_field", ""),
+                },
+            )
+            await log_trace_event(
+                trace_id,
+                "final",
+                {
+                    "total_time_ms": (time.monotonic() - request_start) * 1000,
+                    "result": "execution_clarification_requested",
+                    "mode": "clarification",
+                    "total_tokens": trace_total_tokens,
+                },
+            )
+            return ChatResponse(
+                reply="",
+                servants=[],
+                count=0,
+                query={
+                    "mode": "clarification",
+                    "clarification": {
+                        "question": result.clarification["question"],
+                        "options": result.clarification.get("options", []),
+                        "ambiguous_field": result.clarification.get("ambiguous_field", ""),
+                    },
+                    "source": "execution",
+                },
+                model=model_used,
+                traceId=trace_id,
+            )
+        # 猜测成功（clarification 被清除），更新结果变量
+        servants = result.servants
+        total_found = result.total_found
+        returned_servants = servants[:MAX_RESULTS]
 
     # Fallback 处理：先尝试异步昵称识别，再 Agent 兜底
     if result.is_fallback:
@@ -521,15 +616,231 @@ async def handle_skill_mode(
     )
 
 
-async def stream_event_generator(message: str, preset_name: str | None = None, *, client_ip: str = "unknown"):
+async def _handle_confirmation_direct(
+    *,
+    message: str,
+    confirmation_id: int,
+    confirmation_context: str,
+    trace_id: str,
+    stream_start: float,
+    client_ip: str,
+):
+    """确认直达路径：用户通过 clarification 选择了具体实体（collectionNo），
+    直接从 DB 定位唯一从者/礼装，跳过 LLM 路由和 Skill 执行，直入 RAG 生成。
+
+    这避免了"选择后重新路由 → 名称模糊匹配又找到多个 → 再次 clarification"的死循环。
+    """
+    from server.query_executor import load_ce_database, load_database
+
+    model_used = "confirmation_direct"
+    trace_total_tokens = 0
+
+    yield sse_event("thinking", {"phase": "routing", "message": "正在理解你的问题..."})
+
+    # ── Trace: confirmation_direct ──
+    await log_trace_event(
+        trace_id,
+        "routing_input",
+        {
+            "query": message,
+            "mode": "confirmation_direct",
+            "confirmation_id": confirmation_id,
+            "confirmation_context": confirmation_context[:200] if confirmation_context else "",
+            "client_ip": client_ip,
+        },
+    )
+
+    # 按 collectionNo 从两个数据库中查找
+    servant_db = load_database()
+    target = None
+    domain = "servant"
+    for servant in servant_db:
+        if servant.get("collectionNo") == confirmation_id:
+            target = servant
+            break
+
+    if target is None:
+        ce_db = load_ce_database()
+        for ce_item in ce_db:
+            if ce_item.get("collectionNo") == confirmation_id:
+                target = ce_item
+                domain = "ce"
+                break
+
+    if target is None:
+        yield sse_event("error", {"message": f"未找到编号 {confirmation_id} 的实体"})
+        await log_trace_event(
+            trace_id,
+            "final",
+            {"total_time_ms": (time.monotonic() - stream_start) * 1000, "result": "confirmation_not_found"},
+        )
+        yield sse_event("done", {"model": model_used, "traceId": trace_id})
+        return
+
+    servants = [target]
+    total_found = 1
+    response_skill_name = "respond_ce_list" if domain == "ce" else "respond_servant_detail"
+    skill_calls = [
+        {
+            "skill_name": "lookup_servant" if domain == "servant" else "ce_lookup",
+            "params": {"name": confirmation_context},
+        }
+    ]
+
+    yield sse_event(
+        "thinking",
+        {"phase": "routed", "message": "意图识别完成", "detail": f"查询从者「{confirmation_context}」"},
+    )
+
+    await log_trace_event(
+        trace_id,
+        "routing_output",
+        {"skill_calls": skill_calls, "response_skill": response_skill_name, "mode": "confirmation_direct"},
+    )
+
+    # ── Trace: execution ──
+    await log_trace_event(
+        trace_id,
+        "execution",
+        {"accepted_skills": skill_calls, "total_found": total_found, "confirmation_direct": True},
+    )
+
+    yield sse_event("thinking", {"phase": "querying", "message": "正在检索从者数据..."})
+
+    # 卡片先行
+    returned_servants = servants[:MAX_RESULTS]
+    if returned_servants:
+        yield sse_event(
+            "servants",
+            {"servants": returned_servants, "count": len(returned_servants), "total": total_found},
+        )
+
+    # ── RAG 生成 ──
+    yield sse_event("thinking", {"phase": "generating", "message": "正在生成分析..."})
+
+    applied_filters = describe_filters(skill_calls)
+
+    if domain == "ce":
+        context_data, _ = build_ce_context(servants, skill_calls=skill_calls)
+        context_data["已应用的筛选条件"] = applied_filters
+        context_data["筛选条件"] = applied_filters
+    else:
+        detail_mode = response_skill_name == "respond_servant_detail"
+        context_data, _ = build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
+        context_data["已应用的筛选条件"] = applied_filters
+        context_data["筛选条件"] = applied_filters
+
+    context_json = json.dumps(context_data, ensure_ascii=False)
+
+    await log_trace_event(trace_id, "context_build", {"applied_filters": applied_filters, "context_data": context_data})
+
+    # 使用 Response Skill 的 prompt（如果可用）
+    response_skill = SKILL_REGISTRY.get(response_skill_name)
+    from server.skills.base import ResponseSkill
+
+    if response_skill is not None and isinstance(response_skill, ResponseSkill):
+        gen_prompt = response_skill.build_prompt(message, context_json)
+    else:
+        gen_prompt = get_generation_prompt(message, context_json)
+
+    await log_trace_event(trace_id, "generation_input", {"generation_prompt": gen_prompt})
+
+    full_reply_parts: list[str] = []
+    gen_usage: dict = {}
+
+    try:
+        stream_metadata = StreamMetadata()
+        async for chunk in chat_completion_stream(
+            system_prompt=(
+                "You are a helpful AI assistant. You MUST strictly follow "
+                "the provided data and NEVER use your internal knowledge about FGO."
+            ),
+            user_message=gen_prompt,
+            temperature=0.1,
+            max_tokens=2048,
+            metadata=stream_metadata,
+        ):
+            full_reply_parts.append(chunk)
+            yield sse_event("delta", {"text": chunk})
+
+        final_reply = "".join(full_reply_parts).strip()
+        gen_usage = stream_metadata.usage
+        trace_total_tokens += gen_usage.get("total_tokens", 0)
+        if not final_reply:
+            raise ValueError("Empty response from LLM")
+    except Exception as generation_error:
+        entity_label = "礼装" if domain == "ce" else "从者"
+        final_reply = f"为你找到了 {total_found} 位{entity_label}。"
+        if not full_reply_parts:
+            try:
+                yield sse_event("delta", {"text": final_reply})
+            except Exception:
+                pass
+        await log_trace_event(
+            trace_id,
+            "generation_output",
+            {"reply": final_reply},
+            error=str(generation_error),
+        )
+    else:
+        await log_trace_event(
+            trace_id,
+            "generation_output",
+            {"reply": final_reply, "generation_usage": gen_usage},
+        )
+
+    await log_trace_event(
+        trace_id,
+        "final",
+        {
+            "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
+            "total_found": total_found,
+            "result": "success",
+            "mode": "confirmation_direct",
+            "total_tokens": trace_total_tokens,
+        },
+    )
+
+    yield sse_event("done", {"model": model_used, "traceId": trace_id})
+
+
+async def stream_event_generator(
+    message: str,
+    preset_name: str | None = None,
+    *,
+    client_ip: str = "unknown",
+    confirmation_context: str | None = None,
+    confirmation_id: str | None = None,
+):
     """SSE 流式事件生成器 — 分阶段推送思考过程和结果。
 
     从 main.py chat_stream() 内部的 event_generator() 抽取。
+
+    Args:
+        confirmation_context: 用户确认选择后回传的上下文，拼接到 message 进行精确路由。
+        confirmation_id: 用户选择的选项 ID（collectionNo），用于精确定位实体跳过路由。
     """
     trace_id = uuid.uuid4().hex[:8]
     stream_start = time.monotonic()
     model_used = "unknown"
     trace_total_tokens = 0  # 累计 token 消耗
+
+    # ── 确认直达：用户通过 clarification 选择了具体实体（collectionNo），跳过路由+执行 ──
+    if confirmation_id and confirmation_id.isdigit():
+        async for event in _handle_confirmation_direct(
+            message=message,
+            confirmation_id=int(confirmation_id),
+            confirmation_context=confirmation_context or "",
+            trace_id=trace_id,
+            stream_start=stream_start,
+            client_ip=client_ip,
+        ):
+            yield event
+        return
+
+    # 用户确认后的第二次请求（自定义输入，无 confirmation_id）：将选择上下文拼接到消息
+    if confirmation_context:
+        message = f"{message}\n[用户确认：{confirmation_context}]"
 
     # ── 阶段 1: Skill 路由（或 Preset 展开） ──
     if preset_name:
@@ -653,6 +964,8 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
                 "routing_prompt_length": len(routing_prompt),
                 "skill_count": len(skill_descriptions),
                 "client_ip": client_ip,
+                "is_confirmation": confirmation_context is not None,
+                "confirmation_context": confirmation_context[:200] if confirmation_context else None,
             },
         )
 
@@ -784,6 +1097,39 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
                 )
                 yield sse_event("done", {"model": model_used, "traceId": trace_id})
                 return
+
+        # ── 用户确认机制：检测 clarification ──
+        clarification = routing_result.get("clarification")
+        if clarification:
+            await log_trace_event(
+                trace_id,
+                "clarification_requested",
+                {
+                    "question": clarification.get("question", ""),
+                    "options": clarification.get("options", []),
+                    "ambiguous_field": clarification.get("ambiguous_field", ""),
+                },
+            )
+            await log_trace_event(
+                trace_id,
+                "final",
+                {
+                    "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                    "result": "clarification_requested",
+                    "mode": "clarification",
+                    "total_tokens": trace_total_tokens,
+                },
+            )
+            yield sse_event(
+                "clarification",
+                {
+                    "question": clarification["question"],
+                    "options": clarification["options"],
+                    "trace_id": trace_id,
+                },
+            )
+            yield sse_event("done", {"model": model_used, "traceId": trace_id, "needs_confirmation": True})
+            return
 
         # 推送路由结果（预消化：中文描述替代原始英文 skill_name）
         yield sse_event(
@@ -946,8 +1292,56 @@ async def stream_event_generator(message: str, preset_name: str | None = None, *
             "total_found": total_found,
             "execution_time_ms": round(result.execution_time_ms, 2),
             "is_fallback": result.is_fallback,
+            "has_clarification": result.clarification is not None,
         },
     )
+
+    # ── 执行层 clarification 检测 ──
+    if result.clarification:
+        from server.skills.executor import CLARIFICATION_EMPTY_NAME
+
+        # 名称查询空结果：异步 LLM 猜测填充候选
+        if result.clarification.get("type") == CLARIFICATION_EMPTY_NAME:
+            yield sse_event("thinking", {"phase": "resolving", "message": "正在智能识别..."})
+            result = await executor.guess_candidates_async(result)
+
+        # 猜测后仍有 clarification → 推送给前端
+        if result.clarification:
+            await log_trace_event(
+                trace_id,
+                "execution_clarification_requested",
+                {
+                    "type": result.clarification.get("type", ""),
+                    "question": result.clarification.get("question", ""),
+                    "options": result.clarification.get("options", []),
+                    "ambiguous_field": result.clarification.get("ambiguous_field", ""),
+                },
+            )
+            await log_trace_event(
+                trace_id,
+                "final",
+                {
+                    "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                    "result": "execution_clarification_requested",
+                    "mode": "clarification",
+                    "total_tokens": trace_total_tokens,
+                },
+            )
+            yield sse_event(
+                "clarification",
+                {
+                    "question": result.clarification["question"],
+                    "options": result.clarification.get("options", []),
+                    "trace_id": trace_id,
+                },
+            )
+            yield sse_event("done", {"model": model_used, "traceId": trace_id, "needs_confirmation": True})
+            return
+
+        # 猜测成功（clarification 被清除），更新结果变量
+        servants = result.servants
+        total_found = result.total_found
+        returned_servants = servants[:MAX_RESULTS]
 
     # 执行阶段 fallback：先尝试异步昵称识别，再 Agent 兜底
     if result.is_fallback:
