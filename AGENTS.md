@@ -82,7 +82,7 @@
 2. 实现代码，验证功能正确性
 3. 更新 `需求描述.md`（产品路线图状态、Phase 进度等）
 4. 更新 `MEMORY.md` 热层（迭代计划、活跃问题、技术备忘）；如产生新决策，创建 `docs/adr/ADR-NNN-<slug>.md` 并在索引表追加一行
-5. 如果完成了 Phase 或核心特性，在 `docs/CHANGELOG.md` 追加里程碑
+5. 如果完成了 Phase 或核心特性，在 `docs/CHANGELOG.md` 追加里程碑，并按 §14 SOP 同步更新 `demo/changelog-data.json`（面向用户的更新日志）
 6. 如果发现了新的通用架构约束或工程标准，主动向用户提议后更新 `AGENTS.md`
 7. 按需更新 `README.md`（对外说明变更）、`PRODUCT.md`（用户侧功能变更）
 
@@ -118,6 +118,7 @@
 | **`MEMORY.md`** 热层 | 几乎每次 | 更新迭代计划、活跃问题、技术备忘；新 ADR 只加索引行 |
 | **`docs/adr/ADR-NNN-*.md`** | 新增 / 修改架构决策 | 独立文件，编号递增；禁止在 `MEMORY.md` 写详情 |
 | **`docs/CHANGELOG.md`** | Phase / 核心特性完成 | 表头追加一行里程碑（时间倒序） |
+| **`demo/changelog-data.json`** | **强制 — 与 CHANGELOG.md 同步** | 按 §14 SOP 追加版本条目（面向用户的更新说明） |
 | **`AGENTS.md`** | 发现新通用标准 | 日常不动；新的架构约束 / 工程标准才更新 |
 | **`README.md`** | 对外说明变化 | 新功能、部署方式变更等 |
 | **`PRODUCT.md`** | 用户侧功能变化 | 非技术语言 |
