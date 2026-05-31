@@ -33,6 +33,28 @@ from server.skills.executor import SkillExecutor
 from server.skills.presets import PRESET_REGISTRY
 from server.translation import describe_filters
 
+# Agent 工具名 → 用户友好中文描述
+_AGENT_TOOL_DISPLAY = {
+    "search_servants": "搜索从者",
+    "lookup_servant": "查询从者详情",
+    "compare_servants": "对比从者",
+    "list_effects": "查询效果列表",
+    "list_traits": "查询特性列表",
+    "list_classes": "查询职阶列表",
+    "lookup_skill_detail": "查询技能数值",
+}
+
+
+def _build_agent_progress_messages(tool_trace: list[dict]) -> list[str]:
+    """将 Agent tool_trace 转换为用户友好的中文进度消息列表。"""
+    messages = []
+    for entry in tool_trace:
+        tool_name = entry.get("tool", "")
+        display_name = _AGENT_TOOL_DISPLAY.get(tool_name, tool_name)
+        summary = entry.get("result_summary", "")
+        messages.append(f"{display_name}：{summary}" if summary else display_name)
+    return messages
+
 
 class ChatResponse(BaseModel):
     """对话响应（pipeline 内部使用，与 main.py 中的定义保持一致）。"""
@@ -120,14 +142,84 @@ async def handle_skill_mode(
         )
 
         try:
-            routing_result = await chat_completion(
-                system_prompt=routing_prompt,
-                user_message=user_message,
-                temperature=0.1,
-                json_mode=True,
-                response_schema=routing_response_json_schema,
-                response_validator=parse_routing_response,
-            )
+            # 路由失败重试：最多 2 次尝试，全部失败走 Agent 兜底
+            routing_result = None
+            _routing_last_error = None
+            for _routing_attempt in range(2):
+                try:
+                    routing_result = await chat_completion(
+                        system_prompt=routing_prompt,
+                        user_message=user_message,
+                        temperature=0.1,
+                        json_mode=True,
+                        response_schema=routing_response_json_schema,
+                        response_validator=parse_routing_response,
+                    )
+                    break  # 成功则跳出重试循环
+                except Exception as retry_err:
+                    _routing_last_error = retry_err
+                    if _routing_attempt == 0:
+                        print(f"⚠️ [{trace_id}] 路由第 1 次尝试失败，重试中: {retry_err}")
+
+            # 2 次路由均失败 → Agent 兜底
+            if routing_result is None:
+                print(f"⚠️ [{trace_id}] 路由 2 次均失败，降级到 Agent: {_routing_last_error}")
+                try:
+                    agent_result = await agent_route(user_message, TOOL_HANDLERS, trace_id)
+                    trace_total_tokens += agent_result.total_tokens
+                    category, clean_reply = classify_agent_reply(agent_result.reply)
+                    returned = (
+                        agent_result.servants_data[:MAX_RESULTS] if agent_result.servants_data and not category else []
+                    )
+                    await log_trace_event(
+                        trace_id,
+                        "agent_detail",
+                        {
+                            "rounds": agent_result.rounds,
+                            "agent_tokens": agent_result.total_tokens,
+                            "tool_trace": agent_result.tool_trace,
+                            "reply": clean_reply,
+                        },
+                    )
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": (time.monotonic() - request_start) * 1000,
+                            "result": "routing_retry_agent_fallback",
+                            "mode": "agent_fallback",
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                    return ChatResponse(
+                        reply=clean_reply,
+                        servants=returned,
+                        count=len(agent_result.servants_data),
+                        query={"mode": "routing_retry_agent_fallback", "routing_error": str(_routing_last_error)},
+                        model=f"agent_{agent_result.rounds}r",
+                        traceId=trace_id,
+                    )
+                except Exception as agent_err:
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": (time.monotonic() - request_start) * 1000,
+                            "result": "routing_error",
+                            "mode": "routing_error",
+                            "total_tokens": trace_total_tokens,
+                        },
+                        error=f"routing: {_routing_last_error}; agent: {agent_err}",
+                    )
+                    return ChatResponse(
+                        reply="抱歉，Skill 路由遇到问题，请稍后重试。",
+                        servants=[],
+                        count=0,
+                        query={},
+                        model="error",
+                        traceId=trace_id,
+                    )
+
             model_used = routing_result.pop("_model", "unknown")
             routing_result.pop("_response_format", None)
             routing_result.pop("_provider", None)
@@ -606,11 +698,14 @@ async def handle_skill_mode(
         },
     )
 
+    query_info: dict = {"mode": "skill", "skill_calls": skill_calls}
+    if result.rejected_skills:
+        query_info["rejected_skills"] = result.rejected_skills
     return ChatResponse(
         reply=final_reply,
         servants=returned_servants,
         count=total_found,
-        query={"mode": "skill", "skill_calls": skill_calls},
+        query=query_info,
         model=model_used,
         traceId=trace_id,
     )
@@ -969,28 +1064,75 @@ async def stream_event_generator(
             },
         )
 
-        try:
-            routing_result = await chat_completion(
-                system_prompt=routing_prompt,
-                user_message=message,
-                temperature=0.1,
-                json_mode=True,
-                response_schema=routing_response_json_schema,
-                response_validator=parse_routing_response,
-            )
-        except Exception as e:
-            await log_trace_event(
-                trace_id,
-                "final",
-                {
-                    "total_time_ms": (time.monotonic() - stream_start) * 1000,
-                    "result": "routing_error",
-                    "mode": "routing_error",
-                    "total_tokens": trace_total_tokens,
-                },
-                error=str(e),
-            )
-            yield sse_event("error", {"phase": "routing", "message": "路由失败，请稍后重试"})
+        # 路由失败重试：最多 2 次尝试，全部失败走 Agent 兜底
+        routing_result = None
+        _sse_routing_last_error = None
+        for _sse_routing_attempt in range(2):
+            try:
+                routing_result = await chat_completion(
+                    system_prompt=routing_prompt,
+                    user_message=message,
+                    temperature=0.1,
+                    json_mode=True,
+                    response_schema=routing_response_json_schema,
+                    response_validator=parse_routing_response,
+                )
+                break
+            except Exception as retry_err:
+                _sse_routing_last_error = retry_err
+                if _sse_routing_attempt == 0:
+                    print(f"⚠️ [{trace_id}] SSE 路由第 1 次尝试失败，重试中: {retry_err}")
+
+        if routing_result is None:
+            print(f"⚠️ [{trace_id}] SSE 路由 2 次均失败，降级到 Agent: {_sse_routing_last_error}")
+            yield sse_event("thinking", {"phase": "agent_fallback", "message": "路由异常，正在启动智能搜索..."})
+            try:
+                agent_result = await agent_route(message, TOOL_HANDLERS, trace_id)
+                trace_total_tokens += agent_result.total_tokens
+                category, clean_reply = classify_agent_reply(agent_result.reply)
+                for progress_msg in _build_agent_progress_messages(agent_result.tool_trace):
+                    yield sse_event("thinking", {"phase": "agent_tool", "message": progress_msg})
+                if agent_result.servants_data and not category:
+                    returned = agent_result.servants_data[:MAX_RESULTS]
+                    yield sse_event(
+                        "servants",
+                        {"servants": returned, "count": len(returned), "total": len(agent_result.servants_data)},
+                    )
+                yield sse_event("delta", {"text": clean_reply})
+                await log_trace_event(
+                    trace_id,
+                    "agent_detail",
+                    {
+                        "rounds": agent_result.rounds,
+                        "agent_tokens": agent_result.total_tokens,
+                        "tool_trace": agent_result.tool_trace,
+                        "reply": clean_reply,
+                    },
+                )
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                        "result": "routing_retry_agent_fallback",
+                        "mode": "agent_fallback",
+                        "total_tokens": trace_total_tokens,
+                    },
+                )
+            except Exception as agent_err:
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                        "result": "routing_error",
+                        "mode": "routing_error",
+                        "total_tokens": trace_total_tokens,
+                    },
+                    error=f"routing: {_sse_routing_last_error}; agent: {agent_err}",
+                )
+                yield sse_event("error", {"phase": "routing", "message": "路由失败，请稍后重试"})
+            yield sse_event("done", {"model": "error", "traceId": trace_id})
             return
 
         model_used = routing_result.pop("_model", "unknown")
@@ -1168,6 +1310,8 @@ async def stream_event_generator(
                 agent_result: AgentResult = await agent_route(message, TOOL_HANDLERS, trace_id)
                 trace_total_tokens += agent_result.total_tokens
                 category, clean_reply = classify_agent_reply(agent_result.reply)
+                for progress_msg in _build_agent_progress_messages(agent_result.tool_trace):
+                    yield sse_event("thinking", {"phase": "agent_tool", "message": progress_msg})
                 if agent_result.servants_data and not category:
                     returned = agent_result.servants_data[:MAX_RESULTS]
                     yield sse_event(
@@ -1220,6 +1364,8 @@ async def stream_event_generator(
                 agent_result = await agent_route(message, TOOL_HANDLERS, trace_id)
                 trace_total_tokens += agent_result.total_tokens
                 category, clean_reply = classify_agent_reply(agent_result.reply)
+                for progress_msg in _build_agent_progress_messages(agent_result.tool_trace):
+                    yield sse_event("thinking", {"phase": "agent_tool", "message": progress_msg})
                 if agent_result.servants_data and not category:
                     returned = agent_result.servants_data[:MAX_RESULTS]
                     yield sse_event(
@@ -1370,6 +1516,8 @@ async def stream_event_generator(
             agent_result = await agent_route(message, TOOL_HANDLERS, trace_id, oneshot_context=oneshot_ctx)
             trace_total_tokens += agent_result.total_tokens
             category, clean_reply = classify_agent_reply(agent_result.reply)
+            for progress_msg in _build_agent_progress_messages(agent_result.tool_trace):
+                yield sse_event("thinking", {"phase": "agent_tool", "message": progress_msg})
             if agent_result.servants_data and not category:
                 returned = agent_result.servants_data[:MAX_RESULTS]
                 yield sse_event(
@@ -1552,7 +1700,10 @@ async def stream_event_generator(
     )
 
     # ── 完成 ──
-    yield sse_event("done", {"model": model_used, "traceId": trace_id})
+    done_data: dict = {"model": model_used, "traceId": trace_id}
+    if result.rejected_skills:
+        done_data["rejected_skills"] = result.rejected_skills
+    yield sse_event("done", done_data)
 
 
 # ============================================================

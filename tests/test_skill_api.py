@@ -294,7 +294,7 @@ class TestSkillModeLLMRouting:
 
     @pytest.mark.anyio
     async def test_llm_routing_error(self):
-        """LLM 路由异常：应返回友好错误而非 500。"""
+        """LLM 路由异常：2 次重试后降级到 Agent 兜底，而非直接返回错误。"""
 
         async def raise_error(**kwargs):
             raise ConnectionError("Network error")
@@ -307,8 +307,11 @@ class TestSkillModeLLMRouting:
                 )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["model"] == "error"
-        assert "路由" in data["reply"] or "重试" in data["reply"]
+        # 路由失败后降级到 Agent 兜底，model 应为 agent_Xr 格式
+        assert data["model"].startswith("agent_") or data["model"] == "error"
+        # Agent 降级时 query.mode 标记为 routing_retry_agent_fallback
+        if data["model"].startswith("agent_"):
+            assert data["query"]["mode"] == "routing_retry_agent_fallback"
 
 
 # ============================================================
