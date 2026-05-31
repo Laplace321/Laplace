@@ -247,7 +247,7 @@ async function sendPresetQuery(presetName, userText) {
       finalizeStreamingContainer(els);
     } else {
       els.container.remove();
-      showToast(`请求失败: ${err.message}`);
+      showToast(classifyError(err));
     }
   } finally {
     currentAbortController = null;
@@ -357,7 +357,7 @@ async function sendMessage() {
           finalizeStreamingContainer(els);
         } else {
           els.container.remove();
-          showToast(`请求失败: ${err.message}`);
+          showToast(classifyError(err));
         }
       } finally {
         currentAbortController = null;
@@ -416,7 +416,7 @@ async function sendMessage() {
       finalizeStreamingContainer(els);
     } else {
       els.container.remove();
-      showToast(`请求失败: ${err.message}`);
+      showToast(classifyError(err));
     }
   } finally {
     currentAbortController = null;
@@ -462,9 +462,8 @@ function parseSSE(text) {
 
 // === Create Streaming Container ===
 function createStreamingContainer() {
-  // 重置流式文本累积变量，确保每次新请求不拼接上一次的内容
+  // accumulatedText 存储在返回的 els 对象上，每次新建容器自动隔离
   // A 链路推送完整回复（累积后即完整内容），C 链路推送增量片段（需逐次追加）
-  _streamAccumulatedText = "";
 
   const msg = document.createElement("div");
   msg.className = "message assistant-message";
@@ -504,7 +503,7 @@ function createStreamingContainer() {
   chatMessages.appendChild(msg);
   scrollToBottom();
 
-  return { container: msg, thinkingSteps, cardsArea, replyBody };
+  return { container: msg, thinkingSteps, cardsArea, replyBody, accumulatedText: "" };
 }
 
 // === Handle Stream Event ===
@@ -684,7 +683,6 @@ async function sendWithConfirmation(confirmationText, confirmationId) {
 
   // 创建新的助手消息容器（复用 createStreamingContainer）
   const els = createStreamingContainer();
-  _streamAccumulatedText = "";
 
   currentAbortController = new AbortController();
   try {
@@ -719,7 +717,7 @@ async function sendWithConfirmation(confirmationText, confirmationId) {
     if (err.name === "AbortError") {
       finalizeStreamingContainer(els);
     } else {
-      handleError({ message: `确认请求失败: ${err.message}` }, els);
+      handleError({ message: classifyError(err) }, els);
     }
   } finally {
     currentAbortController = null;
@@ -764,16 +762,16 @@ function renderMarkdown(text) {
 
 // === Handle Delta Event ===
 // 累积流式文本片段，每次 delta 追加后整体渲染 markdown
-let _streamAccumulatedText = "";
+// accumulatedText 存储在 els 对象上，避免全局变量跨请求污染
 
 function handleDelta(data, els) {
   // Complete generating step
   const activeStep = els.thinkingSteps.querySelector(".thinking-step.active");
   if (activeStep) completeThinkingStep(activeStep);
 
-  // 追加增量文本片段（而非替换）
-  _streamAccumulatedText += data.text || "";
-  const replyHtml = renderMarkdown(_streamAccumulatedText);
+  // 追加增量文本片段到 els 实例属性（而非全局变量）
+  els.accumulatedText += data.text || "";
+  const replyHtml = renderMarkdown(els.accumulatedText);
   els.replyBody.innerHTML = replyHtml + '<span class="stream-cursor"></span>';
   void els.replyBody.offsetHeight;
   els.replyBody.classList.remove("stream-hidden");
@@ -1055,6 +1053,28 @@ function appendTypingIndicator() {
   return msg;
 }
 
+// === Error Classification ===
+function classifyError(err) {
+  const msg = (err && err.message) || String(err);
+  const status = err && err.status;
+  if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("network")) {
+    return "网络连接异常，请检查网络后重试";
+  }
+  if (status === 429 || msg.includes("429") || msg.includes("rate limit") || msg.includes("繁忙")) {
+    return "服务繁忙，请稍后再试";
+  }
+  if (status >= 500 || msg.includes("500") || msg.includes("502") || msg.includes("503")) {
+    return "服务暂时不可用，请稍后重试";
+  }
+  if (msg.includes("AbortError") || msg.includes("aborted")) {
+    return "请求已取消";
+  }
+  if (status === 400 || msg.includes("400")) {
+    return "请求参数有误，请调整后重试";
+  }
+  return msg || "请求失败，请重试";
+}
+
 // === Toast ===
 function showToast(message, type = "error") {
   const toast = document.createElement("div");
@@ -1193,8 +1213,25 @@ document.querySelector(".logo-icon")?.addEventListener("click", () => {
 });
 
 // === Session Persistence ===
+function getStorageUsageBytes() {
+  let total = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    total += key.length + (localStorage.getItem(key) || "").length;
+  }
+  return total * 2; // JS 字符串为 UTF-16，每字符 2 字节
+}
+
+function trimOldSessions(sessions) {
+  // 按时间升序排列，删除最旧的 50%
+  sessions.sort((a, b) => a.timestamp - b.timestamp);
+  const removeCount = Math.max(1, Math.floor(sessions.length / 2));
+  sessions.splice(0, removeCount);
+  return sessions;
+}
+
 function saveSession() {
-  const sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  let sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
   const idx = sessions.findIndex(s => s.id === currentSessionId);
   const sessionData = {
     id: currentSessionId,
@@ -1206,7 +1243,26 @@ function saveSession() {
   else sessions.push(sessionData);
   // 最多保留 20 个会话
   while (sessions.length > 20) sessions.shift();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+
+  // 主动检查：存储超过 4MB 时预先清理
+  if (getStorageUsageBytes() > 4 * 1024 * 1024) {
+    sessions = trimOldSessions(sessions);
+  }
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  } catch (storageErr) {
+    // QuotaExceededError: 清理最旧的 50% 会话后重试
+    if (storageErr.name === "QuotaExceededError" || storageErr.code === 22) {
+      sessions = trimOldSessions(sessions);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+      } catch (_retryErr) {
+        // 仍然失败则清空所有历史，保留当前会话
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([sessionData]));
+      }
+    }
+  }
 }
 
 function loadSessions() {
