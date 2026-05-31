@@ -335,37 +335,57 @@ async function sendMessage() {
     chatInput.value = "";
     deactivatePreset();
 
-      const { done, value } = await readWithTimeout(reader);
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const events = parseSSE(buffer);
-      buffer = events.remainder;
-
-      for (const ev of events.parsed) {
-        handleStreamEvent(ev.event, ev.data, els);
+    // sendAsText presets: concatenate defaultMessage + user input
+    if (preset && preset.sendAsText) {
+      const parts = [preset.defaultMessage, userText].filter(Boolean);
+      const effectiveMessage = parts.join(" ");
+      if (!effectiveMessage) return;
+      isProcessing = true;
+      setSendButtonToStop();
+      appendMessage("user", effectiveMessage);
+      chatHistory.push({ role: "user", text: effectiveMessage });
+      saveSession();
+      const els = createStreamingContainer();
+      currentAbortController = new AbortController();
+      try {
+        const url = `${STREAM_API_URL}?message=${encodeURIComponent(effectiveMessage)}`;
+        const resp = await fetch(url, { signal: currentAbortController.signal });
+        if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await readWithTimeout(reader);
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const events = parseSSE(buffer);
+          buffer = events.remainder;
+          for (const ev of events.parsed) {
+            handleStreamEvent(ev.event, ev.data, els);
+          }
+        }
+        const cursor = els.replyBody.querySelector(".stream-cursor");
+        if (cursor) cursor.remove();
+      } catch (err) {
+        if (err.name === "AbortError") {
+          finalizeStreamingContainer(els);
+        } else {
+          els.container.remove();
+          showToast(classifyError(err));
+        }
+      } finally {
+        currentAbortController = null;
+        isProcessing = false;
+        setSendButtonToSend();
       }
-    }
-
-    // Finalize: remove cursor if present
-    const cursor = els.replyBody.querySelector(".stream-cursor");
-    if (cursor) cursor.remove();
-  } catch (err) {
-    if (err.name === "AbortError") {
-      finalizeStreamingContainer(els);
-    } else {
-      els.container.remove();
-      showToast(classifyError(err));
-    }
-  } finally {
-    currentAbortController = null;
-    isProcessing = false;
-    setSendButtonToSend();
-  }
       return;
     }
 
     sendPresetQuery(presetName, userText);
+    return;
+  }
+
+  if (!text) return;
 
   isProcessing = true;
   setSendButtonToStop();
