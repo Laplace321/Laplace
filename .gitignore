@@ -14,10 +14,10 @@ dist/
 build/
 out/
 
-# Environment
+# Environment (catch ALL .env variants — prevent secret leaks)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # IDE
 .vscode/
