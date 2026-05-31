@@ -56,11 +56,22 @@ def mock_chat_completion_rag():
 
 @pytest.fixture
 def mock_chat_completion_routing_and_rag():
-    """Mock chat_completion 同时覆盖路由阶段和 RAG 阶段。"""
+    """Mock chat_completion 同时覆盖 Stage 0 分类、Stage 1 路由和 RAG 阶段。"""
+    from server.schemas import parse_classifier_response
 
     async def side_effect(**kwargs):
         if kwargs.get("json_mode") is True:
-            # 路由阶段：返回 search_by_class Saber
+            # 区分 Stage 0 分类器 vs Stage 1 路由：通过 response_validator 判断
+            validator = kwargs.get("response_validator")
+            if validator is parse_classifier_response:
+                # Stage 0 分类器：返回链路 A + 高置信度
+                return {
+                    "pipeline": "A",
+                    "confidence": 0.95,
+                    "_model": "mock-classifier",
+                    "_usage": {"total_tokens": 50},
+                }
+            # Stage 1 路由：返回 search_by_class Saber
             return {
                 "skill_calls": [{"skill_name": "search_by_class", "params": {"className": "Saber"}}],
                 "response_skill": "respond_servant_list",
@@ -77,9 +88,18 @@ def mock_chat_completion_routing_and_rag():
 @pytest.fixture
 def mock_chat_completion_fallback():
     """Mock chat_completion 返回 fallback（路由无法匹配）。"""
+    from server.schemas import parse_classifier_response
 
     async def side_effect(**kwargs):
         if kwargs.get("json_mode") is True:
+            validator = kwargs.get("response_validator")
+            if validator is parse_classifier_response:
+                return {
+                    "pipeline": "A",
+                    "confidence": 0.95,
+                    "_model": "mock-classifier",
+                    "_usage": {"total_tokens": 50},
+                }
             return {
                 "skill_calls": [],
                 "response_skill": "respond_servant_list",
@@ -94,9 +114,18 @@ def mock_chat_completion_fallback():
 @pytest.fixture
 def mock_chat_completion_empty_skills():
     """Mock chat_completion 返回空 skill_calls 且无 fallback。"""
+    from server.schemas import parse_classifier_response
 
     async def side_effect(**kwargs):
         if kwargs.get("json_mode") is True:
+            validator = kwargs.get("response_validator")
+            if validator is parse_classifier_response:
+                return {
+                    "pipeline": "A",
+                    "confidence": 0.95,
+                    "_model": "mock-classifier",
+                    "_usage": {"total_tokens": 50},
+                }
             return {
                 "skill_calls": [],
                 "response_skill": "respond_servant_list",

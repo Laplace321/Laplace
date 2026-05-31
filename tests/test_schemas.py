@@ -9,9 +9,12 @@ import json
 import pytest
 
 from server.schemas import (
+    ClassifierResponse,
     FallbackReason,
     RoutingResponse,
     SkillCall,
+    classifier_response_json_schema,
+    parse_classifier_response,
     parse_routing_response,
     routing_response_json_schema,
 )
@@ -288,6 +291,105 @@ class TestClarification:
             extra="ignored",
         )
         assert req.question == "q"
+
+
+# ============================================================
+# ClassifierResponse 测试（Stage 0 分类器, ADR-024）
+# ============================================================
+
+
+class TestClassifierResponse:
+    """Stage 0 分类器 Schema 测试。"""
+
+    def test_basic_creation(self):
+        resp = ClassifierResponse(pipeline="A", confidence=0.95)
+        assert resp.pipeline == "A"
+        assert resp.confidence == 0.95
+
+    def test_all_pipelines(self):
+        for pipeline in ("A", "B", "C"):
+            resp = ClassifierResponse(pipeline=pipeline, confidence=0.8)
+            assert resp.pipeline == pipeline
+
+    def test_confidence_boundary_values(self):
+        resp_zero = ClassifierResponse(pipeline="A", confidence=0.0)
+        assert resp_zero.confidence == 0.0
+        resp_one = ClassifierResponse(pipeline="B", confidence=1.0)
+        assert resp_one.confidence == 1.0
+
+    def test_confidence_out_of_range_raises(self):
+        with pytest.raises(Exception):
+            ClassifierResponse(pipeline="A", confidence=1.5)
+        with pytest.raises(Exception):
+            ClassifierResponse(pipeline="A", confidence=-0.1)
+
+    def test_invalid_pipeline_raises(self):
+        with pytest.raises(Exception):
+            ClassifierResponse(pipeline="D", confidence=0.5)
+
+    def test_extra_fields_ignored(self):
+        resp = ClassifierResponse(pipeline="C", confidence=0.7, extra_field="ignored")
+        assert resp.pipeline == "C"
+
+    def test_serialization_roundtrip(self):
+        original = ClassifierResponse(pipeline="B", confidence=0.85)
+        dumped = original.model_dump()
+        restored = ClassifierResponse.model_validate(dumped)
+        assert restored.pipeline == "B"
+        assert restored.confidence == 0.85
+
+    def test_from_json_string(self):
+        import json
+
+        data = json.loads('{"pipeline": "A", "confidence": 0.92}')
+        resp = ClassifierResponse.model_validate(data)
+        assert resp.pipeline == "A"
+        assert resp.confidence == 0.92
+
+
+class TestClassifierJsonSchema:
+    """Stage 0 分类器 JSON Schema 测试。"""
+
+    def test_schema_has_required_fields(self):
+        schema = classifier_response_json_schema()
+        props = schema.get("properties", {})
+        assert "pipeline" in props
+        assert "confidence" in props
+
+    def test_pipeline_enum_values(self):
+        schema = classifier_response_json_schema()
+        pipeline_prop = schema["properties"]["pipeline"]
+        assert set(pipeline_prop.get("enum", [])) == {"A", "B", "C"}
+
+
+class TestParseClassifierResponse:
+    """Stage 0 分类器解析函数测试。"""
+
+    def test_parse_valid_json_string(self):
+        result = parse_classifier_response('{"pipeline": "A", "confidence": 0.95}')
+        assert result["pipeline"] == "A"
+        assert result["confidence"] == 0.95
+
+    def test_parse_dict_input(self):
+        result = parse_classifier_response({"pipeline": "B", "confidence": 0.8})
+        assert result["pipeline"] == "B"
+
+    def test_parse_with_fenced_json(self):
+        content = '```json\n{"pipeline": "C", "confidence": 0.7}\n```'
+        result = parse_classifier_response(content)
+        assert result["pipeline"] == "C"
+
+    def test_parse_invalid_json_raises(self):
+        with pytest.raises(ValueError):
+            parse_classifier_response("not json")
+
+    def test_parse_invalid_schema_raises(self):
+        with pytest.raises(ValueError):
+            parse_classifier_response('{"pipeline": "X", "confidence": 0.5}')
+
+    def test_parse_missing_field_raises(self):
+        with pytest.raises(ValueError):
+            parse_classifier_response('{"pipeline": "A"}')
 
 
 # ============================================================

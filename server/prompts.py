@@ -112,6 +112,73 @@ def get_generation_prompt(user_query: str, context_json: str) -> str:
 
 
 # ============================================================
+# Stage 0 分类器 Prompt（两阶段路由, ADR-024）
+# ============================================================
+
+
+def build_classifier_prompt() -> str:
+    """构建 Stage 0 分类器 Prompt。
+
+    极简 Prompt，只判断用户查询应走 A/B/C 哪条链路，不做参数提取。
+    输出链路标识 + 置信度分数。
+
+    Returns:
+        系统 Prompt 字符串
+    """
+    return """你是 Laplace 链路分类器。根据用户的自然语言问题，判断应走哪条处理链路。
+
+## 三条链路定义
+
+**链路 A — 从者/礼装结构化数据查询**
+用户想从数据库中按条件筛选、查找、对比从者或概念礼装。
+典型场景：按职阶/稀有度/效果/特性/充能/配卡筛选从者，查询从者详情，对比从者，查询礼装。
+关键信号：包含具体的筛选维度（职阶名、效果名、数值条件）、从者名/昵称、礼装名、"查一下"、"有哪些"、"对比"。
+
+**链路 B — FGO 游戏事实知识问答**
+用户询问游戏中的客观事实信息，需要从 Atlas 知识库检索。
+典型场景：活动时间、卡池复刻、主线关卡、素材掉落、版本历史。
+关键信号：活动、卡池、复刻、up、素材、掉落、主线、特异点、章节、版本、周年、联动、"什么时候"。
+
+**链路 C — 攻略/评价/主观推荐**
+用户询问主观性的攻略建议、打法推荐、强度评价，需要从攻略文档检索。
+典型场景：关卡攻略、配队推荐、强度评价、戴冠战相关问题。
+关键信号：攻略、打法、配队、阵容、推荐（主观性的）、评价、强度、tier、戴冠战/冠位/剑冠/弓冠/星图。
+
+## 消歧义规则（关键）
+
+1. **「职阶 + 效果/能力 + 推荐」= 链路 A**：当用户问"XX阶有XX效果的从者推荐"时，本质是按条件筛选从者，走链路 A。例如"剑阶出星推荐"="筛选出星能力强的剑阶从者"，是数据查询不是攻略推荐。判断标准：如果"推荐"可以被替换为"有哪些"且语义不变，则走 A。
+2. **「戴冠战」相关 = 链路 C**：只要提到"戴冠战/冠位/剑冠/弓冠/星图"等戴冠战专有词，无论问什么都走链路 C。但"XX职阶的从者"不含戴冠战关键词时走链路 A。
+3. **可拆解为具体筛选条件 = 链路 A**：如果用户的问题可以被拆解为明确的筛选参数（职阶名 + 效果名 + 数值等），走链路 A。只有无法拆解为具体条件的泛泛推荐（"推荐几个好用的从者"）才走链路 C。
+4. **从者/礼装名称查询 = 链路 A**：用户问某个从者或礼装的信息（"查一下梅林"、"梅林技能"），走链路 A，不是链路 B。链路 B 是查游戏事实（"梅林什么时候复刻"）。
+5. **职阶克制 = 链路 A**：用户问克制关系（"什么克制XX"、"打XX用什么职阶"），走链路 A。
+
+## 输出格式
+
+严格按以下 JSON 格式输出，不要有任何其他内容：
+```json
+{"pipeline": "A", "confidence": 0.95}
+```
+
+- `pipeline`：链路标识，只能是 "A"、"B"、"C" 之一
+- `confidence`：你对这个分类判断的置信度，0.0~1.0。对于明确匹配的查询给高置信度（>0.8），对于边界 case 给较低置信度（0.5~0.7）
+
+## 示例
+
+用户："30自充以上的术阶" → {"pipeline": "A", "confidence": 0.95}
+用户："剑阶出星推荐" → {"pipeline": "A", "confidence": 0.9}
+用户："查一下梅林" → {"pipeline": "A", "confidence": 0.95}
+用户："克制月癌的从者" → {"pipeline": "A", "confidence": 0.95}
+用户："有NP充能效果的五星礼装" → {"pipeline": "A", "confidence": 0.95}
+用户："梅林什么时候复刻" → {"pipeline": "B", "confidence": 0.95}
+用户："最近有什么活动" → {"pipeline": "B", "confidence": 0.9}
+用户："龙之牙在哪里掉" → {"pipeline": "B", "confidence": 0.9}
+用户："戴冠战剑阶怎么打" → {"pipeline": "C", "confidence": 0.95}
+用户："高难配队推荐" → {"pipeline": "C", "confidence": 0.9}
+用户："村正值不值得练" → {"pipeline": "C", "confidence": 0.85}
+"""
+
+
+# ============================================================
 # Stage 1 路由 Prompt（Skill-Based Architecture, ADR-018）
 # ============================================================
 
@@ -162,22 +229,12 @@ def build_routing_prompt(
 {{
   "skill_calls": [],
   "response_skill": "respond_servant_list",
-  "fallback": null,
-  "target_pipeline": null,
-  "atlas_query": null
+  "fallback": null
 }}
 ```
 
 **重要说明**：
-- `target_pipeline` 取值：`null` = 默认走链路 A，`"B"` = Atlas 知识问答，`"C"` = 攻略知识问答
 - `clarification`：当参数存在歧义/缺失时输出确认请求对象（含 question、options、ambiguous_field），此时 skill_calls 必须为空
-- **当 `target_pipeline` 为 `"B"` 时，`atlas_query` 必须填写为一个对象（不能为 null）**，包含以下字段：
-  - `name`: 具体的活动名/卡池名/关卡名/素材名/从者名（字符串）
-  - `entry_type`: 条目类型（字符串，可选值：event/war/gacha/item）
-  - `tag`: 标签（字符串，可选）
-  - `year_month`: 时间（字符串，格式 YYYY-MM，可选）
-  - `linked_servant_id`: 关联从者 ID（整数，暂不填）
-- 如果无法提取具体信息，至少填写空对象 `{{}}`
 
 ## 路由规则
 1. **skill_name 必须严格从「可用 Skills」列表中选择，禁止编造任何不在列表中的 Skill 名称**
@@ -226,8 +283,7 @@ def build_routing_prompt(
 13. **不可查效果 — 直接 fallback**：以下效果属于被动/活动/礼装效果，**当前不在从者查询能力范围内**，应直接走 fallback 回复用户"此类效果暂不支持查询"：羁绊加成（`servantFriendshipUp`）、QP 加成（`qpUp`）、素材掉落加成（`eventDropUp`）。**禁止**对这些效果调用任何 Skill，否则一定返回 0 条结果
 14. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"、"哪个职阶克制XX"、"什么克制XX"等表达时，**必须**使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"、"月癌"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。**即使用户只问"哪个职阶克制X"这种看似知识性问题，也必须走 `search_by_class_advantage`**，系统会在结果中返回克制关系和对应从者。
 16. **疑似从者名称/昵称一律用 lookup_servant（重要）**：当用户的问题中包含你不确定是否为从者名称的词语（如"红A"、"小太阳"、"花之魔术师"、"老虚"、"CBA"、"XJB"、"呆毛"、"2B"等看起来像昵称/外号/缩写/纯字母组合的表达），**必须**使用 `lookup_servant`，将该词语作为 `name` 参数传入。系统后端支持昵称映射和模糊匹配，会自动处理识别。**绝不要**因为你不认识某个名称就返回 `no_match` 或 `out_of_scope`。只要用户的问题看起来是在查询或询问某个特定角色/从者，就选择 `lookup_servant`。**特别注意**：纯英文字母、数字组合、字母+数字混合（如"CBA"、"X4"、"2B"）在 FGO 社区中是常见的从者昵称缩写形式，绝不能因为看起来不像名字就判定为超出范围。如果用户同时问了从者详情（如"XX技能介绍"、"XX宝具是什么"），response_skill 选 `respond_servant_detail`。
-17. **戴冠战知识问答**：当用户提到"戴冠战"/"冠位"/"剑冠"/"弓冠"等并询问任何相关问题（机制/星图/礼装/刷取/Boss/配队/打手/条件/攻略等）时，设置 `"target_pipeline": "C"`，skill_calls 留空。
-19. **概念礼装查询（重要）**：当用户提到"礼装"/"概念礼装"/"CE"/"带XX效果的礼装"/"推荐礼装"时，必须使用 CE domain 的 Skills，response_skill 选 `respond_ce_list`：
+17. **概念礼装查询（重要）**：当用户提到"礼装"/"概念礼装"/"CE"/"带XX效果的礼装"/"推荐礼装"时，必须使用 CE domain 的 Skills，response_skill 选 `respond_ce_list`：
     - **按名称/昵称查找**：`ce_lookup`，参数 `name`（如"万花筒"、"黑杯"、"2030"）
     - **按效果搜索**：`ce_search_by_effect`，参数 `effect`（效果名同从者效果体系，如 `gainNp`、`upBuster`、`invincible`）、可选 `limit_break`（默认 true 搜满破效果）
     - **按稀有度筛选**：`ce_search_by_rarity`，参数 `op`/`value`（同从者稀有度筛选）
@@ -235,32 +291,7 @@ def build_routing_prompt(
     - **按获取方式筛选**：`ce_search_by_obtain`，参数 `obtain_type`（`permanent`=常驻、`limited`=限定、`event`=活动配布、`bond`=羁绊、`valentine`=情人节）
     - 多个 CE Skills 可组合使用（AND 关系），如"有NP充能效果的五星纯攻礼装"
     - ⚠️ **严禁**将礼装查询路由到从者 domain 的 Skills（如 `search_by_effect`），也**严禁**将从者查询路由到 CE Skills
-20. **Atlas 知识问答（链路 B）**：当用户询问以下内容时，设置 `"target_pipeline": "B"`，skill_calls 留空，**同时填写 `atlas_query` 字段提取结构化参数**：
-    - 活动相关："最近有什么活动"、"XX活动什么时候"、"去年周年庆"、"圣诞活动奖励"
-    - 卡池相关："XX第一次up"、"什么时候复刻"、"限定卡池"
-    - 主线关卡："特异点F"、"冬木"、"第二部第六章"、"主线进度"
-    - 素材掉落："XX在哪里掉"、"刷什么本效率高"
-    - 版本历史："去年出了什么新从者"、"XX年有哪些活动"
-    关键词参考：活动、卡池、up、复刻、主线、特异点、章节、素材、掉落、版本、周年、联动
-
-    **CRITICAL**: 当设置 target_pipeline="B" 时，atlas_query 字段必须填写且不能为 null！LLM 必须从用户问题中提取结构化参数填入 atlas_query。如果无法提取任何信息，至少填写空对象。**严禁将 atlas_query 留空或省略**！
-
-    **`atlas_query` 字段提取规则**：
-    - `name`：提取具体的活动名/卡池名/关卡名/素材名/从者名（如"圣诞祭"、"梅林"、"特异点F"、"龙之牙"），**不要填入整个问句**
-    - `entry_type`：根据问题类型推断（event=活动/war=主线关卡/gacha=卡池/item=素材）
-    - `tag`：如果能识别出具体标签则填写（如 event_type:campaign）
-    - `year_month`：如果用户提到具体时间（如"去年"、"2024年"、"周年庆"），尝试转换为 YYYY-MM 格式
-    - `linked_servant_id`：暂不填（留给后续迭代）
-
-21. **攻略知识问答（链路 C）**：当用户询问以下内容时，设置 `"target_pipeline": "C"`，skill_calls 留空：
-    - 关卡攻略："XX怎么打"、"Boss机制"、"通关阵容"
-    - 配队推荐："高难配队"、"周回队伍"、"泛用组队"、"戴冠战配队"
-    - 玩法分析："值不值得练"、"强度评价"、"对比分析"
-    - 主观评价："哪个好用"、"推荐优先度"
-    - 戴冠战相关：机制/星图/礼装/刷取/Boss/配队/打手/条件/攻略等所有戴冠战问题
-    关键词参考：攻略、打法、配队、阵容、推荐、评价、值得、强度、tier、节奏榜、戴冠、冠位、剑冠、弓冠、星图、Boss
-
-22. **参数完整性检查（用户确认机制）**：确定 Skill 后，检查必要参数是否可从用户问题中无歧义推断：
+18. **参数完整性检查（用户确认机制）**：确定 Skill 后，检查必要参数是否可从用户问题中无歧义推断：
     - 所有参数都能确定 → 正常输出 skill_calls
     - 某个参数存在多种合理解释且差异显著 → 输出 `clarification`，skill_calls 留空
     **需要确认的场景**：
@@ -276,7 +307,7 @@ def build_routing_prompt(
 
 23. **clarification 输出格式**：触发确认时，输出 `clarification` 对象，skill_calls 必须为空数组：
     ```json
-    {{"skill_calls": [], "clarification": {{"question": "你想查哪种类型的暴击拐？", "options": [{{"id": "party", "label": "全队暴击伤害UP"}}, {{"id": "self", "label": "自身暴击伤害UP"}}, {{"id": "ptOne", "label": "给单个队友暴击伤害UP"}}], "ambiguous_field": "targetType"}}, "response_skill": "respond_servant_list", "fallback": null, "target_pipeline": null}}
+    {{"skill_calls": [], "clarification": {{"question": "你想查哪种类型的暴击拐？", "options": [{{"id": "party", "label": "全队暴击伤害UP"}}, {{"id": "self", "label": "自身暴击伤害UP"}}, {{"id": "ptOne", "label": "给单个队友暴击伤害UP"}}], "ambiguous_field": "targetType"}}, "response_skill": "respond_servant_list", "fallback": null}}
     ```
     - `options[].id` 为参数实际值（回传给系统用）
     - `options[].label` 为面向玩家的中文描述
@@ -395,20 +426,6 @@ def build_routing_prompt(
 {{"skill_calls": [{{"skill_name": "ce_search_by_effect", "params": {{"effect": "upBuster"}}}}], "response_skill": "respond_ce_list"}}
 ```
 
-用户："什么时候复刻过梅林"（Atlas 卡池查询 → 链路 B，提取结构化参数）
-```json
-{{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": null, "target_pipeline": "B", "atlas_query": {{"name": "梅林", "entry_type": "gacha"}}}}
-```
-
-用户："特异点F是什么"（Atlas 主线关卡查询 → 链路 B）
-```json
-{{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": null, "target_pipeline": "B", "atlas_query": {{"name": "特异点F", "entry_type": "war"}}}}
-```
-
-用户："最近有什么活动"（Atlas 活动查询 → 链路 B）
-```json
-{{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": null, "target_pipeline": "B", "atlas_query": {{"entry_type": "event"}}}}
-```
 """
 
     # 追加 Preset 场景约束段落（方案 D：让 LLM 在 Preset 模式下成为约束参数提取器）

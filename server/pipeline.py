@@ -26,8 +26,13 @@ from server.fallback import (
 )
 from server.llm import StreamMetadata, chat_completion, chat_completion_stream
 from server.logger import log_trace_event
-from server.prompts import build_routing_prompt, get_generation_prompt
-from server.schemas import parse_routing_response, routing_response_json_schema
+from server.prompts import build_classifier_prompt, build_routing_prompt, get_generation_prompt
+from server.schemas import (
+    classifier_response_json_schema,
+    parse_classifier_response,
+    parse_routing_response,
+    routing_response_json_schema,
+)
 from server.skills.base import SKILL_REGISTRY, QuerySkill
 from server.skills.executor import SkillExecutor
 from server.skills.presets import PRESET_REGISTRY
@@ -119,12 +124,11 @@ async def handle_skill_mode(
             },
         )
 
-    # 如果没有传入 skill_calls，通过 LLM 路由获取
+    # 如果没有传入 skill_calls，通过两阶段路由获取
     if skill_calls is None:
         skill_descriptions = [
             {"name": s.name, "description": s.description} for s in SKILL_REGISTRY.values() if isinstance(s, QuerySkill)
         ]
-        routing_prompt = build_routing_prompt(skill_descriptions)
 
         # ── Trace: routing_input ──
         await log_trace_event(
@@ -132,8 +136,7 @@ async def handle_skill_mode(
             "routing_input",
             {
                 "query": user_message,
-                "mode": "oneshot_llm",
-                "routing_prompt_length": len(routing_prompt),
+                "mode": "two_stage",
                 "skill_count": len(skill_descriptions),
                 "client_ip": client_ip,
                 "is_confirmation": confirmation_context is not None,
@@ -142,6 +145,111 @@ async def handle_skill_mode(
         )
 
         try:
+            # ══════════════════════════════════════════════════════
+            # Stage 0: 链路分类器（ADR-024）
+            # ══════════════════════════════════════════════════════
+            classifier_prompt = build_classifier_prompt()
+            classifier_result = None
+            _classifier_error = None
+            for _cls_attempt in range(2):
+                try:
+                    classifier_result = await chat_completion(
+                        system_prompt=classifier_prompt,
+                        user_message=user_message,
+                        temperature=0.0,
+                        json_mode=True,
+                        response_schema=classifier_response_json_schema,
+                        response_validator=parse_classifier_response,
+                    )
+                    break
+                except Exception as cls_err:
+                    _classifier_error = cls_err
+                    if _cls_attempt == 0:
+                        print(f"⚠️ [{trace_id}] Stage 0 分类第 1 次尝试失败，重试中: {cls_err}")
+
+            # Stage 0 失败 → 降级走 Stage 1 全量路由（兼容旧逻辑）
+            if classifier_result is None:
+                print(f"⚠️ [{trace_id}] Stage 0 分类 2 次均失败，降级全量路由: {_classifier_error}")
+                classified_pipeline = "A"
+                classifier_confidence = 1.0  # 降级时视为高置信度，让 Stage 1 处理
+            else:
+                classifier_model = classifier_result.pop("_model", "unknown")
+                classifier_result.pop("_response_format", None)
+                classifier_result.pop("_provider", None)
+                classifier_result.pop("_attempts", None)
+                classifier_usage = classifier_result.pop("_usage", {})
+                trace_total_tokens += classifier_usage.get("total_tokens", 0)
+                classified_pipeline = classifier_result.get("pipeline", "A")
+                classifier_confidence = classifier_result.get("confidence", 0.0)
+
+                # ── Trace: classifier_output ──
+                await log_trace_event(
+                    trace_id,
+                    "classifier_output",
+                    {
+                        "pipeline": classified_pipeline,
+                        "confidence": classifier_confidence,
+                        "model": classifier_model,
+                        "usage": classifier_usage,
+                    },
+                )
+
+            # ── Stage 0 分发：B/C 链路直接处理 ──
+            if classified_pipeline == "B":
+                return await _handle_atlas_pipeline(
+                    user_message, trace_id, model_used, request_start, trace_total_tokens
+                )
+            if classified_pipeline == "C":
+                return await _handle_guide_pipeline(
+                    user_message, trace_id, model_used, request_start, trace_total_tokens
+                )
+
+            # ── Stage 0 分发：A 链路低置信度 → Agent fallback ──
+            if classified_pipeline == "A" and classifier_confidence < 0.6:
+                try:
+                    agent_result = await agent_route(user_message, TOOL_HANDLERS, trace_id)
+                    trace_total_tokens += agent_result.total_tokens
+                    category, clean_reply = classify_agent_reply(agent_result.reply)
+                    returned = (
+                        agent_result.servants_data[:MAX_RESULTS] if agent_result.servants_data and not category else []
+                    )
+                    await log_trace_event(
+                        trace_id,
+                        "agent_detail",
+                        {
+                            "rounds": agent_result.rounds,
+                            "agent_tokens": agent_result.total_tokens,
+                            "tool_trace": agent_result.tool_trace,
+                            "reply": clean_reply,
+                        },
+                    )
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": (time.monotonic() - request_start) * 1000,
+                            "result": "classifier_low_confidence_agent",
+                            "mode": "agent_fallback",
+                            "classifier_confidence": classifier_confidence,
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                    return ChatResponse(
+                        reply=clean_reply,
+                        servants=returned,
+                        count=len(agent_result.servants_data),
+                        query={"mode": "agent_fallback", "classifier_confidence": classifier_confidence},
+                        model=f"agent_{agent_result.rounds}r",
+                        traceId=trace_id,
+                    )
+                except Exception:
+                    pass  # Agent fallback 失败，继续走 Stage 1
+
+            # ══════════════════════════════════════════════════════
+            # Stage 1: Skill 选择 + 参数提取（仅链路 A）
+            # ══════════════════════════════════════════════════════
+            routing_prompt = build_routing_prompt(skill_descriptions)
+
             # 路由失败重试：最多 2 次尝试，全部失败走 Agent 兜底
             routing_result = None
             _routing_last_error = None
@@ -159,7 +267,7 @@ async def handle_skill_mode(
                 except Exception as retry_err:
                     _routing_last_error = retry_err
                     if _routing_attempt == 0:
-                        print(f"⚠️ [{trace_id}] 路由第 1 次尝试失败，重试中: {retry_err}")
+                        print(f"⚠️ [{trace_id}] Stage 1 路由第 1 次尝试失败，重试中: {retry_err}")
 
             # 2 次路由均失败 → Agent 兜底
             if routing_result is None:
@@ -242,22 +350,6 @@ async def handle_skill_mode(
                     "target_pipeline": routing_result.get("target_pipeline"),
                 },
             )
-
-            # ── 链路 B/C 分发 ──
-            target_pipeline = routing_result.get("target_pipeline")
-            if target_pipeline == "B":
-                return await _handle_atlas_pipeline(
-                    user_message,
-                    trace_id,
-                    model_used,
-                    request_start,
-                    trace_total_tokens,
-                    routing_result.get("atlas_query"),
-                )
-            if target_pipeline == "C":
-                return await _handle_guide_pipeline(
-                    user_message, trace_id, model_used, request_start, trace_total_tokens
-                )
 
             # ── 用户确认机制：检测 clarification ──
             clarification = routing_result.get("clarification")
@@ -1041,13 +1133,12 @@ async def stream_event_generator(
         )
 
     else:
-        # 普通模式：Stage 1 LLM 路由
-        yield sse_event("thinking", {"phase": "routing", "message": "正在理解你的问题..."})
+        # 普通模式：两阶段路由（ADR-024）
+        yield sse_event("thinking", {"phase": "routing", "message": "正在分析问题类型..."})
 
         skill_descriptions = [
             {"name": s.name, "description": s.description} for s in SKILL_REGISTRY.values() if isinstance(s, QuerySkill)
         ]
-        routing_prompt = build_routing_prompt(skill_descriptions)
 
         # ── Trace: routing_input ──
         await log_trace_event(
@@ -1055,14 +1146,183 @@ async def stream_event_generator(
             "routing_input",
             {
                 "query": message,
-                "mode": "oneshot_llm",
-                "routing_prompt_length": len(routing_prompt),
+                "mode": "two_stage",
                 "skill_count": len(skill_descriptions),
                 "client_ip": client_ip,
                 "is_confirmation": confirmation_context is not None,
                 "confirmation_context": confirmation_context[:200] if confirmation_context else None,
             },
         )
+
+        # ══════════════════════════════════════════════════════
+        # Stage 0: 链路分类器（ADR-024）
+        # ══════════════════════════════════════════════════════
+        classifier_prompt = build_classifier_prompt()
+        sse_classifier_result = None
+        _sse_classifier_error = None
+        for _sse_cls_attempt in range(2):
+            try:
+                sse_classifier_result = await chat_completion(
+                    system_prompt=classifier_prompt,
+                    user_message=message,
+                    temperature=0.0,
+                    json_mode=True,
+                    response_schema=classifier_response_json_schema,
+                    response_validator=parse_classifier_response,
+                )
+                break
+            except Exception as cls_err:
+                _sse_classifier_error = cls_err
+                if _sse_cls_attempt == 0:
+                    print(f"⚠️ [{trace_id}] SSE Stage 0 分类第 1 次尝试失败，重试中: {cls_err}")
+
+        # Stage 0 失败 → 降级走 Stage 1 全量路由
+        if sse_classifier_result is None:
+            print(f"⚠️ [{trace_id}] SSE Stage 0 分类 2 次均失败，降级全量路由: {_sse_classifier_error}")
+            sse_classified_pipeline = "A"
+            sse_classifier_confidence = 1.0
+        else:
+            sse_cls_model = sse_classifier_result.pop("_model", "unknown")
+            sse_classifier_result.pop("_response_format", None)
+            sse_classifier_result.pop("_provider", None)
+            sse_classifier_result.pop("_attempts", None)
+            sse_cls_usage = sse_classifier_result.pop("_usage", {})
+            trace_total_tokens += sse_cls_usage.get("total_tokens", 0)
+            sse_classified_pipeline = sse_classifier_result.get("pipeline", "A")
+            sse_classifier_confidence = sse_classifier_result.get("confidence", 0.0)
+
+            await log_trace_event(
+                trace_id,
+                "classifier_output",
+                {
+                    "pipeline": sse_classified_pipeline,
+                    "confidence": sse_classifier_confidence,
+                    "model": sse_cls_model,
+                    "usage": sse_cls_usage,
+                },
+            )
+
+        # ── Stage 0 分发：B/C 链路直接处理 ──
+        if sse_classified_pipeline in ("B", "C"):
+            pipeline_label = "Atlas 知识检索" if sse_classified_pipeline == "B" else "攻略文档检索"
+            yield sse_event("thinking", {"phase": "routing", "message": f"识别为{pipeline_label}，正在检索..."})
+            if sse_classified_pipeline == "B":
+                atlas_response = await _handle_atlas_pipeline(
+                    message, trace_id, model_used, stream_start, trace_total_tokens
+                )
+                try:
+                    yield sse_event("delta", {"text": atlas_response.reply})
+                except Exception:
+                    pass
+                yield sse_event("done", {"model": atlas_response.model, "traceId": trace_id})
+                return
+            else:
+                # 链路 C：流式 generation
+                guide_result = _prepare_guide_context(message)
+
+                await log_trace_event(
+                    trace_id,
+                    "guide_search",
+                    {"query": message, "result_count": len(guide_result[0]) if guide_result else 0},
+                )
+
+                if guide_result is None:
+                    no_match_reply = "抱歉，我在攻略库中未找到相关内容。你可以尝试更具体的关键词，如职阶名或关卡名。"
+                    yield sse_event("delta", {"text": no_match_reply})
+                    await log_trace_event(
+                        trace_id,
+                        "final",
+                        {
+                            "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
+                            "result": "guide_no_match",
+                            "mode": "guide_pipeline",
+                            "total_tokens": trace_total_tokens,
+                        },
+                    )
+                    yield sse_event("done", {"model": model_used, "traceId": trace_id})
+                    return
+
+                chunks, source_labels, source_authors = guide_result
+                guide_context = _build_guide_context_text(chunks)
+                generation_prompt = _build_guide_generation_prompt(guide_context, message)
+
+                full_reply_parts: list[str] = []
+                async for chunk in chat_completion_stream(
+                    system_prompt=generation_prompt,
+                    user_message=message,
+                    temperature=0.3,
+                    max_tokens=2048,
+                ):
+                    full_reply_parts.append(chunk)
+                    yield sse_event("delta", {"text": chunk})
+
+                source_suffix = _format_source_suffix(source_labels, source_authors)
+                if source_suffix:
+                    full_reply_parts.append(source_suffix)
+                    yield sse_event("delta", {"text": source_suffix})
+
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
+                        "result": "guide_pipeline",
+                        "mode": "guide_pipeline",
+                        "guide_chunks": len(chunks),
+                        "sources": list(source_labels),
+                        "total_tokens": "streaming",
+                    },
+                )
+                yield sse_event("done", {"model": model_used, "traceId": trace_id})
+                return
+
+        # ── Stage 0 分发：A 链路低置信度 → Agent fallback ──
+        if sse_classified_pipeline == "A" and sse_classifier_confidence < 0.6:
+            yield sse_event("thinking", {"phase": "agent_fallback", "message": "正在启动智能搜索..."})
+            try:
+                agent_result = await agent_route(message, TOOL_HANDLERS, trace_id)
+                trace_total_tokens += agent_result.total_tokens
+                category, clean_reply = classify_agent_reply(agent_result.reply)
+                for progress_msg in _build_agent_progress_messages(agent_result.tool_trace):
+                    yield sse_event("thinking", {"phase": "agent_tool", "message": progress_msg})
+                if agent_result.servants_data and not category:
+                    returned = agent_result.servants_data[:MAX_RESULTS]
+                    yield sse_event(
+                        "servants",
+                        {"servants": returned, "count": len(returned), "total": len(agent_result.servants_data)},
+                    )
+                yield sse_event("delta", {"text": clean_reply})
+                await log_trace_event(
+                    trace_id,
+                    "agent_detail",
+                    {
+                        "rounds": agent_result.rounds,
+                        "agent_tokens": agent_result.total_tokens,
+                        "tool_trace": agent_result.tool_trace,
+                        "reply": clean_reply,
+                    },
+                )
+                await log_trace_event(
+                    trace_id,
+                    "final",
+                    {
+                        "total_time_ms": (time.monotonic() - stream_start) * 1000,
+                        "result": "classifier_low_confidence_agent",
+                        "mode": "agent_fallback",
+                        "classifier_confidence": sse_classifier_confidence,
+                        "total_tokens": trace_total_tokens,
+                    },
+                )
+                yield sse_event("done", {"model": f"agent_{agent_result.rounds}r", "traceId": trace_id})
+                return
+            except Exception:
+                pass  # Agent fallback 失败，继续走 Stage 1
+
+        # ══════════════════════════════════════════════════════
+        # Stage 1: Skill 选择 + 参数提取（仅链路 A）
+        # ══════════════════════════════════════════════════════
+        yield sse_event("thinking", {"phase": "routing", "message": "正在理解你的问题..."})
+        routing_prompt = build_routing_prompt(skill_descriptions)
 
         # 路由失败重试：最多 2 次尝试，全部失败走 Agent 兜底
         routing_result = None
@@ -1081,7 +1341,7 @@ async def stream_event_generator(
             except Exception as retry_err:
                 _sse_routing_last_error = retry_err
                 if _sse_routing_attempt == 0:
-                    print(f"⚠️ [{trace_id}] SSE 路由第 1 次尝试失败，重试中: {retry_err}")
+                    print(f"⚠️ [{trace_id}] SSE Stage 1 路由第 1 次尝试失败，重试中: {retry_err}")
 
         if routing_result is None:
             print(f"⚠️ [{trace_id}] SSE 路由 2 次均失败，降级到 Agent: {_sse_routing_last_error}")
@@ -1158,87 +1418,6 @@ async def stream_event_generator(
                 "target_pipeline": routing_result.get("target_pipeline"),
             },
         )
-
-        # ── 链路 B/C 分发（SSE 流式） ──
-        target_pipeline = routing_result.get("target_pipeline")
-        if target_pipeline in ("B", "C"):
-            pipeline_label = "Atlas 知识检索" if target_pipeline == "B" else "攻略文档检索"
-            yield sse_event("thinking", {"phase": "routing", "message": f"识别为{pipeline_label}，正在检索..."})
-            if target_pipeline == "B":
-                atlas_response = await _handle_atlas_pipeline(
-                    message,
-                    trace_id,
-                    model_used,
-                    stream_start,
-                    trace_total_tokens,
-                    routing_result.get("atlas_query"),
-                )
-                try:
-                    yield sse_event("delta", {"text": atlas_response.reply})
-                except Exception:
-                    pass
-                yield sse_event("done", {"model": atlas_response.model, "traceId": trace_id})
-                return
-            else:
-                # 链路 C：流式 generation
-                guide_result = _prepare_guide_context(message)
-
-                await log_trace_event(
-                    trace_id,
-                    "guide_search",
-                    {"query": message, "result_count": len(guide_result[0]) if guide_result else 0},
-                )
-
-                if guide_result is None:
-                    no_match_reply = "抱歉，我在攻略库中未找到相关内容。你可以尝试更具体的关键词，如职阶名或关卡名。"
-                    yield sse_event("delta", {"text": no_match_reply})
-                    await log_trace_event(
-                        trace_id,
-                        "final",
-                        {
-                            "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
-                            "result": "guide_no_match",
-                            "mode": "guide_pipeline",
-                            "total_tokens": trace_total_tokens,
-                        },
-                    )
-                    yield sse_event("done", {"model": model_used, "traceId": trace_id})
-                    return
-
-                chunks, source_labels, source_authors = guide_result
-                guide_context = _build_guide_context_text(chunks)
-                generation_prompt = _build_guide_generation_prompt(guide_context, message)
-
-                full_reply_parts: list[str] = []
-                async for chunk in chat_completion_stream(
-                    system_prompt=generation_prompt,
-                    user_message=message,
-                    temperature=0.3,
-                    max_tokens=2048,
-                ):
-                    full_reply_parts.append(chunk)
-                    yield sse_event("delta", {"text": chunk})
-
-                # 流式结束后追加来源标注
-                source_suffix = _format_source_suffix(source_labels, source_authors)
-                if source_suffix:
-                    full_reply_parts.append(source_suffix)
-                    yield sse_event("delta", {"text": source_suffix})
-
-                await log_trace_event(
-                    trace_id,
-                    "final",
-                    {
-                        "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
-                        "result": "guide_pipeline",
-                        "mode": "guide_pipeline",
-                        "guide_chunks": len(chunks),
-                        "sources": list(source_labels),
-                        "total_tokens": "streaming",
-                    },
-                )
-                yield sse_event("done", {"model": model_used, "traceId": trace_id})
-                return
 
         # ── 用户确认机制：检测 clarification ──
         clarification = routing_result.get("clarification")
@@ -1711,6 +1890,61 @@ async def stream_event_generator(
 # ============================================================
 
 
+async def _extract_atlas_query(user_message: str, trace_id: str) -> dict | None:
+    """独立 LLM 调用：从用户查询中提取 Atlas 结构化参数。
+
+    Stage 0 只做链路分类不提取参数，链路 B 需要单独调用此函数提取
+    name/entry_type/year_month 等结构化字段。
+
+    Returns:
+        提取到的参数字典，失败时返回 None（由调用方降级处理）。
+    """
+    extraction_prompt = """你是 FGO 知识查询参数提取器。从用户问题中提取结构化查询参数。
+
+## 输出字段
+- `name`: 具体的活动名/卡池名/关卡名/素材名/从者名（字符串），不要填入整个问句
+- `entry_type`: 条目类型（event=活动/war=主线关卡/gacha=卡池/item=素材）
+- `tag`: 标签（如 event_type:campaign，可选）
+- `year_month`: 时间（YYYY-MM 格式，可选）
+
+## 输出格式
+严格按 JSON 格式输出，只包含能从问题中提取到的字段，无法确定的字段不要填：
+```json
+{"name": "梅林", "entry_type": "gacha"}
+```
+
+## 示例
+用户："梅林什么时候复刻" → {"name": "梅林", "entry_type": "gacha"}
+用户："最近有什么活动" → {"entry_type": "event"}
+用户："特异点F是什么" → {"name": "特异点F", "entry_type": "war"}
+用户："龙之牙在哪里掉" → {"name": "龙之牙", "entry_type": "item"}
+用户："去年周年庆" → {"entry_type": "event", "year_month": "2025-07"}
+"""
+    try:
+        result = await chat_completion(
+            system_prompt=extraction_prompt,
+            user_message=user_message,
+            temperature=0.0,
+            json_mode=True,
+        )
+        import json as _json
+
+        from server.llm import extract_json_object
+
+        text = result.get("text", "")
+        extracted = _json.loads(extract_json_object(text))
+
+        await log_trace_event(
+            trace_id,
+            "atlas_query_extraction",
+            {"query": user_message, "extracted": extracted},
+        )
+        return extracted
+    except Exception as extraction_err:
+        print(f"⚠️ [{trace_id}] Atlas 参数提取失败，降级原始查询: {extraction_err}")
+        return None
+
+
 async def _handle_atlas_pipeline(
     user_message: str,
     trace_id: str,
@@ -1728,9 +1962,16 @@ async def _handle_atlas_pipeline(
     query_source = "structured"
     if atlas_query:
         params = AtlasQueryParams(**atlas_query)
-    else:
-        query_source = "raw_fallback"
-        params = AtlasQueryParams(name=user_message)
+    elif atlas_query is None:
+        # Stage 0 只做分类不提取参数 → 独立 LLM 调用提取 atlas_query
+        query_source = "llm_extraction"
+        extracted_query = await _extract_atlas_query(user_message, trace_id)
+        if extracted_query:
+            params = AtlasQueryParams(**extracted_query)
+            atlas_query = extracted_query
+        else:
+            query_source = "raw_fallback"
+            params = AtlasQueryParams(name=user_message)
 
     results = atlas.search(params)
 

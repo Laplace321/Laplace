@@ -81,6 +81,50 @@ class RoutingResponse(BaseModel):
         return self
 
 
+# ============================================================
+# Stage 0 Classifier Schema（两阶段路由, ADR-024）
+# ============================================================
+
+
+class ClassifierResponse(BaseModel):
+    """Stage 0 分类器输出：判断用户查询应走哪条链路。"""
+
+    model_config = ConfigDict(extra="ignore")
+
+    pipeline: Literal["A", "B", "C"] = Field(
+        description="目标链路：A=从者/礼装结构化查询, B=游戏事实知识问答, C=攻略/评价/主观推荐",
+    )
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="分类置信度，0.0~1.0。低于阈值时走 fallback",
+    )
+
+
+def classifier_response_json_schema() -> dict:
+    """Return the JSON schema for Stage 0 classifier response_format."""
+    return ClassifierResponse.model_json_schema()
+
+
+def parse_classifier_response(content: str | dict) -> dict:
+    """Parse and validate a Stage 0 classifier response from LLM.
+
+    可作为 chat_completion 的 response_validator 参数使用。
+    """
+    import json
+
+    from pydantic import ValidationError
+
+    from server.llm import extract_json_object
+
+    raw = content if isinstance(content, dict) else json.loads(extract_json_object(content))
+    try:
+        parsed = ClassifierResponse.model_validate(raw)
+    except ValidationError as e:
+        raise ValueError(f"Classifier response validation failed: {e}") from e
+    return parsed.model_dump()
+
+
 def routing_response_json_schema() -> dict:
     """Return the JSON schema for Stage 1 routing response_format."""
     return RoutingResponse.model_json_schema()
