@@ -256,6 +256,10 @@ def build_routing_prompt(
     - 主观评价："哪个好用"、"推荐优先度"
     - 戴冠战相关：机制/星图/礼装/刷取/Boss/配队/打手/条件/攻略等所有戴冠战问题
     关键词参考：攻略、打法、配队、阵容、推荐、评价、值得、强度、tier、节奏榜、戴冠、冠位、剑冠、弓冠、星图、Boss
+    **⚠️ 排除（必须走链路 A，不走链路 C）**：当用户的问题本质是"按职阶/效果/能力筛选从者"时，即使包含"推荐"二字，也必须走链路 A 使用 Skills 查询，**不要**走链路 C。典型模式：
+    - "XX阶 + 效果/能力 + 推荐"："剑阶出星推荐"、"术阶充能推荐"、"弓阶暴击推荐" → 链路 A（search_by_class + search_by_effect）
+    - "XX效果的从者推荐"："有群充的从者推荐"、"能挂无敌的推荐" → 链路 A（search_by_effect）
+    - 判断标准：如果能拆解为具体的 Skill 参数（职阶、效果名、数值），就是链路 A；如果是需要主观分析/攻略经验才能回答的问题（如"高难怎么打"、"值不值得练"），才是链路 C
 
 22. **参数完整性检查（用户确认机制）**：确定 Skill 后，检查必要参数是否可从用户问题中无歧义推断：
     - 所有参数都能确定 → 正常输出 skill_calls
@@ -405,6 +409,11 @@ def build_routing_prompt(
 用户："最近有什么活动"（Atlas 活动查询 → 链路 B）
 ```json
 {{"skill_calls": [], "response_skill": "respond_servant_list", "fallback": null, "target_pipeline": "B", "atlas_query": {{"entry_type": "event"}}}}
+```
+
+用户："剑阶出星推荐"（职阶+效果筛选 → 链路 A，不是攻略推荐！"推荐"在此语境下等同于"查询"）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "upCriticalpoint"}}}}, {{"skill_name": "search_by_class", "params": {{"className": "Saber"}}}}], "response_skill": "respond_servant_list"}}
 ```
 """
 
