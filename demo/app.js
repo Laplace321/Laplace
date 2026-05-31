@@ -664,7 +664,7 @@ function handleClarification(data, els) {
     sendWithConfirmation(customText, null);
   });
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") submitBtn.click();
+    if (e.key === "Enter" && !e.isComposing) submitBtn.click();
   });
   inputRow.appendChild(input);
   inputRow.appendChild(submitBtn);
@@ -1149,7 +1149,7 @@ sendBtn.addEventListener("click", () => {
 });
 
 chatInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
     e.preventDefault();
     sendMessage();
   }
