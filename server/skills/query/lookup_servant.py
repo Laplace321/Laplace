@@ -15,8 +15,12 @@ class Params(BaseModel):
     name: str = Field(description="从者名称（支持中/英/日/昵称）")
 
 
-def _resolve_nickname(query_name: str) -> tuple[str | None, dict]:
-    """解析昵称映射，返回 (映射后的名称, 额外过滤器)。"""
+def _resolve_nickname(query_name: str) -> list[tuple[str, dict]]:
+    """解析昵称映射，返回所有匹配的 (映射后名称, 额外过滤器) 列表。
+
+    当同一昵称指向多个从者（Mooncell 冲突条目为 list）时，
+    返回多组候选，由 find_servant_candidates 收集后交给 Clarification 机制。
+    """
     normalized_query = _normalize_text(query_name)
     nicknames = load_nicknames()
 
@@ -26,17 +30,25 @@ def _resolve_nickname(query_name: str) -> tuple[str | None, dict]:
             mapped_data = data
             break
 
-    mapped_name = None
-    extra_filters = {}
-    if isinstance(mapped_data, str):
-        mapped_name = mapped_data.lower()
-    elif isinstance(mapped_data, dict):
-        mapped_name = mapped_data.get("name", "").lower()
-        for key, val in mapped_data.items():
-            if key != "name":
-                extra_filters[key] = val
+    if mapped_data is None:
+        return []
 
-    return mapped_name, extra_filters
+    # 统一转为列表处理
+    entries = mapped_data if isinstance(mapped_data, list) else [mapped_data]
+
+    results = []
+    for entry in entries:
+        if isinstance(entry, str):
+            results.append((entry.lower(), {}))
+        elif isinstance(entry, dict):
+            name = entry.get("name", "").lower()
+            extra_filters = {}
+            for key, val in entry.items():
+                if key not in ("name", "_source", "_collectionNo"):
+                    extra_filters[key] = val
+            results.append((name, extra_filters))
+
+    return results
 
 
 def find_servant_candidates(db: list[dict], query_name: str) -> list[dict]:
@@ -50,7 +62,7 @@ def find_servant_candidates(db: list[dict], query_name: str) -> list[dict]:
         return []
 
     normalized_query = _normalize_text(query_name)
-    mapped_name, extra_filters = _resolve_nickname(query_name)
+    nickname_mappings = _resolve_nickname(query_name)
 
     # 阶段 1: 精确匹配（昵称映射后）
     exact_matches: list[dict] = []
@@ -59,30 +71,47 @@ def find_servant_candidates(db: list[dict], query_name: str) -> list[dict]:
     # 阶段 3: 反向子串匹配
     reverse_matches: list[dict] = []
 
-    for servant in db:
-        # 额外过滤器（如职阶限制）
-        skip = False
-        for attr, val in extra_filters.items():
-            if attr == "className":
-                if servant.get("className", "").lower() != val.lower():
-                    skip = True
-                    break
-        if skip:
-            continue
+    # 收集所有昵称映射的 extra_filters（用于多候选时）
+    # 如果有多组映射（冲突昵称），分别精确匹配
+    if nickname_mappings:
+        matched_ids = set()
+        for mapped_name, extra_filters in nickname_mappings:
+            if not mapped_name:
+                continue
+            norm_mapped = _normalize_text(mapped_name)
+            for servant in db:
+                servant_id = servant.get("collectionNo", id(servant))
+                if servant_id in matched_ids:
+                    continue
+                # 额外过滤器（如职阶限制）
+                skip = False
+                for attr, val in extra_filters.items():
+                    if attr == "className":
+                        if servant.get("className", "").lower() != val.lower():
+                            skip = True
+                            break
+                if skip:
+                    continue
 
+                norm_en = _normalize_text(servant.get("name", ""))
+                norm_cn = _normalize_text(servant.get("aliasCN", ""))
+                norm_jp = _normalize_text(servant.get("originalName", ""))
+
+                if norm_mapped in (norm_en, norm_cn, norm_jp):
+                    exact_matches.append(servant)
+                    matched_ids.add(servant_id)
+
+        if exact_matches:
+            return exact_matches
+
+    # 无昵称映射或昵称映射未命中时，走子串模糊匹配
+    for servant in db:
         en_name = servant.get("name", "").lower()
         cn_name = servant.get("aliasCN", "").lower()
         jp_name = servant.get("originalName", "").lower()
         norm_en = _normalize_text(en_name)
         norm_cn = _normalize_text(cn_name)
         norm_jp = _normalize_text(jp_name)
-
-        # 阶段 1: 精确匹配
-        if mapped_name:
-            norm_mapped = _normalize_text(mapped_name)
-            if norm_mapped in (norm_en, norm_cn, norm_jp):
-                exact_matches.append(servant)
-                continue
 
         # 阶段 2: 子串模糊匹配
         if len(normalized_query) >= 2:
@@ -98,9 +127,6 @@ def find_servant_candidates(db: list[dict], query_name: str) -> list[dict]:
         ):
             reverse_matches.append(servant)
 
-    # 优先返回精确匹配，其次子串，最后反向子串
-    if exact_matches:
-        return exact_matches
     if substring_matches:
         return substring_matches
     return reverse_matches

@@ -16,6 +16,7 @@ CE_DATA_PATH = Path(__file__).parent / "data" / "craft_essences_db.json"
 FIXTURE_PATH = Path(__file__).parent.parent / "tests" / "fixtures" / "servants_fixture.json"
 CE_FIXTURE_PATH = Path(__file__).parent.parent / "tests" / "fixtures" / "ce_fixture.json"
 NICKNAMES_PATH = Path(__file__).parent / "config" / "nicknames.json"
+MOONCELL_NICKNAMES_PATH = Path(__file__).parent / "config" / "mooncell_nicknames.json"
 CE_NICKNAMES_PATH = Path(__file__).parent / "config" / "ce_nicknames.json"
 
 # 全局缓存
@@ -23,6 +24,7 @@ _servants_db: list[dict] | None = None
 _ce_db: list[dict] | None = None
 
 _nicknames_cache = CachedConfig(NICKNAMES_PATH)
+_mooncell_nicknames_cache = CachedConfig(MOONCELL_NICKNAMES_PATH)
 
 
 def _fullwidth_to_halfwidth(text: str) -> str:
@@ -53,8 +55,26 @@ _ce_nicknames_cache = CachedConfig(CE_NICKNAMES_PATH)
 
 
 def load_nicknames() -> dict[str, str]:
-    """加载从者昵称映射（支持热更新）。"""
-    return _nicknames_cache.get()
+    """加载从者昵称映射（Mooncell 自动层 + 手工覆盖层，支持热更新）。
+
+    合并策略与 Effect Schema Overlay 机制一致：
+    底层 = mooncell_nicknames.json（自动生成，禁止手编）
+    覆盖层 = nicknames.json（手工维护，优先级最高）
+    同名条目以手工覆盖层为准。
+    """
+    merged = {}
+    # 底层：Mooncell 自动生成（文件不存在时静默跳过）
+    mooncell_data = _mooncell_nicknames_cache.get()
+    if mooncell_data:
+        for key, value in mooncell_data.items():
+            if key.startswith("_"):
+                continue  # 跳过 _comment 等元数据字段
+            merged[key] = value
+    # 覆盖层：手工维护（优先级最高）
+    manual_data = _nicknames_cache.get()
+    if manual_data:
+        merged.update(manual_data)
+    return merged
 
 
 def load_ce_nicknames() -> dict[str, str]:

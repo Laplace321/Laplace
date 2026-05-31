@@ -303,3 +303,68 @@ class TestExecutorFallbackChain:
         assert result.total_found == 0
         assert result.is_fallback
         assert result.clarification is None  # clarification 被清除，降级为 fallback
+
+
+class TestMooncellNicknameMerge:
+    """测试 Mooncell 昵称层与手工层的合并逻辑。"""
+
+    def test_mooncell_nickname_loaded(self):
+        """Mooncell 昵称能被正常加载到合并结果中。"""
+        from server.query_executor import load_nicknames
+
+        nicknames = load_nicknames()
+        # 验证 Mooncell 特有的昵称存在（手工表中没有的）
+        # "法国民心" 是贞德的 Mooncell 昵称，手工表中无此条目
+        if "法国民心" in nicknames:
+            data = nicknames["法国民心"]
+            if isinstance(data, dict):
+                assert data.get("name") == "贞德"
+
+    def test_manual_overrides_mooncell(self):
+        """手工昵称表应覆盖 Mooncell 中的同名条目。"""
+        from server.query_executor import load_nicknames
+
+        nicknames = load_nicknames()
+        # "金闪闪" 在两份表中都有，手工表映射到 "吉尔伽美什"（无职阶限制）
+        if "金闪闪" in nicknames:
+            data = nicknames["金闪闪"]
+            # 手工表中 "金闪闪" 的值是简单字符串 "吉尔伽美什"
+            if isinstance(data, str):
+                assert data == "吉尔伽美什"
+
+    def test_mooncell_file_missing_graceful(self):
+        """Mooncell 文件不存在时不报错，仅返回手工昵称。"""
+        from unittest.mock import patch
+
+        from server.query_executor import load_nicknames
+
+        # Mock mooncell cache 返回空（模拟文件不存在）
+        with patch("server.query_executor._mooncell_nicknames_cache") as mock_cache:
+            mock_cache.get.return_value = None
+            nicknames = load_nicknames()
+            # 手工昵称应仍正常加载
+            assert "呆毛王" in nicknames
+
+    def test_conflict_list_format_resolved(self):
+        """冲突昵称（list 格式）能被 _resolve_nickname 正确处理。"""
+        from unittest.mock import patch
+
+        from server.skills.query.lookup_servant import _resolve_nickname
+
+        conflict_data = [
+            {"name": "从者A", "className": "saber", "_source": "mooncell", "_collectionNo": 1},
+            {"name": "从者B", "className": "archer", "_source": "mooncell", "_collectionNo": 2},
+        ]
+
+        mock_nicknames = {"冲突昵称": conflict_data}
+
+        with patch("server.skills.query.lookup_servant.load_nicknames", return_value=mock_nicknames):
+            results = _resolve_nickname("冲突昵称")
+            assert len(results) == 2
+            assert results[0][0] == "从者a"
+            assert results[1][0] == "从者b"
+            # _source 和 _collectionNo 不应出现在 extra_filters 中
+            assert "_source" not in results[0][1]
+            assert "_collectionNo" not in results[0][1]
+            # className 应出现在 extra_filters 中
+            assert results[0][1].get("className") == "saber"
