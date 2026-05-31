@@ -45,6 +45,7 @@ RE_PAREN_SUFFIX = re.compile(r"^(.+?)[（(].+[）)]$")
 
 # ── MediaWiki API 交互 ──────────────────────────────────────
 
+
 def _create_session() -> requests.Session:
     """创建带 User-Agent 的请求会话。"""
     session = requests.Session()
@@ -82,9 +83,7 @@ def fetch_servant_titles(session: requests.Session) -> list[str]:
     return titles
 
 
-def fetch_page_contents(
-    session: requests.Session, titles: list[str]
-) -> dict[str, str]:
+def fetch_page_contents(session: requests.Session, titles: list[str]) -> dict[str, str]:
     """批量获取页面 wikitext 源码。返回 {title: wikitext}。"""
     results = {}
 
@@ -110,10 +109,7 @@ def fetch_page_contents(
             title = page.get("title", "")
             revisions = page.get("revisions", [])
             if revisions:
-                content = (
-                    revisions[0].get("slots", {}).get("main", {}).get("*", "")
-                    or revisions[0].get("*", "")
-                )
+                content = revisions[0].get("slots", {}).get("main", {}).get("*", "") or revisions[0].get("*", "")
                 results[title] = content
 
         progress = min(batch_start + BATCH_SIZE, len(titles))
@@ -124,6 +120,7 @@ def fetch_page_contents(
 
 
 # ── 解析与映射 ──────────────────────────────────────────────
+
 
 def parse_nicknames_from_wikitext(wikitext: str) -> tuple[list[str], int | None]:
     """从 wikitext 中提取昵称列表和序号。
@@ -237,9 +234,7 @@ def generate_nickname_mapping(
             else:
                 # 检查是否真正冲突（不同从者）
                 existing = nickname_mapping[nick]
-                is_duplicate = any(
-                    e["_collectionNo"] == collection_no for e in existing
-                )
+                is_duplicate = any(e["_collectionNo"] == collection_no for e in existing)
                 if not is_duplicate:
                     nickname_mapping[nick].append(entry)
 
@@ -253,18 +248,19 @@ def generate_nickname_mapping(
         else:
             # 冲突：同一昵称指向多个从者，全部保留
             final_mapping[nick] = entries
-            conflict_servants = [
-                f"{e['name']}({e['className']})" for e in entries
-            ]
-            stats["conflicts"].append({
-                "nickname": nick,
-                "servants": conflict_servants,
-            })
+            conflict_servants = [f"{e['name']}({e['className']})" for e in entries]
+            stats["conflicts"].append(
+                {
+                    "nickname": nick,
+                    "servants": conflict_servants,
+                }
+            )
 
     return final_mapping, stats
 
 
 # ── 输出 ────────────────────────────────────────────────────
+
 
 def write_output(mapping: dict, output_path: Path) -> None:
     """写入 JSON 文件，包含禁止手编的注释头。"""
@@ -303,6 +299,7 @@ def print_stats(stats: dict) -> None:
 
 
 # ── 主流程 ──────────────────────────────────────────────────
+
 
 def main() -> None:
     dry_run = "--dry-run" in sys.argv
