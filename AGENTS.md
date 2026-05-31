@@ -399,11 +399,38 @@
   | `server/pipeline.py` → `_handle_guide_pipeline()` | `server/pipeline.py` → `stream_event_generator()` 链路 C 分支 |
 - **目的**：确保流式与非流式路径行为一致，避免功能漂移。此约束已同步记录到记忆系统 `feedback_bc_generation_adapter_decoupling.md`。
 
+## 敏感信息防护 (Secret Protection)
+
+### 1. 环境变量文件管理
+- **准则**：**[绝对纪律]** 任何包含 API Key、密码、Token 等敏感信息的文件，**严禁**被提交到 Git 仓库。
+- **执行**：
+  1. **`.gitignore` 必须覆盖所有 `.env` 变体**：使用 `.env.*` 通配符 + `!.env.example` 否定模式，确保 `.env`、`.env.local`、`.env.bak`、`.env.production` 等所有变体都被忽略。
+  2. **新增敏感文件类型时**：必须同步更新 `.gitignore`，在 commit 前执行 `git status` 确认该文件未被 tracked。
+  3. **`.env.example` 作为唯一模板**：项目根目录保留 `.env.example` 文件，包含所有需要配置的环境变量名（值留空或使用占位符 `your-xxx-key-here`），**严禁**在 `.env.example` 中填入真实密钥。
+  4. **备份环境变量文件的正确方式**：使用加密存储（如 1Password、Bitwarden）或私有 Gist，**严禁**在仓库中创建 `.env.bak`、`.env.backup` 等备份副本。
+
+### 2. 提交前 Secret 扫描
+- **准则**：每次 `git add` 后、`git commit` 前，必须检查暂存区是否包含疑似敏感信息。
+- **执行**：
+  1. **快速人工审查**：`git diff --cached --name-only` 确认暂存文件列表中无 `.env*`（除 `.env.example`）、`*credentials*`、`*secret*`、`*.pem`、`*.key` 等敏感文件。
+  2. **内容扫描**：对新增/修改的文件执行 `git diff --cached | grep -iE "(api_key|secret|password|token|sk-)" | head -20`，确认无真实密钥泄露。
+  3. **已 tracked 的敏感文件处理**：如果发现某个敏感文件已被历史 commit 追踪，必须使用 `git filter-repo --invert-paths --path <file>` 彻底删除历史，并 force push 所有分支。仅 `git rm` 不够——历史 commit 中仍可查看文件内容。
+- **目的**：防止 API Key 等敏感信息泄露到公开仓库，避免被自动化扫描工具（TruffleHog、GitGuardian）检测到后造成安全事件。
+
+### 3. 泄露应急响应
+- **准则**：一旦发现敏感信息已被推送到远程仓库，必须立即执行以下应急流程。
+- **执行**：
+  1. **立即轮换所有泄露的密钥**——在对应平台（百炼控制台、云服务商等）重新生成 API Key，旧 key 作废。
+  2. **从 Git 历史中彻底删除**——`git filter-repo --invert-paths --path <泄露文件> --force`，然后 `git push origin --all --force`。
+  3. **强化 `.gitignore`**——确认通配符模式覆盖到该文件类型。
+  4. **检查调用日志**——在泄露 key 的平台查看异常调用记录，评估是否已被滥用。
+
 ## 禁止事项
 
 - ❌ 未经确认删除文件或数据
 - ❌ 引入未经审查的第三方依赖
 - ❌ 修改与当前任务无关的代码
 - ❌ 忽略错误处理
-- ❌ 提交包含敏感信息（密钥、密码等）的代码
+- ❌ 提交包含敏感信息（密钥、密码等）的代码——参见上方「敏感信息防护」章节
+- ❌ 将 `.env`、`.env.bak` 等包含真实密钥的文件提交到 Git（包括 `.env.example` 中填写真实值）
 - ❌ **未经用户明确确认，禁止将任何变更部署到线上环境**（包括但不限于：执行远程服务器上的 docker build/run/restart、SSH 到线上执行部署脚本等操作。所有线上部署动作必须在用户完成本地测试并明确授权后才可执行）
