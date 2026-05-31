@@ -215,11 +215,87 @@ def _validate_translations():
         print(f"ℹ️  翻译映射包含非可玩职阶（可忽略）: {sorted(extra)}")
 
 
+def _validate_skill_registry():
+    """校验 SKILL_REGISTRY 完整性和每个 Skill 的基本合法性。
+
+    检查项：
+    1. 每个已注册 Skill 的 name / description 非空
+    2. 有 params_schema 的 Skill，尝试获取 JSON Schema 验证 Pydantic 模型合法性
+    3. 对比 server/skills/query/ 目录下的 .py 文件与 SKILL_REGISTRY 中的 QuerySkill，
+       检测是否有 Skill 文件存在但未注册（忘记在 __init__.py 中导入）
+    校验失败时输出 warning 日志，不阻塞启动。
+    """
+    from server.skills.base import ResponseSkill
+
+    # ── 检查 1：name / description 非空 ──
+    for skill_name, skill in SKILL_REGISTRY.items():
+        if not skill.name:
+            print(f"⚠️  Skill 注册异常：SKILL_REGISTRY 中存在 name 为空的 Skill（key='{skill_name}'）")
+        if not skill.description:
+            print(f"⚠️  Skill '{skill_name}' 缺少 description，路由阶段 LLM 无法正确识别此 Skill")
+
+    # ── 检查 2：params_schema 合法性 ──
+    for skill_name, skill in SKILL_REGISTRY.items():
+        if not isinstance(skill, QuerySkill):
+            continue
+        schema_cls = skill.params_schema
+        if schema_cls is None:
+            continue
+        try:
+            schema_cls.model_json_schema()
+        except Exception as schema_err:
+            print(f"⚠️  Skill '{skill_name}' 的 params_schema 生成 JSON Schema 失败: {schema_err}")
+
+    # ── 检查 3：文件 vs 注册表一致性 ──
+    query_dir = Path(__file__).parent / "skills" / "query"
+    if query_dir.exists():
+        # 获取目录中所有非 __init__ 的 .py 文件名（不含扩展名）
+        file_modules = {f.stem for f in query_dir.glob("*.py") if f.stem != "__init__" and not f.stem.startswith("_")}
+        # 获取已注册的 QuerySkill 的模块名（从类的 __module__ 提取最后一段）
+        registered_modules = set()
+        for skill in SKILL_REGISTRY.values():
+            if isinstance(skill, QuerySkill):
+                module_name = type(skill).__module__
+                # module_name 格式如 "server.skills.query.lookup_servant"
+                registered_modules.add(module_name.rsplit(".", 1)[-1])
+
+        unregistered = file_modules - registered_modules
+        if unregistered:
+            print(f"⚠️  以下 Skill 文件存在于 server/skills/query/ 但未注册到 SKILL_REGISTRY: {sorted(unregistered)}")
+            print("   请检查 server/skills/__init__.py 的 _SKILL_MODULES 列表是否遗漏了导入")
+
+    # ── 检查 4：Response Skills 文件 vs 注册表一致性 ──
+    response_dir = Path(__file__).parent / "skills" / "response"
+    if response_dir.exists():
+        response_file_modules = {
+            f.stem for f in response_dir.glob("*.py") if f.stem != "__init__" and not f.stem.startswith("_")
+        }
+        registered_response_modules = set()
+        for skill in SKILL_REGISTRY.values():
+            if isinstance(skill, ResponseSkill):
+                module_name = type(skill).__module__
+                registered_response_modules.add(module_name.rsplit(".", 1)[-1])
+
+        unregistered_response = response_file_modules - registered_response_modules
+        if unregistered_response:
+            print(
+                f"⚠️  以下 Response Skill 文件存在于 server/skills/response/ 但未注册: {sorted(unregistered_response)}"
+            )
+
+    registered_query_count = sum(1 for s in SKILL_REGISTRY.values() if isinstance(s, QuerySkill))
+    registered_response_count = sum(1 for s in SKILL_REGISTRY.values() if isinstance(s, ResponseSkill))
+    print(
+        f"✅  Skill 注册表校验完成：{registered_query_count} 个 QuerySkill + "
+        f"{registered_response_count} 个 ResponseSkill = {len(SKILL_REGISTRY)} 个已注册"
+    )
+
+
 @app.on_event("startup")
 async def startup():
     """启动时预加载数据库并校验配置一致性。"""
     load_database()
     _validate_translations()
+    _validate_skill_registry()
 
 
 @app.post("/api/chat", response_model=ChatResponse)
