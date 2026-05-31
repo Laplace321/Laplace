@@ -207,7 +207,15 @@ def build_routing_prompt(
 10. **宝具目标类型筛选（全体/单体）**：用户提到"全体宝具"/"全体攻击宝具"/"AOE宝具"时，使用 `search_by_cards` 的 `npTarget` 参数：`"all"` = 全体（光炮）、`"one"` = 单体、`"support"` = 辅助。同理，"单体宝具"对应 `npTarget: "one"`。**严禁**将"全体攻击宝具"误解为宝具特攻（`damageNpSP`），它们是完全不同的概念。
     - **FGO 俚语「d类特攻」「D特攻」**：玩家口中的"d类特攻"/"D特攻"是指**宝具附带的特攻效果**（`damageNpSP` 或 `damageNpIndividuality`），即宝具伤害对特定敌方特性有额外倍率。这是**宝具效果**，应使用 `search_by_np_effect(npEffect="damageNpSP")` 或 `search_by_np_effect(npEffect="damageNpIndividuality")`，**严禁**将"d类"误解为特性名称（如"死灵"），也**严禁**使用 `search_by_traits`。类似地，"w类特攻"指 `damageNpIndividualityAll`（全体宝具特攻）
 11. **效果的目标类型和数值条件**：效果类 Skill（`search_by_effect` / `search_by_skill_effect`）支持可选的 `targetType`、`minValue`、`maxValue` 参数：
-    - `targetType`：效果施加目标。`"self"` = 自身可获得的（含 self+全队含自己+单体队友）、`"party"` = 全队（含自己）、`"partyOther"` = 仅队友不含自己、`"ptOne"` = 单体队友、`"enemy"` = 敌方。用户说"给队友"/"全队"/"辅助"时传 `"party"`，说"自身"时传 `"self"`
+    - `targetType`：效果施加目标，取值如下：
+      - `"self"` = 自身（含全队增益中自身也受益的部分）
+      - `"party"` = 全队同时受益（含自己）
+      - `"ally"` = 能惠及队友（含全队/单体指定/仅队友，不含纯自身）
+      - `"partyOther"` = 仅队友不含自己（极少使用，仅用户明确说"不含自己"时）
+      - `"ptOne"` = 单体指定队友
+      - `"enemy"` = 敌方
+    - **路由要点**：用户说"给队友XX"/"辅助XX"/"能给队友XX的" → 传 `"ally"`；说"全队XX"/"群体XX"/"群充" → 传 `"party"`；说"自身"/"自充" → 传 `"self"`。**绝对禁止**用户说"给队友"时使用 `partyOther`
+    - **同时提到多个目标**：用户说"50自充 + 30群充"时，拆为两个 `search_by_effect` 调用，分别带各自的 targetType 和 minValue
     - `minValue`：效果最小数值（百分比）。用户说"超过50%"/"大于30%"/"50以上"时传对应数值。如 `"minValue": 50` 表示 ≥50%
     - `maxValue`：效果最大数值（百分比）。用户说"不超过50%"/"小于30%"/"50以下"时传对应数值。如 `"maxValue": 50` 表示 ≤50%
     - **精确匹配**：用户说"刚好"/"恰好"/"正好"/"等于"某个数值时，**同时传 `minValue` 和 `maxValue` 为相同值**。如"刚好50%"→ `"minValue": 50, "maxValue": 50`
@@ -216,13 +224,7 @@ def build_routing_prompt(
     - 可选参数 `ascension`（整数 0-4）：指定灵基阶段。用户说"第三灵基"/"最终再临"/"泳装形态"时传对应值。灵基映射：0=初始、1=灵基一、2=灵基二、3=灵基三/最终再临、4=最终再临（部分从者）。不传此参数时，默认匹配全灵基并集（即该从者在任意灵基下拥有的所有特性）
     - 注意：61 个从者存在灵基间特性差异（如梅露辛灵基 0-2 有圆桌骑士特性，灵基 3-4 没有），指定灵基时可精确筛选
 13. **不可查效果 — 直接 fallback**：以下效果属于被动/活动/礼装效果，**当前不在从者查询能力范围内**，应直接走 fallback 回复用户"此类效果暂不支持查询"：羁绊加成（`servantFriendshipUp`）、QP 加成（`qpUp`）、素材掉落加成（`eventDropUp`）。**禁止**对这些效果调用任何 Skill，否则一定返回 0 条结果
-14. **NP 充能路由（重要）**：NP 充能查询统一使用 `search_by_effect(effect="gainNp", ...)`，通过 `targetType` 和 `minValue` 区分场景：
-    - **用户只说"自充"**（如"50自充"、"自充50以上"）→ `search_by_effect(effect="gainNp", targetType="self", minValue=50)`
-    - **用户说"群充"/"全队充能"/"给队友充能"/"能给队友充的"**（如"30群充"、"能给队友充能的从者"）→ `search_by_effect(effect="gainNp", targetType="party")`（**必须用 `party`**，系统内部会自动匹配 party + ptOne + partyOther 所有给他人充能的方式）
-    - **用户同时提到"自充"和"群充"**（如"50自充，30群充"）→ 分别发两个 `search_by_effect` 调用
-    - `targetType` 取值：`"self"` = 自身可获得的充能总量、`"party"` = 全队充能（含自己）、`"partyOther"` = 仅队友不含自己（极少使用）、`"ptOne"` = 单体队友
-    - **绝对禁止**：用户说"给队友充能"时使用 `partyOther`。`partyOther` 仅严格匹配标记为"仅队友不含自己"的效果，会遗漏大量通过 `party`（全队含自己）和 `ptOne`（单体指定队友）给队友充能的从者（如孔明、斯卡蒂等核心辅助）。**"给队友"= `party`**，只有用户明确说"不含自己"/"不给自己"时才用 `partyOther`
-15. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"、"哪个职阶克制XX"、"什么克制XX"等表达时，**必须**使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"、"月癌"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。**即使用户只问"哪个职阶克制X"这种看似知识性问题，也必须走 `search_by_class_advantage`**，系统会在结果中返回克制关系和对应从者。
+14. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"、"哪个职阶克制XX"、"什么克制XX"等表达时，**必须**使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"、"月癌"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。**即使用户只问"哪个职阶克制X"这种看似知识性问题，也必须走 `search_by_class_advantage`**，系统会在结果中返回克制关系和对应从者。
 16. **疑似从者名称/昵称一律用 lookup_servant（重要）**：当用户的问题中包含你不确定是否为从者名称的词语（如"红A"、"小太阳"、"花之魔术师"、"老虚"、"CBA"、"XJB"、"呆毛"、"2B"等看起来像昵称/外号/缩写/纯字母组合的表达），**必须**使用 `lookup_servant`，将该词语作为 `name` 参数传入。系统后端支持昵称映射和模糊匹配，会自动处理识别。**绝不要**因为你不认识某个名称就返回 `no_match` 或 `out_of_scope`。只要用户的问题看起来是在查询或询问某个特定角色/从者，就选择 `lookup_servant`。**特别注意**：纯英文字母、数字组合、字母+数字混合（如"CBA"、"X4"、"2B"）在 FGO 社区中是常见的从者昵称缩写形式，绝不能因为看起来不像名字就判定为超出范围。如果用户同时问了从者详情（如"XX技能介绍"、"XX宝具是什么"），response_skill 选 `respond_servant_detail`。
 17. **戴冠战知识问答**：当用户提到"戴冠战"/"冠位"/"剑冠"/"弓冠"等并询问任何相关问题（机制/星图/礼装/刷取/Boss/配队/打手/条件/攻略等）时，设置 `"target_pipeline": "C"`，skill_calls 留空。
 19. **概念礼装查询（重要）**：当用户提到"礼装"/"概念礼装"/"CE"/"带XX效果的礼装"/"推荐礼装"时，必须使用 CE domain 的 Skills，response_skill 选 `respond_ce_list`：

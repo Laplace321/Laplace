@@ -96,12 +96,15 @@ def _match_target_type(query_type: str, data_type: str) -> bool:
     """匹配目标类型。
 
     - party 查询匹配 party + partyOther（ptOne 是单体指定，不等于全队效果）
+    - ally 查询匹配 party + ptOne + partyOther（能惠及队友的所有方式）
     - self 查询仅匹配 self
     - partyOther 查询仅匹配 partyOther
     """
     if query_type == data_type:
         return True
     if query_type == "party" and data_type == "partyOther":
+        return True
+    if query_type == "ally" and data_type in ("party", "ptOne", "partyOther"):
         return True
     return False
 
@@ -183,6 +186,12 @@ def _match_effect(
                 if self_total < min_value:
                     return False
             total_value = team_value
+        elif target_type == "ally":
+            # "队友"查询：能惠及队友的所有方式（party + ptOne + partyOther）
+            ally_value = party_value + pt_one_value + party_other_value
+            if ally_value == 0:
+                return False
+            total_value = ally_value
         elif target_type == "self":
             # 自身查询：self + party（全队含自己）+ ptOne（可指定自身）
             total_value = self_value + party_value + pt_one_value
@@ -278,6 +287,12 @@ def _match_np_effect(
                 if self_total < min_value:
                     return False
             total_value = team_value
+        elif target_type == "ally":
+            # "队友"查询：能惠及队友的所有方式（party + ptOne + partyOther）
+            ally_value = party_value + pt_one_value + party_other_value
+            if ally_value == 0:
+                return False
+            total_value = ally_value
         elif target_type == "self":
             total_value = self_value + party_value + pt_one_value
         elif target_type == "partyOther":
