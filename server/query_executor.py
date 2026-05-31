@@ -25,9 +25,26 @@ _ce_db: list[dict] | None = None
 _nicknames_cache = CachedConfig(NICKNAMES_PATH)
 
 
+def _fullwidth_to_halfwidth(text: str) -> str:
+    """全角英数字转半角（Ａ→A, ０→0 等），保留中日文不变。"""
+    result = []
+    for char in text:
+        code = ord(char)
+        # 全角字母/数字/符号 (！=0xFF01 ~ ～=0xFF5E) → 半角 (!=0x0021 ~ ~=0x007E)
+        if 0xFF01 <= code <= 0xFF5E:
+            result.append(chr(code - 0xFEE0))
+        # 全角空格 → 半角空格
+        elif code == 0x3000:
+            result.append(" ")
+        else:
+            result.append(char)
+    return "".join(result)
+
+
 def _normalize_text(value: str) -> str:
     """Normalize names for nickname and substring matching."""
     text = value.strip().lower()
+    text = _fullwidth_to_halfwidth(text)
     text = re.sub(r"[\s·•・\-.()（）〔〕\[\]「」『』_]+", "", text)
     return text
 
