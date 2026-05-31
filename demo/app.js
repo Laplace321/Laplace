@@ -786,6 +786,25 @@ function handleDone(data, els) {
     lastTraceId = data.traceId;
     updateDebugPanel();
   }
+  // rejected_skills 可折叠调试信息展示
+  if (els && data.rejected_skills && data.rejected_skills.length > 0) {
+    const bubble = els.container.querySelector(".message-bubble");
+    if (bubble) {
+      const details = document.createElement("details");
+      details.className = "rejected-skills-debug";
+      const summary = document.createElement("summary");
+      summary.textContent = `${data.rejected_skills.length} 个筛选条件被跳过`;
+      details.appendChild(summary);
+      const list = document.createElement("ul");
+      for (const rs of data.rejected_skills) {
+        const li = document.createElement("li");
+        li.textContent = `${rs.skill || rs.skill_name || "未知"}: ${rs.reason || "参数校验失败"}`;
+        list.appendChild(li);
+      }
+      details.appendChild(list);
+      bubble.appendChild(details);
+    }
+  }
   // clarification 是中间询问步骤，不追加评分按钮
   const isClarification = data.needs_confirmation === true;
   if (els && data.traceId && !isClarification) {
