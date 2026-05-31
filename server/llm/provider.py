@@ -7,12 +7,13 @@ Laplace — LLM Provider 配置与路由调度
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 
-from server.llm.base import BaseLLMAdapter, StreamMetadata
+from server.llm.base import BaseLLMAdapter, LLMResponseFormatUnsupported, StreamMetadata
 
 
 @dataclass
@@ -108,6 +109,93 @@ def _load_providers() -> list[LLMProvider]:
 
 # 模块加载时解析一次
 PROVIDERS: list[LLMProvider] = _load_providers()
+
+
+# ── 错误分类与重试策略 ──
+
+# 错误类型常量
+ERROR_RATE_LIMIT = "rate_limit"
+ERROR_TIMEOUT = "timeout"
+ERROR_AUTH = "auth"
+ERROR_BAD_REQUEST = "bad_request"
+ERROR_SERVER = "server_error"
+ERROR_UNKNOWN = "unknown"
+
+# 不可恢复错误：跳过当前 provider 的所有剩余模型
+_SKIP_PROVIDER_ERRORS = frozenset({ERROR_AUTH, ERROR_BAD_REQUEST})
+
+# rate_limit 指数退避基础秒数
+_RATE_LIMIT_BACKOFF_BASE = 2.0
+
+
+def _classify_llm_error(exc: Exception) -> str:
+    """根据异常类型和内容判断 LLM 调用错误的分类。
+
+    Returns:
+        错误类型常量：rate_limit / timeout / auth / bad_request / server_error / unknown
+    """
+    # 延迟 import，仅在错误路径时加载
+    try:
+        import openai
+    except ImportError:
+        openai = None  # type: ignore[assignment]
+
+    exc_msg = str(exc).lower()
+
+    # openai SDK 异常（覆盖 obao / openai adapter 的错误）
+    if openai is not None:
+        if isinstance(exc, openai.RateLimitError):
+            return ERROR_RATE_LIMIT
+        if isinstance(exc, openai.AuthenticationError):
+            return ERROR_AUTH
+        if isinstance(exc, openai.BadRequestError):
+            return ERROR_BAD_REQUEST
+        if isinstance(exc, openai.APITimeoutError):
+            return ERROR_TIMEOUT
+        if isinstance(exc, openai.APIConnectionError):
+            return ERROR_TIMEOUT
+        if isinstance(exc, openai.InternalServerError):
+            return ERROR_SERVER
+        if isinstance(exc, openai.APIStatusError):
+            # 兜底：按 HTTP 状态码分类
+            status = getattr(exc, "status_code", 0)
+            if status == 429:
+                return ERROR_RATE_LIMIT
+            if status in (401, 403):
+                return ERROR_AUTH
+            if status == 400:
+                return ERROR_BAD_REQUEST
+            if status >= 500:
+                return ERROR_SERVER
+
+    # LLMResponseFormatUnsupported → bad_request（模型不支持结构化输出）
+    if isinstance(exc, LLMResponseFormatUnsupported):
+        return ERROR_BAD_REQUEST
+
+    # dashscope 错误：异常消息格式为 "dashscope API 错误 [{error_code}]: {error_msg}"
+    # error_code 是英文标识如 InvalidApiKey / Throttling / BadRequest 等
+    if "dashscope api" in exc_msg:
+        if "throttl" in exc_msg:
+            return ERROR_RATE_LIMIT
+        if "invalidapikey" in exc_msg or "arrearage" in exc_msg or "accessdenied" in exc_msg:
+            return ERROR_AUTH
+        if "timeout" in exc_msg or "requesttimeout" in exc_msg:
+            return ERROR_TIMEOUT
+        if "badrequest" in exc_msg or "invalidparameter" in exc_msg:
+            return ERROR_BAD_REQUEST
+        if "internalerror" in exc_msg or "systemerror" in exc_msg:
+            return ERROR_SERVER
+        return ERROR_SERVER
+
+    # 通用文本匹配兜底
+    if "timeout" in exc_msg or "timed out" in exc_msg:
+        return ERROR_TIMEOUT
+    if "rate limit" in exc_msg or "429" in exc_msg:
+        return ERROR_RATE_LIMIT
+    if "auth" in exc_msg or "401" in exc_msg or "api key" in exc_msg:
+        return ERROR_AUTH
+
+    return ERROR_UNKNOWN
 
 
 # ── Messages 清洗 ──
@@ -221,8 +309,11 @@ async def chat_completion(
     for provider in PROVIDERS:
         if provider.adapter is None:
             continue
+        skip_provider = False
         models_to_try = [model] if model else provider.models
         for m in models_to_try:
+            if skip_provider:
+                break
             try:
                 result = await provider.adapter.chat_completion(
                     model=m,
@@ -238,8 +329,43 @@ async def chat_completion(
                 result["_attempts"] = attempts_log
                 return result
             except Exception as e:
-                attempts_log.append({"provider": provider.name, "model": m, "error": str(e)})
-                print(f"⚠️  [{provider.name}] 模型 {m} 调用失败: {e}")
+                error_type = _classify_llm_error(e)
+                attempts_log.append({"provider": provider.name, "model": m, "error": str(e), "error_type": error_type})
+                print(f"⚠️  [{provider.name}] 模型 {m} 调用失败 ({error_type}): {e}")
+
+                if error_type in _SKIP_PROVIDER_ERRORS:
+                    # 认证/参数错误：不可恢复，跳过此 provider 所有模型
+                    skip_provider = True
+                elif error_type == ERROR_RATE_LIMIT:
+                    # 限流：指数退避后重试同一模型（仅 1 次）
+                    await asyncio.sleep(_RATE_LIMIT_BACKOFF_BASE)
+                    try:
+                        result = await provider.adapter.chat_completion(
+                            model=m,
+                            system_prompt=system_prompt,
+                            user_message=user_message,
+                            max_tokens=max_tokens,
+                            temperature=temperature,
+                            json_mode=json_mode,
+                            response_schema=response_schema,
+                            response_validator=response_validator,
+                        )
+                        result["_provider"] = provider.name
+                        result["_attempts"] = attempts_log
+                        return result
+                    except Exception as retry_err:
+                        retry_type = _classify_llm_error(retry_err)
+                        attempts_log.append(
+                            {
+                                "provider": provider.name,
+                                "model": m,
+                                "error": str(retry_err),
+                                "error_type": retry_type,
+                                "retry": True,
+                            }
+                        )
+                        print(f"⚠️  [{provider.name}] 模型 {m} 限流重试仍失败 ({retry_type}): {retry_err}")
+                # timeout / server_error / unknown → 立即尝试下一个模型/provider
                 continue
 
     raise Exception(f"所有模型都调用失败。尝试记录: {attempts_log}")
@@ -280,8 +406,11 @@ async def agent_completion(
     for provider in PROVIDERS:
         if provider.adapter is None:
             continue
+        skip_provider = False
         models_to_try = [model] if model else provider.models
         for m in models_to_try:
+            if skip_provider:
+                break
             try:
                 result = await provider.adapter.agent_completion(
                     model=m,
@@ -295,8 +424,38 @@ async def agent_completion(
                 result["_attempts"] = attempts_log
                 return result
             except Exception as e:
-                attempts_log.append({"provider": provider.name, "model": m, "error": str(e)})
-                print(f"⚠️  [agent] [{provider.name}] 模型 {m} 调用失败: {e}")
+                error_type = _classify_llm_error(e)
+                attempts_log.append({"provider": provider.name, "model": m, "error": str(e), "error_type": error_type})
+                print(f"⚠️  [agent] [{provider.name}] 模型 {m} 调用失败 ({error_type}): {e}")
+
+                if error_type in _SKIP_PROVIDER_ERRORS:
+                    skip_provider = True
+                elif error_type == ERROR_RATE_LIMIT:
+                    await asyncio.sleep(_RATE_LIMIT_BACKOFF_BASE)
+                    try:
+                        result = await provider.adapter.agent_completion(
+                            model=m,
+                            messages=sanitized_messages,
+                            tools=tools,
+                            max_tokens=max_tokens,
+                            temperature=temperature,
+                        )
+                        result["_model"] = m
+                        result["_provider"] = provider.name
+                        result["_attempts"] = attempts_log
+                        return result
+                    except Exception as retry_err:
+                        retry_type = _classify_llm_error(retry_err)
+                        attempts_log.append(
+                            {
+                                "provider": provider.name,
+                                "model": m,
+                                "error": str(retry_err),
+                                "error_type": retry_type,
+                                "retry": True,
+                            }
+                        )
+                        print(f"⚠️  [agent] [{provider.name}] 模型 {m} 限流重试仍失败 ({retry_type}): {retry_err}")
                 continue
 
     raise Exception(f"[agent] 所有模型都调用失败。尝试记录: {attempts_log}")
@@ -328,8 +487,11 @@ async def chat_completion_stream(
     for provider in PROVIDERS:
         if provider.adapter is None:
             continue
+        skip_provider = False
         models_to_try = [model] if model else provider.models
         for m in models_to_try:
+            if skip_provider:
+                break
             try:
                 async for chunk in provider.adapter.chat_completion_stream(
                     model=m,
@@ -342,7 +504,11 @@ async def chat_completion_stream(
                     yield chunk
                 return  # 成功完成，退出
             except Exception as e:
-                print(f"⚠️  [{provider.name}] 模型 {m} stream 失败: {e}")
+                error_type = _classify_llm_error(e)
+                print(f"⚠️  [{provider.name}] 模型 {m} stream 失败 ({error_type}): {e}")
+                if error_type in _SKIP_PROVIDER_ERRORS:
+                    skip_provider = True
+                # 流式场景不做 rate_limit 退避重试（避免阻塞 generator）
                 continue
 
     yield "抱歉，生成服务暂时不可用。"
