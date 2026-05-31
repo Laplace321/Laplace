@@ -218,9 +218,10 @@ def build_routing_prompt(
 13. **不可查效果 — 直接 fallback**：以下效果属于被动/活动/礼装效果，**当前不在从者查询能力范围内**，应直接走 fallback 回复用户"此类效果暂不支持查询"：羁绊加成（`servantFriendshipUp`）、QP 加成（`qpUp`）、素材掉落加成（`eventDropUp`）。**禁止**对这些效果调用任何 Skill，否则一定返回 0 条结果
 14. **NP 充能路由（重要）**：NP 充能查询统一使用 `search_by_effect(effect="gainNp", ...)`，通过 `targetType` 和 `minValue` 区分场景：
     - **用户只说"自充"**（如"50自充"、"自充50以上"）→ `search_by_effect(effect="gainNp", targetType="self", minValue=50)`
-    - **用户说"群充"/"全队充能"**（如"30群充"）→ `search_by_effect(effect="gainNp", targetType="party", minValue=30)`（party 含自己，系统会自动做复合判定：全队效果≥30 且自身也能获得≥30 充能才命中）
+    - **用户说"群充"/"全队充能"/"给队友充能"/"能给队友充的"**（如"30群充"、"能给队友充能的从者"）→ `search_by_effect(effect="gainNp", targetType="party")`（**必须用 `party`**，系统内部会自动匹配 party + ptOne + partyOther 所有给他人充能的方式）
     - **用户同时提到"自充"和"群充"**（如"50自充，30群充"）→ 分别发两个 `search_by_effect` 调用
-    - `targetType` 取值：`"self"` = 自身可获得的充能总量、`"party"` = 全队充能（含自己）、`"partyOther"` = 仅队友不含自己、`"ptOne"` = 单体队友
+    - `targetType` 取值：`"self"` = 自身可获得的充能总量、`"party"` = 全队充能（含自己）、`"partyOther"` = 仅队友不含自己（极少使用）、`"ptOne"` = 单体队友
+    - **绝对禁止**：用户说"给队友充能"时使用 `partyOther`。`partyOther` 仅严格匹配标记为"仅队友不含自己"的效果，会遗漏大量通过 `party`（全队含自己）和 `ptOne`（单体指定队友）给队友充能的从者（如孔明、斯卡蒂等核心辅助）。**"给队友"= `party`**，只有用户明确说"不含自己"/"不给自己"时才用 `partyOther`
 15. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"、"哪个职阶克制XX"、"什么克制XX"等表达时，**必须**使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"、"月癌"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。**即使用户只问"哪个职阶克制X"这种看似知识性问题，也必须走 `search_by_class_advantage`**，系统会在结果中返回克制关系和对应从者。
 16. **疑似从者名称/昵称一律用 lookup_servant（重要）**：当用户的问题中包含你不确定是否为从者名称的词语（如"红A"、"小太阳"、"花之魔术师"、"老虚"、"CBA"、"XJB"、"呆毛"、"2B"等看起来像昵称/外号/缩写/纯字母组合的表达），**必须**使用 `lookup_servant`，将该词语作为 `name` 参数传入。系统后端支持昵称映射和模糊匹配，会自动处理识别。**绝不要**因为你不认识某个名称就返回 `no_match` 或 `out_of_scope`。只要用户的问题看起来是在查询或询问某个特定角色/从者，就选择 `lookup_servant`。**特别注意**：纯英文字母、数字组合、字母+数字混合（如"CBA"、"X4"、"2B"）在 FGO 社区中是常见的从者昵称缩写形式，绝不能因为看起来不像名字就判定为超出范围。如果用户同时问了从者详情（如"XX技能介绍"、"XX宝具是什么"），response_skill 选 `respond_servant_detail`。
 17. **戴冠战知识问答**：当用户提到"戴冠战"/"冠位"/"剑冠"/"弓冠"等并询问任何相关问题（机制/星图/礼装/刷取/Boss/配队/打手/条件/攻略等）时，设置 `"target_pipeline": "C"`，skill_calls 留空。
