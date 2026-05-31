@@ -1580,9 +1580,32 @@ function checkFirstVisitHelp() {
 }
 
 // Init on load
+// === Support Modal ===
+function initSupportModal() {
+  const overlay = document.getElementById("support-overlay");
+  const openBtn = document.getElementById("support-btn");
+  const closeBtn = document.getElementById("support-close-btn");
+  if (!overlay || !openBtn) return;
+
+  const openSupportModal = () => overlay.classList.add("visible");
+  const closeSupportModal = () => overlay.classList.remove("visible");
+
+  openBtn.addEventListener("click", openSupportModal);
+  if (closeBtn) closeBtn.addEventListener("click", closeSupportModal);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeSupportModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.classList.contains("visible")) {
+      closeSupportModal();
+    }
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   createHistoryPanel();
   createHelpModal();
+  initSupportModal();
   renderPresetBar();
   // Inject welcome message dynamically
   if (chatMessages.querySelectorAll(".message").length === 0) {

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
   <link rel="preconnect" href="https://gstatic.loli.net" crossorigin>
   <link href="https://fonts.loli.net/css2?family=Noto+Sans+SC:wght@400;500;700&family=Orbitron:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=18">
+  <link rel="stylesheet" href="style.css?v=19">
   <script src="marked.min.js"></script>
 </head>
 <body>
@@ -89,11 +89,43 @@
     </div>
     <div class="input-footer">
       <span class="credit-line">攻略知识合作：<a href="https://space.bilibili.com/1620123701" target="_blank" class="credit-link">怀旧大金</a> · <a href="https://space.bilibili.com/21840109" target="_blank" class="credit-link">秩序善良の咕哒子</a></span>
+      <span class="support-line"><a href="javascript:void(0)" id="support-btn" class="support-link">☕ 打赏项目</a></span>
       <span>数据源自 <a href="https://atlasacademy.io/" target="_blank">Atlas Academy</a> · 逻辑参考 <a href="https://github.com/chaldea-center/chaldea" target="_blank">Chaldea</a></span>
       <span class="disclaimer">本项目为个人学习与技术验证用途，处于内部测试阶段，尚未正式上线运营。数据来源于第三方开源 API，内容仅供参考，不构成任何商业服务。本站与 TYPE-MOON / Lasengle / Aniplex 无任何关联。</span>
     </div>
   </div>
 
-  <script src="app.js?v=23"></script>
+  <!-- Support Modal -->
+  <div id="support-overlay" class="support-overlay">
+    <div class="support-modal">
+      <button class="help-close-btn" id="support-close-btn">&times;</button>
+      <div class="support-modal-header">
+        <h2>☕ 打赏 Laplace</h2>
+        <p class="support-subtitle">如果 Laplace 帮到了你，可以请作者喝杯咖啡</p>
+      </div>
+      <div class="support-modal-body">
+        <a href="https://afdian.com/a/laplace-fgo" target="_blank" rel="noopener noreferrer" class="support-afdian-btn">
+          <span class="afdian-icon">⚡</span>
+          <span>在爱发电支持</span>
+        </a>
+        <div class="support-qrcode-section">
+          <p class="qrcode-label">或扫码直接支持</p>
+          <div class="qrcode-row">
+            <div class="qrcode-item">
+              <img src="微信收款码.JPG" alt="微信收款码" class="qrcode-img">
+              <span>微信</span>
+            </div>
+            <div class="qrcode-item">
+              <img src="支付宝收款码.JPG" alt="支付宝收款码" class="qrcode-img">
+              <span>支付宝</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="support-footer-note">所有收入将用于 API 调用和服务器运行成本</p>
+    </div>
+  </div>
+
+  <script src="app.js?v=24"></script>
 </body>
 </html>

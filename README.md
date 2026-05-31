@@ -419,6 +419,19 @@ Preset(
 
 > **注意**：无需修改 `server/main.py`、`server/prompts.py` 或路由逻辑。Skill 的 `description` 字段会被自动注入 LLM 路由 Prompt，`@register_skill` 装饰器自动完成注册，`SkillExecutor` 自动识别并执行新 Skill。
 
+## 支持项目
+
+Laplace 是一个纯个人开源项目，不做商业化、不会收费。如果它帮到了你，可以考虑请作者喝杯咖啡，所有收入将用于 API 调用和服务器运行成本。
+
+- **爱发电**：[https://afdian.com/a/laplace-fgo](https://afdian.com/a/laplace-fgo)
+- **微信 / 支付宝**：扫描下方收款码
+
+<p align="center">
+  <img src="demo/微信收款码.JPG" alt="微信收款码" width="200">
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="demo/支付宝收款码.JPG" alt="支付宝收款码" width="200">
+</p>
+
 ## 合规声明
 
 数据及部分领域逻辑源自开源项目 [Chaldea](https://github.com/chaldea-center/chaldea)，数据来源 [Atlas Academy](https://atlasacademy.io/)。
