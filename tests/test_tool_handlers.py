@@ -31,17 +31,18 @@ class TestListEffects:
     def test_returns_effects_list(self):
         result = handle_list_effects({})
         assert "total" in result
-        assert "effects" in result
+        assert "standard_effects" in result
+        assert "composite_effects" in result
         assert result["total"] > 0
-        # 每个效果应有 name 和 aliases_zh
-        for eff in result["effects"]:
+        # 每个标准效果应有 name 和 aliases_zh
+        for eff in result["standard_effects"]:
             assert "name" in eff
             assert "aliases_zh" in eff
 
     def test_composite_effects_have_includes(self):
         """复合效果（如 damageBoost）应包含 composite 和 includes 字段。"""
         result = handle_list_effects({})
-        composites = [e for e in result["effects"] if e.get("composite")]
+        composites = result["composite_effects"]
         assert len(composites) > 0, "应至少有一个复合效果（如 damageBoost）"
         for c in composites:
             assert "includes" in c
@@ -98,7 +99,7 @@ class TestSearchServants:
 
     def test_full_servants_field_present(self):
         """返回应包含 _full_servants 字段（供前端卡片渲染）。"""
-        result = handle_search_servants({"class_name": "Saber", "rarity": 5})
+        result = handle_search_servants({"className": "Saber", "rarity": 5})
         assert "_full_servants" in result
         assert isinstance(result["_full_servants"], list)
         assert len(result["_full_servants"]) > 0
@@ -109,7 +110,7 @@ class TestSearchServants:
 
     def test_class_filter(self):
         """按职阶筛选。"""
-        result = handle_search_servants({"class_name": "Saber"})
+        result = handle_search_servants({"className": "Saber"})
         assert result["total"] > 0
         # 结果中所有从者应为 Saber
         for s in result["top_results"]:
@@ -124,7 +125,7 @@ class TestSearchServants:
 
     def test_combined_filters(self):
         """组合筛选：5星 Caster。"""
-        result = handle_search_servants({"class_name": "Caster", "rarity": 5})
+        result = handle_search_servants({"className": "Caster", "rarity": 5})
         assert result["total"] > 0
         for s in result["top_results"]:
             assert s["class"].lower() == "caster"
@@ -132,12 +133,12 @@ class TestSearchServants:
 
     def test_effect_filter(self):
         """按效果筛选。"""
-        result = handle_search_servants({"effects": ["gainNp"]})
+        result = handle_search_servants({"effectNames": ["gainNp"]})
         assert result["total"] > 0
 
     def test_np_card_filter(self):
         """按宝具卡色筛选。"""
-        result = handle_search_servants({"np_card": "arts"})
+        result = handle_search_servants({"npCard": "arts"})
         assert result["total"] > 0
 
     def test_attribute_chinese_mapping(self):

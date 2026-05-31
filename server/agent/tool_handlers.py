@@ -30,28 +30,31 @@ _executor = SkillExecutor()
 
 
 def handle_search_servants(params: dict) -> dict:
-    """搜索从者 — 将 Agent 参数映射为 SkillCall 列表，调用 SkillExecutor。"""
+    """搜索从者 — 将 Agent 参数映射为 SkillCall 列表，调用 SkillExecutor。
+
+    参数命名与 RoutingResponse.SkillCall 保持 camelCase 一致，
+    减少 Agent Tool → SkillExecutor 之间的映射转换。
+    """
     skill_calls: list[dict] = []
 
     # 1. 效果筛选
-    effects = params.get("effects") or []
+    effects = params.get("effectNames") or []
     if effects:
         skill_calls.append(
             {
                 "skill_name": "search_by_effect",
                 "params": {
                     "effects": effects,
-                    "effectsOp": params.get("effects_op", "and"),
-                    "source": params.get("effect_source", "both"),
-                    "targetType": params.get("effect_target_type"),
-                    "minValue": params.get("effect_min_value"),
-                    "maxValue": params.get("effect_max_value"),
+                    "effectsOp": params.get("effectsOp", "and"),
+                    "source": params.get("effectSource", "both"),
+                    "targetType": params.get("targetType"),
+                    "minValue": params.get("minValue"),
                 },
             }
         )
 
     # 2. 职阶筛选
-    class_name = params.get("class_name")
+    class_name = params.get("className")
     if class_name:
         skill_calls.append(
             {
@@ -68,13 +71,13 @@ def handle_search_servants(params: dict) -> dict:
                 "skill_name": "search_by_rarity",
                 "params": {
                     "value": rarity,
-                    "op": params.get("rarity_op", "eq"),
+                    "op": params.get("rarityOp", "eq"),
                 },
             }
         )
 
     # 4. NP 充能筛选（统一到 search_by_effect + gainNp）
-    np_charge = params.get("np_charge_value")
+    np_charge = params.get("npChargeValue")
     if np_charge is not None:
         skill_calls.append(
             {
@@ -88,8 +91,8 @@ def handle_search_servants(params: dict) -> dict:
         )
 
     # 5. 宝具卡色 / 宝具目标筛选（合并为一个 SkillCall）
-    np_card = params.get("np_card")
-    np_target = params.get("np_target")
+    np_card = params.get("npCard")
+    np_target = params.get("npTarget")
     if np_card or np_target:
         cards_params: dict[str, Any] = {}
         if np_card:
@@ -104,8 +107,8 @@ def handle_search_servants(params: dict) -> dict:
         )
 
     # 6. 特性筛选（中文特性名，由 search_by_traits Skill 内部做名称→ID 转换）
-    trait_names = params.get("trait_names")
-    trait_ascension = params.get("trait_ascension")
+    trait_names = params.get("traitNames")
+    trait_ascension = params.get("traitAscension")
     if trait_names:
         trait_params: dict[str, Any] = {"traitNames": trait_names}
         if trait_ascension is not None:
@@ -218,11 +221,12 @@ def handle_compare_servants(params: dict) -> dict:
 
 
 def handle_list_effects(_params: dict) -> dict:
-    """列出所有可用效果名及中文别名。"""
+    """列出所有可用效果名及中文别名，分层返回标准效果和虚拟复合效果。"""
     schema = load_effect_schema()
     effects = schema.get("effects", [])
 
-    result = []
+    standard_effects = []
+    composite_effects = []
     for eff in effects:
         entry: dict[str, Any] = {
             "name": eff["name"],
@@ -231,9 +235,15 @@ def handle_list_effects(_params: dict) -> dict:
         if eff.get("composite"):
             entry["composite"] = True
             entry["includes"] = eff.get("includes", [])
-        result.append(entry)
+            composite_effects.append(entry)
+        else:
+            standard_effects.append(entry)
 
-    return {"total": len(result), "effects": result}
+    return {
+        "total": len(standard_effects) + len(composite_effects),
+        "standard_effects": standard_effects,
+        "composite_effects": composite_effects,
+    }
 
 
 def handle_list_traits(_params: dict) -> dict:

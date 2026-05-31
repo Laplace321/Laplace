@@ -67,7 +67,7 @@ def _tool_search_servants() -> dict:
         "parameters": {
             "type": "object",
             "properties": {
-                "effects": {
+                "effectNames": {
                     "type": "array",
                     "items": {"type": "string"},
                     "description": (
@@ -75,12 +75,12 @@ def _tool_search_servants() -> dict:
                         "支持虚拟复合效果：damageBoost（泛用增伤）、damageShield（挡伤害）"
                     ),
                 },
-                "effects_op": {
+                "effectsOp": {
                     "type": "string",
                     "enum": ["and", "or"],
                     "description": "多效果组合方式：and（全部满足）或 or（任一满足）。默认 and",
                 },
-                "effect_source": {
+                "effectSource": {
                     "type": "string",
                     "enum": ["skill", "np", "both"],
                     "description": (
@@ -88,16 +88,16 @@ def _tool_search_servants() -> dict:
                         "用户说了'技能'则用 skill，说了'宝具'则用 np，否则用 both"
                     ),
                 },
-                "effect_target_type": {
+                "targetType": {
                     "type": "string",
                     "enum": ["self", "party", "ptOne", "enemy"],
                     "description": "效果目标：self（自身）、party（队友，含全队+单体队友）、ptOne（仅单体队友）、enemy（敌方）",
                 },
-                "effect_min_value": {
+                "minValue": {
                     "type": "integer",
                     "description": "效果最小数值（百分比）。如用户说'超过50%'则传 50",
                 },
-                "class_name": {
+                "className": {
                     "type": "string",
                     "description": (
                         "职阶英文名。可选值：Saber, Archer, Lancer, Rider, Caster, "
@@ -109,36 +109,36 @@ def _tool_search_servants() -> dict:
                     "type": "integer",
                     "description": "稀有度（0-5星）",
                 },
-                "rarity_op": {
+                "rarityOp": {
                     "type": "string",
                     "enum": ["eq", "gte", "lte", "gt", "lt"],
                     "description": "稀有度比较方式：eq（等于）、gte（大于等于）等。默认 eq",
                 },
-                "np_charge_value": {
+                "npChargeValue": {
                     "type": "integer",
                     "description": "NP 充能量（百分比）。如'30充以上'传 30",
                 },
-                "np_charge_op": {
+                "npChargeOp": {
                     "type": "string",
                     "enum": ["eq", "gte", "lte", "gt", "lt"],
                     "description": "NP 充能比较方式。默认 gte（大于等于）",
                 },
-                "np_card": {
+                "npCard": {
                     "type": "string",
                     "enum": ["arts", "buster", "quick"],
                     "description": "宝具卡色",
                 },
-                "np_target": {
+                "npTarget": {
                     "type": "string",
                     "enum": ["all", "one", "support"],
                     "description": "宝具目标：all（全体/光炮/AOE）、one（单体）、support（辅助）",
                 },
-                "trait_names": {
+                "traitNames": {
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "特性名列表（中文）。如 ['龙','王']。系统会自动将中文特性名转换为 ID 进行筛选",
                 },
-                "trait_ascension": {
+                "traitAscension": {
                     "type": "integer",
                     "description": "指定灵基阶段(0-4)进行特性筛选。不传则匹配全灵基并集",
                 },
