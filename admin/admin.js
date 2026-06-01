@@ -38,6 +38,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 配置文件
     document.getElementById('config-save-btn').addEventListener('click', saveConfig);
+
+    // 监控仪表盘
+    document.getElementById('monitor-refresh-btn').addEventListener('click', () => {
+        loadMonitor();
+        countdownSeconds = REFRESH_INTERVAL;
+    });
+    document.querySelectorAll('.window-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.window-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            loadMonitor(parseInt(btn.dataset.minutes));
+            countdownSeconds = REFRESH_INTERVAL;
+        });
+    });
 });
 
 // ── 登录/登出 ──
@@ -89,6 +103,14 @@ function showAdminPage() {
 function switchTab(tabName) {
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${tabName}`));
+
+    // 监控 Tab 激活/离开时控制自动刷新
+    if (tabName === 'monitor') {
+        loadMonitor();
+        startAutoRefresh();
+    } else {
+        stopAutoRefresh();
+    }
 }
 
 // ── 环境变量管理 ──
@@ -231,6 +253,147 @@ async function saveConfig() {
     } catch (err) {
         setStatus('config-status', '网络错误', 'error');
     }
+}
+
+// ── 监控仪表盘 ──
+
+let monitorMinutes = 5;
+let monitorTimer = null;
+let countdownTimer = null;
+let countdownSeconds = 30;
+const REFRESH_INTERVAL = 30;
+
+async function loadMonitor(minutes) {
+    if (minutes !== undefined) monitorMinutes = minutes;
+    try {
+        const res = await fetch(`/api/admin/monitor?minutes=${monitorMinutes}`);
+        if (res.status === 401) { handleLogout(); return; }
+        const data = await res.json();
+        renderMonitor(data);
+    } catch (err) {
+        document.getElementById('monitor-content').innerHTML =
+            `<p class="status-msg error">加载失败: ${err.message}</p>`;
+    }
+}
+
+function renderMonitor(data) {
+    const container = document.getElementById('monitor-content');
+    const available = data.model_available || {};
+    const llm = data.llm || {};
+    const totals = data.totals || {};
+    const errorTypes = llm.error_types || {};
+    const models = data.models || {};
+
+    let html = '';
+
+    // ── 模型可用性 ──
+    html += '<h4 class="monitor-section-title">模型可用性</h4>';
+    html += '<div class="model-grid">';
+    for (const [model, isUp] of Object.entries(available)) {
+        const status = isUp ? 'up' : 'down';
+        html += `<div class="model-card ${status}">
+            <span class="status-dot ${status}"></span>
+            <span class="model-name">${escapeHtml(model)}</span>
+        </div>`;
+    }
+    if (Object.keys(available).length === 0) {
+        html += '<p class="monitor-empty">暂无模型数据</p>';
+    }
+    html += '</div>';
+
+    // ── LLM 调用概览 ──
+    html += `<h4 class="monitor-section-title">LLM 调用（${monitorMinutes} 分钟窗口）</h4>`;
+    html += '<div class="metric-grid">';
+    html += metricCard(llm.calls || 0, '总调用', 'info');
+    html += metricCard(llm.successes || 0, '成功', 'success');
+    html += metricCard(llm.errors || 0, '失败', llm.errors > 0 ? 'danger' : 'success');
+    html += metricCard(llm.fallbacks || 0, '降级', llm.fallbacks > 0 ? 'warning' : 'success');
+    html += metricCard((llm.success_rate ?? 100) + '%', '成功率',
+        (llm.success_rate ?? 100) >= 90 ? 'success' : (llm.success_rate ?? 100) >= 50 ? 'warning' : 'danger');
+    html += metricCard((llm.avg_latency_ms || 0) + 'ms', '平均延迟', 'info');
+    html += metricCard((llm.max_latency_ms || 0) + 'ms', '最大延迟', 'info');
+    html += '</div>';
+
+    // ── 模型级别统计 ──
+    if (Object.keys(models).length > 0) {
+        html += '<h4 class="monitor-section-title">模型级别统计</h4>';
+        html += '<div class="metric-grid">';
+        for (const [model, stats] of Object.entries(models)) {
+            const rate = stats.success_rate ?? 100;
+            const rateClass = rate >= 90 ? 'success' : rate >= 50 ? 'warning' : 'danger';
+            html += `<div class="metric-card">
+                <div class="metric-value ${rateClass}" style="font-size:1.1rem">${escapeHtml(model)}</div>
+                <div class="metric-label" style="margin-top:0.5rem">
+                    ${stats.calls || 0} 调用 · ${rate}% 成功 · ${stats.avg_latency_ms || 0}ms
+                </div>
+            </div>`;
+        }
+        html += '</div>';
+    }
+
+    // ── 错误类型分布 ──
+    html += '<h4 class="monitor-section-title">错误类型分布</h4>';
+    if (Object.keys(errorTypes).length > 0) {
+        html += '<ul class="error-list">';
+        for (const [errType, count] of Object.entries(errorTypes)) {
+            html += `<li class="error-tag">
+                <span class="error-count">${count}</span> ${escapeHtml(errType)}
+            </li>`;
+        }
+        html += '</ul>';
+    } else {
+        html += '<p class="monitor-empty">窗口内无错误</p>';
+    }
+
+    // ── 历史累计 ──
+    html += '<h4 class="monitor-section-title">历史累计（自启动）</h4>';
+    html += '<div class="totals-row">';
+    html += `<span class="total-item"><strong>${totals.llm_calls || 0}</strong> LLM 调用</span>`;
+    html += `<span class="total-item"><strong>${totals.llm_successes || 0}</strong> 成功</span>`;
+    html += `<span class="total-item"><strong>${totals.llm_errors || 0}</strong> 失败</span>`;
+    html += `<span class="total-item"><strong>${totals.llm_fallbacks || 0}</strong> 降级</span>`;
+    html += `<span class="total-item"><strong>${totals.http_requests || 0}</strong> HTTP 请求</span>`;
+    html += '</div>';
+
+    container.innerHTML = html;
+}
+
+function metricCard(value, label, colorClass) {
+    return `<div class="metric-card">
+        <div class="metric-value ${colorClass}">${value}</div>
+        <div class="metric-label">${label}</div>
+    </div>`;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
+function startAutoRefresh() {
+    stopAutoRefresh();
+    countdownSeconds = REFRESH_INTERVAL;
+    updateCountdown();
+    countdownTimer = setInterval(() => {
+        countdownSeconds--;
+        updateCountdown();
+        if (countdownSeconds <= 0) {
+            loadMonitor();
+            countdownSeconds = REFRESH_INTERVAL;
+        }
+    }, 1000);
+}
+
+function stopAutoRefresh() {
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+    const el = document.getElementById('refresh-countdown');
+    if (el) el.textContent = '';
+}
+
+function updateCountdown() {
+    const el = document.getElementById('refresh-countdown');
+    if (el) el.textContent = countdownSeconds + 's';
 }
 
 // ── 工具函数 ──

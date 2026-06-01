@@ -295,6 +295,175 @@ header h1 {
 
 .config-editor-header span { font-size: 0.9rem; color: var(--text-secondary); font-weight: 500; }
 
+/* ── 监控仪表盘 ── */
+
+.monitor-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.window-selector {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.window-btn {
+  padding: 0.35rem 0.75rem;
+  border: none;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-body);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.window-btn:last-child { border-right: none; }
+.window-btn:hover { color: var(--text-secondary); background: var(--bg-card-hover); }
+.window-btn.active { background: var(--accent-gold); color: #0a0b1a; font-weight: 500; }
+
+.monitor-section-title {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 1.5rem 0 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.monitor-section-title:first-child { margin-top: 0; }
+
+/* 模型可用性网格 */
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.model-card {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.2s;
+}
+
+.model-card.up { border-color: rgba(52, 211, 153, 0.3); }
+.model-card.down { border-color: rgba(245, 101, 101, 0.3); }
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.up { background: #34d399; box-shadow: 0 0 6px rgba(52, 211, 153, 0.5); }
+.status-dot.down { background: #f56565; box-shadow: 0 0 6px rgba(245, 101, 101, 0.5); }
+
+.model-name {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* 指标卡片网格 */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.metric-card {
+  padding: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.metric-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+  font-family: var(--font-display);
+}
+
+.metric-value.success { color: #34d399; }
+.metric-value.warning { color: #fbbf24; }
+.metric-value.danger { color: #f56565; }
+.metric-value.info { color: var(--accent-blue); }
+
+.metric-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* 错误类型列表 */
+.error-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.error-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  background: rgba(245, 101, 101, 0.1);
+  border: 1px solid rgba(245, 101, 101, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  color: #fca5a5;
+}
+
+.error-tag .error-count {
+  font-weight: 600;
+  color: #f56565;
+}
+
+.monitor-empty {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* 历史累计行 */
+.totals-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding: 0.75rem 0;
+}
+
+.total-item {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.total-item strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+
 /* ── 响应式 ── */
 
 @media (max-width: 768px) {
