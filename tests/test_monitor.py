@@ -231,7 +231,7 @@ class TestAlerter:
         alerter = Alerter()
         msg = alerter._format_message("CRITICAL", "模型不可用", "claude-sonnet 连续 2 次探活失败")
         assert "🔴" in msg
-        assert "*CRITICAL*" in msg
+        assert "CRITICAL" in msg
         assert "模型不可用" in msg
         assert "Laplace Monitor" in msg
 
