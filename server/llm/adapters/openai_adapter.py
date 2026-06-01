@@ -16,6 +16,7 @@ from server.llm.base import (
     RETRY_BACKOFF,
     BaseLLMAdapter,
     StreamMetadata,
+    is_server_unavailable,
 )
 
 
@@ -36,7 +37,8 @@ class OpenAIAdapter(BaseLLMAdapter):
             self._client = AsyncOpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url,
-                timeout=30.0,
+                timeout=15.0,
+                max_retries=0,
             )
         return self._client
 
@@ -99,6 +101,9 @@ class OpenAIAdapter(BaseLLMAdapter):
                     }
                 return {"text": resp.output_text or "", "_model": model, "_usage": usage}
             except Exception as e:
+                if is_server_unavailable(e):
+                    print(f"  ✗ [{self.name}] 模型 {model} 服务端不可用，跳过重试: {e}")
+                    raise
                 last_error = e
                 if attempt < MAX_RETRIES - 1:
                     wait = RETRY_BACKOFF[attempt]
@@ -166,6 +171,9 @@ class OpenAIAdapter(BaseLLMAdapter):
                     response_format_label = "text_fallback"
                     text_format = None
                     continue
+                if is_server_unavailable(e):
+                    print(f"  ✗ [{self.name}] 模型 {model} 服务端不可用，跳过重试: {e}")
+                    raise
                 last_error = e
                 if attempt < MAX_RETRIES - 1:
                     wait = RETRY_BACKOFF[attempt]
@@ -222,6 +230,9 @@ class OpenAIAdapter(BaseLLMAdapter):
                     "usage": resp.usage.model_dump() if resp.usage else {},
                 }
             except Exception as e:
+                if is_server_unavailable(e):
+                    print(f"  ✗ [agent] [{self.name}] 模型 {model} 服务端不可用，跳过重试: {e}")
+                    raise
                 last_error = e
                 if attempt < MAX_RETRIES - 1:
                     wait = RETRY_BACKOFF[attempt]

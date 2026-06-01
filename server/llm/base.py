@@ -161,6 +161,21 @@ class BaseLLMAdapter(ABC):
         raise last_error  # type: ignore[misc]
 
 
+def is_server_unavailable(exc: Exception) -> bool:
+    """判断是否为服务端不可用错误（502/503 等网关故障）。
+
+    这类错误重试无意义（网关级故障短时间内不会恢复），
+    应跳过 adapter 层剩余重试，直接抛出让 provider 层降级到下一个模型。
+    """
+    try:
+        from openai import APIStatusError
+    except ImportError:
+        return False
+    if isinstance(exc, APIStatusError) and exc.status_code in (502, 503):
+        return True
+    return False
+
+
 def extract_json_object(content: str) -> str:
     """Extract the first complete JSON object from model text."""
     text = content.strip()

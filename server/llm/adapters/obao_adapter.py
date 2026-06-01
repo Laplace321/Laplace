@@ -12,7 +12,7 @@ from typing import Any
 from openai import AsyncOpenAI
 
 from server.llm.adapters.openai_adapter import OpenAIAdapter
-from server.llm.base import MAX_RETRIES, RETRY_BACKOFF, StreamMetadata
+from server.llm.base import MAX_RETRIES, RETRY_BACKOFF, StreamMetadata, is_server_unavailable
 
 
 class ObaoAdapter(OpenAIAdapter):
@@ -81,6 +81,9 @@ class ObaoAdapter(OpenAIAdapter):
                 usage = resp.usage.model_dump() if resp.usage else {}
                 return {"text": choice.message.content or "", "_model": model, "_usage": usage}
             except Exception as e:
+                if is_server_unavailable(e):
+                    print(f"  ✗ [{self.name}] 模型 {model} 服务端不可用，跳过重试: {e}")
+                    raise
                 last_error = e
                 if attempt < MAX_RETRIES - 1:
                     wait = RETRY_BACKOFF[attempt]
@@ -167,6 +170,9 @@ class ObaoAdapter(OpenAIAdapter):
                     response_format_label = "text_fallback"
                     print(f"  ↻ [{self.name}] json_object 不支持，降级 text_fallback")
                     continue
+                if is_server_unavailable(e):
+                    print(f"  ✗ [{self.name}] 模型 {model} 服务端不可用，跳过重试: {e}")
+                    raise
                 last_error = e
                 if attempt < MAX_RETRIES - 1:
                     wait = RETRY_BACKOFF[attempt]
@@ -230,6 +236,9 @@ class ObaoAdapter(OpenAIAdapter):
                     "usage": resp.usage.model_dump() if resp.usage else {},
                 }
             except Exception as e:
+                if is_server_unavailable(e):
+                    print(f"  ✗ [agent] [{self.name}] 模型 {model} 服务端不可用，跳过重试: {e}")
+                    raise
                 last_error = e
                 if attempt < MAX_RETRIES - 1:
                     wait = RETRY_BACKOFF[attempt]
@@ -273,6 +282,9 @@ class ObaoAdapter(OpenAIAdapter):
                 stream_options={"include_usage": True},
             )
         except Exception as stream_opt_err:
+            if is_server_unavailable(stream_opt_err):
+                print(f"  ✗ [{self.name}] 模型 {model} stream 服务端不可用，跳过: {stream_opt_err}")
+                raise
             print(f"  ↻ [{self.name}] stream_options 不支持，回退: {stream_opt_err}")
             stream = await client.chat.completions.create(
                 model=model,
