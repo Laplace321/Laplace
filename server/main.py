@@ -292,10 +292,15 @@ def _validate_skill_registry():
 
 @app.on_event("startup")
 async def startup():
-    """启动时预加载数据库并校验配置一致性。"""
+    """启动时预加载数据库、校验配置一致性、启动监控探活。"""
     load_database()
     _validate_translations()
     _validate_skill_registry()
+
+    # 启动后台模型探活任务
+    from server.monitor.health_checker import start_probe_loop
+
+    start_probe_loop()
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -449,8 +454,35 @@ async def chat_stream(
 
 @app.get("/api/health")
 async def health():
-    """健康检查。"""
-    return {"status": "ok", "service": "laplace"}
+    """健康检查（含模型可用性状态）。"""
+    from server.monitor.metrics import get_collector
+
+    model_status = get_collector().get_model_status()
+    all_ok = all(model_status.values()) if model_status else True
+    return {
+        "status": "ok" if all_ok else "degraded",
+        "service": "laplace",
+        "models": model_status,
+    }
+
+
+@app.get("/metrics")
+async def prometheus_metrics():
+    """Prometheus text exposition format 端点。"""
+    from fastapi.responses import Response
+
+    from server.monitor.metrics import get_collector
+
+    body = get_collector().to_prometheus_text()
+    return Response(content=body, media_type="text/plain; charset=utf-8")
+
+
+@app.get("/api/admin/monitor")
+async def admin_monitor(minutes: int = 5, _=Depends(require_admin)):
+    """运维监控仪表盘 API — 返回指定时间窗口的汇总指标。"""
+    from server.monitor.metrics import get_collector
+
+    return get_collector().get_summary(minutes=minutes)
 
 
 # 挂载 Admin 后台静态文件（必须在 "/" 之前注册，否则会被 catch-all 拦截）

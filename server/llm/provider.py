@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time as _time
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 
@@ -304,7 +305,10 @@ async def chat_completion(
     if json_mode and (response_schema is None or response_validator is None):
         raise ValueError("json_mode=True requires both response_schema and response_validator")
 
+    from server.monitor.metrics import get_collector
+
     attempts_log: list[dict] = []
+    collector = get_collector()
 
     for provider in PROVIDERS:
         if provider.adapter is None:
@@ -314,6 +318,7 @@ async def chat_completion(
         for m in models_to_try:
             if skip_provider:
                 break
+            t0 = _time.monotonic()
             try:
                 result = await provider.adapter.chat_completion(
                     model=m,
@@ -325,11 +330,17 @@ async def chat_completion(
                     response_schema=response_schema,
                     response_validator=response_validator,
                 )
+                latency_ms = (_time.monotonic() - t0) * 1000
+                collector.record_llm_call(provider.name, m, latency_ms, success=True)
                 result["_provider"] = provider.name
                 result["_attempts"] = attempts_log
                 return result
             except Exception as e:
+                latency_ms = (_time.monotonic() - t0) * 1000
                 error_type = _classify_llm_error(e)
+                collector.record_llm_call(
+                    provider.name, m, latency_ms, success=False, is_fallback=True, error_type=error_type
+                )
                 attempts_log.append({"provider": provider.name, "model": m, "error": str(e), "error_type": error_type})
                 print(f"⚠️  [{provider.name}] 模型 {m} 调用失败 ({error_type}): {e}")
 
@@ -339,6 +350,7 @@ async def chat_completion(
                 elif error_type == ERROR_RATE_LIMIT:
                     # 限流：指数退避后重试同一模型（仅 1 次）
                     await asyncio.sleep(_RATE_LIMIT_BACKOFF_BASE)
+                    t0 = _time.monotonic()
                     try:
                         result = await provider.adapter.chat_completion(
                             model=m,
@@ -350,11 +362,17 @@ async def chat_completion(
                             response_schema=response_schema,
                             response_validator=response_validator,
                         )
+                        latency_ms = (_time.monotonic() - t0) * 1000
+                        collector.record_llm_call(provider.name, m, latency_ms, success=True)
                         result["_provider"] = provider.name
                         result["_attempts"] = attempts_log
                         return result
                     except Exception as retry_err:
+                        latency_ms = (_time.monotonic() - t0) * 1000
                         retry_type = _classify_llm_error(retry_err)
+                        collector.record_llm_call(
+                            provider.name, m, latency_ms, success=False, is_fallback=True, error_type=retry_type
+                        )
                         attempts_log.append(
                             {
                                 "provider": provider.name,
@@ -398,7 +416,10 @@ async def agent_completion(
             "_provider": str,
         }
     """
+    from server.monitor.metrics import get_collector
+
     attempts_log: list[dict] = []
+    collector = get_collector()
 
     # 预清洗 messages，确保跨 provider fallback 时格式兼容
     sanitized_messages = _sanitize_tool_messages(messages)
@@ -411,6 +432,7 @@ async def agent_completion(
         for m in models_to_try:
             if skip_provider:
                 break
+            t0 = _time.monotonic()
             try:
                 result = await provider.adapter.agent_completion(
                     model=m,
@@ -419,12 +441,18 @@ async def agent_completion(
                     max_tokens=max_tokens,
                     temperature=temperature,
                 )
+                latency_ms = (_time.monotonic() - t0) * 1000
+                collector.record_llm_call(provider.name, m, latency_ms, success=True)
                 result["_model"] = m
                 result["_provider"] = provider.name
                 result["_attempts"] = attempts_log
                 return result
             except Exception as e:
+                latency_ms = (_time.monotonic() - t0) * 1000
                 error_type = _classify_llm_error(e)
+                collector.record_llm_call(
+                    provider.name, m, latency_ms, success=False, is_fallback=True, error_type=error_type
+                )
                 attempts_log.append({"provider": provider.name, "model": m, "error": str(e), "error_type": error_type})
                 print(f"⚠️  [agent] [{provider.name}] 模型 {m} 调用失败 ({error_type}): {e}")
 
@@ -432,6 +460,7 @@ async def agent_completion(
                     skip_provider = True
                 elif error_type == ERROR_RATE_LIMIT:
                     await asyncio.sleep(_RATE_LIMIT_BACKOFF_BASE)
+                    t0 = _time.monotonic()
                     try:
                         result = await provider.adapter.agent_completion(
                             model=m,
@@ -440,12 +469,18 @@ async def agent_completion(
                             max_tokens=max_tokens,
                             temperature=temperature,
                         )
+                        latency_ms = (_time.monotonic() - t0) * 1000
+                        collector.record_llm_call(provider.name, m, latency_ms, success=True)
                         result["_model"] = m
                         result["_provider"] = provider.name
                         result["_attempts"] = attempts_log
                         return result
                     except Exception as retry_err:
+                        latency_ms = (_time.monotonic() - t0) * 1000
                         retry_type = _classify_llm_error(retry_err)
+                        collector.record_llm_call(
+                            provider.name, m, latency_ms, success=False, is_fallback=True, error_type=retry_type
+                        )
                         attempts_log.append(
                             {
                                 "provider": provider.name,
@@ -484,6 +519,10 @@ async def chat_completion_stream(
     Yields:
         文本片段（str）
     """
+    from server.monitor.metrics import get_collector
+
+    collector = get_collector()
+
     for provider in PROVIDERS:
         if provider.adapter is None:
             continue
@@ -492,6 +531,7 @@ async def chat_completion_stream(
         for m in models_to_try:
             if skip_provider:
                 break
+            t0 = _time.monotonic()
             try:
                 async for chunk in provider.adapter.chat_completion_stream(
                     model=m,
@@ -502,9 +542,15 @@ async def chat_completion_stream(
                     metadata=metadata,
                 ):
                     yield chunk
+                latency_ms = (_time.monotonic() - t0) * 1000
+                collector.record_llm_call(provider.name, m, latency_ms, success=True)
                 return  # 成功完成，退出
             except Exception as e:
+                latency_ms = (_time.monotonic() - t0) * 1000
                 error_type = _classify_llm_error(e)
+                collector.record_llm_call(
+                    provider.name, m, latency_ms, success=False, is_fallback=True, error_type=error_type
+                )
                 print(f"⚠️  [{provider.name}] 模型 {m} stream 失败 ({error_type}): {e}")
                 if error_type in _SKIP_PROVIDER_ERRORS:
                     skip_provider = True
