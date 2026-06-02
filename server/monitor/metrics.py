@@ -2,11 +2,14 @@
 Laplace — 指标采集器
 
 内存环形缓冲，按分钟聚合 LLM 调用和 HTTP 请求指标。
+集成被动告警：按 provider 记录连续失败计数，达到阈值触发 Warning 告警。
 无外部依赖，线程安全。
 """
 
 from __future__ import annotations
 
+import asyncio
+import os
 import threading
 import time
 from collections import defaultdict
@@ -56,6 +59,11 @@ class MetricsCollector:
         self._total_llm_fallbacks = 0
         self._total_llm_errors = 0
         self._total_http_requests = 0
+        # ── 被动告警：按 provider 连续失败计数 ──
+        self._consecutive_failures: dict[str, int] = {}
+        self._alert_threshold = int(os.getenv("ALERT_CONSECUTIVE_THRESHOLD", "5"))
+        # 已经触发过 Warning 的 provider（成功后重置）
+        self._warned_providers: set[str] = set()
 
     def _current_minute(self) -> int:
         return int(time.time()) // 60
@@ -73,6 +81,16 @@ class MetricsCollector:
         for key in stale_keys:
             del self._buckets[key]
 
+    @staticmethod
+    def _fire_and_forget(coro) -> None:
+        """安全地调度异步协程，无 event loop 时静默跳过（兼容同步测试环境）。"""
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(coro)
+        except RuntimeError:
+            # 没有运行中的 event loop（同步测试环境），关闭协程避免 warning
+            coro.close()
+
     # ── 记录 LLM 调用 ──
 
     def record_llm_call(
@@ -85,7 +103,15 @@ class MetricsCollector:
         is_fallback: bool = False,
         error_type: str = "",
     ) -> None:
-        """记录一次 LLM 调用。"""
+        """记录一次 LLM 调用。
+
+        成功时重置该 provider 连续失败计数；若之前处于告警状态，发送恢复通知。
+        失败时递增连续失败计数；达到阈值触发 Warning 告警（30 分钟内去重）。
+        """
+        should_send_recovery = False
+        should_send_warning = False
+        fail_count = 0
+
         with self._lock:
             bucket = self._get_bucket(self._current_minute())
             bucket.llm_calls += 1
@@ -100,16 +126,36 @@ class MetricsCollector:
                 bucket.llm_successes += 1
                 self._total_llm_successes += 1
                 bucket.model_successes[model] += 1
+                # 重置连续失败计数
+                if self._consecutive_failures.get(provider, 0) > 0:
+                    self._consecutive_failures[provider] = 0
+                # 如果之前触发过 Warning，发恢复通知
+                if provider in self._warned_providers:
+                    self._warned_providers.discard(provider)
+                    should_send_recovery = True
             else:
                 bucket.llm_errors += 1
                 self._total_llm_errors += 1
                 bucket.model_errors[model] += 1
                 if error_type:
                     bucket.error_types[error_type] += 1
+                # 递增连续失败计数
+                self._consecutive_failures[provider] = self._consecutive_failures.get(provider, 0) + 1
+                fail_count = self._consecutive_failures[provider]
+                # 达到阈值触发 Warning
+                if fail_count >= self._alert_threshold and provider not in self._warned_providers:
+                    self._warned_providers.add(provider)
+                    should_send_warning = True
 
             if is_fallback:
                 bucket.llm_fallbacks += 1
                 self._total_llm_fallbacks += 1
+
+        # 告警发送放在锁外，避免阻塞
+        if should_send_recovery:
+            self._fire_and_forget(self._send_recovery_alert(provider))
+        if should_send_warning:
+            self._fire_and_forget(self._send_warning_alert(provider, fail_count))
 
     # ── 记录 HTTP 请求 ──
 
@@ -280,6 +326,60 @@ class MetricsCollector:
 
         lines.append("")  # trailing newline
         return "\n".join(lines)
+
+    # ── 被动告警方法 ──
+
+    async def _send_warning_alert(self, provider: str, fail_count: int) -> None:
+        """发送 Warning 告警：前置 provider 连续失败达到阈值。"""
+        from server.monitor.alerter import AlertLevel, get_alerter
+
+        alerter = get_alerter()
+        await alerter.send_alert(
+            level=AlertLevel.WARNING,
+            title=f"Provider {provider} 连续失败",
+            message=f"提供商 `{provider}` 已连续 {fail_count} 次业务调用失败，请关注",
+            alert_key=f"warning:{provider}",
+        )
+
+    async def _send_recovery_alert(self, provider: str) -> None:
+        """发送恢复通知：provider 从告警状态恢复。"""
+        from server.monitor.alerter import AlertLevel, get_alerter
+
+        alerter = get_alerter()
+        await alerter.send_alert(
+            level=AlertLevel.RECOVERY,
+            title=f"Provider {provider} 已恢复",
+            message=f"提供商 `{provider}` 已恢复正常",
+        )
+
+    async def record_all_providers_failed(self, attempts_log: list[dict]) -> None:
+        """全链路失败告警：所有 provider 所有 model 都失败。
+
+        Critical 级别，每次都推送（无去重）。
+        """
+        from server.monitor.alerter import AlertLevel, get_alerter
+
+        alerter = get_alerter()
+        # 构建简要的失败摘要
+        summary_lines = []
+        for attempt in attempts_log[-5:]:  # 最多展示最近 5 条
+            summary_lines.append(
+                f"  · {attempt.get('provider', '?')}/{attempt.get('model', '?')}: "
+                f"{attempt.get('error_type', 'unknown')}"
+            )
+        summary = "\n".join(summary_lines) if summary_lines else "无详细记录"
+        await alerter.send_alert(
+            level=AlertLevel.CRITICAL,
+            title="全链路失败",
+            message=f"所有提供商全部失败，影响线上查询！\n\n最近尝试:\n{summary}",
+            # 不传 alert_key → 不去重，每次都推送
+        )
+
+    def get_alert_history(self) -> list[dict]:
+        """返回告警历史列表（委托给 Alerter）。"""
+        from server.monitor.alerter import get_alerter
+
+        return get_alerter().get_alert_history()
 
 
 # ── 单例 ──

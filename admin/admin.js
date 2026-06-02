@@ -355,6 +355,28 @@ function renderMonitor(data) {
     html += `<span class="total-item"><strong>${totals.http_requests || 0}</strong> HTTP 请求</span>`;
     html += '</div>';
 
+    // ── 告警历史 ──
+    const alertHistory = data.alert_history || [];
+    html += '<h4 class="monitor-section-title">告警历史</h4>';
+    if (alertHistory.length > 0) {
+        html += '<div class="alert-history-list">';
+        for (const entry of alertHistory) {
+            const levelClass = (entry.level || '').toLowerCase();
+            const statusIcon = entry.success ? '✓' : '✗';
+            const statusClass = entry.success ? 'sent-ok' : 'sent-fail';
+            html += `<div class="alert-history-item">
+                <span class="alert-level-tag ${levelClass}">${escapeHtml(entry.level || '?')}</span>
+                <span class="alert-time">${escapeHtml(entry.time || '')}</span>
+                <span class="alert-title">${escapeHtml(entry.title || '')}</span>
+                <span class="alert-channel">${escapeHtml(entry.channel || '')}</span>
+                <span class="alert-status ${statusClass}">${statusIcon}</span>
+            </div>`;
+        }
+        html += '</div>';
+    } else {
+        html += '<p class="monitor-empty">暂无告警记录</p>';
+    }
+
     container.innerHTML = html;
 }
 

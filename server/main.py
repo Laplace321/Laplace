@@ -479,10 +479,13 @@ async def prometheus_metrics():
 
 @app.get("/api/admin/monitor")
 async def admin_monitor(minutes: int = 5, _=Depends(require_admin)):
-    """运维监控仪表盘 API — 返回指定时间窗口的汇总指标。"""
+    """运维监控仪表盘 API — 返回指定时间窗口的汇总指标 + 告警历史。"""
     from server.monitor.metrics import get_collector
 
-    return get_collector().get_summary(minutes=minutes)
+    collector = get_collector()
+    summary = collector.get_summary(minutes=minutes)
+    summary["alert_history"] = collector.get_alert_history()
+    return summary
 
 
 # 挂载 Admin 后台静态文件（必须在 "/" 之前注册，否则会被 catch-all 拦截）

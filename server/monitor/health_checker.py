@@ -12,8 +12,8 @@ import asyncio
 import os
 import time
 
-# 探活默认间隔（秒）
-_DEFAULT_PROBE_INTERVAL = 120
+# 探活默认间隔（秒），0 = 禁用（改用被动业务感知告警）
+_DEFAULT_PROBE_INTERVAL = 0
 
 # 连续失败多少次才告警
 _FAIL_THRESHOLD = 2
