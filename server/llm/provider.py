@@ -386,6 +386,8 @@ async def chat_completion(
                 # timeout / server_error / unknown → 立即尝试下一个模型/provider
                 continue
 
+    # 全链路失败 → Critical 告警
+    await collector.record_all_providers_failed(attempts_log)
     raise Exception(f"所有模型都调用失败。尝试记录: {attempts_log}")
 
 
@@ -493,6 +495,8 @@ async def agent_completion(
                         print(f"⚠️  [agent] [{provider.name}] 模型 {m} 限流重试仍失败 ({retry_type}): {retry_err}")
                 continue
 
+    # 全链路失败 → Critical 告警
+    await collector.record_all_providers_failed(attempts_log)
     raise Exception(f"[agent] 所有模型都调用失败。尝试记录: {attempts_log}")
 
 
@@ -522,6 +526,7 @@ async def chat_completion_stream(
     from server.monitor.metrics import get_collector
 
     collector = get_collector()
+    attempts_log: list[dict] = []
 
     for provider in PROVIDERS:
         if provider.adapter is None:
@@ -551,10 +556,13 @@ async def chat_completion_stream(
                 collector.record_llm_call(
                     provider.name, m, latency_ms, success=False, is_fallback=True, error_type=error_type
                 )
+                attempts_log.append({"provider": provider.name, "model": m, "error": str(e), "error_type": error_type})
                 print(f"⚠️  [{provider.name}] 模型 {m} stream 失败 ({error_type}): {e}")
                 if error_type in _SKIP_PROVIDER_ERRORS:
                     skip_provider = True
                 # 流式场景不做 rate_limit 退避重试（避免阻塞 generator）
                 continue
 
+    # 全链路失败 → Critical 告警
+    await collector.record_all_providers_failed(attempts_log)
     yield "抱歉，生成服务暂时不可用。"

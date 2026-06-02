@@ -218,18 +218,16 @@ class TestAlerter:
         """去重窗口内 send_alert 返回 False。"""
         with patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "fake", "TELEGRAM_CHAT_ID": "123"}):
             alerter = Alerter()
-            # 第一次应尝试发送（会因为假 token 失败，但逻辑上通过了去重检查）
-            # mock _send_sync 避免真实网络调用
-            with patch.object(alerter, "_send_sync", return_value=True):
+            with patch.object(alerter, "_send_telegram_sync", return_value=True):
                 result1 = await alerter.send_alert("CRITICAL", "Test", "msg", alert_key="test_key")
                 assert result1 is True
                 result2 = await alerter.send_alert("CRITICAL", "Test", "msg", alert_key="test_key")
                 assert result2 is False
 
-    def test_format_message(self):
-        """消息格式包含级别标记、标题和时间戳。"""
+    def test_format_telegram_message(self):
+        """Telegram 消息格式包含级别标记、标题和时间戳。"""
         alerter = Alerter()
-        msg = alerter._format_message("CRITICAL", "模型不可用", "claude-sonnet 连续 2 次探活失败")
+        msg = alerter._format_telegram_message("CRITICAL", "模型不可用", "claude-sonnet 连续 2 次探活失败")
         assert "🔴" in msg
         assert "CRITICAL" in msg
         assert "模型不可用" in msg
@@ -306,3 +304,207 @@ class TestMonitorEndpoints:
         assert "laplace_llm_requests_total" in body
         assert "# HELP" in body
         assert "# TYPE" in body
+
+
+# ══════════════════════════════════════════
+#  Bark 推送 + 分层告警 单元测试
+# ══════════════════════════════════════════
+
+
+class TestBarkAlert:
+    """Bark 推送通道和多通道优先级测试。"""
+
+    def test_bark_configured(self):
+        """配置 BARK_URL 时 bark_configured 为 True。"""
+        with patch.dict("os.environ", {"BARK_URL": "https://api.day.app/test-key"}, clear=False):
+            import os
+
+            os.environ.pop("TELEGRAM_BOT_TOKEN", None)
+            os.environ.pop("TELEGRAM_CHAT_ID", None)
+            alerter = Alerter()
+            assert alerter.bark_configured is True
+            assert alerter.telegram_configured is False
+            assert alerter.is_configured is True
+
+    def test_bark_not_configured_empty(self):
+        """BARK_URL 为空时 bark_configured 为 False。"""
+        with patch.dict("os.environ", {"BARK_URL": ""}, clear=False):
+            import os
+
+            os.environ.pop("TELEGRAM_BOT_TOKEN", None)
+            os.environ.pop("TELEGRAM_CHAT_ID", None)
+            alerter = Alerter()
+            assert alerter.bark_configured is False
+            assert alerter.is_configured is False
+
+    @pytest.mark.asyncio
+    async def test_bark_priority_over_telegram(self):
+        """Bark 配置时优先使用 Bark，不调用 Telegram。"""
+        with patch.dict(
+            "os.environ",
+            {
+                "BARK_URL": "https://api.day.app/test",
+                "TELEGRAM_BOT_TOKEN": "fake",
+                "TELEGRAM_CHAT_ID": "123",
+            },
+        ):
+            alerter = Alerter()
+            with (
+                patch.object(alerter, "_send_bark_sync", return_value=True) as bark_mock,
+                patch.object(alerter, "_send_telegram_sync", return_value=True) as tg_mock,
+            ):
+                result = await alerter.send_alert("WARNING", "Test", "msg")
+                assert result is True
+                bark_mock.assert_called_once()
+                tg_mock.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_fallback_to_telegram_on_bark_failure(self):
+        """Bark 发送失败时 fallback 到 Telegram。"""
+        with patch.dict(
+            "os.environ",
+            {
+                "BARK_URL": "https://api.day.app/test",
+                "TELEGRAM_BOT_TOKEN": "fake",
+                "TELEGRAM_CHAT_ID": "123",
+            },
+        ):
+            alerter = Alerter()
+            with (
+                patch.object(alerter, "_send_bark_sync", return_value=False) as bark_mock,
+                patch.object(alerter, "_send_telegram_sync", return_value=True) as tg_mock,
+            ):
+                result = await alerter.send_alert("CRITICAL", "Test", "msg")
+                assert result is True
+                bark_mock.assert_called_once()
+                tg_mock.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_alert_history_recorded(self):
+        """发送告警后，告警历史记录正确保存。"""
+        with patch.dict("os.environ", {"BARK_URL": "https://api.day.app/test"}):
+            alerter = Alerter()
+            with patch.object(alerter, "_send_bark_sync", return_value=True):
+                await alerter.send_alert("WARNING", "Test Title", "Test Body")
+
+            history = alerter.get_alert_history()
+            assert len(history) == 1
+            assert history[0]["level"] == "WARNING"
+            assert history[0]["title"] == "Test Title"
+            assert history[0]["body"] == "Test Body"
+            assert history[0]["channel"] == "bark"
+            assert history[0]["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_alert_history_max_capacity(self):
+        """告警历史超过 100 条时截断。"""
+        with patch.dict("os.environ", {"BARK_URL": "https://api.day.app/test"}):
+            alerter = Alerter()
+            with patch.object(alerter, "_send_bark_sync", return_value=True):
+                for i in range(110):
+                    await alerter.send_alert("WARNING", f"Alert {i}", "body")
+
+            history = alerter.get_alert_history()
+            assert len(history) == 100
+            # 最新的在前
+            assert history[0]["title"] == "Alert 109"
+
+
+class TestConsecutiveFailureAlert:
+    """连续失败计数 + 分层告警触发测试。"""
+
+    def test_consecutive_failure_count_increments(self):
+        """连续失败时计数器正确递增。"""
+        collector = MetricsCollector()
+        collector._alert_threshold = 10  # 设高阈值避免触发告警
+
+        for i in range(3):
+            collector.record_llm_call("obao", "m", 100.0, success=False, error_type="timeout")
+
+        assert collector._consecutive_failures["obao"] == 3
+
+    def test_consecutive_failure_resets_on_success(self):
+        """成功调用后连续失败计数重置为 0。"""
+        collector = MetricsCollector()
+        collector._alert_threshold = 10
+
+        collector.record_llm_call("obao", "m", 100.0, success=False, error_type="timeout")
+        collector.record_llm_call("obao", "m", 100.0, success=False, error_type="timeout")
+        assert collector._consecutive_failures["obao"] == 2
+
+        collector.record_llm_call("obao", "m", 100.0, success=True)
+        assert collector._consecutive_failures["obao"] == 0
+
+    def test_warning_triggered_at_threshold(self):
+        """连续失败达到阈值时触发 Warning，provider 加入 warned 集合。"""
+        collector = MetricsCollector()
+        collector._alert_threshold = 3
+
+        for i in range(3):
+            collector.record_llm_call("obao", "m", 100.0, success=False, error_type="server_error")
+
+        assert "obao" in collector._warned_providers
+
+    def test_warning_not_repeated_within_threshold(self):
+        """已触发 Warning 后继续失败，不会重复添加到 warned 集合（幂等）。"""
+        collector = MetricsCollector()
+        collector._alert_threshold = 2
+
+        for i in range(5):
+            collector.record_llm_call("obao", "m", 100.0, success=False, error_type="timeout")
+
+        assert "obao" in collector._warned_providers
+        assert collector._consecutive_failures["obao"] == 5
+
+    def test_recovery_clears_warned_state(self):
+        """成功调用后从 warned 集合中移除。"""
+        collector = MetricsCollector()
+        collector._alert_threshold = 2
+
+        collector.record_llm_call("obao", "m", 100.0, success=False, error_type="timeout")
+        collector.record_llm_call("obao", "m", 100.0, success=False, error_type="timeout")
+        assert "obao" in collector._warned_providers
+
+        collector.record_llm_call("obao", "m", 100.0, success=True)
+        assert "obao" not in collector._warned_providers
+        assert collector._consecutive_failures["obao"] == 0
+
+    def test_different_providers_independent(self):
+        """不同 provider 的连续失败计数互不影响。"""
+        collector = MetricsCollector()
+        collector._alert_threshold = 10
+
+        collector.record_llm_call("obao", "m", 100.0, success=False, error_type="timeout")
+        collector.record_llm_call("obao", "m", 100.0, success=False, error_type="timeout")
+        collector.record_llm_call("dashscope", "m", 100.0, success=False, error_type="timeout")
+
+        assert collector._consecutive_failures["obao"] == 2
+        assert collector._consecutive_failures["dashscope"] == 1
+
+    @pytest.mark.asyncio
+    async def test_record_all_providers_failed_sends_critical(self):
+        """全链路失败时发送 Critical 告警。"""
+        collector = MetricsCollector()
+        attempts = [
+            {"provider": "obao", "model": "claude", "error": "timeout", "error_type": "timeout"},
+            {"provider": "dashscope", "model": "qwen", "error": "server error", "error_type": "server_error"},
+        ]
+
+        import server.monitor.alerter as _alerter_mod
+
+        old_alerter = _alerter_mod._alerter
+        try:
+            with patch.dict("os.environ", {"BARK_URL": "https://api.day.app/test"}):
+                _alerter_mod._alerter = None  # 重置单例
+                from server.monitor.alerter import get_alerter
+
+                alerter = get_alerter()
+                with patch.object(alerter, "_send_bark_sync", return_value=True) as bark_mock:
+                    await collector.record_all_providers_failed(attempts)
+                    bark_mock.assert_called_once()
+                    call_args = bark_mock.call_args
+                    # body 参数应包含尝试记录
+                    assert "obao/claude" in call_args[0][1]
+                    assert "dashscope/qwen" in call_args[0][1]
+        finally:
+            _alerter_mod._alerter = old_alerter
