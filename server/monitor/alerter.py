@@ -130,23 +130,22 @@ class Alerter:
     # ── Telegram 推送 ──
 
     def _format_telegram_message(self, level: str, title: str, message: str) -> str:
-        """格式化 Telegram 消息（Markdown）。"""
+        """格式化 Telegram 消息（纯文本，避免特殊字符导致 parse 失败）。"""
         now_str = datetime.now(_BEIJING_TZ).strftime("%Y-%m-%d %H:%M:%S")
         level_emoji = {
             AlertLevel.CRITICAL: "🔴",
             AlertLevel.WARNING: "🟡",
             AlertLevel.RECOVERY: "🟢",
         }.get(level, "⚪")
-        return f"{level_emoji} *{level}* | {title}\n\n{message}\n\n_Laplace Monitor · {now_str}_"
+        return f"{level_emoji} {level} | {title}\n\n{message}\n\n— Laplace Monitor · {now_str}"
 
     def _send_telegram_sync(self, text: str) -> bool:
-        """同步发送 Telegram 消息。"""
+        """同步发送 Telegram 消息（纯文本，不使用 parse_mode 避免格式错误）。"""
         url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
         payload = json.dumps(
             {
                 "chat_id": self._chat_id,
                 "text": text,
-                "parse_mode": "Markdown",
             }
         ).encode("utf-8")
         req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
