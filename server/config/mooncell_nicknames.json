@@ -1098,6 +1098,12 @@
     "_source": "mooncell",
     "_collectionNo": 79
   },
+  "果子龙": {
+    "name": "堤丰·厄斐墨洛斯",
+    "className": "pretender",
+    "_source": "mooncell",
+    "_collectionNo": 441
+  },
   "毛妹": {
     "name": "多布雷尼亚·尼基季奇",
     "className": "rider",
@@ -3011,6 +3017,18 @@
     "className": "saber",
     "_source": "mooncell",
     "_collectionNo": 160
+  },
+  "水伊吹": {
+    "name": "伊吹童子",
+    "className": "berserker",
+    "_source": "mooncell",
+    "_collectionNo": 355
+  },
+  "泳装伊吹": {
+    "name": "伊吹童子",
+    "className": "berserker",
+    "_source": "mooncell",
+    "_collectionNo": 355
   },
   "宅姬": {
     "name": "刑部姬",
