@@ -50,54 +50,6 @@ const STORAGE_KEY = "laplace_chat_history";
 let currentSessionId = Date.now().toString(36);
 let chatHistory = []; // 当前会话的消息数组
 
-// === Preset Definitions (mirror server/skills/presets.py) ===
-const PRESETS = [
-  {
-    name: "cycle_farming",
-    label: "周回筛选",
-    description: "按充能、职阶、稀有度筛选周回从者",
-    defaultMessage: "帮我找适合周回的从者",
-  },
-  {
-    name: "servant_lookup",
-    label: "从者查询",
-    description: "查询单个从者的详细信息",
-    defaultMessage: "查一下梅林的详细信息",
-  },
-  {
-    name: "servant_compare",
-    label: "从者对比",
-    description: "对比多个从者的能力",
-    defaultMessage: "对比村正和武尊",
-  },
-  {
-    name: "support_recommend",
-    label: "辅助推荐",
-    description: "筛选辅助向从者并推荐搭配",
-    defaultMessage: "有充能技能的辅助从者",
-  },
-  {
-    name: "coronation_guide",
-    label: "戴冠战攻略",
-    description: "查询戴冠战机制、星图、礼装等知识",
-    defaultMessage: "戴冠战剑介职阶攻略",
-    sendAsText: true,
-  },
-  {
-    name: "coronation_team",
-    label: "戴冠战配队",
-    description: "查询戴冠战配队推荐",
-    defaultMessage: "剑阶戴冠战配队推荐",
-    sendAsText: true,
-  },
-  {
-    name: "ce_query",
-    label: "礼装查询",
-    description: "按效果、稀有度、类型筛选概念礼装",
-    defaultMessage: "有50%NP的礼装有哪些",
-  },
-];
-
 // === Thinking Step Labels ===
 const THINKING_LABELS = {
   // Skill 路由阶段（新）
@@ -210,180 +162,10 @@ function finalizeStreamingContainer(els) {
   if (skeleton) skeleton.remove();
 }
 
-async function sendPresetQuery(presetName, userText) {
-  if (isProcessing) return;
-
-  isProcessing = true;
-  setSendButtonToStop();
-  chatInput.value = ""; // ensure input is cleared
-
-  const preset = PRESETS.find(p => p.name === presetName);
-  const presetLabel = preset ? preset.label : presetName;
-  // Display message: show preset label + user text
-  const displayMsg = userText ? `[${presetLabel}] ${userText}` : `[${presetLabel}]`;
-  appendMessage("user", displayMsg);
-  chatHistory.push({ role: "user", text: displayMsg });
-  saveSession();
-
-  // Use streaming container (same as manual input) for consistent thinking steps
-  const els = createStreamingContainer();
-
-  currentAbortController = new AbortController();
-  try {
-    const effectiveMessage = userText || (preset ? preset.defaultMessage : "") || "";
-    const url = `${STREAM_API_URL}?message=${encodeURIComponent(effectiveMessage)}&preset_name=${encodeURIComponent(presetName)}`;
-    const resp = await fetch(url, { signal: currentAbortController.signal });
-    if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
-
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await readWithTimeout(reader);
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const events = parseSSE(buffer);
-      buffer = events.remainder;
-
-      for (const ev of events.parsed) {
-        handleStreamEvent(ev.event, ev.data, els);
-      }
-    }
-
-    // Finalize: remove cursor if present
-    const cursor = els.replyBody.querySelector(".stream-cursor");
-    if (cursor) cursor.remove();
-
-  } catch (err) {
-    if (err.name === "AbortError") {
-      finalizeStreamingContainer(els);
-    } else {
-      els.container.remove();
-      showToast(classifyError(err));
-    }
-  } finally {
-    currentAbortController = null;
-    isProcessing = false;
-    setSendButtonToSend();
-    chatInput.focus();
-  }
-}
-
-// === Preset Bar: Render persistent tabs above input ===
-let activePreset = null;
-
-function renderPresetBar() {
-  const bar = document.getElementById("preset-bar");
-  if (!bar) return;
-  bar.innerHTML = PRESETS.map(p =>
-    `<button class="preset-bar-tab" data-preset="${p.name}" title="${escapeHtml(p.description)}">${escapeHtml(p.label)}</button>`
-  ).join("");
-}
-
-// === Tag Pill: Activate/Deactivate Preset ===
-function activatePreset(presetName) {
-  const preset = PRESETS.find(p => p.name === presetName);
-  if (!preset) return;
-
-  activePreset = presetName;
-
-  // Show pill in input wrapper
-  const pill = document.getElementById("preset-pill");
-  if (pill) {
-    pill.innerHTML = `<span class="preset-pill-icon">⧫</span><span class="preset-pill-label">${escapeHtml(preset.label)}</span><button class="preset-pill-close" title="取消">&times;</button>`;
-    pill.classList.remove("hidden");
-  }
-
-  // Highlight active tab
-  document.querySelectorAll(".preset-bar-tab").forEach(tab => {
-    tab.classList.toggle("active", tab.dataset.preset === presetName);
-  });
-
-  // Update placeholder
-  chatInput.placeholder = preset.description + "...";
-  chatInput.focus();
-}
-
-function deactivatePreset() {
-  activePreset = null;
-
-  const pill = document.getElementById("preset-pill");
-  if (pill) {
-    pill.classList.add("hidden");
-    pill.innerHTML = "";
-  }
-
-  // Remove active state from tabs
-  document.querySelectorAll(".preset-bar-tab").forEach(tab => tab.classList.remove("active"));
-
-  // Restore placeholder
-  chatInput.placeholder = "输入你的问题... 例如「30 自充的从者有哪些」";
-}
-
-// === Send Message (SSE Stream or Preset) ===
+// === Send Message (SSE Stream) ===
 async function sendMessage() {
   const text = chatInput.value.trim();
   if (isProcessing) return;
-
-  // If preset is active, route to preset mode
-  if (activePreset) {
-    const presetName = activePreset;
-    const preset = PRESETS.find(p => p.name === presetName);
-    const userText = text; // may be empty — uses preset defaults
-    chatInput.value = "";
-    deactivatePreset();
-
-    // sendAsText presets: concatenate defaultMessage + user input
-    if (preset && preset.sendAsText) {
-      const parts = [preset.defaultMessage, userText].filter(Boolean);
-      const effectiveMessage = parts.join(" ");
-      if (!effectiveMessage) return;
-      isProcessing = true;
-      setSendButtonToStop();
-      appendMessage("user", effectiveMessage);
-      chatHistory.push({ role: "user", text: effectiveMessage });
-      saveSession();
-      const els = createStreamingContainer();
-      currentAbortController = new AbortController();
-      try {
-        const url = `${STREAM_API_URL}?message=${encodeURIComponent(effectiveMessage)}`;
-        const resp = await fetch(url, { signal: currentAbortController.signal });
-        if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        while (true) {
-          const { done, value } = await readWithTimeout(reader);
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const events = parseSSE(buffer);
-          buffer = events.remainder;
-          for (const ev of events.parsed) {
-            handleStreamEvent(ev.event, ev.data, els);
-          }
-        }
-        const cursor = els.replyBody.querySelector(".stream-cursor");
-        if (cursor) cursor.remove();
-      } catch (err) {
-        if (err.name === "AbortError") {
-          finalizeStreamingContainer(els);
-        } else {
-          els.container.remove();
-          showToast(classifyError(err));
-        }
-      } finally {
-        currentAbortController = null;
-        isProcessing = false;
-        setSendButtonToSend();
-      }
-      return;
-    }
-
-    sendPresetQuery(presetName, userText);
-    return;
-  }
 
   if (!text) return;
 
@@ -1155,24 +937,11 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-// Suggestion chips + Preset bar + Pill close (event delegation)
+// Suggestion chips (event delegation)
 document.addEventListener("click", (e) => {
   if (e.target.classList.contains("chip")) {
     chatInput.value = e.target.dataset.query;
     sendMessage();
-  }
-  // Preset bar tab toggle → show/hide tag pill
-  if (e.target.classList.contains("preset-bar-tab")) {
-    const presetName = e.target.dataset.preset;
-    if (activePreset === presetName) {
-      deactivatePreset();
-    } else {
-      activatePreset(presetName);
-    }
-  }
-  // Pill close button
-  if (e.target.classList.contains("preset-pill-close")) {
-    deactivatePreset();
   }
 });
 
@@ -1437,10 +1206,10 @@ function appendWelcomeMessage() {
         <p>你好，Master！我是 <strong>Laplace</strong>，你的 FGO 数据助手。</p>
         <p>你可以用自然语言向我提问，例如：</p>
         <div class="suggestion-chips">
-          <button class="chip" data-query="帮我找一下 30 自充的从者有哪些">30 自充的从者</button>
-          <button class="chip" data-query="大于 50 自充的从者有哪些">50% 以上自充</button>
-          <button class="chip" data-query="五星 Caster 有自充的从者">五星 Caster 自充</button>
-          <button class="chip" data-query="四星以上的 Berserker 有哪些">四星以上狂阶</button>
+          <button class="chip" data-query="五星自充Caster">五星自充 Caster</button>
+          <button class="chip" data-query="50%初始NP的五星礼装">50% 初始 NP 礼装</button>
+          <button class="chip" data-query="秩序女性从者">秩序·女性从者</button>
+          <button class="chip" data-query="剑阶戴冠战攻略">剑阶戴冠战攻略</button>
         </div>
       </div>
     </div>
@@ -1606,7 +1375,6 @@ document.addEventListener("DOMContentLoaded", () => {
   createHistoryPanel();
   createHelpModal();
   initSupportModal();
-  renderPresetBar();
   // Inject welcome message dynamically
   if (chatMessages.querySelectorAll(".message").length === 0) {
     appendWelcomeMessage();
