@@ -282,6 +282,7 @@ def build_routing_prompt(
     - 注意：61 个从者存在灵基间特性差异（如梅露辛灵基 0-2 有圆桌骑士特性，灵基 3-4 没有），指定灵基时可精确筛选
 13. **不可查效果 — 直接 fallback**：以下效果属于被动/活动/礼装效果，**当前不在从者查询能力范围内**，应直接走 fallback 回复用户"此类效果暂不支持查询"：羁绊加成（`servantFriendshipUp`）、QP 加成（`qpUp`）、素材掉落加成（`eventDropUp`）。**禁止**对这些效果调用任何 Skill，否则一定返回 0 条结果
 14. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"、"哪个职阶克制XX"、"什么克制XX"等表达时，**必须**使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"、"月癌"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。**即使用户只问"哪个职阶克制X"这种看似知识性问题，也必须走 `search_by_class_advantage`**，系统会在结果中返回克制关系和对应从者。
+15. **技能冷却时间（CD）筛选**：当用户提到"技能CD"/"冷却时间"/"CD小于X回合"/"短CD技能"时，使用 `search_by_skill_cd`。参数：`op`（lt/lte/eq/gte/gt）、`value`（回合数，如"CD小于5"→ op:"lt",value:5）。可选参数 `effect`（效果名锚点）和 `targetType`（目标类型锚点），用于将 CD 条件限定在拥有此效果的技能上。当用户说"自充技能CD<5"时，**必须**在 search_by_skill_cd 中同时传 effect:"gainNp"+targetType:"self"，保证 CD 和效果关联到同一个技能，而不是拆成两个独立 Skill。"短CD"默认理解为 CD ≤ 5。纯 CD 查询（如"蓝卡宝具且CD<5"）不需要传 effect，直接与其他 Skill AND 组合即可
 16. **疑似从者名称/昵称一律用 lookup_servant（重要）**：当用户的问题中包含你不确定是否为从者名称的词语（如"红A"、"小太阳"、"花之魔术师"、"老虚"、"CBA"、"XJB"、"呆毛"、"2B"等看起来像昵称/外号/缩写/纯字母组合的表达），**必须**使用 `lookup_servant`，将该词语作为 `name` 参数传入。系统后端支持昵称映射和模糊匹配，会自动处理识别。**绝不要**因为你不认识某个名称就返回 `no_match` 或 `out_of_scope`。只要用户的问题看起来是在查询或询问某个特定角色/从者，就选择 `lookup_servant`。**特别注意**：纯英文字母、数字组合、字母+数字混合（如"CBA"、"X4"、"2B"）在 FGO 社区中是常见的从者昵称缩写形式，绝不能因为看起来不像名字就判定为超出范围。如果用户同时问了从者详情（如"XX技能介绍"、"XX宝具是什么"），response_skill 选 `respond_servant_detail`。
 17. **概念礼装查询（重要）**：当用户提到"礼装"/"概念礼装"/"CE"/"带XX效果的礼装"/"推荐礼装"时，必须使用 CE domain 的 Skills，response_skill 选 `respond_ce_list`：
     - **按名称/昵称查找**：`ce_lookup`，参数 `name`（如"万花筒"、"黑杯"、"2030"）
@@ -404,6 +405,21 @@ def build_routing_prompt(
 用户："哪个职阶克制月癌"（纯职阶克制关系问题 → 仍然用 search_by_class_advantage，不要判定为知识性问题）
 ```json
 {{"skill_calls": [{{"skill_name": "search_by_class_advantage", "params": {{"targetClass": "月癌"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："自充技能CD小于5回合的从者"（效果+CD联合 → search_by_skill_cd 带 effect 锚点）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_skill_cd", "params": {{"op": "lt", "value": 5, "effect": "gainNp", "targetType": "self"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："蓝卡宝具且技能CD小于5"（独立条件 AND 组合）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_cards", "params": {{"npCard": "arts"}}}}, {{"skill_name": "search_by_skill_cd", "params": {{"op": "lt", "value": 5}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户："自充50%以上且CD小于5的从者"（CD关联+数值精筛）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_skill_cd", "params": {{"op": "lt", "value": 5, "effect": "gainNp", "targetType": "self"}}}}, {{"skill_name": "search_by_effect", "params": {{"effect": "gainNp", "targetType": "self", "minValue": 50}}}}], "response_skill": "respond_servant_list"}}
 ```
 
 用户："有NP充能效果的五星礼装"（礼装查询 → CE domain Skills + respond_ce_list）

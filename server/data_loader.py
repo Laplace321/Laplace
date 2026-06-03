@@ -932,10 +932,12 @@ def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[
                 )
 
         if skill_effects:
+            cool_down = skill.get("coolDown", [])
             details_by_num[skill_num] = {
                 "skillId": skill.get("id", 0),
                 "skillName": skill.get("name", ""),
                 "skillNum": skill_num,
+                "coolDown": cool_down[-1] if cool_down else 0,
                 "effects": skill_effects,
             }
 

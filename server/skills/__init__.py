@@ -15,6 +15,7 @@ _SKILL_MODULES = [
     "server.skills.query.search_by_class",
     "server.skills.query.search_by_class_advantage",
     "server.skills.query.search_by_effect",
+    "server.skills.query.search_by_skill_cd",
     "server.skills.query.search_by_np_effect",
     "server.skills.query.search_by_rarity",
     "server.skills.query.search_by_skill_effect",

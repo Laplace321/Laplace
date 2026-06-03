@@ -137,6 +137,17 @@ def describe_filters(skill_calls: list[dict]) -> list[str]:
         elif name == "search_by_class_advantage":
             target = params.get("targetClass") or params.get("target_class", "")
             descriptions.append(f"克制「{target}」职阶")
+        elif name == "search_by_skill_cd":
+            op = params.get("op", "lte")
+            val = params.get("value", "")
+            effect_name = params.get("effect")
+            op_map = {"lt": "<", "lte": "≤", "eq": "=", "gte": "≥", "gt": ">"}
+            op_symbol = op_map.get(op, op)
+            if effect_name:
+                effect_cn = get_effect_translation(effect_name) or effect_name
+                descriptions.append(f"{effect_cn}技能CD {op_symbol} {val}回合")
+            else:
+                descriptions.append(f"技能CD {op_symbol} {val}回合")
         elif name == "search_by_traits":
             trait_names = params.get("traitNames") or params.get("trait_names") or []
             ascension = params.get("ascension")
