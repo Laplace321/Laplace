@@ -31,6 +31,7 @@ class Params(BaseModel):
     )
     min_value: int | None = Field(default=None, alias="minValue", description="效果最小数值（百分比，如50表示≥50%）")
     max_value: int | None = Field(default=None, alias="maxValue", description="效果最大数值（百分比）")
+    max_cd: int | None = Field(default=None, alias="maxCd", description="技能CD上限（回合数），同一技能内联合校验")
 
 
 def _convert_value(
@@ -83,6 +84,45 @@ def _check_effect(
     return hit_skill or hit_np
 
 
+def _match_skill_with_cd(
+    servant: dict,
+    effect_name: str | None,
+    target_type: str | None,
+    min_value: int | None,
+    max_value: int | None,
+    max_cd: int,
+) -> bool:
+    """单技能粒度联合匹配：在同一个技能内同时检查效果+数值+CD。
+
+    当 effect_name 为 None 时（纯 CD 查询），只检查技能 CD ≤ max_cd。
+    """
+    for skill in servant.get("skillDetails", []):
+        cool_down = skill.get("coolDown", 0)
+        if cool_down <= 0 or cool_down > max_cd:
+            continue
+
+        # CD 条件满足
+        if effect_name is None:
+            return True
+
+        # 检查同一技能内的效果匹配
+        for eff in skill.get("effects", []):
+            if eff.get("type") != effect_name:
+                continue
+            if target_type and eff.get("targetType") != target_type:
+                continue
+            # 数值校验
+            if min_value is not None or max_value is not None:
+                value_max = eff.get("valueMax", 0)
+                if min_value is not None and value_max < min_value:
+                    continue
+                if max_value is not None and value_max > max_value:
+                    continue
+            return True
+
+    return False
+
+
 @register_skill
 class SearchByEffect(QuerySkill):
     name = "search_by_effect"
@@ -100,6 +140,24 @@ class SearchByEffect(QuerySkill):
         target_type = params.get("target_type")
         raw_min = params.get("min_value")
         raw_max = params.get("max_value")
+        max_cd = params.get("max_cd")
+
+        # ── CD 联合匹配路径（同一技能粒度内） ──
+        # 当 max_cd 有值时，必须在单个技能内同时满足效果+数值+CD
+        # source="np" 时 CD 无意义（宝具没有冷却），退化为普通效果匹配
+        if max_cd is not None and source != "np":
+            if effect is not None:
+                expanded = _expand_effect(effect)
+                # 复合效果展开为 OR：任一子效果+CD 命中即可
+                for sub_eff in expanded:
+                    sub_min, sub_max = _convert_value(sub_eff, raw_min, raw_max)
+                    if _match_skill_with_cd(servant, sub_eff, target_type, sub_min, sub_max, max_cd):
+                        return True
+                return False
+            # 纯 CD 查询（effect=None）
+            return _match_skill_with_cd(servant, None, None, None, None, max_cd)
+
+        # ── 标准效果匹配路径（无 CD 约束，行为不变） ──
 
         # 单效果模式（支持复合效果自动展开为 OR）
         if effect is not None:

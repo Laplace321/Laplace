@@ -98,12 +98,17 @@ def describe_filters(skill_calls: list[dict]) -> list[str]:
             translated = get_effect_translation(effect) if effect else effect
             source = params.get("source", "both")
             qualifier = effect_qualifier(params)
-            if source == "skill":
-                descriptions.append(f"技能效果包含「{qualifier}{translated}」")
+            max_cd = params.get("maxCd") or params.get("max_cd")
+            cd_suffix = f" + CD ≤ {max_cd}回合" if max_cd else ""
+            if not effect and max_cd:
+                # 纯 CD 查询
+                descriptions.append(f"技能CD ≤ {max_cd}回合")
+            elif source == "skill":
+                descriptions.append(f"技能效果包含「{qualifier}{translated}」{cd_suffix}")
             elif source == "np":
                 descriptions.append(f"宝具效果包含「{qualifier}{translated}」")
             else:
-                descriptions.append(f"效果包含「{qualifier}{translated}」（技能或宝具）")
+                descriptions.append(f"效果包含「{qualifier}{translated}」{cd_suffix}")
         elif name == "search_by_skill_effect":
             effect = params.get("skillEffect") or params.get("effect", "")
             translated = get_effect_translation(effect) if effect else effect
@@ -137,17 +142,6 @@ def describe_filters(skill_calls: list[dict]) -> list[str]:
         elif name == "search_by_class_advantage":
             target = params.get("targetClass") or params.get("target_class", "")
             descriptions.append(f"克制「{target}」职阶")
-        elif name == "search_by_skill_cd":
-            op = params.get("op", "lte")
-            val = params.get("value", "")
-            effect_name = params.get("effect")
-            op_map = {"lt": "<", "lte": "≤", "eq": "=", "gte": "≥", "gt": ">"}
-            op_symbol = op_map.get(op, op)
-            if effect_name:
-                effect_cn = get_effect_translation(effect_name) or effect_name
-                descriptions.append(f"{effect_cn}技能CD {op_symbol} {val}回合")
-            else:
-                descriptions.append(f"技能CD {op_symbol} {val}回合")
         elif name == "search_by_traits":
             trait_names = params.get("traitNames") or params.get("trait_names") or []
             ascension = params.get("ascension")
