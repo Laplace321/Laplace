@@ -171,7 +171,7 @@
     "アビゲイル・ウィリアムズ〔サンタ〕": {
       "JP": null,
       "CN": "阿比盖尔·威廉姆斯〔圣诞〕",
-      "TW": "艾比蓋兒．威廉斯〔聖誕〕",
+      "TW": "艾比蓋兒威廉斯〔Santa〕",
       "NA": "Abigail Williams (Santa)",
       "KR": null
     },
@@ -311,7 +311,7 @@
     "アンキ・エレシュキガル": {
       "JP": null,
       "CN": "安基埃列什基伽勒",
-      "TW": "太空埃列什基伽勒",
+      "TW": "安祺埃列什基伽勒",
       "NA": "Anki Ereshkigal",
       "KR": "안키・에레쉬키갈"
     },
@@ -489,6 +489,13 @@
       "TW": "威廉．泰爾",
       "NA": "William Tell",
       "KR": "윌리엄 텔"
+    },
+    "ウルズ": {
+      "JP": null,
+      "CN": "乌尔德",
+      "TW": null,
+      "NA": null,
+      "KR": null
     },
     "エイリーク": {
       "JP": null,
@@ -698,7 +705,7 @@
       "CN": "Kazuradrop",
       "TW": "Kazuradrop",
       "NA": "Kazuradrop",
-      "KR": null
+      "KR": "카즈라드롭"
     },
     "カラミティ・ジェーン": {
       "JP": null,
@@ -997,9 +1004,9 @@
     "ゴールデンＢＢ": {
       "JP": null,
       "CN": "黄金ＢＢ",
-      "TW": "黃金BB",
+      "TW": "黃金ＢＢ",
       "NA": "Golden BB",
-      "KR": null
+      "KR": "골든 BB"
     },
     "サリエリ": {
       "JP": null,
@@ -1039,7 +1046,7 @@
     "サンタズムーン": {
       "JP": null,
       "CN": "Santasmoon",
-      "TW": "聖誕月姬",
+      "TW": "Santasmoon",
       "NA": "Santa's Moon",
       "KR": null
     },
@@ -1893,7 +1900,7 @@
     "ヒロインXX・オルタ": {
       "JP": null,
       "CN": "谜之女主角XX·Alter",
-      "TW": "女主角XX・Alter",
+      "TW": "謎之女主角XXAlter",
       "NA": "Heroine XX (Alter)",
       "KR": "히로인 XX 얼터"
     },
@@ -2301,7 +2308,7 @@
       "CN": "缪瑞恩",
       "TW": "姆莉安",
       "NA": "Muryan",
-      "KR": null
+      "KR": "무리안"
     },
     "メアリー": {
       "JP": null,
@@ -3409,6 +3416,13 @@
       "NA": "Elisabeth of the End",
       "KR": null
     },
+    "終末のアーチャー": {
+      "JP": null,
+      "CN": null,
+      "TW": null,
+      "NA": null,
+      "KR": null
+    },
     "織田信勝": {
       "JP": null,
       "CN": "织田信胜",
@@ -3608,7 +3622,7 @@
     "謎の代行者C.I.E.L": {
       "JP": null,
       "CN": "谜之代行者C.I.E.L",
-      "TW": "謎之代行者C.I.E.L",
+      "TW": "謎之代理人C.I.E.L",
       "NA": "Mysterious Executor C.I.E.L",
       "KR": "수수께끼의 대행자 C.I.E.L"
     },
@@ -3811,14 +3825,14 @@
     "ＢＢコスモ": {
       "JP": null,
       "CN": "ＢＢ宇宙",
-      "TW": "BB宇宙",
+      "TW": "ＢＢ宇宙",
       "NA": "BB Cosmos",
       "KR": "BB 코스모"
     },
     "ＢＢドバイ": {
       "JP": null,
       "CN": "ＢＢ迪拜",
-      "TW": "BB杜拜",
+      "TW": "ＢＢ杜拜",
       "NA": "BB Dubai",
       "KR": "BB 두바이"
     },
@@ -6517,6 +6531,13 @@
       "CN": "已使用宝具",
       "TW": null,
       "NA": "Used Noble Phantasm",
+      "KR": null
+    },
+    "10039": {
+      "JP": "過去改竄",
+      "CN": "\"篡改过去\"",
+      "TW": null,
+      "NA": null,
       "KR": null
     },
     "94000049": {
