@@ -113,7 +113,12 @@ def describe_filters(skill_calls: list[dict]) -> list[str]:
             effect = params.get("skillEffect") or params.get("effect", "")
             translated = get_effect_translation(effect) if effect else effect
             qualifier = effect_qualifier(params)
-            descriptions.append(f"技能效果包含「{qualifier}{translated}」")
+            max_cd = params.get("maxCd") or params.get("max_cd")
+            cd_suffix = f" + CD ≤ {max_cd}回合" if max_cd else ""
+            if not effect and max_cd:
+                descriptions.append(f"技能CD ≤ {max_cd}回合")
+            else:
+                descriptions.append(f"技能效果包含「{qualifier}{translated}」{cd_suffix}")
         elif name == "search_by_np_effect":
             effect = params.get("npEffect") or params.get("effect", "")
             translated = get_effect_translation(effect) if effect else effect

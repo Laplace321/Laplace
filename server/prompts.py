@@ -257,7 +257,7 @@ def build_routing_prompt(
 7. 根据查询类型选择合适的 response_skill
 8. **效果类查询的 Skill 选择（重要）**：
    - **默认**：用户未指定来源时（如"有XX效果的从者"、"能XX的从者"），使用 `search_by_effect`（同时搜技能+宝具）
-   - **用户说了"技能"**：当用户提到"技能"二字时（如"有XX**技能**"、"**技能**带XX"、"**技能**效果包含XX"），必须用 `search_by_skill_effect`
+   - **用户说了"技能"**：当用户提到"技能"二字时（如"有XX**技能**"、"**技能**带XX"、"**技能**效果包含XX"、"**技能**CD小于X"），必须用 `search_by_skill_effect`
    - **用户说了"宝具"**：当用户提到"宝具"二字时（如"**宝具**带XX"、"**宝具**效果包含XX"），必须用 `search_by_np_effect`
    - 判断依据是用户原话中是否包含"技能"或"宝具"这两个关键词，有则精确路由，无则默认统一搜索
 9. **禁止同 Skill 多次调用表达 OR**：当用户的查询涉及"任意一种"效果时（如"能挡伤害"、"能辅助"），**禁止**对同一个 Skill 发起多次调用。应使用单次调用的 `effects` + `effectsOp: "or"` 参数，或使用虚拟复合效果名（如 `damageBoost`、`damageShield`）。多个 skill_call 之间是 AND 关系，重复调用同一 Skill 会变成"必须同时满足所有条件"，导致结果为空。
@@ -282,7 +282,7 @@ def build_routing_prompt(
     - 注意：61 个从者存在灵基间特性差异（如梅露辛灵基 0-2 有圆桌骑士特性，灵基 3-4 没有），指定灵基时可精确筛选
 13. **不可查效果 — 直接 fallback**：以下效果属于被动/活动/礼装效果，**当前不在从者查询能力范围内**，应直接走 fallback 回复用户"此类效果暂不支持查询"：羁绊加成（`servantFriendshipUp`）、QP 加成（`qpUp`）、素材掉落加成（`eventDropUp`）。**禁止**对这些效果调用任何 Skill，否则一定返回 0 条结果
 14. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"、"哪个职阶克制XX"、"什么克制XX"等表达时，**必须**使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"、"月癌"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。**即使用户只问"哪个职阶克制X"这种看似知识性问题，也必须走 `search_by_class_advantage`**，系统会在结果中返回克制关系和对应从者。
-15. **技能冷却时间（CD）筛选**：当用户提到"技能CD"/"冷却时间"/"CD小于X回合"/"短CD技能"时，使用 `search_by_effect` 的 `maxCd` 参数。`maxCd` 语义是"CD **≤** maxCd"，因此**必须注意"小于"和"小于等于"的区别**：用户说"CD小于5"/"CD<5"→ maxCd:**4**（因为 ≤4 等价于 <5）；用户说"CD不超过5"/"CD≤5"→ maxCd:5。CD 是技能的固有属性，`maxCd` 保证在同一技能粒度内联合匹配效果+数值+CD。当用户说"自充50%以上且CD<5"时，传 effect:"gainNp"+targetType:"self"+minValue:50+maxCd:4。"短CD"默认理解为 maxCd:5。纯 CD 查询（如"蓝卡宝具且CD<5"）只传 maxCd 即可，与其他 Skill AND 组合。**禁止使用已废弃的 search_by_skill_cd**
+15. **技能冷却时间（CD）筛选**：`search_by_effect` 和 `search_by_skill_effect` 均支持 `maxCd` 参数。选择哪个 Skill 遵循规则 8（用户说了"技能"用 `search_by_skill_effect`，未指定来源用 `search_by_effect`）。`maxCd` 语义是"CD **≤** maxCd"，因此**必须注意"小于"和"小于等于"的区别**：用户说"CD小于5"/"CD<5"→ maxCd:**4**（因为 ≤4 等价于 <5）；用户说"CD不超过5"/"CD≤5"→ maxCd:5。CD 是技能的固有属性，`maxCd` 保证在同一技能粒度内联合匹配效果+数值+CD。当用户说"技能自充50%以上且CD<5"时，用 `search_by_skill_effect` 传 skillEffect:"gainNp"+targetType:"self"+minValue:50+maxCd:4。"短CD"默认理解为 maxCd:5。纯 CD 查询（如"蓝卡宝具且CD<5"）只传 maxCd 即可，与其他 Skill AND 组合。**禁止使用已废弃的 search_by_skill_cd**
 16. **疑似从者名称/昵称一律用 lookup_servant（重要）**：当用户的问题中包含你不确定是否为从者名称的词语（如"红A"、"小太阳"、"花之魔术师"、"老虚"、"CBA"、"XJB"、"呆毛"、"2B"等看起来像昵称/外号/缩写/纯字母组合的表达），**必须**使用 `lookup_servant`，将该词语作为 `name` 参数传入。系统后端支持昵称映射和模糊匹配，会自动处理识别。**绝不要**因为你不认识某个名称就返回 `no_match` 或 `out_of_scope`。只要用户的问题看起来是在查询或询问某个特定角色/从者，就选择 `lookup_servant`。**特别注意**：纯英文字母、数字组合、字母+数字混合（如"CBA"、"X4"、"2B"）在 FGO 社区中是常见的从者昵称缩写形式，绝不能因为看起来不像名字就判定为超出范围。如果用户同时问了从者详情（如"XX技能介绍"、"XX宝具是什么"），response_skill 选 `respond_servant_detail`。
 17. **概念礼装查询（重要）**：当用户提到"礼装"/"概念礼装"/"CE"/"带XX效果的礼装"/"推荐礼装"时，必须使用 CE domain 的 Skills，response_skill 选 `respond_ce_list`：
     - **按名称/昵称查找**：`ce_lookup`，参数 `name`（如"万花筒"、"黑杯"、"2030"）
