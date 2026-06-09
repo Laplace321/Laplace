@@ -2061,6 +2061,46 @@ async def _handle_atlas_pipeline(
     )
 
 
+def _extract_guide_tags(query: str) -> list[str]:
+    """从用户查询中提取攻略相关的 tag 关键词，用于缩小 BM25 检索范围。
+
+    仅提取职阶相关 tag，避免全量检索时拉入不相关职阶的攻略文档。
+    """
+    # 职阶关键词 → 对应 tag（优先匹配中文简称/俗称）
+    _CLASS_TAG_MAP: dict[str, str] = {
+        "剑": "saber",
+        "剑阶": "saber",
+        "剑冠": "saber",
+        "弓": "archer",
+        "弓阶": "archer",
+        "弓冠": "archer",
+        "枪": "lancer",
+        "枪阶": "lancer",
+        "枪冠": "lancer",
+        "骑": "rider",
+        "骑阶": "rider",
+        "骑冠": "rider",
+        "术": "caster",
+        "术阶": "caster",
+        "术冠": "caster",
+        "杀": "assassin",
+        "杀阶": "assassin",
+        "杀冠": "assassin",
+        "狂": "berserker",
+        "狂阶": "berserker",
+        "狂冠": "berserker",
+        "ex": "extra",
+        "EX": "extra",
+        "ex冠": "extra",
+        "EX冠": "extra",
+    }
+    tags: list[str] = []
+    for keyword, tag in _CLASS_TAG_MAP.items():
+        if keyword in query and tag not in tags:
+            tags.append(tag)
+    return tags
+
+
 def _prepare_guide_context(user_message: str) -> tuple[list, set[str], dict[str, str]] | None:
     """BM25 检索攻略文档并构建上下文。
 
@@ -2070,7 +2110,8 @@ def _prepare_guide_context(user_message: str) -> tuple[list, set[str], dict[str,
     from server.guide_retriever import GuideRetriever
 
     retriever = GuideRetriever()
-    chunks = retriever.search(user_message, top_k=3)
+    guide_tags = _extract_guide_tags(user_message)
+    chunks = retriever.search(user_message, tags=guide_tags or None, top_k=3)
 
     if not chunks:
         return None
