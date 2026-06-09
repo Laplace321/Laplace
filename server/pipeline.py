@@ -1255,7 +1255,6 @@ async def stream_event_generator(
                         system_prompt=generation_prompt,
                         user_message=message,
                         temperature=0.3,
-                        max_tokens=2048,
                         metadata=guide_gen_metadata,
                     ):
                         full_reply_parts.append(chunk)
@@ -2195,12 +2194,14 @@ def _build_guide_generation_prompt(guide_context: str, user_message: str) -> str
         "4. **列表并列**：并列选项（多套阵容、多个从者推荐、多步操作）使用 `- ` 无序列表\n"
         "5. **精简表达**：每段话不超过 3 句，删除「接下来我们看」等过渡废话，"
         "优先用短句和列表替代长段落\n"
-        "6. **禁止冗余**：不要复述用户的问题，不要写开头寒暄，不要添加总结段\n\n"
+        "6. **禁止冗余**：不要复述用户的问题，不要写开头寒暄，不要添加总结段\n"
+        "7. **总长度控制**：整体回复控制在 600 字以内，信息密度优先于面面俱到\n\n"
         "## 禁止事项\n"
         "- 不要出现文件名、文件路径、内部标题格式（如 [xxx] > yyy）\n"
         "- 不要出现技术术语或系统实现细节\n"
         "- 不要自行添加来源标注（系统会自动处理）\n"
-        "- 不要使用一级标题 `#` 或二级标题 `##`\n\n"
+        "- 不要使用一级标题 `#` 或二级标题 `##`\n"
+        "- **禁止使用 Markdown 表格**（`|---|` 语法），改用列表呈现对比信息\n\n"
         f"攻略内容：\n{guide_context}\n\n"
         f"用户问题：{user_message}"
     )
