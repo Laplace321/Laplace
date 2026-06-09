@@ -38,8 +38,8 @@ Archer 职阶推荐搭配 CBA 和花嫁尼禄。
 """
     guide3 = """\
 ---
-title: "通用机制说明"
-tags: [guide, 机制]
+title: "戴冠战通用攻略"
+tags: [coronation, 通用]
 ---
 
 ## 戴冠战基本规则
@@ -112,6 +112,57 @@ class TestGuideRetrieverSearch:
         results = retriever.search("配队", top_k=1)
         sources = {r.metadata.get("source") for r in results}
         assert len(sources) <= 1
+
+
+class TestGuideRetrieverAutoRecall:
+    """同系列通用文档自动补召测试。"""
+
+    def test_tag_filter_auto_recall_general(self, retriever):
+        """传 tags=["saber"] 时，通用篇（含 通用 + coronation）应被自动补召。"""
+        results = retriever.search("配队", tags=["saber"])
+        sources = {r.metadata.get("source") for r in results}
+        # Saber 攻略应命中
+        assert "saber.md" in sources
+        # 通用篇应被自动补召（共享 coronation tag）
+        assert "general.md" in sources
+
+    def test_tag_filter_no_cross_series_recall(self, retriever, tmp_path):
+        """通用篇不应补召到不同系列的 tag 过滤结果中。"""
+        # 新增一篇不同系列的文档和通用篇
+        other_guide = """\
+---
+title: "活动攻略"
+tags: [event, 夏日]
+---
+
+## 活动说明
+
+夏日活动关卡配队推荐。
+"""
+        other_general = """\
+---
+title: "活动通用说明"
+tags: [event, 通用]
+---
+
+## 通用规则
+
+活动通用规则说明。
+"""
+        (tmp_path / "event.md").write_text(other_guide, encoding="utf-8")
+        (tmp_path / "event_general.md").write_text(other_general, encoding="utf-8")
+        retriever2 = GuideRetriever(guides_dir=tmp_path)
+
+        # 用 saber tag 过滤，不应召回 event 系列的通用篇
+        results = retriever2.search("配队", tags=["saber"])
+        sources = {r.metadata.get("source") for r in results}
+        assert "event_general.md" not in sources
+
+    def test_no_recall_without_tag_filter(self, retriever):
+        """不传 tags 时，补召逻辑不触发，纯靠 BM25 排序。"""
+        results = retriever.search("配队")
+        # 应该有结果，但不触发补召逻辑（无 tag 过滤）
+        assert len(results) >= 1
 
 
 class TestGuideRetrieverEmptyDir:

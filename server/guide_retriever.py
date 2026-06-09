@@ -128,6 +128,25 @@ class GuideRetriever:
             if max_score > 0:
                 doc_scores[source] = max_score
 
+        # 同系列通用文档自动补召：tag 过滤后，自动拉入共享系列 tag 的通用文档
+        if tags and doc_scores:
+            # 收集已命中文档的所有 tag（作为系列标识）
+            hit_all_tags: set[str] = set()
+            for source in doc_scores:
+                for idx in self._doc_chunks[source]:
+                    hit_all_tags |= set(self._chunks[idx].metadata.get("tags", []))
+
+            # 查找未命中但属于同系列的通用文档
+            for source, indices in self._doc_chunks.items():
+                if source in doc_scores:
+                    continue
+                sample_tags = set(self._chunks[indices[0]].metadata.get("tags", []))
+                # 通用文档需同时满足：含 "通用" tag + 与已命中文档共享至少一个非"通用"的 tag
+                shared = (sample_tags - {"通用"}) & (hit_all_tags - {"通用"})
+                if "通用" in sample_tags and shared:
+                    raw_score = max((float(scores[i]) for i in indices), default=0.0)
+                    doc_scores[source] = raw_score if raw_score > 0 else 0.01
+
         # 按文档分数排序，取 top_k 篇文档
         top_docs = sorted(doc_scores.keys(), key=lambda s: doc_scores[s], reverse=True)[:top_k]
 
