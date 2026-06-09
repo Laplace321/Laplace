@@ -1247,33 +1247,72 @@ async def stream_event_generator(
                 generation_prompt = _build_guide_generation_prompt(guide_context, message)
 
                 full_reply_parts: list[str] = []
-                async for chunk in chat_completion_stream(
-                    system_prompt=generation_prompt,
-                    user_message=message,
-                    temperature=0.3,
-                    max_tokens=2048,
-                ):
-                    full_reply_parts.append(chunk)
-                    yield sse_event("delta", {"text": chunk})
+                guide_gen_metadata = StreamMetadata()
+                guide_gen_failed = False
+                _PROVIDER_FALLBACK_PREFIX = "抱歉，生成服务暂时不可用"
+                try:
+                    async for chunk in chat_completion_stream(
+                        system_prompt=generation_prompt,
+                        user_message=message,
+                        temperature=0.3,
+                        max_tokens=2048,
+                        metadata=guide_gen_metadata,
+                    ):
+                        full_reply_parts.append(chunk)
+                        yield sse_event("delta", {"text": chunk})
 
-                source_suffix = _format_source_suffix(source_labels, source_authors)
-                if source_suffix:
-                    full_reply_parts.append(source_suffix)
-                    yield sse_event("delta", {"text": source_suffix})
+                    guide_gen_reply = "".join(full_reply_parts).strip()
+                    # provider 全链路失败时 yield 兜底文本而非抛异常，需检测
+                    if not guide_gen_reply or guide_gen_reply.startswith(_PROVIDER_FALLBACK_PREFIX):
+                        raise ValueError(
+                            f"Guide generation failed: {'provider fallback' if guide_gen_reply else 'empty response'}"
+                        )
+                except Exception as guide_gen_error:
+                    guide_gen_failed = True
+                    fallback_reply = "抱歉，攻略生成服务暂时繁忙，请稍后重试。"
+                    # 仅当没有任何内容被推送时才发送兜底消息
+                    has_meaningful_output = any(part.strip() for part in full_reply_parts)
+                    if not has_meaningful_output:
+                        try:
+                            yield sse_event("delta", {"text": fallback_reply})
+                        except Exception:
+                            pass
+                    await log_trace_event(
+                        trace_id,
+                        "generation_output",
+                        {"reply": fallback_reply},
+                        error=str(guide_gen_error),
+                    )
+                else:
+                    source_suffix = _format_source_suffix(source_labels, source_authors)
+                    if source_suffix:
+                        full_reply_parts.append(source_suffix)
+                        yield sse_event("delta", {"text": source_suffix})
+
+                    await log_trace_event(
+                        trace_id,
+                        "generation_output",
+                        {"reply": guide_gen_reply, "generation_usage": guide_gen_metadata.usage},
+                    )
+
+                # generation 实际使用的模型；全链路失败时 metadata.model 为空，回退到分类器模型
+                guide_model_used = guide_gen_metadata.model or sse_cls_model
+                guide_gen_usage = guide_gen_metadata.usage
+                trace_total_tokens += guide_gen_usage.get("total_tokens", 0)
 
                 await log_trace_event(
                     trace_id,
                     "final",
                     {
                         "total_time_ms": round((time.monotonic() - stream_start) * 1000, 2),
-                        "result": "guide_pipeline",
+                        "result": "guide_generation_failed" if guide_gen_failed else "guide_pipeline",
                         "mode": "guide_pipeline",
                         "guide_chunks": len(chunks),
                         "sources": list(source_labels),
-                        "total_tokens": "streaming",
+                        "total_tokens": trace_total_tokens,
                     },
                 )
-                yield sse_event("done", {"model": model_used, "traceId": trace_id})
+                yield sse_event("done", {"model": guide_model_used, "traceId": trace_id})
                 return
 
         # ── Stage 0 分发：A 链路低置信度 → Agent fallback ──
