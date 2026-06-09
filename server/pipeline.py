@@ -1190,6 +1190,8 @@ async def stream_event_generator(
             trace_total_tokens += sse_cls_usage.get("total_tokens", 0)
             sse_classified_pipeline = sse_classifier_result.get("pipeline", "A")
             sse_classifier_confidence = sse_classifier_result.get("confidence", 0.0)
+            # B/C 链路在 Stage 0 后直接返回，不经过 Stage 1 赋值，需提前同步
+            model_used = sse_cls_model
 
             await log_trace_event(
                 trace_id,
