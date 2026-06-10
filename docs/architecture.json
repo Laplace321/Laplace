@@ -1,10 +1,10 @@
 {
-  "version": "0.2.6",
-  "lastUpdated": "2025-05-16",
+  "version": "0.4.1",
+  "lastUpdated": "2026-06-10",
   "system": {
     "name": "Laplace",
-    "description": "AI Native 对话式 FGO（Fate/Grand Order）数据助手。用户通过自然语言提问，系统自动解析意图、检索数据库、生成结构化回答。",
-    "coreDesign": "Two-Step RAG（路由+生成）架构，Skill-Based Architecture 可扩展查询，OneShot 优先 + Agent 兜底混合路由。",
+    "description": "AI Native 对话式 FGO（Fate/Grand Order）数据助手。用户通过自然语言提问，系统自动解析意图、检索数据库、生成结构化回答。支持 A→B→C 三级知识问答链路（精确查询/Atlas 知识/攻略文档 BM25 检索）。",
+    "coreDesign": "两阶段路由（Stage 0 分类器 + Stage 1 参数提取）+ Skill-Based Architecture 可扩展查询 + OneShot 优先 + Agent 兜底混合路由。链路 C 支持攻略文档 BM25 检索与 LLM 流式生成。",
     "techStack": {
       "runtime": "Python 3.12",
       "framework": "FastAPI + Uvicorn (ASGI)",
