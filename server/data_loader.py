@@ -1012,7 +1012,8 @@ def extract_skill_effects(
                     )
                     sub_skill_id = trigger_sval.get("Value", 0)
                     trigger_rate = trigger_sval.get("Rate", 0)
-                    trigger_delay = trigger_sval.get("Value2", 0) if buff_type == "delayFunction" else 0
+                    # delayFunction: Turn = 延迟N回合后触发；Value2 是子skill level，非延迟回合数
+                    trigger_delay = trigger_sval.get("Turn", 0) if buff_type == "delayFunction" else 0
 
                     sub_funcs = conditional_skill_map.get(sub_skill_id, [])
                     for sub_func in sub_funcs:
