@@ -38,6 +38,82 @@
         "生存"
       ],
       "description": "泛用防御/生存效果的统称，包含无敌、闪避、防御提升、减伤、毅力（不含回血）"
+    },
+    {
+      "_comment": "以下为 damageClass 乘区标签覆盖，严格遵守 AGENTS.md 伤害公式定义",
+      "name": "upArts",
+      "category": "attack",
+      "damageClass": "A",
+      "funcTypes": [],
+      "buffTypes": ["upCommandall", "upCommandatk", "upCommandstar", "upCommandnp"],
+      "validate": {"type": "buff_ckSelfIndv_contains", "trait": "cardArts", "traitValue": 4001},
+      "aliases_zh": ["Arts提升", "蓝卡提升", "蓝卡增伤", "A卡提升", "A卡增伤", "蓝魔放"],
+      "description": "提升Arts卡(蓝卡)的性能，增加Arts指令卡伤害和NP获取"
+    },
+    {
+      "name": "upBuster",
+      "category": "attack",
+      "damageClass": "A",
+      "funcTypes": [],
+      "buffTypes": ["upCommandall", "upCommandatk", "upCommandstar", "upCommandnp"],
+      "validate": {"type": "buff_ckSelfIndv_contains", "trait": "cardBuster", "traitValue": 4002},
+      "aliases_zh": ["Buster提升", "红卡提升", "红卡增伤", "B卡提升", "B卡增伤", "红魔放"],
+      "description": "提升Buster卡(红卡)的性能，增加Buster指令卡伤害"
+    },
+    {
+      "name": "upQuick",
+      "category": "attack",
+      "damageClass": "A",
+      "funcTypes": [],
+      "buffTypes": ["upCommandall", "upCommandatk", "upCommandstar", "upCommandnp"],
+      "validate": {"type": "buff_ckSelfIndv_contains", "trait": "cardQuick", "traitValue": 4003},
+      "aliases_zh": ["Quick提升", "绿卡提升", "绿卡增伤", "Q卡提升", "Q卡增伤", "绿魔放"],
+      "description": "提升Quick卡(绿卡)的性能，增加Quick指令卡伤害、NP获取和产星"
+    },
+    {
+      "name": "upAtk",
+      "category": "attack",
+      "damageClass": "B",
+      "funcTypes": [],
+      "buffTypes": ["upAtk"],
+      "aliases_zh": ["攻击力提升", "加攻"],
+      "description": "提升攻击力，增加所有攻击的基础伤害"
+    },
+    {
+      "name": "upDamage",
+      "category": "attack",
+      "damageClass": "C",
+      "funcTypes": [],
+      "buffTypes": ["upDamage", "upDamageIndividuality", "upDamageIndividualityActiveonly"],
+      "aliases_zh": ["特攻", "特攻伤害", "特攻威力"],
+      "description": "对特定特性敌人造成额外伤害的特攻效果"
+    },
+    {
+      "name": "upCriticaldamage",
+      "category": "attack",
+      "damageClass": "C",
+      "funcTypes": [],
+      "buffTypes": ["upCriticaldamage"],
+      "aliases_zh": ["暴击威力提升", "暴击伤害", "爆伤"],
+      "description": "提升暴击时的伤害倍率"
+    },
+    {
+      "name": "upNpdamage",
+      "category": "attack",
+      "damageClass": "C",
+      "funcTypes": [],
+      "buffTypes": ["upNpdamage"],
+      "aliases_zh": ["宝具威力提升", "宝威", "宝伤"],
+      "description": "提升宝具的伤害倍率"
+    },
+    {
+      "name": "damageNpSP",
+      "category": "attack",
+      "damageClass": "D",
+      "funcTypes": ["damageNpIndividual", "damageNpIndividualSum", "damageNpRare", "damageNpStateIndividualFix", "damageNpHpratioLow", "damageNpStateIndividual", "damageNpAndOrCheckIndividuality", "damageNpHpratioHigh", "damageNpBattlePointPhase"],
+      "buffTypes": [],
+      "aliases_zh": ["宝具特攻"],
+      "description": "宝具附带特攻倍率，对特定特性敌人造成额外伤害"
     }
   ]
 }

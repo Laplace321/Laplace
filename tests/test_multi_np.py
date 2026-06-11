@@ -169,9 +169,17 @@ class TestConditionalTriggerEffects:
     """测试间接触发 buff（selfturnendFunction / delayFunction）的解析。"""
 
     def test_conditional_trigger_buff_types_constant(self):
-        """确认间接触发 buff 类型常量包含预期值。"""
+        """确认间接触发 buff 类型常量包含全部 17 种。"""
+        assert len(_CONDITIONAL_TRIGGER_BUFF_TYPES) == 17
         assert "selfturnendFunction" in _CONDITIONAL_TRIGGER_BUFF_TYPES
         assert "delayFunction" in _CONDITIONAL_TRIGGER_BUFF_TYPES
+        assert "attackAfterFunction" in _CONDITIONAL_TRIGGER_BUFF_TYPES
+        assert "attackAfterFunctionMainOnly" in _CONDITIONAL_TRIGGER_BUFF_TYPES
+        assert "damageFunction" in _CONDITIONAL_TRIGGER_BUFF_TYPES
+        assert "gutsFunction" in _CONDITIONAL_TRIGGER_BUFF_TYPES
+        assert "deadFunction" in _CONDITIONAL_TRIGGER_BUFF_TYPES
+        assert "selfturnstartFunction" in _CONDITIONAL_TRIGGER_BUFF_TYPES
+        assert "treasureDevicePostAfterFunction" in _CONDITIONAL_TRIGGER_BUFF_TYPES
 
     def test_salome_conditional_effect_parsed(self):
         """莎乐美3技能：selfturnendFunction 引用子 skill 962914（gainNp），应被正确解析。
@@ -198,7 +206,7 @@ class TestConditionalTriggerEffects:
                             "funcTargetType": "self",
                             "buffs": [{"type": "selfturnendFunction"}],
                             "svals": [
-                                {"Rate": 5000, "Turn": 7, "Count": -1, "Value": 962914},
+                                {"Rate": 5000, "Turn": 7, "Count": -1, "Value": 962914, "UseRate": 5000},
                             ],
                         },
                     ],
@@ -233,8 +241,11 @@ class TestConditionalTriggerEffects:
 
         cond_eff = conditional_effects[0]
         assert cond_eff["type"] == "gainNp"
-        assert cond_eff["conditional"]["triggerType"] == "turnEnd"
-        assert cond_eff["conditional"]["triggerRate"] == 5000
+        assert cond_eff["conditional"]["triggerType"] == "回合结束时"
+        # UseRate=5000 → useRate 字段存在
+        assert cond_eff["conditional"]["useRate"] == 5000
+        # triggerRate 字段不再存在
+        assert "triggerRate" not in cond_eff["conditional"]
 
     def test_conditional_gainNp_not_in_total_charge(self):
         """条件触发的 gainNp 不应计入 totalSelfCharge。
@@ -365,8 +376,11 @@ class TestConditionalTriggerEffects:
         skill3 = next(d for d in details if d["skillNum"] == 3)
         cond_effects = [e for e in skill3["effects"] if e.get("conditional")]
         assert len(cond_effects) >= 1
-        assert cond_effects[0]["conditional"]["triggerType"] == "delayed"
-        assert cond_effects[0]["conditional"]["triggerDelay"] == 10
+        assert cond_effects[0]["conditional"]["triggerType"] == "延迟触发"
+        # delayFunction 无 UseRate → useRate 字段不存在（必定触发）
+        assert "useRate" not in cond_effects[0]["conditional"]
+        # triggerDelay 字段已移除
+        assert "triggerDelay" not in cond_effects[0]["conditional"]
 
     def test_no_conditional_map_backward_compatible(self):
         """不传 conditional_skill_map 时，行为与原逻辑完全一致。"""

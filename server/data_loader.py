@@ -424,11 +424,18 @@ def build_effect_matcher(schema: dict) -> dict:
         if "validate" in effect:
             validates[name] = effect["validate"]
 
+    # damageClass 乘区索引：从 effect_overrides overlay 合并后的 schema 中提取
+    damage_classes: dict[str, str] = {}
+    for effect in effects:
+        if "damageClass" in effect:
+            damage_classes[effect["name"]] = effect["damageClass"]
+
     return {
         "funcType": func_index,
         "buffType": buff_index,
         "validates": validates,
         "triggerBuffTypes": schema.get("triggerBuffTypes", []),
+        "damageClasses": damage_classes,
     }
 
 
@@ -984,18 +991,31 @@ def extract_skill_effects(
             )
             for effect_name in matched_effects:
                 all_effects.add(effect_name)
-                skill_effects.append(
-                    {
-                        "type": effect_name,
-                        "funcType": func_type,
-                        "targetType": classify_target_type(target_type),
-                        "valueMax": max_sval.get("Value", 0),
-                        "turn": max_sval.get("Turn", 0),
-                        "count": max_sval.get("Count", 0),
-                    }
-                )
+                entry: dict = {
+                    "type": effect_name,
+                    "funcType": func_type,
+                    "targetType": classify_target_type(target_type),
+                    "valueMax": max_sval.get("Value", 0),
+                    "turn": max_sval.get("Turn", 0),
+                    "count": max_sval.get("Count", 0),
+                }
+                # damageClass 乘区标签（仅增伤效果）
+                damage_class = matcher.get("damageClasses", {}).get(effect_name)
+                if damage_class:
+                    entry["damageClass"] = damage_class
+                # antiTarget 特攻目标（C类特攻：upDamage + ckOpIndv）
+                if effect_name == "upDamage":
+                    for buff in func.get("buffs", []):
+                        ck_op = buff.get("ckOpIndv", [])
+                        if ck_op:
+                            trait = ck_op[0]
+                            trait_id = trait.get("id", trait) if isinstance(trait, dict) else trait
+                            trait_name = trait.get("name", "") if isinstance(trait, dict) else ""
+                            entry["antiTarget"] = {"trait": trait_name, "traitId": trait_id}
+                            break
+                skill_effects.append(entry)
 
-            # 间接触发效果解析：selfturnendFunction / delayFunction
+            # 间接触发效果解析
             # 如果直接匹配返回空集，检查是否有间接触发 buff
             if not matched_effects and conditional_skill_map:
                 for buff in func.get("buffs", []):
@@ -1011,8 +1031,9 @@ def extract_skill_effects(
                         else {}
                     )
                     sub_skill_id = trigger_sval.get("Value", 0)
-                    trigger_rate = trigger_sval.get("Rate", 0)
-                    trigger_delay = trigger_sval.get("Value2", 0) if buff_type == "delayFunction" else 0
+                    # UseRate = 条件触发发动概率（千分比），None/缺失 = 必定触发
+                    # Rate = buff 附加概率（对抗耐性用），不是触发概率
+                    trigger_use_rate = trigger_sval.get("UseRate")
 
                     sub_funcs = conditional_skill_map.get(sub_skill_id, [])
                     for sub_func in sub_funcs:
@@ -1029,6 +1050,11 @@ def extract_skill_effects(
                         sub_target = sub_func.get("funcTargetType", target_type)
                         for eff_name in sub_matched:
                             all_effects.add(eff_name)
+                            conditional_info: dict = {
+                                "triggerType": _TRIGGER_TYPE_LABELS.get(buff_type, buff_type),
+                            }
+                            if trigger_use_rate is not None:
+                                conditional_info["useRate"] = trigger_use_rate
                             skill_effects.append(
                                 {
                                     "type": eff_name,
@@ -1037,11 +1063,7 @@ def extract_skill_effects(
                                     "valueMax": sub_max_sval.get("Value", 0),
                                     "turn": sub_max_sval.get("Turn", 0),
                                     "count": sub_max_sval.get("Count", 0),
-                                    "conditional": {
-                                        "triggerType": _TRIGGER_TYPE_LABELS.get(buff_type, buff_type),
-                                        "triggerRate": trigger_rate,
-                                        "triggerDelay": trigger_delay,
-                                    },
+                                    "conditional": conditional_info,
                                 }
                             )
 
@@ -1144,7 +1166,7 @@ def build_database(
                 matched_np_effects = _match_func_effects(func, matcher)
                 np_effects_set.update(matched_np_effects)
 
-                # 烘焙宝具效果详情（OC1 Lv1 = svals[0]）
+                # 烘焙宝具效果详情（分维度数值存储）
                 raw_svals = func.get("svals", [])
                 lv1_sval = (
                     raw_svals[0]
@@ -1153,17 +1175,50 @@ def build_database(
                     if isinstance(raw_svals, dict)
                     else {}
                 )
-                for eff_name in matched_np_effects:
-                    np_effect_entries.append(
-                        {
-                            "type": eff_name,
-                            "funcType": ftype,
-                            "targetType": classify_target_type(func_target),
-                            "valueLv1": lv1_sval.get("Value", 0),
-                            "turn": lv1_sval.get("Turn", 0),
-                            "count": lv1_sval.get("Count", 0),
-                        }
+                # npValues: NP Lv1~5 在 OC1 下的数值（svals 的 [0]~[4]）
+                np_values = (
+                    [(raw_svals[i].get("Value", 0) if i < len(raw_svals) else 0) for i in range(5)]
+                    if isinstance(raw_svals, list)
+                    else [lv1_sval.get("Value", 0)] * 5
+                )
+                # ocValues: OC1~5 在 NP1 下的数值（svals/svals2~5 的 [0]）
+                oc_keys = ["svals", "svals2", "svals3", "svals4", "svals5"]
+                oc_values = []
+                for oc_key in oc_keys:
+                    oc_svals = func.get(oc_key, [])
+                    oc_val = (
+                        oc_svals[0].get("Value", 0)
+                        if isinstance(oc_svals, list) and oc_svals and isinstance(oc_svals[0], dict)
+                        else 0
                     )
+                    oc_values.append(oc_val)
+
+                for eff_name in matched_np_effects:
+                    np_entry: dict = {
+                        "type": eff_name,
+                        "funcType": ftype,
+                        "targetType": classify_target_type(func_target),
+                        "npValues": np_values,
+                        "ocValues": oc_values,
+                        "turn": lv1_sval.get("Turn", 0),
+                        "count": lv1_sval.get("Count", 0),
+                    }
+                    # damageClass 乘区标签
+                    damage_class = matcher.get("damageClasses", {}).get(eff_name)
+                    if damage_class:
+                        np_entry["damageClass"] = damage_class
+                    # antiTarget: D类宝具特攻（damageNpSP）
+                    # Atlas API 中特攻目标存储在 svals[].Target（trait ID）
+                    if eff_name == "damageNpSP":
+                        target_trait_id = lv1_sval.get("Target", 0)
+                        if target_trait_id:
+                            np_entry["antiTarget"] = {
+                                "traitId": target_trait_id,
+                            }
+                        correction = lv1_sval.get("Correction", 0)
+                        if correction:
+                            np_entry["correction"] = correction
+                    np_effect_entries.append(np_entry)
 
                 if "damage" in ftype.lower():
                     target = func_target
@@ -1254,6 +1309,38 @@ def build_database(
             "skillDetails": skill_details,
             "npDetails": np_details,
         }
+
+        # antiTraitIndex: 从 skillDetails 和 npDetails 中提取特攻目标，构建顶层索引
+        anti_trait_index: list[dict] = []
+        for sk in skill_details:
+            for eff in sk.get("effects", []):
+                anti_target = eff.get("antiTarget")
+                if anti_target:
+                    anti_trait_index.append(
+                        {
+                            "trait": anti_target["trait"],
+                            "traitId": anti_target["traitId"],
+                            "source": "skill",
+                            "buffClass": eff.get("damageClass", "C"),
+                            "effectType": eff["type"],
+                        }
+                    )
+        for np_d in np_details:
+            for eff in np_d.get("effects", []):
+                anti_target = eff.get("antiTarget")
+                if anti_target:
+                    idx_entry: dict = {
+                        "traitId": anti_target["traitId"],
+                        "source": "np",
+                        "buffClass": eff.get("damageClass", "D"),
+                        "effectType": eff["type"],
+                    }
+                    if "trait" in anti_target:
+                        idx_entry["trait"] = anti_target["trait"]
+                    anti_trait_index.append(idx_entry)
+        if anti_trait_index:
+            entry["antiTraitIndex"] = anti_trait_index
+
         db.append(entry)
         if skill_effects:
             total_with_effects += 1
@@ -1410,22 +1497,56 @@ def get_ce_face_url(ce: dict) -> str:
 
 
 # ── 间接触发 buff 类型（从者技能中引用子 skill 的 buff） ──
-# selfturnendFunction: 每回合末触发（如莎乐美3技能的概率NP充能）
-# delayFunction: 延迟N回合后触发
-# 这些 buff 的 svals.Value 存储的是子 skill ID，需要请求 Atlas API 获取实际效果
-_CONDITIONAL_TRIGGER_BUFF_TYPES = frozenset({"selfturnendFunction", "delayFunction"})
+# 这些 buff 的 svals.Value 存储的是子 skill ID，需要请求 Atlas API 获取实际效果。
+# Chaldea 代码定义 43 种 triggerBuffTypes，主动技能中实际使用 17 种。
+_CONDITIONAL_TRIGGER_BUFF_TYPES = frozenset(
+    {
+        "selfturnendFunction",  # 每回合结束时
+        "selfturnstartFunction",  # 每回合开始时
+        "delayFunction",  # 延迟N回合后
+        "attackAfterFunction",  # 攻击后（含支援）
+        "attackAfterFunctionMainOnly",  # 攻击后（仅自身）
+        "attackBeforeFunction",  # 攻击前（含支援）
+        "attackBeforeFunctionMainOnly",  # 攻击前（仅自身）
+        "commandattackAfterFunction",  # 指令卡攻击后（含支援）
+        "commandattackAfterFunctionMainOnly",  # 指令卡攻击后（仅自身）
+        "commandattackBeforeFunction",  # 指令卡攻击前（含支援）
+        "commandattackBeforeFunctionMainOnly",  # 指令卡攻击前（仅自身）
+        "damageFunction",  # 受击时
+        "gutsFunction",  # 毅力触发时
+        "deadFunction",  # 死亡时
+        "functionedFunction",  # 被赋予效果时
+        "treasureDevicePostAfterFunction",  # 宝具使用后
+        "avoidFunctionExecuteSelf",  # 回避成功时
+    }
+)
 
 # buff 类型到中文触发描述的映射
 _TRIGGER_TYPE_LABELS: dict[str, str] = {
-    "selfturnendFunction": "turnEnd",
-    "delayFunction": "delayed",
+    "selfturnendFunction": "回合结束时",
+    "selfturnstartFunction": "回合开始时",
+    "delayFunction": "延迟触发",
+    "attackAfterFunction": "攻击后",
+    "attackAfterFunctionMainOnly": "攻击后",
+    "attackBeforeFunction": "攻击前",
+    "attackBeforeFunctionMainOnly": "攻击前",
+    "commandattackAfterFunction": "指令卡攻击后",
+    "commandattackAfterFunctionMainOnly": "指令卡攻击后",
+    "commandattackBeforeFunction": "指令卡攻击前",
+    "commandattackBeforeFunctionMainOnly": "指令卡攻击前",
+    "damageFunction": "受击时",
+    "gutsFunction": "毅力触发时",
+    "deadFunction": "死亡时",
+    "functionedFunction": "被赋予效果时",
+    "treasureDevicePostAfterFunction": "宝具使用后",
+    "avoidFunctionExecuteSelf": "回避成功时",
 }
 
 
 def _fetch_conditional_trigger_skills(servants_raw: list[dict]) -> dict[int, list[dict]]:
     """扫描所有从者技能，收集间接触发 buff 引用的子 skill ID，批量请求 Atlas API 获取实际效果。
 
-    间接触发 buff（selfturnendFunction / delayFunction）的 svals[0].Value
+    间接触发 buff（_CONDITIONAL_TRIGGER_BUFF_TYPES 中的 17 种）的 svals[0].Value
     存储的是一个子 skill ID，实际效果（如 gainNp）定义在该子 skill 的 functions 中。
 
     Args:
