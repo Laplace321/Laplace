@@ -862,6 +862,63 @@ def classify_target_type(func_target_type: str) -> str:
     return "other"
 
 
+def _has_transform_servant(svt: dict) -> bool:
+    """检测从者技能中是否存在 transformServant 类型的 funcType。
+
+    用于区分"切换型"（如托勒密、妖兰）和"强化型"同 num 组宝具。
+    切换型从者的同 num 组宝具应全部保留，而非只取最新版本。
+    """
+    for skill in svt.get("skills", []):
+        for func in skill.get("functions", []):
+            if func.get("funcType") == "transformServant":
+                return True
+    return False
+
+
+def _select_retained_nps(svt: dict) -> list[dict]:
+    """基于 num 字段分组去重，选择需要保留的宝具列表。
+
+    规则：
+    1. 按 num 字段将所有宝具分组
+    2. 每个 num 组内：
+       - 如果该从者有 transformServant 技能 → 组内全部保留（切换型）
+       - 否则 → 只取最后一个（强化后版本）
+    3. 所有 num 组的保留宝具全部返回
+    4. 跳过无 card 字段的宝具（无效数据）
+
+    Returns:
+        保留的宝具列表（按原始顺序）
+    """
+    noble_phantasms = svt.get("noblePhantasms", [])
+    if not noble_phantasms:
+        return []
+
+    # 按 num 分组（保持原始顺序）
+    groups: dict[int, list[dict]] = {}
+    for np_data in noble_phantasms:
+        if not np_data.get("card"):
+            continue
+        num = np_data.get("num", 1)
+        groups.setdefault(num, []).append(np_data)
+
+    if not groups:
+        return []
+
+    is_transform = _has_transform_servant(svt)
+    retained: list[dict] = []
+
+    for num in sorted(groups.keys()):
+        nps_in_group = groups[num]
+        if is_transform:
+            # 切换型：组内全部保留
+            retained.extend(nps_in_group)
+        else:
+            # 强化型：只取最后一个（最新版本）
+            retained.append(nps_in_group[-1])
+
+    return retained
+
+
 def _match_func_effects(func: dict, matcher: dict) -> set[str]:
     """对单个 func 进行粗匹配 + validate 精筛，返回通过的效果名集合。"""
     func_type = func.get("funcType", "")
@@ -885,11 +942,18 @@ def _match_func_effects(func: dict, matcher: dict) -> set[str]:
     return validated
 
 
-def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[dict]]:
+def extract_skill_effects(
+    servant: dict, matcher: dict, conditional_skill_map: dict[int, list[dict]] | None = None
+) -> tuple[set[str], list[dict]]:
     """提取从者所有技能中的全部效果（使用 validate 执行器替代手写 refine）。
 
     同一 skillNum 可能因技能强化存在多个版本，仅保留最后出现的
     （Atlas Academy 数据中强化后版本排在后面）。
+
+    Args:
+        servant: 从者原始数据
+        matcher: 效果匹配索引
+        conditional_skill_map: 条件触发子 skill 查找表（由 _fetch_conditional_trigger_skills 构建）
 
     Returns:
         (效果集合, 技能详情列表)
@@ -931,6 +995,56 @@ def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[
                     }
                 )
 
+            # 间接触发效果解析：selfturnendFunction / delayFunction
+            # 如果直接匹配返回空集，检查是否有间接触发 buff
+            if not matched_effects and conditional_skill_map:
+                for buff in func.get("buffs", []):
+                    buff_type = buff.get("type", "")
+                    if buff_type not in _CONDITIONAL_TRIGGER_BUFF_TYPES:
+                        continue
+                    # 获取子 skill ID（svals.Value）和触发概率（svals.Rate）
+                    trigger_sval = (
+                        raw_svals[-1]
+                        if isinstance(raw_svals, list) and raw_svals
+                        else raw_svals
+                        if isinstance(raw_svals, dict)
+                        else {}
+                    )
+                    sub_skill_id = trigger_sval.get("Value", 0)
+                    trigger_rate = trigger_sval.get("Rate", 0)
+                    trigger_delay = trigger_sval.get("Value2", 0) if buff_type == "delayFunction" else 0
+
+                    sub_funcs = conditional_skill_map.get(sub_skill_id, [])
+                    for sub_func in sub_funcs:
+                        # 对子 skill 的每个 function 进行效果匹配
+                        sub_matched = _match_func_effects(sub_func, matcher)
+                        sub_svals = sub_func.get("svals", [])
+                        sub_max_sval = (
+                            sub_svals[-1]
+                            if isinstance(sub_svals, list) and sub_svals
+                            else sub_svals
+                            if isinstance(sub_svals, dict)
+                            else {}
+                        )
+                        sub_target = sub_func.get("funcTargetType", target_type)
+                        for eff_name in sub_matched:
+                            all_effects.add(eff_name)
+                            skill_effects.append(
+                                {
+                                    "type": eff_name,
+                                    "funcType": sub_func.get("funcType", func_type),
+                                    "targetType": classify_target_type(sub_target),
+                                    "valueMax": sub_max_sval.get("Value", 0),
+                                    "turn": sub_max_sval.get("Turn", 0),
+                                    "count": sub_max_sval.get("Count", 0),
+                                    "conditional": {
+                                        "triggerType": _TRIGGER_TYPE_LABELS.get(buff_type, buff_type),
+                                        "triggerRate": trigger_rate,
+                                        "triggerDelay": trigger_delay,
+                                    },
+                                }
+                            )
+
         if skill_effects:
             cool_down = skill.get("coolDown", [])
             details_by_num[skill_num] = {
@@ -945,7 +1059,11 @@ def extract_skill_effects(servant: dict, matcher: dict) -> tuple[set[str], list[
 
 
 def build_database(
-    servants: list[dict], matcher: dict, name_mapping: dict, skill_cn_map: dict | None = None
+    servants: list[dict],
+    matcher: dict,
+    name_mapping: dict,
+    skill_cn_map: dict | None = None,
+    conditional_skill_map: dict[int, list[dict]] | None = None,
 ) -> list[dict]:
     """构建通用从者数据库。
 
@@ -954,6 +1072,7 @@ def build_database(
         matcher: 效果匹配索引
         name_mapping: 从者名翻译映射
         skill_cn_map: 中文技能名/宝具名映射 {"skills": {id: cn_name}, "tds": {id: cn_name}}
+        conditional_skill_map: 条件触发子 skill 查找表（由 _fetch_conditional_trigger_skills 构建）
     """
     db = []
     total_with_effects = 0
@@ -961,7 +1080,7 @@ def build_database(
     cn_tds = (skill_cn_map or {}).get("tds", {})
 
     for svt in servants:
-        skill_effects, skill_details = extract_skill_effects(svt, matcher)
+        skill_effects, skill_details = extract_skill_effects(svt, matcher, conditional_skill_map)
 
         # 填充中文技能名（有映射用中文，无映射保留英文原名）
         for sk_detail in skill_details:
@@ -981,6 +1100,9 @@ def build_database(
         for sk in skill_details:
             for eff in sk.get("effects", []):
                 if eff.get("type") != "gainNp":
+                    continue
+                # 条件触发效果（如概率NP充能）不计入确定性自充
+                if eff.get("conditional"):
                     continue
                 tt = eff.get("targetType", "")
                 charge_percent = eff.get("valueMax", 0) // 100  # 千分比→百分比
@@ -1002,67 +1124,78 @@ def build_database(
             if str(c) in card_map:
                 cards_count[card_map[str(c)]] += 1
 
-        # 解析宝具信息
+        # 解析宝具信息（支持多宝具从者）
+        # 使用 _select_retained_nps() 基于 num 分组去重，保留所有有效宝具
         np_card = "unknown"
         np_target = "unknown"
-        np_effects_set = set()
+        np_effects_set: set[str] = set()
         np_details: list[dict] = []
-        for np in svt.get("noblePhantasms", []):
-            if np.get("card"):
-                np_card = card_map.get(str(np["card"]), "unknown")
-                # 解析宝具目标与附带特效
-                np_effect_entries: list[dict] = []
-                for func in np.get("functions", []):
-                    ftype = func.get("funcType", "")
-                    func_target = func.get("funcTargetType", "")
+        retained_nps = _select_retained_nps(svt)
+        for np in retained_nps:
+            this_np_card = card_map.get(str(np["card"]), "unknown")
+            # 解析宝具目标与附带特效
+            np_effect_entries: list[dict] = []
+            this_np_target = "unknown"
+            for func in np.get("functions", []):
+                ftype = func.get("funcType", "")
+                func_target = func.get("funcTargetType", "")
 
-                    # 提取宝具特效（使用 validate 执行器）
-                    matched_np_effects = _match_func_effects(func, matcher)
-                    np_effects_set.update(matched_np_effects)
+                # 提取宝具特效（使用 validate 执行器）
+                matched_np_effects = _match_func_effects(func, matcher)
+                np_effects_set.update(matched_np_effects)
 
-                    # 烘焙宝具效果详情（OC1 Lv1 = svals[0]）
-                    raw_svals = func.get("svals", [])
-                    lv1_sval = (
-                        raw_svals[0]
-                        if isinstance(raw_svals, list) and raw_svals
-                        else raw_svals
-                        if isinstance(raw_svals, dict)
-                        else {}
-                    )
-                    for eff_name in matched_np_effects:
-                        np_effect_entries.append(
-                            {
-                                "type": eff_name,
-                                "funcType": ftype,
-                                "targetType": classify_target_type(func_target),
-                                "valueLv1": lv1_sval.get("Value", 0),
-                                "turn": lv1_sval.get("Turn", 0),
-                                "count": lv1_sval.get("Count", 0),
-                            }
-                        )
-
-                    if "damage" in ftype.lower():
-                        target = func_target
-                        if target == "enemyAll":
-                            np_target = "all"
-                        elif target == "enemy":
-                            np_target = "one"
-                        else:
-                            np_target = "support"
-
-                # 如果是纯辅助宝具（没有伤害函数）
-                if np_target == "unknown":
-                    np_target = "support"
-
-                if np_effect_entries:
-                    np_details.append(
+                # 烘焙宝具效果详情（OC1 Lv1 = svals[0]）
+                raw_svals = func.get("svals", [])
+                lv1_sval = (
+                    raw_svals[0]
+                    if isinstance(raw_svals, list) and raw_svals
+                    else raw_svals
+                    if isinstance(raw_svals, dict)
+                    else {}
+                )
+                for eff_name in matched_np_effects:
+                    np_effect_entries.append(
                         {
-                            "npId": np.get("id", 0),
-                            "npName": np.get("name", ""),
-                            "effects": np_effect_entries,
+                            "type": eff_name,
+                            "funcType": ftype,
+                            "targetType": classify_target_type(func_target),
+                            "valueLv1": lv1_sval.get("Value", 0),
+                            "turn": lv1_sval.get("Turn", 0),
+                            "count": lv1_sval.get("Count", 0),
                         }
                     )
-                break
+
+                if "damage" in ftype.lower():
+                    target = func_target
+                    if target == "enemyAll":
+                        this_np_target = "all"
+                    elif target == "enemy":
+                        this_np_target = "one"
+                    else:
+                        this_np_target = "support"
+
+            # 如果是纯辅助宝具（没有伤害函数）
+            if this_np_target == "unknown":
+                this_np_target = "support"
+
+            # npCard / npTarget 取第一个含 damage 函数的宝具（主宝具优先）
+            if np_card == "unknown":
+                np_card = this_np_card
+            if np_target == "unknown" and this_np_target != "support":
+                np_target = this_np_target
+
+            if np_effect_entries:
+                np_details.append(
+                    {
+                        "npId": np.get("id", 0),
+                        "npName": np.get("name", ""),
+                        "effects": np_effect_entries,
+                    }
+                )
+
+        # 如果所有宝具都是辅助型，np_target 仍为 unknown → 设为 support
+        if np_target == "unknown" and retained_nps:
+            np_target = "support"
 
         # 填充中文宝具名（有映射用中文，无映射保留英文原名）
         for np_detail in np_details:
@@ -1272,6 +1405,85 @@ def get_ce_face_url(ce: dict) -> str:
     parsed = urlparse(absolute_url)
     filename = Path(parsed.path).name
     return f"/faces/{filename}" if filename else ""
+
+
+# ── 间接触发 buff 类型（从者技能中引用子 skill 的 buff） ──
+# selfturnendFunction: 每回合末触发（如莎乐美3技能的概率NP充能）
+# delayFunction: 延迟N回合后触发
+# 这些 buff 的 svals.Value 存储的是子 skill ID，需要请求 Atlas API 获取实际效果
+_CONDITIONAL_TRIGGER_BUFF_TYPES = frozenset({"selfturnendFunction", "delayFunction"})
+
+# buff 类型到中文触发描述的映射
+_TRIGGER_TYPE_LABELS: dict[str, str] = {
+    "selfturnendFunction": "turnEnd",
+    "delayFunction": "delayed",
+}
+
+
+def _fetch_conditional_trigger_skills(servants_raw: list[dict]) -> dict[int, list[dict]]:
+    """扫描所有从者技能，收集间接触发 buff 引用的子 skill ID，批量请求 Atlas API 获取实际效果。
+
+    间接触发 buff（selfturnendFunction / delayFunction）的 svals[0].Value
+    存储的是一个子 skill ID，实际效果（如 gainNp）定义在该子 skill 的 functions 中。
+
+    Args:
+        servants_raw: Atlas API 返回的原始从者列表（svals 为 list 格式）
+
+    Returns:
+        {sub_skill_id: [{"funcType": str, "buffType": str, "svals": list}]}
+        每个子 skill 可能有多个 function，全部保留。
+    """
+    import requests
+
+    # 收集所有间接触发 buff 引用的子 skill ID
+    sub_skill_ids: set[int] = set()
+    for svt in servants_raw:
+        for skill in svt.get("skills", []):
+            for func in skill.get("functions", []):
+                for buff in func.get("buffs", []):
+                    if buff.get("type") in _CONDITIONAL_TRIGGER_BUFF_TYPES:
+                        svals = func.get("svals", [])
+                        sval = svals[0] if isinstance(svals, list) and svals else {}
+                        sub_id = sval.get("Value", 0) if isinstance(sval, dict) else 0
+                        if sub_id > 0:
+                            sub_skill_ids.add(sub_id)
+
+    if not sub_skill_ids:
+        return {}
+
+    print(f"   📡 获取 {len(sub_skill_ids)} 个条件触发子 skill...")
+    trigger_map: dict[int, list[dict]] = {}
+    for sid in sub_skill_ids:
+        try:
+            url = f"https://api.atlasacademy.io/nice/JP/skill/{sid}?lang=en"
+            resp = requests.get(url, timeout=10)
+            if resp.status_code != 200:
+                continue
+            sk_data = resp.json()
+            funcs_info: list[dict] = []
+            for func in sk_data.get("functions", []):
+                func_type = func.get("funcType", "")
+                svals = func.get("svals", [])
+                buff_type = ""
+                buffs = func.get("buffs", [])
+                if buffs:
+                    buff_type = buffs[0].get("type", "")
+                funcs_info.append(
+                    {
+                        "funcType": func_type,
+                        "funcTargetType": func.get("funcTargetType", ""),
+                        "buffType": buff_type,
+                        "buffs": buffs,
+                        "svals": svals,
+                    }
+                )
+            if funcs_info:
+                trigger_map[sid] = funcs_info
+        except Exception:
+            continue
+
+    print(f"   ✅ 获取到 {len(trigger_map)} 个条件触发子 skill 效果")
+    return trigger_map
 
 
 def _fetch_entry_function_skills(craft_essences: list[dict]) -> dict[int, dict]:
@@ -1711,7 +1923,11 @@ def main():
     skill_cn_map = load_skill_names_cn()
 
     servants = fetch_normal_servants()
-    db = build_database(servants, matcher, name_mapping, skill_cn_map)
+
+    # 预获取所有条件触发 buff 引用的子 skill 数据
+    conditional_skill_map = _fetch_conditional_trigger_skills(servants)
+
+    db = build_database(servants, matcher, name_mapping, skill_cn_map, conditional_skill_map)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     output_path = OUTPUT_DIR / "servants_db.json"
