@@ -291,7 +291,9 @@ def _match_np_effect(
                 if eff.get("type") != effect_name:
                     continue
                 eff_target = eff.get("targetType", "")
-                val = eff.get("valueLv1", 0)
+                # 优先从 npValues[0]（NP1 OC1）取值，向后兼容 valueLv1
+                np_vals = eff.get("npValues")
+                val = np_vals[0] if np_vals else eff.get("valueLv1", 0)
                 if eff_target == "self":
                     np_self += val
                 elif eff_target == "party":

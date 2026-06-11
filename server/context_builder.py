@@ -51,39 +51,30 @@ _COUNT_EFFECTS = {"shortenSkill", "upChagetd"}  # 直接数值，无单位后缀
 def _format_conditional_prefix(conditional: dict) -> str:
     """将 conditional 字段转为中文前缀标记。
 
-    FGO 的 Rate 字段单位为 base-10（Rate/10=百分比）：1000=100%，5000=500%。
-    与 chaldea App 的 _maybeAddRate() / _LazyTrigger 展示逻辑一致。
-    100% 为必定触发，省略概率描述；超过 100% 的概率用于对抗敌方状态抵抗率。
+    UseRate 是条件触发发动概率（千分比），缺失/None = 必定触发。
+    1000=100% 为必定触发，省略概率描述。
 
     Args:
-        conditional: {"triggerType": "turnEnd", "triggerRate": 5000, "triggerDelay": 1}
+        conditional: {"triggerType": "回合结束时", "useRate": 5000}
 
     Returns:
-        如 "[回合结束时]" 或 "[延迟1回合500%概率]"
+        如 "[回合结束时]" 或 "[攻击后50%概率]"
     """
     trigger_type = conditional.get("triggerType", "")
-    trigger_rate = conditional.get("triggerRate", 0)
-    trigger_delay = conditional.get("triggerDelay", 0)
+    use_rate = conditional.get("useRate")
 
-    # 概率描述：千分比→百分比（1000=100%），100%（必定触发）时省略
-    rate_percent = trigger_rate // 10
-    rate_text = f"{rate_percent}%概率" if rate_percent > 0 and rate_percent != 100 else ""
+    # 概率描述：千分比→百分比，None 或 1000（100%）= 必定触发，省略
+    rate_text = ""
+    if use_rate is not None:
+        rate_percent = use_rate // 10
+        if rate_percent > 0 and rate_percent != 100:
+            rate_text = f"{rate_percent}%概率"
 
-    type_labels = {
-        "turnEnd": "回合结束时",
-        "delayed": "延迟触发",
-    }
-    type_text = type_labels.get(trigger_type, trigger_type)
-
-    parts = []
-    if trigger_type == "delayed" and trigger_delay > 0:
-        parts.append(f"延迟{trigger_delay}回合")
-    else:
-        parts.append(type_text)
+    parts = [trigger_type]
     if rate_text:
         parts.append(rate_text)
 
-    return f"[{''.join(parts)}]" if parts else ""
+    return f"[{''.join(parts)}]" if parts and any(parts) else ""
 
 
 def format_effect_detail(eff: dict, is_np: bool = False) -> str:
@@ -103,7 +94,12 @@ def format_effect_detail(eff: dict, is_np: bool = False) -> str:
     target = TARGET_TYPE_MAP.get(eff.get("targetType", ""), "")
     eff_type = eff.get("type", "")
 
-    raw_value = eff.get("valueLv1", 0) if is_np else eff.get("valueMax", 0)
+    # 宝具效果：优先从 npValues[0] 取值（NP1 OC1），向后兼容 valueLv1
+    if is_np:
+        np_values = eff.get("npValues")
+        raw_value = np_values[0] if np_values else eff.get("valueLv1", 0)
+    else:
+        raw_value = eff.get("valueMax", 0)
 
     parts: list[str] = []
     if raw_value and raw_value > 0:
@@ -133,6 +129,18 @@ def format_effect_detail(eff: dict, is_np: bool = False) -> str:
 
     base = f"{effect_name}({','.join(parts)})" if parts else effect_name
 
+    # 宝具效果：追加 NP/OC 数值区间描述
+    if is_np:
+        range_parts: list[str] = []
+        np_values = eff.get("npValues", [])
+        oc_values = eff.get("ocValues", [])
+        if np_values and len(np_values) >= 5 and np_values[0] != np_values[4]:
+            range_parts.append(_format_value_range("NP", np_values[0], np_values[4], eff_type))
+        if oc_values and len(oc_values) >= 5 and oc_values[0] != oc_values[4]:
+            range_parts.append(_format_value_range("OC", oc_values[0], oc_values[4], eff_type))
+        if range_parts:
+            base += " " + " ".join(range_parts)
+
     # 条件触发效果：添加前缀标记
     conditional = eff.get("conditional")
     if conditional:
@@ -140,6 +148,18 @@ def format_effect_detail(eff: dict, is_np: bool = False) -> str:
         return f"{prefix}{base}" if prefix else base
 
     return base
+
+
+def _format_value_range(dimension: str, val_min: int, val_max: int, eff_type: str) -> str:
+    """格式化 NP/OC 维度的数值区间。"""
+    if eff_type in _NP_PERCENT_EFFECTS:
+        return f"({dimension}1:{val_min / 100:.0f}%→{dimension}5:{val_max / 100:.0f}%)"
+    elif eff_type in _STAR_EFFECTS:
+        return f"({dimension}1:{val_min}个→{dimension}5:{val_max}个)"
+    elif eff_type in (_HP_EFFECTS | _DAMAGE_EFFECTS | _COUNT_EFFECTS):
+        return f"({dimension}1:{val_min}→{dimension}5:{val_max})"
+    else:
+        return f"({dimension}1:{val_min / 10:.0f}%→{dimension}5:{val_max / 10:.0f}%)"
 
 
 def build_skill_details(servant: dict) -> list[dict]:
