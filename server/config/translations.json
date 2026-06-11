@@ -25,5 +25,24 @@
     "all": "全体(光炮)",
     "one": "单体",
     "support": "辅助"
+  },
+  "triggerType": {
+    "selfturnendFunction": "回合结束时",
+    "selfturnstartFunction": "回合开始时",
+    "delayFunction": "延迟触发",
+    "attackAfterFunction": "攻击后",
+    "attackAfterFunctionMainOnly": "攻击后",
+    "attackBeforeFunction": "攻击前",
+    "attackBeforeFunctionMainOnly": "攻击前",
+    "commandattackAfterFunction": "指令卡攻击后",
+    "commandattackAfterFunctionMainOnly": "指令卡攻击后",
+    "commandattackBeforeFunction": "指令卡攻击前",
+    "commandattackBeforeFunctionMainOnly": "指令卡攻击前",
+    "damageFunction": "受击时",
+    "gutsFunction": "毅力触发时",
+    "deadFunction": "死亡时",
+    "functionedFunction": "被赋予效果时",
+    "treasureDevicePostAfterFunction": "宝具使用后",
+    "avoidFunctionExecuteSelf": "回避成功时"
   }
 }

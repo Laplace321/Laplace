@@ -1496,51 +1496,24 @@ def get_ce_face_url(ce: dict) -> str:
     return f"/faces/{filename}" if filename else ""
 
 
-# ── 间接触发 buff 类型（从者技能中引用子 skill 的 buff） ──
+# ── 间接触发 buff 类型（从 config/translations.json 的 triggerType 节加载） ──
 # 这些 buff 的 svals.Value 存储的是子 skill ID，需要请求 Atlas API 获取实际效果。
-# Chaldea 代码定义 43 种 triggerBuffTypes，主动技能中实际使用 17 种。
-_CONDITIONAL_TRIGGER_BUFF_TYPES = frozenset(
-    {
-        "selfturnendFunction",  # 每回合结束时
-        "selfturnstartFunction",  # 每回合开始时
-        "delayFunction",  # 延迟N回合后
-        "attackAfterFunction",  # 攻击后（含支援）
-        "attackAfterFunctionMainOnly",  # 攻击后（仅自身）
-        "attackBeforeFunction",  # 攻击前（含支援）
-        "attackBeforeFunctionMainOnly",  # 攻击前（仅自身）
-        "commandattackAfterFunction",  # 指令卡攻击后（含支援）
-        "commandattackAfterFunctionMainOnly",  # 指令卡攻击后（仅自身）
-        "commandattackBeforeFunction",  # 指令卡攻击前（含支援）
-        "commandattackBeforeFunctionMainOnly",  # 指令卡攻击前（仅自身）
-        "damageFunction",  # 受击时
-        "gutsFunction",  # 毅力触发时
-        "deadFunction",  # 死亡时
-        "functionedFunction",  # 被赋予效果时
-        "treasureDevicePostAfterFunction",  # 宝具使用后
-        "avoidFunctionExecuteSelf",  # 回避成功时
-    }
-)
+# keys = 需要追踪的 buff 类型集合，values = 中文触发描述标签。
+# 增删触发类型只需修改 config/translations.json，无需改代码。
 
-# buff 类型到中文触发描述的映射
-_TRIGGER_TYPE_LABELS: dict[str, str] = {
-    "selfturnendFunction": "回合结束时",
-    "selfturnstartFunction": "回合开始时",
-    "delayFunction": "延迟触发",
-    "attackAfterFunction": "攻击后",
-    "attackAfterFunctionMainOnly": "攻击后",
-    "attackBeforeFunction": "攻击前",
-    "attackBeforeFunctionMainOnly": "攻击前",
-    "commandattackAfterFunction": "指令卡攻击后",
-    "commandattackAfterFunctionMainOnly": "指令卡攻击后",
-    "commandattackBeforeFunction": "指令卡攻击前",
-    "commandattackBeforeFunctionMainOnly": "指令卡攻击前",
-    "damageFunction": "受击时",
-    "gutsFunction": "毅力触发时",
-    "deadFunction": "死亡时",
-    "functionedFunction": "被赋予效果时",
-    "treasureDevicePostAfterFunction": "宝具使用后",
-    "avoidFunctionExecuteSelf": "回避成功时",
-}
+
+def _load_trigger_type_labels() -> dict[str, str]:
+    """从 config/translations.json 加载触发类型标签映射。"""
+    translations_path = CONFIG_DIR / "translations.json"
+    if not translations_path.exists():
+        return {}
+    with open(translations_path, encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("triggerType", {})
+
+
+_TRIGGER_TYPE_LABELS = _load_trigger_type_labels()
+_CONDITIONAL_TRIGGER_BUFF_TYPES = frozenset(_TRIGGER_TYPE_LABELS.keys())
 
 
 def _fetch_conditional_trigger_skills(servants_raw: list[dict]) -> dict[int, list[dict]]:
