@@ -1189,6 +1189,8 @@ def build_database(
                     {
                         "npId": np.get("id", 0),
                         "npName": np.get("name", ""),
+                        "npCard": this_np_card,
+                        "npTarget": this_np_target,
                         "effects": np_effect_entries,
                     }
                 )

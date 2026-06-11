@@ -112,15 +112,30 @@ def build_skill_details(servant: dict) -> list[dict]:
 
 
 def build_np_details(servant: dict) -> list[dict]:
-    """构建单从者的宝具详情（含数值），使用中文宝具名或英文原名作为标签。"""
+    """构建单从者的宝具详情（含数值），使用中文宝具名或英文原名作为标签。
+
+    多宝具从者（如卫宫红卡+蓝卡）时，每个宝具条目额外输出色卡和目标类型，
+    帮助 LLM 区分不同宝具。
+    """
+    np_list = servant.get("npDetails", [])
+    has_multiple_nps = len(np_list) > 1
+    np_card_map = get_np_card_map() if has_multiple_nps else {}
+    np_target_map = get_np_target_map() if has_multiple_nps else {}
+
     result = []
-    for np_d in servant.get("npDetails", []):
+    for np_d in np_list:
         effects = []
         for eff in np_d.get("effects", []):
             effects.append(format_effect_detail(eff, is_np=True))
         if effects:
             label = np_d.get("npName", "") or "宝具"
-            result.append({"宝具名": label, "效果": effects})
+            entry: dict = {"宝具名": label, "效果": effects}
+            if has_multiple_nps:
+                raw_card = np_d.get("npCard", "")
+                raw_target = np_d.get("npTarget", "")
+                entry["卡色"] = np_card_map.get(str(raw_card).lower(), raw_card)
+                entry["目标"] = np_target_map.get(str(raw_target).lower(), raw_target)
+            result.append(entry)
     return result
 
 
