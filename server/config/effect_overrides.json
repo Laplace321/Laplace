@@ -107,6 +107,15 @@
       "description": "提升宝具的伤害倍率"
     },
     {
+      "_comment": "npDamage: 宝具基础伤害倍率，覆盖所有 damage 系 funcType。npValues[0]~[4] 为 NP1~5 对应的千分比倍率（如 6000=600%）。用于支持「宝具倍率超过X%」类查询。",
+      "name": "npDamage",
+      "category": "attack",
+      "funcTypes": ["damageNp", "damageNpPierce", "damageNpIndividual", "damageNpIndividualSum", "damageNpRare", "damageNpStateIndividualFix", "damageNpHpratioLow", "damageNpStateIndividual", "damageNpAndOrCheckIndividuality", "damageNpHpratioHigh", "damageNpBattlePointPhase"],
+      "buffTypes": [],
+      "aliases_zh": ["宝具倍率", "宝具伤害倍率", "NP倍率", "宝具伤害"],
+      "description": "宝具基础伤害倍率（NP Lv1~5 的千分比数值，如 6000 表示 600%）"
+    },
+    {
       "name": "damageNpSP",
       "category": "attack",
       "damageClass": "D",
