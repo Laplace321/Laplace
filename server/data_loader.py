@@ -692,6 +692,84 @@ def get_face_url(servant: dict) -> str:
     return f"/faces/{filename}" if filename else ""
 
 
+# ============================================================
+# Player-View Function Filter（对齐 chaldea describeFunctions）
+# ============================================================
+#
+# 与 chaldea 从者技能/宝具页的 function 过滤逻辑严格一致：
+#   showPlayer=True, showEnemy=False（默认玩家视角）
+#
+# 参考实现：
+#   - chaldea/lib/app/descriptors/func/func.dart::describe (L53-152)
+#   - chaldea/lib/models/gamedata/func.dart::isPlayerOnlyFunc / isEnemyOnlyFunc (L421-426)
+#   - chaldea/lib/models/gamedata/func.dart::FuncTargetType.isAlly / isEnemy (L717-720)
+#
+# 过滤规则：
+#   1) funcType == "none" → 直接丢弃
+#   2) funcTargetTeam == "playerAndEnemy"（FuncApplyTarget.all）→ 保留
+#   3) isPlayerOnlyFunc → 保留（showPlayer=True）
+#   4) isEnemyOnlyFunc → 丢弃（showEnemy=False）
+#   5) 其他（双方都能用 / field / dynamic / noTarget）→ 保留
+#
+# 典型案例：莎乐美三技能「七面纱舞」存在两条 funcId 不同但效果完全相同的 delayFunction，
+#         其中 funcTargetTeam=enemy 那条只在敌方持有时生效，玩家页面应剔除。
+
+# FuncTargetType.isAlly 判定：name.startsWith('pt') 或属于这两种特殊值
+_FUNC_TARGET_ALLY_EXTRAS = frozenset({"self", "commandTypeSelfTreasureDevice"})
+# FuncTargetType.isEnemy 判定：name.startsWith('enemy') 但排除这一种动态目标
+_FUNC_TARGET_ENEMY_EXCLUDE = "enemyOneNoTargetNoAction"
+
+
+def _func_target_is_ally(target_type: str) -> bool:
+    """对齐 chaldea FuncTargetType.isAlly。"""
+    return target_type.startswith("pt") or target_type in _FUNC_TARGET_ALLY_EXTRAS
+
+
+def _func_target_is_enemy(target_type: str) -> bool:
+    """对齐 chaldea FuncTargetType.isEnemy。"""
+    return target_type.startswith("enemy") and target_type != _FUNC_TARGET_ENEMY_EXCLUDE
+
+
+def _is_player_only_func(team: str, target_type: str) -> bool:
+    """对齐 chaldea BaseFunctionX.isPlayerOnlyFunc。"""
+    return (team == "enemy" and _func_target_is_enemy(target_type)) or (
+        team == "player" and _func_target_is_ally(target_type)
+    )
+
+
+def _is_enemy_only_func(team: str, target_type: str) -> bool:
+    """对齐 chaldea BaseFunctionX.isEnemyOnlyFunc。"""
+    return (team == "enemy" and _func_target_is_ally(target_type)) or (
+        team == "player" and _func_target_is_enemy(target_type)
+    )
+
+
+def is_player_visible_func(func: dict, *, show_player: bool = True, show_enemy: bool = False) -> bool:
+    """与 chaldea describeFunctions 玩家视角过滤逻辑严格一致。
+
+    Args:
+        func: Atlas API 原始 function 对象
+        show_player: 是否展示「玩家持有时生效」的 function（从者页默认 True）
+        show_enemy: 是否展示「敌方持有时生效」的 function（从者页默认 False）
+
+    Returns:
+        True 表示该 function 应保留，False 表示应过滤掉。
+    """
+    if func.get("funcType", "") == "none":
+        return False
+    team = func.get("funcTargetTeam", "")
+    # FuncApplyTarget.all 在 Atlas JSON 里序列化为 "playerAndEnemy"
+    if team in ("playerAndEnemy", "all"):
+        return True
+    target_type = func.get("funcTargetType", "")
+    if _is_player_only_func(team, target_type):
+        return show_player
+    if _is_enemy_only_func(team, target_type):
+        return show_enemy
+    # 含 field / dynamic / noTarget 等通用场景，chaldea 默认放行
+    return True
+
+
 def _digest_append_passives(raw_passives: list[dict]) -> list[dict]:
     """预消化追加被动：只保留满级数值和解锁素材，丢弃完整 functions 嵌套。"""
     result = []
@@ -737,6 +815,9 @@ def _digest_skills(raw_skills: list[dict]) -> list[dict]:
     for sk in raw_skills:
         funcs = []
         for fn in sk.get("functions", []):
+            # 对齐 chaldea describeFunctions：过滤掉 funcType=none / 仅敌方持有生效的 function
+            if not is_player_visible_func(fn):
+                continue
             # svals 只保留满级（最后一个元素 = Lv.10）
             svals = fn.get("svals", [])
             max_sval = svals[-1] if svals else None
@@ -793,6 +874,9 @@ def _digest_noble_phantasms(raw_nps: list[dict]) -> list[dict]:
     for np_data in raw_nps:
         funcs = []
         for fn in np_data.get("functions", []):
+            # 对齐 chaldea describeFunctions：过滤掉 funcType=none / 仅敌方持有生效的 function
+            if not is_player_visible_func(fn):
+                continue
             digested_buffs = []
             for b in fn.get("buffs", []):
                 digested_buff: dict = {
@@ -976,6 +1060,10 @@ def extract_skill_effects(
         skill_num = skill.get("num", 0)
         skill_effects: list[dict] = []
         for func in skill.get("functions", []):
+            # 对齐 chaldea describeFunctions：过滤掉仅敌方持有生效的 function
+            # （否则莎乐美等从者会出现重复延迟触发等技术性副本条目）
+            if not is_player_visible_func(func):
+                continue
             func_type = func.get("funcType", "")
             target_type = func.get("funcTargetType", "")
 
@@ -1163,6 +1251,9 @@ def build_database(
             np_effect_entries: list[dict] = []
             this_np_target = "unknown"
             for func in np.get("functions", []):
+                # 对齐 chaldea describeFunctions：过滤掉仅敌方持有生效的 function
+                if not is_player_visible_func(func):
+                    continue
                 ftype = func.get("funcType", "")
                 func_target = func.get("funcTargetType", "")
 
@@ -1675,6 +1766,9 @@ def _extract_ce_effects(
         # 跳过活动限定的 eventDropUp 等效果（skillNum > 1 通常是活动加成）
         # 但保留 num=1 的核心效果
         for func in skill.get("functions", []):
+            # 对齐 chaldea describeFunctions：过滤掉仅敌方持有生效的 function
+            if not is_player_visible_func(func):
+                continue
             func_type = func.get("funcType", "")
             # 跳过活动掉落加成
             if func_type == "eventDropUp":
