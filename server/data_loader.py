@@ -1022,6 +1022,10 @@ def extract_skill_effects(
                     buff_type = buff.get("type", "")
                     if buff_type not in _CONDITIONAL_TRIGGER_BUFF_TYPES:
                         continue
+                    # 烘焙触发器伞名到 skillEffects 集合，使 search_by_skill_effect
+                    # 能通过 triggerFunc（虚拟伞）或具体 buff_type（如 attackAfterFunction）命中
+                    all_effects.add("triggerFunc")
+                    all_effects.add(buff_type)
                     # 获取子 skill ID（svals.Value）和触发概率（svals.Rate）
                     trigger_sval = (
                         raw_svals[-1]
