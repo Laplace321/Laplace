@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方案 C · 英灵召唤书 / Servant Codex</title>
+<link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;500;700;900&family=Cormorant+Garamond:wght@500;600;700&family=EB+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F8F4EC; --paper:#FCFAF3;
+  --ink:#1B2D5B; --ink-deep:#0F1B3A; --ink-soft:#566687;
+  --seal:#B8344A; --seal-deep:#8E2438;
+  --gold:#B89968; --gold-deep:#917548;
+  --rule:#D9CFB8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Serif SC','EB Garamond',serif;background:var(--bg);color:var(--ink-deep);min-height:100vh;background-image:radial-gradient(ellipse at 20% 0%,rgba(184,153,104,0.12),transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(184,52,74,0.05),transparent 50%);display:flex}
+
+/* ===== Sidebar (Catalog/Index) ===== */
+.sidebar{width:240px;flex-shrink:0;background:var(--paper);border-right:1px solid var(--rule);padding:32px 24px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar-title{font-family:'EB Garamond',serif;font-style:italic;font-size:14px;letter-spacing:3px;color:var(--gold-deep);text-transform:uppercase;margin-bottom:6px}
+.sidebar-name{font-family:'EB Garamond',serif;font-weight:700;font-size:28px;letter-spacing:4px;color:var(--ink-deep);margin-bottom:4px}
+.sidebar-sub{font-size:11px;color:var(--ink-soft);margin-bottom:24px;letter-spacing:1px}
+.sidebar-divider{height:1px;background:var(--rule);position:relative;margin:18px 0}
+.sidebar-divider::before{content:"❦";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--paper);padding:0 10px;color:var(--gold);font-size:14px}
+.sidebar h3{font-family:'EB Garamond',serif;font-style:italic;font-size:11px;color:var(--gold-deep);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;font-weight:600}
+.sidebar ul{list-style:none}
+.sidebar li{padding:6px 0;font-size:13px;color:var(--ink-soft);cursor:pointer;font-family:'Noto Serif SC';display:flex;align-items:center;gap:8px;border-bottom:1px dotted var(--rule)}
+.sidebar li::before{content:"·";color:var(--gold)}
+.sidebar li:hover{color:var(--ink-deep)}
+.sidebar li.active{color:var(--seal);font-weight:600}
+.sidebar li.active::before{content:"❧";color:var(--seal)}
+
+/* ===== Main ===== */
+main{flex:1;padding:48px 64px 32px;max-width:880px;margin:0 auto;width:100%}
+
+.preamble{text-align:center;margin-bottom:48px;position:relative;padding-bottom:32px}
+.preamble::after{content:"❦   ❦   ❦";display:block;color:var(--gold);font-size:14px;letter-spacing:18px;margin-top:24px}
+.preamble .vol{font-family:'EB Garamond',serif;font-style:italic;font-size:14px;letter-spacing:6px;color:var(--gold-deep);margin-bottom:12px}
+.preamble h1{font-family:'EB Garamond',serif;font-weight:700;font-size:48px;letter-spacing:4px;color:var(--ink-deep);line-height:1.2;margin-bottom:14px}
+.preamble h1 em{font-style:italic;color:var(--seal)}
+.preamble .author{font-size:13px;color:var(--ink-soft);font-family:'Noto Serif SC';letter-spacing:2px}
+.preamble .author em{color:var(--ink);font-style:normal;font-weight:600}
+
+/* ===== Chat (book-page style) ===== */
+.chat{margin-bottom:48px}
+.entry{margin-bottom:36px;padding-bottom:36px;border-bottom:1px solid var(--rule);position:relative}
+.entry:last-child{border:0}
+.entry::after{content:"";position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);width:80px;height:1px;background:var(--gold)}
+
+.q{margin-bottom:18px}
+.q .q-label{display:inline-block;font-family:'EB Garamond',serif;font-style:italic;font-weight:700;font-size:14px;letter-spacing:3px;color:var(--seal);margin-bottom:6px;text-transform:uppercase}
+.q .q-label::before{content:"※ "}
+.q p{font-family:'Noto Serif SC';font-size:17px;line-height:1.85;color:var(--ink-deep);text-indent:2em;font-weight:500}
+
+.a{position:relative;padding-left:32px}
+.a::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;background:var(--ink)}
+.a .a-label{display:inline-block;font-family:'EB Garamond',serif;font-style:italic;font-weight:700;font-size:14px;letter-spacing:3px;color:var(--ink);margin-bottom:8px;text-transform:uppercase}
+.a .a-label::before{content:"❧ "}
+
+.thinking{font-family:'Noto Serif SC';font-style:italic;font-size:13px;color:var(--ink-soft);margin-bottom:12px;line-height:2;padding:10px 16px;background:rgba(184,153,104,0.08);border-left:2px solid var(--gold)}
+.thinking .step{display:block}
+.thinking .step::before{content:"— ";color:var(--gold)}
+
+.a p{font-family:'Noto Serif SC';font-size:15px;line-height:2;color:var(--ink-deep);margin-bottom:10px;text-indent:2em}
+.a strong{color:var(--seal);font-weight:700;border-bottom:1px solid rgba(184,52,74,0.3)}
+.a .signature{text-align:right;font-family:'EB Garamond',serif;font-style:italic;font-size:13px;color:var(--ink-soft);margin-top:14px}
+.a .signature em{color:var(--ink);font-style:normal;font-weight:600;letter-spacing:2px}
+
+/* ===== Servant entry (codex page) ===== */
+.servant-list{display:flex;flex-direction:column;gap:16px;margin:18px 0}
+.servant-entry{background:var(--paper);border:1px solid var(--rule);padding:18px 22px;display:flex;gap:20px;align-items:center;position:relative}
+.servant-entry::before{content:"";position:absolute;top:8px;bottom:8px;left:0;width:3px;background:var(--ink)}
+.servant-entry:hover{box-shadow:0 4px 24px rgba(15,27,58,0.08)}
+.servant-portrait{width:64px;height:80px;background:linear-gradient(180deg,#2a3d6a,#1B2D5B);color:var(--gold);display:flex;align-items:center;justify-content:center;font-family:'EB Garamond',serif;font-style:italic;font-weight:700;font-size:32px;flex-shrink:0;border:1px solid var(--ink)}
+.servant-info{flex:1}
+.servant-info .name-row{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+.servant-info .name{font-family:'EB Garamond',serif;font-weight:700;font-size:22px;letter-spacing:2px;color:var(--ink-deep)}
+.servant-info .name-cn{font-family:'Noto Serif SC';font-size:14px;color:var(--ink-soft)}
+.servant-info .stats{display:flex;gap:18px;font-size:13px;font-family:'Noto Serif SC';color:var(--ink-soft)}
+.servant-info .stats em{font-style:normal;color:var(--ink);font-weight:600;font-family:'EB Garamond',serif;font-size:14px}
+.seal-stamp{width:54px;height:54px;border:2px solid var(--seal);color:var(--seal);display:flex;align-items:center;justify-content:center;font-family:'EB Garamond',serif;font-weight:700;font-size:20px;font-style:italic;border-radius:50%;flex-shrink:0;transform:rotate(-12deg);background:radial-gradient(circle,rgba(184,52,74,0.04),transparent 70%)}
+
+/* ===== Input ===== */
+.input-area{position:sticky;bottom:0;background:linear-gradient(180deg,transparent,var(--bg) 25%);padding:24px 64px}
+.input-inner{max-width:880px;margin:0 auto}
+.input-quote{text-align:center;font-family:'EB Garamond',serif;font-style:italic;font-size:12px;color:var(--gold-deep);letter-spacing:2px;margin-bottom:10px}
+.input-quote::before{content:"« "}
+.input-quote::after{content:" »"}
+.input-row{display:flex;gap:12px;background:var(--paper);border:1px solid var(--ink);padding:6px 10px 6px 22px;align-items:center}
+.input-row input{flex:1;border:0;outline:0;background:transparent;font-family:'Noto Serif SC';font-size:15px;color:var(--ink-deep);height:44px}
+.send-btn{padding:0 24px;height:36px;background:transparent;border:1px solid var(--ink);color:var(--ink);font-family:'EB Garamond',serif;font-weight:700;font-size:13px;letter-spacing:3px;cursor:pointer}
+.send-btn:hover{background:var(--ink);color:var(--gold)}
+
+/* ===== Footer ===== */
+.footer{max-width:880px;margin:0 auto;padding:18px 64px 32px;font-family:'EB Garamond',serif;font-style:italic;font-size:11px;color:var(--ink-soft);text-align:center;letter-spacing:2px;line-height:2}
+.footer a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.footer span{margin:0 10px}
+
+.back{position:fixed;top:18px;right:18px;z-index:50;background:var(--paper);border:1px solid var(--ink);padding:6px 14px;font-size:11px;letter-spacing:2px;color:var(--ink);text-decoration:none;font-family:'EB Garamond',serif;font-style:italic}
+.back:hover{background:var(--ink);color:var(--gold)}
+</style>
+</head>
+<body>
+<a href="index.html" class="back">← BACK</a>
+
+<aside class="sidebar">
+  <div class="sidebar-title">— Codex —</div>
+  <div class="sidebar-name">LAPLACE</div>
+  <div class="sidebar-sub">英灵召唤书·目录</div>
+  <div class="sidebar-divider"></div>
+
+  <h3>Recent Sessions</h3>
+  <ul>
+    <li class="active">Ⅰ. Caster 自充检索</li>
+    <li>Ⅱ. 戴冠战配队建议</li>
+    <li>Ⅲ. 玉藻前技能解析</li>
+    <li>Ⅳ. 50NP 礼装清单</li>
+  </ul>
+
+  <div class="sidebar-divider"></div>
+
+  <h3>Categories</h3>
+  <ul>
+    <li>从者图鉴</li>
+    <li>礼装索引</li>
+    <li>戴冠战攻略</li>
+    <li>关卡通解</li>
+  </ul>
+
+  <div class="sidebar-divider"></div>
+
+  <h3>About</h3>
+  <ul>
+    <li>更新日志</li>
+    <li>使用说明</li>
+    <li>打赏项目</li>
+  </ul>
+</aside>
+
+<main>
+  <div class="preamble">
+    <div class="vol">— Volume Ⅰ · Chapter 001 —</div>
+    <h1>从者<em>·</em>检索之卷</h1>
+    <div class="author">By <em>LAPLACE</em> · 御 主 询 问 录 · 2026.06.10</div>
+  </div>
+
+  <div class="chat">
+    <div class="entry">
+      <div class="q">
+        <div class="q-label">御主询问</div>
+        <p>30NP 自充以上的 Caster 有哪些？最好五星。</p>
+      </div>
+      <div class="a">
+        <div class="a-label">报告</div>
+        <div class="thinking">
+          <span class="step">解析意图——Caster 职阶 · NP ≥ 30 · ★5</span>
+          <span class="step">召唤检索之术——遍历英灵图鉴</span>
+          <span class="step">合并结果——共得四名候选</span>
+        </div>
+        <p>御主啊。圣杯回应了你的呼唤，自迦勒底浩瀚之档案中，共寻得 <strong>四位</strong> 符合条件的英灵。其名讳与渊源，谨录于下：</p>
+
+        <div class="servant-list">
+          <div class="servant-entry">
+            <div class="servant-portrait">Ⅰ</div>
+            <div class="servant-info">
+              <div class="name-row"><div class="name">Merlin</div><div class="name-cn">梅 林 · 花之魔术师</div></div>
+              <div class="stats"><span>职阶 <em>Caster</em></span><span>稀有度 <em>★★★★★</em></span><span>自充 <em>+50</em></span><span>宝具色 <em>Buster</em></span></div>
+            </div>
+            <div class="seal-stamp">EX</div>
+          </div>
+          <div class="servant-entry">
+            <div class="servant-portrait">Ⅱ</div>
+            <div class="servant-info">
+              <div class="name-row"><div class="name">Tamamo no Mae</div><div class="name-cn">玉 藻 前 · 妖狐</div></div>
+              <div class="stats"><span>职阶 <em>Caster</em></span><span>稀有度 <em>★★★★★</em></span><span>自充 <em>+50</em></span><span>宝具色 <em>Arts</em></span></div>
+            </div>
+            <div class="seal-stamp">A+</div>
+          </div>
+          <div class="servant-entry">
+            <div class="servant-portrait">Ⅲ</div>
+            <div class="servant-info">
+              <div class="name-row"><div class="name">Caster of Limbo</div><div class="name-cn">芦 屋 道 满</div></div>
+              <div class="stats"><span>职阶 <em>Caster</em></span><span>稀有度 <em>★★★★★</em></span><span>自充 <em>+30</em></span><span>宝具色 <em>Arts</em></span></div>
+            </div>
+            <div class="seal-stamp">A</div>
+          </div>
+          <div class="servant-entry">
+            <div class="servant-portrait">Ⅳ</div>
+            <div class="servant-info">
+              <div class="name-row"><div class="name">Castoria</div><div class="name-cn">阿尔托莉雅·Caster</div></div>
+              <div class="stats"><span>职阶 <em>Caster</em></span><span>稀有度 <em>★★★★★</em></span><span>自充 <em>+30</em></span><span>宝具色 <em>Arts</em></span></div>
+            </div>
+            <div class="seal-stamp">A</div>
+          </div>
+        </div>
+
+        <p>愚以为，<strong>梅林</strong>与<strong>玉藻前</strong>之自充能力堪为辅助之首选；<strong>呆毛 Caster</strong> 则为 Arts 周回轴心。御主若欲细察其术理，可继续询问。</p>
+        <div class="signature">—— <em>LAPLACE</em>，谨录</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="input-area">
+  <div class="input-inner">
+    <div class="input-quote">向英灵之书提出你的询问</div>
+    <div class="input-row">
+      <input type="text" placeholder="例如「分析下 Castoria 的技能优势」">
+      <button class="send-btn">提 问</button>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <span>Atlas Academy</span>·<span>Chaldea</span>·<span>合作 <em style="color:var(--ink);font-style:normal">怀旧大金</em></span>·<span><a href="#">☕ 打赏</a></span>·<span>v0.3.0</span>
+</div>
+
+</body>
+</html>

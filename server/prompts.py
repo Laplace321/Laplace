@@ -91,6 +91,11 @@ def get_generation_prompt(user_query: str, context_json: str) -> str:
     *   ❌ 绝对禁止：「JSON 中仅列出 5 名」「第6位未在JSON中呈现」「匹配总数为6，但JSON内展示5位」「详情仅展示5位，数据截断」「依规则不推测、不补充」「可能有N名未展开」「需以实际游戏数据为准」
     *   **处理总数与代表数量不一致的正确方式**：直接说"共找到 N 位从者，以下列举其中 M 位代表"，然后自然地介绍这 M 位即可。不要解释为什么只列了 M 位、不要猜测剩余从者是谁、不要提到 JSON 或数据展示的任何概念。
     *   你的每一句话都必须像一个懂游戏的朋友在聊天，而不是一个程序在汇报日志。
+10. **FGO 伤害公式乘区术语**：当用户提到"A类/B类/C类/D类 buff"时，必须按以下定义理解，**严禁**将"A类"误解为"攻击力"：
+    *   **A类 = 色卡性能提升（魔放类）**：Arts提升、Buster提升、Quick提升。梅林的"Buster提升50%"就是 A类buff。
+    *   **B类 = 攻击力提升/防御下降**：攻击力提升属于 B类，不是 A类。
+    *   **C类 = 宝具威力提升 + 暴击威力提升 + 特攻**
+    *   **D类 = 宝具特攻倍率**
 
 ## 检索结果上下文
 ```json
@@ -139,10 +144,10 @@ def build_classifier_prompt() -> str:
 典型场景：活动时间、卡池复刻、主线关卡、素材掉落、版本历史。
 关键信号：活动、卡池、复刻、up、素材、掉落、主线、特异点、章节、版本、周年、联动、"什么时候"。
 
-**链路 C — 攻略/评价/主观推荐**
-用户询问主观性的攻略建议、打法推荐、强度评价，需要从攻略文档检索。
-典型场景：关卡攻略、配队推荐、强度评价、戴冠战相关问题。
-关键信号：攻略、打法、配队、阵容、推荐（主观性的）、评价、强度、tier、戴冠战/冠位/剑冠/弓冠/星图。
+**链路 C — 攻略/评价/主观推荐/游戏机制解释**
+用户询问主观性的攻略建议、打法推荐、强度评价，或游戏机制原理解释，需要从攻略文档检索。
+典型场景：关卡攻略、配队推荐、强度评价、戴冠战相关问题、游戏机制解释（伤害公式、buff 分类、乘区原理等）。
+关键信号：攻略、打法、配队、阵容、推荐（主观性的）、评价、强度、tier、戴冠战/冠位/剑冠/弓冠/星图、伤害公式、乘区、A类/B类/C类/D类buff。
 
 ## 消歧义规则（关键）
 
@@ -151,6 +156,8 @@ def build_classifier_prompt() -> str:
 3. **可拆解为具体筛选条件 = 链路 A**：如果用户的问题可以被拆解为明确的筛选参数（职阶名 + 效果名 + 数值等），走链路 A。只有无法拆解为具体条件的泛泛推荐（"推荐几个好用的从者"）才走链路 C。
 4. **从者/礼装名称查询 = 链路 A**：用户问某个从者或礼装的信息（"查一下梅林"、"梅林技能"），走链路 A，不是链路 B。链路 B 是查游戏事实（"梅林什么时候复刻"）。
 5. **职阶克制 = 链路 A**：用户问克制关系（"什么克制XX"、"打XX用什么职阶"），走链路 A。
+6. **游戏机制原理 = 链路 C**：用户问"什么是 X 类 buff"、"伤害公式怎么算"、"乘区是什么意思"等游戏机制解释类问题，走链路 C。注意区分：问"有哪些从者有 X 效果"是数据查询（A），问"X 效果的计算原理是什么"是机制解释（C）。
+7. **「从者名 + X类buff」= 链路 A**：当用户问某个从者能提供多少 A/B/C/D 类 buff 时（如"梅林能提供多少A类buff"），本质是查询该从者的具体技能数值，走链路 A。只有不涉及具体从者的纯机制性问题（"A类buff是什么"）才走链路 C。
 
 ## 输出格式
 
@@ -175,6 +182,10 @@ def build_classifier_prompt() -> str:
 用户："戴冠战剑阶怎么打" → {"pipeline": "C", "confidence": 0.95}
 用户："高难配队推荐" → {"pipeline": "C", "confidence": 0.9}
 用户："村正值不值得练" → {"pipeline": "C", "confidence": 0.85}
+用户："什么是C类buff" → {"pipeline": "C", "confidence": 0.95}
+用户："伤害公式怎么算" → {"pipeline": "C", "confidence": 0.95}
+用户："A类和B类乘区有什么区别" → {"pipeline": "C", "confidence": 0.9}
+用户："梅林能提供多少A类buff" → {"pipeline": "A", "confidence": 0.9}
 """
 
 
@@ -280,11 +291,12 @@ def build_routing_prompt(
 12. **特性搜索（search_by_traits）**：当用户查询从者的"特性"/"属性"/"标签"（如"龙特性"、"王特性"、"神性"、"活在当下的人类"、"兽科从者"、"圆桌骑士"、"秩序·善"等）时，使用 `search_by_traits`。参数 `traitNames` 传中文特性名列表（如 `["龙"]`、`["活在当下的人类"]`），系统会自动查表转换为 ID。常见特性举例：龙、王、神性、人类、圆桌骑士、兽科从者、活在当下的人类、夏日模式从者、童话特性从者等
     - 可选参数 `ascension`（整数 0-4）：指定灵基阶段。用户说"第三灵基"/"最终再临"/"泳装形态"时传对应值。灵基映射：0=初始、1=灵基一、2=灵基二、3=灵基三/最终再临、4=最终再临（部分从者）。不传此参数时，默认匹配全灵基并集（即该从者在任意灵基下拥有的所有特性）
     - 注意：61 个从者存在灵基间特性差异（如梅露辛灵基 0-2 有圆桌骑士特性，灵基 3-4 没有），指定灵基时可精确筛选
-13. **不可查效果 — 直接 fallback**：以下效果属于被动/活动/礼装效果，**当前不在从者查询能力范围内**，应直接走 fallback 回复用户"此类效果暂不支持查询"：羁绊加成（`servantFriendshipUp`）、QP 加成（`qpUp`）、素材掉落加成（`eventDropUp`）。**禁止**对这些效果调用任何 Skill，否则一定返回 0 条结果
-14. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"、"哪个职阶克制XX"、"什么克制XX"等表达时，**必须**使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"、"月癌"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。**即使用户只问"哪个职阶克制X"这种看似知识性问题，也必须走 `search_by_class_advantage`**，系统会在结果中返回克制关系和对应从者。
-15. **技能冷却时间（CD）筛选**：`search_by_effect` 和 `search_by_skill_effect` 均支持 `maxCd` 参数。选择哪个 Skill 遵循规则 8（用户说了"技能"用 `search_by_skill_effect`，未指定来源用 `search_by_effect`）。`maxCd` 语义是"CD **≤** maxCd"，因此**必须注意"小于"和"小于等于"的区别**：用户说"CD小于5"/"CD<5"→ maxCd:**4**（因为 ≤4 等价于 <5）；用户说"CD不超过5"/"CD≤5"→ maxCd:5。CD 是技能的固有属性，`maxCd` 保证在同一技能粒度内联合匹配效果+数值+CD。当用户说"技能自充50%以上且CD<5"时，用 `search_by_skill_effect` 传 skillEffect:"gainNp"+targetType:"self"+minValue:50+maxCd:4。"短CD"默认理解为 maxCd:5。纯 CD 查询（如"蓝卡宝具且CD<5"）只传 maxCd 即可，与其他 Skill AND 组合。**禁止使用已废弃的 search_by_skill_cd**
-16. **疑似从者名称/昵称一律用 lookup_servant（重要）**：当用户的问题中包含你不确定是否为从者名称的词语（如"红A"、"小太阳"、"花之魔术师"、"老虚"、"CBA"、"XJB"、"呆毛"、"2B"等看起来像昵称/外号/缩写/纯字母组合的表达），**必须**使用 `lookup_servant`，将该词语作为 `name` 参数传入。系统后端支持昵称映射和模糊匹配，会自动处理识别。**绝不要**因为你不认识某个名称就返回 `no_match` 或 `out_of_scope`。只要用户的问题看起来是在查询或询问某个特定角色/从者，就选择 `lookup_servant`。**特别注意**：纯英文字母、数字组合、字母+数字混合（如"CBA"、"X4"、"2B"）在 FGO 社区中是常见的从者昵称缩写形式，绝不能因为看起来不像名字就判定为超出范围。如果用户同时问了从者详情（如"XX技能介绍"、"XX宝具是什么"），response_skill 选 `respond_servant_detail`。
-17. **概念礼装查询（重要）**：当用户提到"礼装"/"概念礼装"/"CE"/"带XX效果的礼装"/"推荐礼装"时，必须使用 CE domain 的 Skills，response_skill 选 `respond_ce_list`：
+13. **伤害公式乘区术语（A/B/C/D类buff）映射**：FGO伤害公式中同一乘区内buff相加、不同乘区相乘。用户使用"X类buff"/"X类增伤"/"乘区X"时，必须按以下映射路由，**严禁**将"A类"误解为"Attack"：A类=色卡性能(魔放)用`effects:["upArts","upBuster","upQuick"],effectsOp:"or"`；B类=攻击力用`effect:"upAtk"`；C类=宝具威力+暴击+特攻用`effects:["upNpdamage","upCriticaldamage","upDamage"],effectsOp:"or"`；D类=宝具特攻用`search_by_np_effect`的`npEffect:"damageNpSP"`
+14. **不可查效果 — 直接 fallback**：以下效果属于被动/活动/礼装效果，**当前不在从者查询能力范围内**，应直接走 fallback 回复用户"此类效果暂不支持查询"：羁绊加成（`servantFriendshipUp`）、QP 加成（`qpUp`）、素材掉落加成（`eventDropUp`）。**禁止**对这些效果调用任何 Skill，否则一定返回 0 条结果
+15. **职阶克制查询**：当用户提到"克制XX职阶"、"打XX有利"、"对XX有优势"、"XX的克星"、"哪个职阶克制XX"、"什么克制XX"等表达时，**必须**使用 `search_by_class_advantage`，参数 `targetClass` 传用户想克制的目标职阶**中文名**（如"伪装者"、"骑阶"、"术阶"、"月癌"）。系统会自动查表找出克制该职阶的所有从者。注意：**不要自行将克制关系转换为 className**，也不要用 `search_by_class` 来代替，系统会自动处理克制关系查表。**即使用户只问"哪个职阶克制X"这种看似知识性问题，也必须走 `search_by_class_advantage`**，系统会在结果中返回克制关系和对应从者。
+16. **技能冷却时间（CD）筛选**：`search_by_effect` 和 `search_by_skill_effect` 均支持 `maxCd` 参数。选择哪个 Skill 遵循规则 8（用户说了"技能"用 `search_by_skill_effect`，未指定来源用 `search_by_effect`）。`maxCd` 语义是"CD **≤** maxCd"，因此**必须注意"小于"和"小于等于"的区别**：用户说"CD小于5"/"CD<5"→ maxCd:**4**（因为 ≤4 等价于 <5）；用户说"CD不超过5"/"CD≤5"→ maxCd:5。CD 是技能的固有属性，`maxCd` 保证在同一技能粒度内联合匹配效果+数值+CD。当用户说"技能自充50%以上且CD<5"时，用 `search_by_skill_effect` 传 skillEffect:"gainNp"+targetType:"self"+minValue:50+maxCd:4。"短CD"默认理解为 maxCd:5。纯 CD 查询（如"蓝卡宝具且CD<5"）只传 maxCd 即可，与其他 Skill AND 组合。**禁止使用已废弃的 search_by_skill_cd**
+17. **疑似从者名称/昵称一律用 lookup_servant（重要）**：当用户的问题中包含你不确定是否为从者名称的词语（如"红A"、"小太阳"、"花之魔术师"、"老虚"、"CBA"、"XJB"、"呆毛"、"2B"等看起来像昵称/外号/缩写/纯字母组合的表达），**必须**使用 `lookup_servant`，将该词语作为 `name` 参数传入。系统后端支持昵称映射和模糊匹配，会自动处理识别。**绝不要**因为你不认识某个名称就返回 `no_match` 或 `out_of_scope`。只要用户的问题看起来是在查询或询问某个特定角色/从者，就选择 `lookup_servant`。**特别注意**：纯英文字母、数字组合、字母+数字混合（如"CBA"、"X4"、"2B"）在 FGO 社区中是常见的从者昵称缩写形式，绝不能因为看起来不像名字就判定为超出范围。如果用户同时问了从者详情（如"XX技能介绍"、"XX宝具是什么"），response_skill 选 `respond_servant_detail`。
+18. **概念礼装查询（重要）**：当用户提到"礼装"/"概念礼装"/"CE"/"带XX效果的礼装"/"推荐礼装"时，必须使用 CE domain 的 Skills，response_skill 选 `respond_ce_list`：
     - **按名称/昵称查找**：`ce_lookup`，参数 `name`（如"万花筒"、"黑杯"、"2030"）
     - **按效果搜索**：`ce_search_by_effect`，参数 `effect`（效果名同从者效果体系，如 `gainNp`、`upBuster`、`invincible`）、可选 `limit_break`（默认 true 搜满破效果）
     - **按稀有度筛选**：`ce_search_by_rarity`，参数 `op`/`value`（同从者稀有度筛选）
@@ -292,7 +304,7 @@ def build_routing_prompt(
     - **按获取方式筛选**：`ce_search_by_obtain`，参数 `obtain_type`（`permanent`=常驻、`limited`=限定、`event`=活动配布、`bond`=羁绊、`valentine`=情人节）
     - 多个 CE Skills 可组合使用（AND 关系），如"有NP充能效果的五星纯攻礼装"
     - ⚠️ **严禁**将礼装查询路由到从者 domain 的 Skills（如 `search_by_effect`），也**严禁**将从者查询路由到 CE Skills
-18. **参数完整性检查（用户确认机制）**：确定 Skill 后，检查必要参数是否可从用户问题中无歧义推断：
+19. **参数完整性检查（用户确认机制）**：确定 Skill 后，检查必要参数是否可从用户问题中无歧义推断：
     - 所有参数都能确定 → 正常输出 skill_calls
     - 某个参数存在多种合理解释且差异显著 → 输出 `clarification`，skill_calls 留空
     **需要确认的场景**：
@@ -306,7 +318,7 @@ def build_routing_prompt(
     - 用户明确说了"自充"/"群充"/"全队" → 已有明确 targetType，无需确认
     - 用户查询的效果仅有单一合理 targetType（如"无敌"默认是自身）→ 无需确认
 
-23. **clarification 输出格式**：触发确认时，输出 `clarification` 对象，skill_calls 必须为空数组：
+24. **clarification 输出格式**：触发确认时，输出 `clarification` 对象，skill_calls 必须为空数组：
     ```json
     {{"skill_calls": [], "clarification": {{"question": "你想查哪种类型的暴击拐？", "options": [{{"id": "party", "label": "全队暴击伤害UP"}}, {{"id": "self", "label": "自身暴击伤害UP"}}, {{"id": "ptOne", "label": "给单个队友暴击伤害UP"}}], "ambiguous_field": "targetType"}}, "response_skill": "respond_servant_list", "fallback": null}}
     ```

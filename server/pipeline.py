@@ -700,7 +700,11 @@ async def handle_skill_mode(
             context_data["已应用的筛选条件"] = applied_filters
             context_data["筛选条件"] = applied_filters
         else:
-            detail_mode = response_skill_name == "respond_servant_detail"
+            detail_mode = response_skill_name in (
+                "respond_servant_detail",
+                "respond_support_analysis",
+                "respond_servant_compare",
+            )
             context_data, _ = build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
             context_data["已应用的筛选条件"] = applied_filters
             context_data["筛选条件"] = applied_filters
@@ -912,7 +916,11 @@ async def _handle_confirmation_direct(
         context_data["已应用的筛选条件"] = applied_filters
         context_data["筛选条件"] = applied_filters
     else:
-        detail_mode = response_skill_name == "respond_servant_detail"
+        detail_mode = response_skill_name in (
+            "respond_servant_detail",
+            "respond_support_analysis",
+            "respond_servant_compare",
+        )
         context_data, _ = build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
         context_data["已应用的筛选条件"] = applied_filters
         context_data["筛选条件"] = applied_filters
@@ -1810,7 +1818,11 @@ async def stream_event_generator(
         context_data["已应用的筛选条件"] = applied_filters
         context_data["筛选条件"] = applied_filters
     else:
-        detail_mode = response_skill_name == "respond_servant_detail"
+        detail_mode = response_skill_name in (
+            "respond_servant_detail",
+            "respond_support_analysis",
+            "respond_servant_compare",
+        )
         context_data, _ = build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
         context_data["已应用的筛选条件"] = applied_filters
         context_data["筛选条件"] = applied_filters

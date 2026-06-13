@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from server.translation import describe_filters
 
@@ -65,16 +66,44 @@ FALLBACK_TEMPLATES: dict[str, str] = {
 }
 
 
+def _sanitize_agent_reply(reply: str) -> str:
+    """清洗 Agent 回复中可能泄露给用户的技术标记。
+
+    移除 <tool_call>...</tool_call> 块及残留的 JSON 工具调用片段，
+    防止 Agent 生成的"思考过程"原样暴露给前端（违反 §9 零技术术语）。
+    """
+    # 移除 Agent 可能产生的各种 XML 标签块（tool_call/tool_use/search_tool_type 等）
+    cleaned = re.sub(
+        r"<[a-z_]+>\s*(?:\{.*?\})?\s*</[a-z_]+>",
+        "",
+        reply,
+        flags=re.DOTALL,
+    )
+    # 移除残留的未闭合 XML 标签
+    cleaned = re.sub(r"</?[a-z_]+>", "", cleaned)
+    # 移除独立出现的 JSON 工具调用行（如 {"type": "search_servants", ...}）
+    cleaned = re.sub(
+        r'^\s*\{"type"\s*:\s*"[^"]+?".*?\}\s*$',
+        "",
+        cleaned,
+        flags=re.MULTILINE,
+    )
+    # 合并连续空行为单个空行
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
 def classify_agent_reply(reply: str) -> tuple[str | None, str]:
     """解析 Agent 回复中的分类标记，返回 (category, clean_reply)。
 
     Agent Prompt 要求在无需调用工具时，以 [GREETING]/[OUT_OF_SCOPE]/[UNSUPPORTED] 开头。
     检测到标记后替换为标准化模板回复。
+    非模板回复也会经过清洗，移除可能泄露的技术标记。
     """
     for tag in ("GREETING", "OUT_OF_SCOPE", "UNSUPPORTED"):
         if reply.strip().startswith(f"[{tag}]"):
             return tag, FALLBACK_TEMPLATES[tag]
-    return None, reply
+    return None, _sanitize_agent_reply(reply)
 
 
 def sse_event(event: str, data: dict) -> str:

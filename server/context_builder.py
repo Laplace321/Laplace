@@ -44,25 +44,72 @@ _HP_EFFECTS = {
     "reduceHp",
     "subSelfdamage",
 }  # 直接数值
-_DAMAGE_EFFECTS = {"addDamage", "damageNpSP"}  # 直接数值
+_DAMAGE_EFFECTS = {"addDamage"}  # 直接数值（固定伤害附加，如 +1000 伤害）
 _COUNT_EFFECTS = {"shortenSkill", "upChagetd"}  # 直接数值，无单位后缀
+
+
+def _format_conditional_prefix(conditional: dict) -> str:
+    """将 conditional 字段转为中文前缀标记。
+
+    UseRate 是条件触发发动概率（千分比），缺失/None = 必定触发。
+    1000=100% 为必定触发，省略概率描述。
+
+    Args:
+        conditional: {"triggerType": "回合结束时", "useRate": 5000}
+
+    Returns:
+        如 "[回合结束时]" 或 "[攻击后50%概率]"
+    """
+    trigger_type = conditional.get("triggerType", "")
+    use_rate = conditional.get("useRate")
+
+    # 概率描述：千分比→百分比，None 或 1000（100%）= 必定触发，省略
+    rate_text = ""
+    if use_rate is not None:
+        rate_percent = use_rate // 10
+        if rate_percent > 0 and rate_percent != 100:
+            rate_text = f"{rate_percent}%概率"
+
+    parts = [trigger_type]
+    if rate_text:
+        parts.append(rate_text)
+
+    return f"[{''.join(parts)}]" if parts and any(parts) else ""
 
 
 def format_effect_detail(eff: dict, is_np: bool = False) -> str:
     """将 effect dict 转为中文描述字符串（含数值、目标、持续）。
+
+    条件触发效果（含 conditional 字段）会在描述前添加触发条件标记，
+    如 "[回合结束时50%概率]弱化状态解除(自身)"。
 
     Args:
         eff: {"type": "upBuster", "targetType": "self", "valueMax": 500, "turn": 1, "count": -1}
         is_np: True 时使用 valueLv1 代替 valueMax
 
     Returns:
-        如 "Buster提升(50%,自身,1T)" 或 "获得暴击星(15个,自身)"
+        如 "Buster提升(50%,自身,1T)" 或 "[延迟10回合50%概率]NP增加(100%,全队)"
     """
     effect_name = get_effect_translation(eff.get("type", ""))
     target = TARGET_TYPE_MAP.get(eff.get("targetType", ""), "")
     eff_type = eff.get("type", "")
 
-    raw_value = eff.get("valueLv1", 0) if is_np else eff.get("valueMax", 0)
+    # 特攻效果：拼接特攻目标特性（C类 upDamage / D类 damageNpSP）
+    anti_target = eff.get("antiTarget")
+    if anti_target and eff_type in ("upDamage", "damageNpSP"):
+        trait_name = anti_target.get("trait") or ""
+        if trait_name:
+            if eff_type == "damageNpSP":
+                effect_name = f"宝具对（{trait_name}）特攻"
+            else:
+                effect_name = f"对（{trait_name}）特攻"
+
+    # 宝具效果：优先从 npValues[0] 取值（NP1 OC1），向后兼容 valueLv1
+    if is_np:
+        np_values = eff.get("npValues")
+        raw_value = np_values[0] if np_values else eff.get("valueLv1", 0)
+    else:
+        raw_value = eff.get("valueMax", 0)
 
     parts: list[str] = []
     if raw_value and raw_value > 0:
@@ -90,37 +137,94 @@ def format_effect_detail(eff: dict, is_np: bool = False) -> str:
     elif count and count > 0:
         parts.append(f"{count}次")
 
-    if parts:
-        return f"{effect_name}({','.join(parts)})"
-    return effect_name
+    base = f"{effect_name}({','.join(parts)})" if parts else effect_name
+
+    # 宝具效果：追加 NP/OC 数值区间描述
+    if is_np:
+        range_parts: list[str] = []
+        np_values = eff.get("npValues", [])
+        oc_values = eff.get("ocValues", [])
+        if np_values and len(np_values) >= 5 and np_values[0] != np_values[4]:
+            range_parts.append(_format_value_range("NP", np_values[0], np_values[4], eff_type))
+        if oc_values and len(oc_values) >= 5 and oc_values[0] != oc_values[4]:
+            range_parts.append(_format_value_range("OC", oc_values[0], oc_values[4], eff_type))
+        if range_parts:
+            base += " " + " ".join(range_parts)
+
+    # 条件触发效果：添加前缀标记
+    conditional = eff.get("conditional")
+    if conditional:
+        prefix = _format_conditional_prefix(conditional)
+        return f"{prefix}{base}" if prefix else base
+
+    return base
+
+
+def _format_value_range(dimension: str, val_min: int, val_max: int, eff_type: str) -> str:
+    """格式化 NP/OC 维度的数值区间。"""
+    if eff_type in _NP_PERCENT_EFFECTS:
+        return f"({dimension}1:{val_min / 100:.0f}%→{dimension}5:{val_max / 100:.0f}%)"
+    elif eff_type in _STAR_EFFECTS:
+        return f"({dimension}1:{val_min}个→{dimension}5:{val_max}个)"
+    elif eff_type in (_HP_EFFECTS | _DAMAGE_EFFECTS | _COUNT_EFFECTS):
+        return f"({dimension}1:{val_min}→{dimension}5:{val_max})"
+    else:
+        return f"({dimension}1:{val_min / 10:.0f}%→{dimension}5:{val_max / 10:.0f}%)"
 
 
 def build_skill_details(servant: dict) -> list[dict]:
-    """构建单从者的技能详情（含数值），使用中文技能名或英文原名作为标签。"""
+    """构建单从者的技能详情（含数值），使用中文技能名或英文原名作为标签。
+
+    将效果分为「效果」（普通效果）和「条件触发效果」两个列表，
+    方便 LLM 区分确定性效果和概率/延迟触发效果。
+    """
     result = []
     for sk in servant.get("skillDetails", []):
-        effects = []
+        normal_effects = []
+        conditional_effects = []
         for eff in sk.get("effects", []):
-            effects.append(format_effect_detail(eff, is_np=False))
-        if effects:
+            formatted = format_effect_detail(eff, is_np=False)
+            if eff.get("conditional"):
+                conditional_effects.append(formatted)
+            else:
+                normal_effects.append(formatted)
+        if normal_effects or conditional_effects:
             label = sk.get("skillName", "")
             if not label:
                 skill_num = sk.get("skillNum", 0)
                 label = f"技能{skill_num}" if skill_num else "技能"
-            result.append({"技能名": label, "效果": effects})
+            entry: dict = {"技能名": label, "效果": normal_effects}
+            if conditional_effects:
+                entry["条件触发效果"] = conditional_effects
+            result.append(entry)
     return result
 
 
 def build_np_details(servant: dict) -> list[dict]:
-    """构建单从者的宝具详情（含数值），使用中文宝具名或英文原名作为标签。"""
+    """构建单从者的宝具详情（含数值），使用中文宝具名或英文原名作为标签。
+
+    多宝具从者（如卫宫红卡+蓝卡）时，每个宝具条目额外输出色卡和目标类型，
+    帮助 LLM 区分不同宝具。
+    """
+    np_list = servant.get("npDetails", [])
+    has_multiple_nps = len(np_list) > 1
+    np_card_map = get_np_card_map() if has_multiple_nps else {}
+    np_target_map = get_np_target_map() if has_multiple_nps else {}
+
     result = []
-    for np_d in servant.get("npDetails", []):
+    for np_d in np_list:
         effects = []
         for eff in np_d.get("effects", []):
             effects.append(format_effect_detail(eff, is_np=True))
         if effects:
             label = np_d.get("npName", "") or "宝具"
-            result.append({"宝具名": label, "效果": effects})
+            entry: dict = {"宝具名": label, "效果": effects}
+            if has_multiple_nps:
+                raw_card = np_d.get("npCard", "")
+                raw_target = np_d.get("npTarget", "")
+                entry["卡色"] = np_card_map.get(str(raw_card).lower(), raw_card)
+                entry["目标"] = np_target_map.get(str(raw_target).lower(), raw_target)
+            result.append(entry)
     return result
 
 

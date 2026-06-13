@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laplace — 你的 FGO 智能数据管家</title>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-card: #1a2332;
+  --bg-code: #0d1117;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #38bdf8;
+  --accent-dim: #0ea5e9;
+  --border: #1e293b;
+  --green: #34d399;
+  --yellow: #fbbf24;
+  --red: #f87171;
+  --purple: #a78bfa;
+  --orange: #fb923c;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.7;
+}
+
+/* ===== Nav ===== */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(10,14,23,0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0.6rem 2rem;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-brand { color: var(--accent); font-weight: 700; font-size: 1.1rem; letter-spacing: 2px; }
+.nav-links a {
+  color: var(--text-muted); text-decoration: none; margin-left: 1.5rem; font-size: 0.9rem; transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--accent); }
+
+/* ===== Hero ===== */
+.hero {
+  text-align: center; padding: 8rem 2rem 4rem;
+  background: linear-gradient(180deg, rgba(56,189,248,0.06) 0%, transparent 60%);
+}
+.hero-badge {
+  display: inline-block; padding: 0.3rem 1rem; border-radius: 20px;
+  background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.2);
+  color: var(--accent); font-size: 0.85rem; margin-bottom: 1.5rem;
+}
+.hero h1 {
+  font-size: 3rem; color: var(--text-primary); letter-spacing: 6px; margin-bottom: 1rem;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.hero .slogan {
+  font-size: 1.3rem; color: var(--text-secondary); margin-bottom: 2.5rem; max-width: 600px; margin-left: auto; margin-right: auto;
+}
+.hero-stats {
+  display: flex; justify-content: center; gap: 3rem; flex-wrap: wrap;
+}
+.stat { text-align: center; }
+.stat-number { font-size: 2.2rem; font-weight: 700; color: var(--accent); }
+.stat-label { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
+.hero-cta {
+  margin-top: 2.5rem;
+}
+.btn-primary {
+  display: inline-block; padding: 0.8rem 2rem; border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+  color: #fff; font-weight: 600; font-size: 1rem; text-decoration: none;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(56,189,248,0.25); }
+
+/* ===== Sections ===== */
+.section { max-width: 1100px; margin: 0 auto; padding: 4rem 2rem; }
+.section-title {
+  font-size: 1.8rem; color: var(--accent); text-align: center; margin-bottom: 0.5rem;
+}
+.section-desc {
+  text-align: center; color: var(--text-muted); margin-bottom: 3rem; font-size: 1rem;
+}
+
+/* ===== Feature Grid ===== */
+.feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+@media (max-width: 900px) { .feature-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .feature-grid { grid-template-columns: 1fr; } }
+.feature-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 1.5rem; transition: transform 0.2s, border-color 0.2s;
+}
+.feature-card:hover { transform: translateY(-4px); border-color: var(--accent); }
+.feature-icon { font-size: 2rem; margin-bottom: 0.8rem; }
+.feature-title { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem; }
+.feature-desc { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; }
+.feature-example {
+  margin-top: 0.8rem; padding: 0.5rem 0.8rem; border-radius: 6px;
+  background: var(--bg-code); font-size: 0.8rem; color: var(--accent);
+  font-family: 'SF Mono', monospace;
+}
+
+/* ===== Compare Table ===== */
+.compare-section { background: var(--bg-secondary); border-radius: 16px; padding: 2.5rem; margin-top: 1rem; }
+.compare-table { width: 100%; border-collapse: collapse; }
+.compare-table th, .compare-table td { padding: 0.8rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+.compare-table th { font-weight: 600; font-size: 0.9rem; }
+.compare-table th:first-child { color: var(--text-muted); }
+.compare-table th:nth-child(2) { color: var(--text-muted); }
+.compare-table th:nth-child(3) { color: var(--accent); }
+.compare-table td { color: var(--text-secondary); font-size: 0.9rem; }
+.compare-table td:nth-child(3) { color: var(--green); font-weight: 500; }
+.compare-table tr:hover td { background: rgba(56,189,248,0.03); }
+.check { color: var(--green); } .cross { color: var(--red); opacity: 0.6; }
+
+/* ===== Showcase ===== */
+.showcase-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
+@media (max-width: 700px) { .showcase-grid { grid-template-columns: 1fr; } }
+.showcase-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem;
+  display: flex; flex-direction: column; gap: 0.6rem;
+}
+.showcase-query {
+  padding: 0.6rem 1rem; border-radius: 8px; background: var(--bg-code);
+  color: var(--accent); font-size: 0.95rem; font-weight: 500; border-left: 3px solid var(--accent);
+}
+.showcase-result { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6; }
+.showcase-tag {
+  display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 500;
+}
+.tag-blue { background: rgba(56,189,248,0.12); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.12); color: var(--green); }
+.tag-purple { background: rgba(167,139,250,0.12); color: var(--purple); }
+.tag-yellow { background: rgba(251,191,36,0.12); color: var(--yellow); }
+.tag-orange { background: rgba(251,146,60,0.12); color: var(--orange); }
+
+/* ===== Tech Section ===== */
+.tech-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
+@media (max-width: 700px) { .tech-grid { grid-template-columns: 1fr; } }
+.tech-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem;
+}
+.tech-title { color: var(--green); font-weight: 600; margin-bottom: 0.4rem; }
+.tech-desc { color: var(--text-secondary); font-size: 0.9rem; }
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center; padding: 3rem 2rem; border-top: 1px solid var(--border);
+  color: var(--text-muted); font-size: 0.85rem;
+}
+.footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+  <span class="nav-brand">LAPLACE</span>
+  <div class="nav-links">
+    <a href="#features">功能</a>
+    <a href="#compare">对比</a>
+    <a href="#showcase">示例</a>
+    <a href="#tech">技术</a>
+    <a href="architecture.html">架构文档</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-badge">AI Native &middot; FGO 数据助手 &middot; v0.4.1</div>
+  <h1>LAPLACE</h1>
+  <p class="slogan">别再翻筛选列表了，直接开口问我。<br>用自然语言查询 FGO 全部游戏数据的 AI 管家。</p>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-number">55+</div><div class="stat-label">技能效果分类</div></div>
+    <div class="stat"><div class="stat-number">623</div><div class="stat-label">社区昵称识别</div></div>
+    <div class="stat"><div class="stat-number">15</div><div class="stat-label">全职阶覆盖</div></div>
+    <div class="stat"><div class="stat-number">10+</div><div class="stat-label">查询维度</div></div>
+  </div>
+  <div class="hero-cta">
+    <a href="https://laplace.live" class="btn-primary" target="_blank">立即体验</a>
+  </div>
+</section>
+
+<!-- Core Features -->
+<section class="section" id="features">
+  <h2 class="section-title">核心能力</h2>
+  <p class="section-desc">一句话替代十分钟菜单翻找，AI 原生的 FGO 数据查询体验</p>
+  <div class="feature-grid">
+
+    <div class="feature-card">
+      <div class="feature-icon">💬</div>
+      <div class="feature-title">自然语言查询</div>
+      <div class="feature-desc">不用找菜单、不用勾选项，直接用大白话提问，AI 秒懂你的意图。</div>
+      <div class="feature-example">"帮我找五星自充50以上的Caster"</div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">⏱️</div>
+      <div class="feature-title">技能 CD 查询</div>
+      <div class="feature-desc">全网独家维度——按技能冷却回合数筛选从者，Chaldea / Atlas 都做不到。</div>
+      <div class="feature-example">"CD3回合以下的自充技能"</div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <div class="feature-title">从者深度分析</div>
+      <div class="feature-desc">输入从者名字，AI 自动梳理技能、宝具、优缺点，给出通俗易懂的评价。</div>
+      <div class="feature-example">"分析下村正的技能和宝具"</div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">⚔️</div>
+      <div class="feature-title">戴冠战攻略</div>
+      <div class="feature-desc">与知名 UP 主合作攻略内容，AI 整合后按职阶给出打手、辅助、打法流派的完整配队方案。</div>
+      <div class="feature-example">"狂阶戴冠战怎么配队"</div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">🎯</div>
+      <div class="feature-title">智能歧义确认</div>
+      <div class="feature-desc">遇到"伊吹童子"等多版本从者，不会乱猜——弹出选项让你精确选择。</div>
+      <div class="feature-example">"伊吹童子" → 剑阶 / 狂阶？</div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">🏷️</div>
+      <div class="feature-title">社区昵称识别</div>
+      <div class="feature-desc">623 条社区昵称全覆盖——"呆毛""村正""C呆""蛾子""拉二"统统能认。</div>
+      <div class="feature-example">"小教授这个从者怎么样？"</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Compare -->
+<section class="section" id="compare">
+  <h2 class="section-title">为什么选择 Laplace</h2>
+  <p class="section-desc">传统工具 vs AI 原生助手，体验天差地别</p>
+  <div class="compare-section">
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>场景</th>
+          <th>传统筛选工具</th>
+          <th>Laplace</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>找五星自充 Caster</td>
+          <td>打开筛选器 → 勾选职阶 → 勾选星级 → 找到充能选项 → 设置数值 → 等待结果 (2~5分钟)</td>
+          <td><span class="check">&#10003;</span> 输入一句话，2 秒出结果</td>
+        </tr>
+        <tr>
+          <td>查从者优缺点</td>
+          <td>搜 NGA/Mooncell → 翻帖子 → 自己总结 (10~30分钟)</td>
+          <td><span class="check">&#10003;</span> 直接问，AI 梳理好优缺点</td>
+        </tr>
+        <tr>
+          <td>戴冠战配队</td>
+          <td>NGA 搜攻略帖 → 爬楼找配队 → 交叉验证 (30分钟+)</td>
+          <td><span class="check">&#10003;</span> 一句话获取完整配队方案</td>
+        </tr>
+        <tr>
+          <td>用昵称查从者</td>
+          <td><span class="cross">&#10007;</span> 必须输入官方全名</td>
+          <td><span class="check">&#10003;</span> "呆毛""村正""C呆"直接识别</td>
+        </tr>
+        <tr>
+          <td>多条件组合</td>
+          <td>需要逐个勾选，部分工具不支持组合</td>
+          <td><span class="check">&#10003;</span> 一句话说完所有条件</td>
+        </tr>
+        <tr>
+          <td>技能 CD 筛选</td>
+          <td><span class="cross">&#10007;</span> 不支持按冷却回合数筛选</td>
+          <td><span class="check">&#10003;</span> "CD3回合以下的自充"全网独家</td>
+        </tr>
+        <tr>
+          <td>职阶克制查询</td>
+          <td>自己背克制表，手动筛选</td>
+          <td><span class="check">&#10003;</span> "克制 Rider 的从者"直接问</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Query Showcase -->
+<section class="section" id="showcase">
+  <h2 class="section-title">查询示例</h2>
+  <p class="section-desc">真实场景，真实结果——这些你都可以直接问</p>
+  <div class="showcase-grid">
+
+    <div class="showcase-card">
+      <span class="showcase-tag tag-blue">多条件筛选</span>
+      <div class="showcase-query">"帮我找五星自充50以上的Caster"</div>
+      <div class="showcase-result">精确筛选出卡斯特职阶、5星、NP自充≥50% 的全部从者，以从者卡片形式展示，标注自充百分比。</div>
+    </div>
+
+    <div class="showcase-card">
+      <span class="showcase-tag tag-green">从者分析</span>
+      <div class="showcase-query">"分析下千子村正的技能和宝具"</div>
+      <div class="showcase-result">自动识别昵称"村正"，展示技能效果逐条解析、宝具机制分析、核心优势与使用建议。</div>
+    </div>
+
+    <div class="showcase-card">
+      <span class="showcase-tag tag-purple">技能CD筛选</span>
+      <div class="showcase-query">"技能CD最短的五星Caster"</div>
+      <div class="showcase-result">全网独家维度——按技能冷却回合数筛选从者，返回 CD 最短的五星 Caster 列表及各技能冷却详情。</div>
+    </div>
+
+    <div class="showcase-card">
+      <span class="showcase-tag tag-orange">攻略问答</span>
+      <div class="showcase-query">"狂阶戴冠战怎么打"</div>
+      <div class="showcase-result">返回狂阶戴冠战完整攻略——Boss 机制、打手推荐(S/A/B梯度)、辅助搭配、打法流派。</div>
+    </div>
+
+    <div class="showcase-card">
+      <span class="showcase-tag tag-yellow">职阶克制</span>
+      <div class="showcase-query">"克制 Rider 的五星从者"</div>
+      <div class="showcase-result">自动查表找出克制 Rider 的职阶，再按5星筛选，返回全部匹配从者及克制倍率。</div>
+    </div>
+
+    <div class="showcase-card">
+      <span class="showcase-tag tag-blue">特性搜索</span>
+      <div class="showcase-query">"具有龙特性的四星以上Saber"</div>
+      <div class="showcase-result">按特性标签"龙"+ 职阶 + 稀有度精确筛选，展示所有命中从者的特性列表。</div>
+    </div>
+
+    <div class="showcase-card">
+      <span class="showcase-tag tag-green">从者对比</span>
+      <div class="showcase-query">"对比村正和武尊"</div>
+      <div class="showcase-result">以结构化表格对比两位从者的技能、宝具、适用场景，给出选择建议。</div>
+    </div>
+
+    <div class="showcase-card">
+      <span class="showcase-tag tag-purple">效果量化</span>
+      <div class="showcase-query">"攻击力提升50%以上的技能"</div>
+      <div class="showcase-result">按效果数值精确筛选，只返回 Lv10 时攻击力提升 ≥ 50% 的从者及对应技能详情。</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Tech Highlights -->
+<section class="section" id="tech">
+  <h2 class="section-title">技术亮点</h2>
+  <p class="section-desc">为什么 Laplace 的回答又准又快</p>
+  <div class="tech-grid">
+
+    <div class="tech-card">
+      <div class="tech-title">两阶段智能路由</div>
+      <div class="tech-desc">先用轻量分类器判断问题类型（精确查询/知识问答/攻略），再针对性提取参数。比单阶段路由快 10 倍，准确率更高。</div>
+    </div>
+
+    <div class="tech-card">
+      <div class="tech-title">Skill 插件化架构</div>
+      <div class="tech-desc">55 种效果查询、职阶克制、NP 充能等能力都是独立插件模块，新功能即插即用，不影响已有查询。</div>
+    </div>
+
+    <div class="tech-card">
+      <div class="tech-title">实时流式输出</div>
+      <div class="tech-desc">SSE 流式推送，AI 边想边答——从者卡片先出、分析文字后到，不用干等整个回答生成完。</div>
+    </div>
+
+    <div class="tech-card">
+      <div class="tech-title">多源数据融合</div>
+      <div class="tech-desc">Atlas Academy 全量从者数据 + Chaldea 领域知识 + Mooncell 社区昵称 + 手工攻略文档，四源合一。</div>
+    </div>
+
+    <div class="tech-card">
+      <div class="tech-title">智能降级保障</div>
+      <div class="tech-desc">多 LLM 提供商自动降级（Claude → GPT → DeepSeek），确保 24/7 可用。Bark 实时告警，异常秒知。</div>
+    </div>
+
+    <div class="tech-card">
+      <div class="tech-title">开源免费</div>
+      <div class="tech-desc">CC-BY-NC-SA 协议开源，不做商业化、不收费。所有收入用于 API 和服务器成本。</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <p>Laplace &mdash; 观测月球数据的真理之眼</p>
+  <p style="margin-top:0.5rem;">
+    <a href="https://laplace.live" target="_blank">在线体验</a> &middot;
+    <a href="https://github.com/Laplace321/Laplace" target="_blank">GitHub</a> &middot;
+    <a href="https://afdian.com/a/laplace-fgo" target="_blank">爱发电</a> &middot;
+    <a href="architecture.html">架构文档</a>
+  </p>
+  <p style="margin-top:0.8rem; font-size:0.8rem;">数据源自 Atlas Academy &amp; Chaldea &middot; CC-BY-NC-SA-4.0</p>
+</footer>
+
+</body>
+</html>

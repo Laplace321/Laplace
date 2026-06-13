@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Laplace UI 方案选型 · 5 套原型对比</title>
+<link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Noto+Sans+SC:wght@400;500;700&family=Cinzel:wght@500;700&family=Cormorant+Garamond:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans SC',sans-serif;background:#0A1426;color:#E8EEF8;min-height:100vh;padding:48px 24px;background-image:radial-gradient(ellipse at top,#1a2c5c 0%,#0a1426 60%);}
+.wrap{max-width:1280px;margin:0 auto}
+.title{font-family:'Cinzel',serif;font-size:42px;font-weight:700;letter-spacing:2px;text-align:center;color:#fff;margin-bottom:8px}
+.title em{color:#5BC8E6;font-style:normal}
+.subtitle{text-align:center;color:#9aa8c0;margin-bottom:48px;font-size:14px;letter-spacing:1px}
+.divider{width:60px;height:2px;background:linear-gradient(90deg,transparent,#D4AF37,transparent);margin:0 auto 48px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:24px}
+.card{background:rgba(255,255,255,0.04);border:1px solid rgba(91,200,230,0.2);border-radius:8px;overflow:hidden;cursor:pointer;transition:all .3s;text-decoration:none;color:inherit;display:flex;flex-direction:column}
+.card:hover{transform:translateY(-4px);border-color:#5BC8E6;box-shadow:0 8px 32px rgba(91,200,230,0.15)}
+
+.card-preview{height:200px;display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-size:48px;font-weight:700;letter-spacing:4px;position:relative;overflow:hidden}
+
+.preview-a{background:#F5F6F8;color:#0A1F4A;background-image:repeating-linear-gradient(0deg,transparent 0,transparent 19px,rgba(10,31,74,0.04) 19px,rgba(10,31,74,0.04) 20px),repeating-linear-gradient(90deg,transparent 0,transparent 19px,rgba(10,31,74,0.04) 19px,rgba(10,31,74,0.04) 20px)}
+.preview-a::before{content:"";position:absolute;top:0;left:0;right:0;height:6px;background:#0A1F4A}
+.preview-a::after{content:"";position:absolute;top:14px;left:14px;width:32px;height:32px;background:#C9A961;clip-path:polygon(0 0,100% 0,100% 70%,70% 100%,0 100%);display:flex;align-items:center;justify-content:center}
+
+.preview-b{background:linear-gradient(180deg,#0B1736 0%,#1A2C5C 100%);color:#fff;position:relative}
+.preview-b::before{content:"⧫";position:absolute;font-size:80px;color:#D4AF37;text-shadow:0 0 30px rgba(212,175,55,0.6);top:50%;left:50%;transform:translate(-50%,-60%);font-family:serif}
+.preview-b span{position:relative;z-index:2;margin-top:60px}
+
+.preview-c{background:#F8F4EC;color:#1B2D5B;font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:500}
+.preview-c::before{content:"❦";position:absolute;font-size:32px;color:#B89968;top:20px;left:50%;transform:translateX(-50%)}
+.preview-c::after{content:"❦";position:absolute;font-size:32px;color:#B89968;bottom:20px;left:50%;transform:translateX(-50%)}
+
+.preview-d{background:#FAFAF7;color:#0E1A33;font-family:'Cormorant Garamond',serif;font-weight:700;border-bottom:4px double #0E1A33}
+.preview-d::before{content:"VOL.0.3";position:absolute;top:20px;left:24px;font-size:11px;letter-spacing:3px;color:#1454B8;font-family:'Noto Sans SC';font-weight:500}
+.preview-d::after{content:"2026.06.10";position:absolute;top:20px;right:24px;font-size:11px;letter-spacing:2px;color:#1454B8;font-family:'Noto Sans SC';font-weight:500}
+
+.preview-e{background:radial-gradient(circle at 30% 30%,#1A2C5C 0%,#0A1426 70%);color:#5BC8E6;text-shadow:0 0 16px rgba(91,200,230,0.6)}
+.preview-e::before{content:"";position:absolute;top:20px;left:20px;width:24px;height:24px;border-top:2px solid #5BC8E6;border-left:2px solid #5BC8E6}
+.preview-e::after{content:"";position:absolute;bottom:20px;right:20px;width:24px;height:24px;border-bottom:2px solid #5BC8E6;border-right:2px solid #5BC8E6}
+
+.card-body{padding:20px 24px;flex:1;display:flex;flex-direction:column}
+.card-tag{display:inline-block;font-size:10px;letter-spacing:2px;color:#5BC8E6;text-transform:uppercase;margin-bottom:8px;font-family:'Cinzel',serif;font-weight:500}
+.card-title{font-size:20px;font-weight:700;color:#fff;margin-bottom:6px}
+.card-en{font-size:11px;color:#7a8aa8;margin-bottom:12px;font-family:'Cinzel',serif;letter-spacing:1px}
+.card-desc{font-size:13px;color:#aab6cc;line-height:1.7;margin-bottom:16px;flex:1}
+.card-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.card-meta span{font-size:11px;padding:3px 10px;background:rgba(91,200,230,0.1);border:1px solid rgba(91,200,230,0.25);border-radius:3px;color:#bcd4eb}
+.card-cta{display:flex;align-items:center;justify-content:space-between;padding-top:14px;border-top:1px solid rgba(91,200,230,0.15)}
+.card-cta .stars{color:#D4AF37;letter-spacing:2px;font-size:13px}
+.card-cta .btn{font-size:12px;color:#5BC8E6;letter-spacing:1px;font-family:'Cinzel',serif;font-weight:500}
+.card:hover .card-cta .btn{color:#D4AF37}
+
+.footer{margin-top:64px;text-align:center;color:#7a8aa8;font-size:12px;line-height:2}
+.footer code{background:rgba(91,200,230,0.1);padding:2px 8px;border-radius:3px;color:#5BC8E6;font-size:11px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="title">LAPLACE · <em>UI 方案选型</em></h1>
+  <p class="subtitle">5 SETS OF VISUAL PROTOTYPES · CLICK TO COMPARE</p>
+  <div class="divider"></div>
+
+  <div class="grid">
+    <a class="card" href="a-archive.html">
+      <div class="card-preview preview-a"><span>ARCHIVE</span></div>
+      <div class="card-body">
+        <span class="card-tag">PLAN · A</span>
+        <div class="card-title">迦勒底档案室</div>
+        <div class="card-en">Chaldea Archive</div>
+        <p class="card-desc">纸白档案 + 深蓝印章 + 网格暗纹 + 折角信封。最贴合 FGO 官网视觉，把 Laplace 包装成迦勒底内部数据终端。</p>
+        <div class="card-meta"><span>白底蓝印</span><span>官方专业</span><span>★★★★★</span></div>
+        <div class="card-cta"><span class="stars">★★★★★</span><span class="btn">VIEW PROTOTYPE →</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="b-grail.html">
+      <div class="card-preview preview-b"><span>GRAIL</span></div>
+      <div class="card-body">
+        <span class="card-tag">PLAN · B</span>
+        <div class="card-title">圣杯仪式</div>
+        <div class="card-en">Holy Grail Ritual</div>
+        <p class="card-desc">深蓝星空 Hero + 纸白主体 + 金色魔法阵装饰。Hero 区直接还原官网主视觉，对话区回到白底纸感。</p>
+        <div class="card-meta"><span>双段沉浸</span><span>仪式感</span><span>★★★★</span></div>
+        <div class="card-cta"><span class="stars">★★★★</span><span class="btn">VIEW PROTOTYPE →</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="c-codex.html">
+      <div class="card-preview preview-c"><span>CODEX</span></div>
+      <div class="card-body">
+        <span class="card-tag">PLAN · C</span>
+        <div class="card-title">英灵召唤书</div>
+        <div class="card-en">Servant Codex</div>
+        <p class="card-desc">羊皮米色 + 深蓝衬线 + 红色印章 + 装饰花纹。像翻阅一本英灵图鉴，与 Fate 世界观贴合度最高。</p>
+        <div class="card-meta"><span>古典文人</span><span>图鉴感</span><span>★★★</span></div>
+        <div class="card-cta"><span class="stars">★★★</span><span class="btn">VIEW PROTOTYPE →</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="d-bulletin.html">
+      <div class="card-preview preview-d"><span>BULLETIN</span></div>
+      <div class="card-body">
+        <span class="card-tag">PLAN · D</span>
+        <div class="card-title">魔术协会公文</div>
+        <div class="card-en">Mage's Bulletin</div>
+        <p class="card-desc">报刊版式 + 双栏排版 + 数据表格 + 印章徽章。信息密度高、阅读型，对长查询结果最友好，CSS 实现成本最低。</p>
+        <div class="card-meta"><span>编辑密度</span><span>数据型</span><span>★★★★</span></div>
+        <div class="card-cta"><span class="stars">★★★★</span><span class="btn">VIEW PROTOTYPE →</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="e-lostbelt.html">
+      <div class="card-preview preview-e"><span>LOSTBELT</span></div>
+      <div class="card-body">
+        <span class="card-tag">PLAN · E</span>
+        <div class="card-title">异闻带</div>
+        <div class="card-en">Lostbelt</div>
+        <p class="card-desc">深蓝渐变底 + 冰蓝霓虹 + 立绘容器。唯一深色方案，仿 Lostbelt 章节页，夜间长时间使用最友好。</p>
+        <div class="card-meta"><span>深色霓虹</span><span>游戏 UI</span><span>★★★★</span></div>
+        <div class="card-cta"><span class="stars">★★★★</span><span class="btn">VIEW PROTOTYPE →</span></div>
+      </div>
+    </a>
+
+    <div class="card" style="cursor:default;border-style:dashed;opacity:.6">
+      <div class="card-preview" style="background:rgba(255,255,255,0.02);color:#5BC8E6;font-size:14px;letter-spacing:2px;font-family:'Noto Sans SC'">点击左侧任一方案进入预览</div>
+      <div class="card-body">
+        <span class="card-tag">HOW TO USE</span>
+        <div class="card-title">对比指引</div>
+        <div class="card-en">Comparison Guide</div>
+        <p class="card-desc">5 套原型展示相同内容场景：Header、对话气泡、思考链、从者卡片、输入框、底部署名。请重点对比标题字体、卡片质感、整体氛围。</p>
+        <div class="card-meta"><span>统一场景</span><span>真实点击</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>每个原型 100% 静态、自包含 CSS，与生产 demo 完全隔离。</p>
+    <p>本地访问：<code>file:///Users/laplacetong/Laplace/demo/prototypes/index.html</code></p>
+  </div>
+</div>
+</body>
+</html>

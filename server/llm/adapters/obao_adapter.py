@@ -271,6 +271,10 @@ class ObaoAdapter(OpenAIAdapter):
             {"role": "user", "content": user_message},
         ]
 
+        # 显式关闭 reasoning/thinking 模式，防止 gpt-5.5 等推理模型
+        # 将内部思考过程混入 delta.content 导致回复中夹带推理文本
+        extra_body = {"thinking": {"type": "disabled"}}
+
         # 尝试带 stream_options 的调用（支持 usage 统计）
         try:
             stream = await client.chat.completions.create(
@@ -280,6 +284,7 @@ class ObaoAdapter(OpenAIAdapter):
                 temperature=temperature,
                 stream=True,
                 stream_options={"include_usage": True},
+                extra_body=extra_body,
             )
         except Exception as stream_opt_err:
             if is_server_unavailable(stream_opt_err):
@@ -292,6 +297,7 @@ class ObaoAdapter(OpenAIAdapter):
                 max_tokens=max_tokens,
                 temperature=temperature,
                 stream=True,
+                extra_body=extra_body,
             )
 
         # 流式传输阶段：异常 yield 错误提示
@@ -301,8 +307,12 @@ class ObaoAdapter(OpenAIAdapter):
                     metadata.usage = chunk.usage.model_dump()
                     metadata.model = model
                     metadata.provider = self.name
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                # 仅 yield 正式内容，跳过 reasoning_content（推理模型可能返回此字段）
+                if delta.content:
+                    yield delta.content
         except Exception as exc:
             print(f"  ✗ [{self.name}] stream mid-transfer error: {exc}")
             yield "\n\n（生成过程中出现异常，请重试）"
