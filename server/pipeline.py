@@ -24,8 +24,17 @@ from server.fallback import (
     classify_agent_reply,
     sse_event,
 )
+from server.graph import END, PipelineState, StateGraph
 from server.llm import StreamMetadata, chat_completion, chat_completion_stream
 from server.logger import log_trace_event
+from server.nodes.atlas import atlas_node
+from server.nodes.guide import (
+    _build_guide_context_text,
+    _build_guide_generation_prompt,
+    _format_source_suffix,
+    _prepare_guide_context,
+    guide_node,
+)
 from server.prompts import build_classifier_prompt, build_routing_prompt, get_generation_prompt
 from server.schemas import (
     classifier_response_json_schema,
@@ -37,6 +46,61 @@ from server.skills.base import SKILL_REGISTRY, QuerySkill
 from server.skills.executor import SkillExecutor
 from server.skills.presets import PRESET_REGISTRY
 from server.translation import describe_filters
+
+# ────────────────────────────────────────────────────────────
+# Pipeline B/C 图引擎（Task 1 — ADR-028）
+# B 与 C 各为单节点图，未来 Task 2/3 会扩展到完整 A 图
+# ────────────────────────────────────────────────────────────
+
+
+def _build_pipeline_b_graph() -> StateGraph:
+    """构建 Pipeline B 图：atlas_node → END。"""
+    g = StateGraph()
+    g.add_node("atlas", atlas_node)
+    g.set_entry("atlas")
+    g.add_edge("atlas", END)
+    return g
+
+
+def _build_pipeline_c_graph() -> StateGraph:
+    """构建 Pipeline C 图：guide_node → END（非流式版）。"""
+    g = StateGraph()
+    g.add_node("guide", guide_node)
+    g.set_entry("guide")
+    g.add_edge("guide", END)
+    return g
+
+
+# 模块级缓存图实例（注册过程是确定性的，复用避免每次请求重建）
+_PIPELINE_B_GRAPH: StateGraph | None = None
+_PIPELINE_C_GRAPH: StateGraph | None = None
+
+
+def _get_pipeline_b_graph() -> StateGraph:
+    global _PIPELINE_B_GRAPH
+    if _PIPELINE_B_GRAPH is None:
+        _PIPELINE_B_GRAPH = _build_pipeline_b_graph()
+    return _PIPELINE_B_GRAPH
+
+
+def _get_pipeline_c_graph() -> StateGraph:
+    global _PIPELINE_C_GRAPH
+    if _PIPELINE_C_GRAPH is None:
+        _PIPELINE_C_GRAPH = _build_pipeline_c_graph()
+    return _PIPELINE_C_GRAPH
+
+
+def _state_to_chat_response(state: PipelineState, trace_id: str) -> ChatResponse:
+    """把 PipelineState 拼装为外部返回的 ChatResponse。"""
+    return ChatResponse(
+        reply=state.reply,
+        servants=state.servants,
+        count=state.count,
+        query=state.query,
+        model=state.model_used,
+        traceId=trace_id,
+    )
+
 
 # Agent 工具名 → 用户友好中文描述
 _AGENT_TOOL_DISPLAY = {
@@ -1940,61 +2004,6 @@ async def stream_event_generator(
 # ============================================================
 
 
-async def _extract_atlas_query(user_message: str, trace_id: str) -> dict | None:
-    """独立 LLM 调用：从用户查询中提取 Atlas 结构化参数。
-
-    Stage 0 只做链路分类不提取参数，链路 B 需要单独调用此函数提取
-    name/entry_type/year_month 等结构化字段。
-
-    Returns:
-        提取到的参数字典，失败时返回 None（由调用方降级处理）。
-    """
-    extraction_prompt = """你是 FGO 知识查询参数提取器。从用户问题中提取结构化查询参数。
-
-## 输出字段
-- `name`: 具体的活动名/卡池名/关卡名/素材名/从者名（字符串），不要填入整个问句
-- `entry_type`: 条目类型（event=活动/war=主线关卡/gacha=卡池/item=素材）
-- `tag`: 标签（如 event_type:campaign，可选）
-- `year_month`: 时间（YYYY-MM 格式，可选）
-
-## 输出格式
-严格按 JSON 格式输出，只包含能从问题中提取到的字段，无法确定的字段不要填：
-```json
-{"name": "梅林", "entry_type": "gacha"}
-```
-
-## 示例
-用户："梅林什么时候复刻" → {"name": "梅林", "entry_type": "gacha"}
-用户："最近有什么活动" → {"entry_type": "event"}
-用户："特异点F是什么" → {"name": "特异点F", "entry_type": "war"}
-用户："龙之牙在哪里掉" → {"name": "龙之牙", "entry_type": "item"}
-用户："去年周年庆" → {"entry_type": "event", "year_month": "2025-07"}
-"""
-    try:
-        result = await chat_completion(
-            system_prompt=extraction_prompt,
-            user_message=user_message,
-            temperature=0.0,
-            json_mode=True,
-        )
-        import json as _json
-
-        from server.llm import extract_json_object
-
-        text = result.get("text", "")
-        extracted = _json.loads(extract_json_object(text))
-
-        await log_trace_event(
-            trace_id,
-            "atlas_query_extraction",
-            {"query": user_message, "extracted": extracted},
-        )
-        return extracted
-    except Exception as extraction_err:
-        print(f"⚠️ [{trace_id}] Atlas 参数提取失败，降级原始查询: {extraction_err}")
-        return None
-
-
 async def _handle_atlas_pipeline(
     user_message: str,
     trace_id: str,
@@ -2003,234 +2012,21 @@ async def _handle_atlas_pipeline(
     trace_total_tokens: int,
     atlas_query: dict | None = None,
 ) -> ChatResponse:
-    """链路 B：Atlas 知识问答。检索 Atlas CN 索引 → LLM 生成回复 → 事实校验。"""
-    from server.atlas_index import AtlasQueryParams, get_atlas_index
+    """链路 B：Atlas 知识问答。Task 1 起改为图引擎执行。
 
-    atlas = get_atlas_index()
-
-    # 优先使用路由 LLM 提取的结构化参数
-    query_source = "structured"
-    if atlas_query:
-        params = AtlasQueryParams(**atlas_query)
-    elif atlas_query is None:
-        # Stage 0 只做分类不提取参数 → 独立 LLM 调用提取 atlas_query
-        query_source = "llm_extraction"
-        extracted_query = await _extract_atlas_query(user_message, trace_id)
-        if extracted_query:
-            params = AtlasQueryParams(**extracted_query)
-            atlas_query = extracted_query
-        else:
-            query_source = "raw_fallback"
-            params = AtlasQueryParams(name=user_message)
-
-    results = atlas.search(params)
-
-    await log_trace_event(
-        trace_id,
-        "atlas_search",
-        {"query": user_message, "result_count": len(results), "query_source": query_source, "atlas_query": atlas_query},
-    )
-
-    # 结构化搜索无结果时，降级到原始消息匹配
-    if not results and query_source == "structured":
-        query_source = "raw_fallback"
-        params = AtlasQueryParams(name=user_message)
-        results = atlas.search(params)
-        await log_trace_event(
-            trace_id,
-            "atlas_search_fallback",
-            {"query": user_message, "result_count": len(results), "query_source": query_source},
-        )
-
-    if not results:
-        reply = "抱歉，我在活动/卡池/主线数据库中未找到相关信息。你可以尝试更具体的关键词，如活动名称或时间段。"
-        await log_trace_event(
-            trace_id,
-            "final",
-            {
-                "total_time_ms": round((time.monotonic() - request_start) * 1000, 2),
-                "result": "atlas_no_match",
-                "mode": "atlas_pipeline",
-                "total_tokens": trace_total_tokens,
-            },
-        )
-        return ChatResponse(
-            reply=reply, servants=[], count=0, query={"mode": "atlas_pipeline"}, model=model_used, traceId=trace_id
-        )
-
-    # 构建上下文摘要供 LLM 参考
-    context_lines = []
-    for item in results[:10]:
-        summary_parts = [f"{k}: {v}" for k, v in item.items() if k != "entry_key"]
-        context_lines.append("- " + ", ".join(summary_parts))
-    atlas_context = "\n".join(context_lines)
-
-    generation_prompt = (
-        "你是 FGO 知识助手。根据以下 Atlas 数据库检索结果回答用户问题。\n"
-        "要求：\n"
-        "1. 仅基于提供的数据回答，不要编造信息\n"
-        "2. 使用中文自然语言，面向玩家\n"
-        "3. 如果数据不足以完整回答，明确告知哪些信息缺失\n\n"
-        f"检索结果：\n{atlas_context}\n\n"
-        f"用户问题：{user_message}"
-    )
-
-    gen_result = await chat_completion(
-        system_prompt="You are a helpful AI assistant.",
-        user_message=generation_prompt,
-        temperature=0.3,
-        json_mode=False,
-    )
-    reply = gen_result.get("text", "").strip()
-    gen_usage = gen_result.get("_usage", {})
-    trace_total_tokens += gen_usage.get("total_tokens", 0)
-    model_used = gen_result.get("_model", model_used)
-
-    # 轻量级事实校验
-    verified = _verify_atlas_facts(reply, atlas)
-    await log_trace_event(
-        trace_id,
-        "fact_verify",
-        {"verified": verified},
-    )
-
-    await log_trace_event(
-        trace_id,
-        "final",
-        {
-            "total_time_ms": round((time.monotonic() - request_start) * 1000, 2),
-            "result": "atlas_pipeline",
-            "mode": "atlas_pipeline",
-            "atlas_results": len(results),
-            "total_tokens": trace_total_tokens,
-        },
-    )
-
-    return ChatResponse(
-        reply=reply, servants=[], count=0, query={"mode": "atlas_pipeline"}, model=model_used, traceId=trace_id
-    )
-
-
-def _extract_guide_tags(query: str) -> list[str]:
-    """从用户查询中提取攻略相关的 tag 关键词，用于缩小 BM25 检索范围。
-
-    仅提取职阶相关 tag，避免全量检索时拉入不相关职阶的攻略文档。
+    本函数现在是 thin wrapper：构建 PipelineState → graph.run(atlas_node) → 拼装 ChatResponse。
+    业务逻辑实现在 ``server.nodes.atlas.atlas_node``。
     """
-    # 职阶关键词 → 对应 tag（优先匹配中文简称/俗称）
-    _CLASS_TAG_MAP: dict[str, str] = {
-        "剑": "saber",
-        "剑阶": "saber",
-        "剑冠": "saber",
-        "弓": "archer",
-        "弓阶": "archer",
-        "弓冠": "archer",
-        "枪": "lancer",
-        "枪阶": "lancer",
-        "枪冠": "lancer",
-        "骑": "rider",
-        "骑阶": "rider",
-        "骑冠": "rider",
-        "术": "caster",
-        "术阶": "caster",
-        "术冠": "caster",
-        "杀": "assassin",
-        "杀阶": "assassin",
-        "杀冠": "assassin",
-        "狂": "berserker",
-        "狂阶": "berserker",
-        "狂冠": "berserker",
-        "ex": "extra",
-        "EX": "extra",
-        "ex冠": "extra",
-        "EX冠": "extra",
-    }
-    tags: list[str] = []
-    for keyword, tag in _CLASS_TAG_MAP.items():
-        if keyword in query and tag not in tags:
-            tags.append(tag)
-    return tags
-
-
-def _prepare_guide_context(user_message: str) -> tuple[list, set[str], dict[str, str]] | None:
-    """BM25 检索攻略文档并构建上下文。
-
-    Returns:
-        (chunks, source_labels, source_authors) 或 None（无结果时）
-    """
-    from server.guide_retriever import GuideRetriever
-
-    retriever = GuideRetriever()
-    guide_tags = _extract_guide_tags(user_message)
-    chunks = retriever.search(user_message, tags=guide_tags or None, top_k=3)
-
-    if not chunks:
-        return None
-
-    source_labels: set[str] = set()
-    source_authors: dict[str, str] = {}
-    for chunk in chunks:
-        title = chunk.metadata.get("title", "攻略")
-        if title and title != "攻略":
-            source_labels.add(title)
-            author = chunk.metadata.get("author", "")
-            if author:
-                source_authors[title] = author
-
-    return chunks, source_labels, source_authors
-
-
-def _build_guide_context_text(chunks: list) -> str:
-    """将 BM25 检索结果拼接为 LLM 上下文字符串。"""
-    context_lines = []
-    for chunk in chunks:
-        title = chunk.metadata.get("title", "攻略")
-        section = chunk.metadata.get("section", "")
-        header = f"【{title}】" + (f" {section}" if section else "")
-        context_lines.append(f"{header}\n{chunk.content}")
-    return "\n\n---\n\n".join(context_lines)
-
-
-def _build_guide_generation_prompt(guide_context: str, user_message: str) -> str:
-    """构建链路 C generation 阶段的 system prompt。"""
-    return (
-        "你是 FGO 攻略助手。根据以下攻略文档内容回答用户问题。\n\n"
-        "## 知识范围\n"
-        "- 仅基于提供的攻略内容回答，严禁使用自身训练知识补充或猜测\n"
-        "- 如果攻略中未涉及用户问的内容，必须明确说「攻略中暂未收录这部分内容」\n"
-        "- 如果攻略内容不足以完整回答，明确告知哪些部分缺少资料\n\n"
-        "## 格式要求（必须严格遵守）\n"
-        "1. **开头直答**：回复第一段用 1-2 句话直接回答用户的核心问题，让用户立刻获得答案\n"
-        "2. **分段标题**：用 `###` 三级标题划分不同话题段落（如阵容、打法、注意事项等），"
-        "每个标题下内容控制在 3-5 句以内\n"
-        "3. **加粗重点**：用 **加粗** 标记关键信息（从者名称、核心机制、必要条件、数值门槛）\n"
-        "4. **列表并列**：并列选项（多套阵容、多个从者推荐、多步操作）使用 `- ` 无序列表\n"
-        "5. **精简表达**：每段话不超过 3 句，删除「接下来我们看」等过渡废话，"
-        "优先用短句和列表替代长段落\n"
-        "6. **禁止冗余**：不要复述用户的问题，不要写开头寒暄，不要添加总结段\n"
-        "7. **总长度控制**：整体回复控制在 600 字以内，信息密度优先于面面俱到\n\n"
-        "## 禁止事项\n"
-        "- 不要出现文件名、文件路径、内部标题格式（如 [xxx] > yyy）\n"
-        "- 不要出现技术术语或系统实现细节\n"
-        "- 不要自行添加来源标注（系统会自动处理）\n"
-        "- 不要使用一级标题 `#` 或二级标题 `##`\n"
-        "- **禁止使用 Markdown 表格**（`|---|` 语法），改用列表呈现对比信息\n\n"
-        f"攻略内容：\n{guide_context}\n\n"
-        f"用户问题：{user_message}"
+    state = PipelineState(
+        user_message=user_message,
+        trace_id=trace_id,
+        request_start=request_start,
+        model_used=model_used,
+        trace_total_tokens=trace_total_tokens,
+        atlas_query=atlas_query,
     )
-
-
-def _format_source_suffix(source_labels: set[str], source_authors: dict[str, str]) -> str:
-    """格式化来源标注后缀。"""
-    if not source_labels:
-        return ""
-    labels_with_author = []
-    for title in sorted(source_labels):
-        author = source_authors.get(title)
-        if author:
-            labels_with_author.append(f"{title}（作者：**{author}**）")
-        else:
-            labels_with_author.append(title)
-    return "\n\n📖 参考：" + ", ".join(labels_with_author)
+    state = await _get_pipeline_b_graph().run(state)
+    return _state_to_chat_response(state, trace_id)
 
 
 async def _handle_guide_pipeline(
@@ -2240,90 +2036,17 @@ async def _handle_guide_pipeline(
     request_start: float,
     trace_total_tokens: int,
 ) -> ChatResponse:
-    """链路 C：攻略知识问答。BM25 检索攻略文档 → LLM 生成回复 → 来源标注。"""
-    result = _prepare_guide_context(user_message)
+    """链路 C：攻略知识问答。Task 1 起改为图引擎执行（非流式）。
 
-    await log_trace_event(
-        trace_id,
-        "guide_search",
-        {"query": user_message, "result_count": len(result[0]) if result else 0},
-    )
-
-    if result is None:
-        reply = "抱歉，我在攻略库中未找到相关内容。你可以尝试更具体的关键词，如职阶名或关卡名。"
-        await log_trace_event(
-            trace_id,
-            "final",
-            {
-                "total_time_ms": round((time.monotonic() - request_start) * 1000, 2),
-                "result": "guide_no_match",
-                "mode": "guide_pipeline",
-                "total_tokens": trace_total_tokens,
-            },
-        )
-        return ChatResponse(
-            reply=reply, servants=[], count=0, query={"mode": "guide_pipeline"}, model=model_used, traceId=trace_id
-        )
-
-    chunks, source_labels, source_authors = result
-    guide_context = _build_guide_context_text(chunks)
-    generation_prompt = _build_guide_generation_prompt(guide_context, user_message)
-
-    gen_result = await chat_completion(
-        system_prompt=generation_prompt,
-        user_message=user_message,
-        temperature=0.3,
-        json_mode=False,
-    )
-    reply = gen_result.get("text", "").strip()
-    gen_usage = gen_result.get("_usage", {})
-    trace_total_tokens += gen_usage.get("total_tokens", 0)
-    model_used = gen_result.get("_model", model_used)
-
-    reply += _format_source_suffix(source_labels, source_authors)
-
-    await log_trace_event(
-        trace_id,
-        "final",
-        {
-            "total_time_ms": round((time.monotonic() - request_start) * 1000, 2),
-            "result": "guide_pipeline",
-            "mode": "guide_pipeline",
-            "guide_chunks": len(chunks),
-            "sources": list(source_labels),
-            "total_tokens": trace_total_tokens,
-        },
-    )
-
-    return ChatResponse(
-        reply=reply, servants=[], count=0, query={"mode": "guide_pipeline"}, model=model_used, traceId=trace_id
-    )
-
-
-def _verify_atlas_facts(reply: str, atlas) -> bool:
-    """轻量级事实验证：检查回复中提到的实体是否存在于 Atlas 索引中。
-
-    提取回复中的引号内容和专有名词，验证其在索引中存在。
-    返回 True 表示验证通过或未检测到可验证实体。
+    SSE 流式版本仍由 ``stream_event_generator`` 内联实现（直接调用
+    ``_prepare_guide_context`` / ``_build_guide_generation_prompt``），Task 5 统一改造。
     """
-    import re
-
-    # 提取中文引号内的内容作为待验证实体
-    quoted_entities = re.findall(r"[\u201c\u201d](.*?)[\u201c\u201d]", reply)
-    if not quoted_entities:
-        return True
-
-    verified_count = 0
-    total_count = 0
-    for entity in quoted_entities:
-        if len(entity) < 2:
-            continue
-        total_count += 1
-        if atlas.verify_fact("name", entity):
-            verified_count += 1
-
-    if total_count == 0:
-        return True
-
-    # 超过 70% 的实体可验证即通过
-    return verified_count / total_count >= 0.7
+    state = PipelineState(
+        user_message=user_message,
+        trace_id=trace_id,
+        request_start=request_start,
+        model_used=model_used,
+        trace_total_tokens=trace_total_tokens,
+    )
+    state = await _get_pipeline_c_graph().run(state)
+    return _state_to_chat_response(state, trace_id)
