@@ -18,6 +18,22 @@ from server.skills.executor import SkillExecutor
 
 async def execute_node(state: PipelineState) -> PipelineState:
     """Skill 执行：调度 QuerySkill → 收敛 servants/total_found。"""
+    streaming = bool(state.extras.get("streaming"))
+    if streaming:
+        # 判断是否包含知识类 Skill（用于动态调整 thinking message）
+        from server.skills.base import SKILL_REGISTRY
+
+        has_knowledge_skill = (
+            any(
+                getattr(SKILL_REGISTRY.get(c.get("skill_name", "")), "domain", "servant") != "servant"
+                for c in state.skill_calls
+            )
+            if state.skill_calls
+            else False
+        )
+        executing_msg = "正在检索知识库..." if has_knowledge_skill else "正在检索从者数据..."
+        state.pending_events.append({"type": "thinking", "data": {"phase": "executing", "message": executing_msg}})
+
     executor = SkillExecutor()
     result = executor.execute(state.skill_calls, state.response_skill_name)
 
@@ -41,6 +57,10 @@ async def execute_node(state: PipelineState) -> PipelineState:
 
         # 名称查询空结果：异步 LLM 猜测填充候选
         if result.clarification.get("type") == CLARIFICATION_EMPTY_NAME:
+            if streaming:
+                state.pending_events.append(
+                    {"type": "thinking", "data": {"phase": "resolving", "message": "正在智能识别..."}}
+                )
             result = await executor.guess_candidates_async(result)
 
         # 猜测后仍有 clarification → bail_out

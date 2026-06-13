@@ -29,6 +29,7 @@ async def clarify_node(state: PipelineState) -> PipelineState:
     reason = state.extras.get("bail_out", "unknown")
     trace_id = state.trace_id
     request_start = state.request_start
+    streaming = bool(state.extras.get("streaming"))
 
     if reason == "clarification":
         routing_result = state.extras.get("routing_result", {}) or {}
@@ -57,6 +58,17 @@ async def clarify_node(state: PipelineState) -> PipelineState:
         state.count = 0
         state.query = {"mode": "clarification", "clarification": clarification}
         await _maybe_save_pending(state, source="routing")
+        if streaming:
+            state.pending_events.append(
+                {
+                    "type": "clarification",
+                    "data": {
+                        "question": clarification.get("question", ""),
+                        "options": clarification.get("options", []),
+                        "trace_id": trace_id,
+                    },
+                }
+            )
         return state
 
     # execution_clarification
@@ -95,6 +107,17 @@ async def clarify_node(state: PipelineState) -> PipelineState:
         "source": "execution",
     }
     await _maybe_save_pending(state, source="execution")
+    if streaming:
+        state.pending_events.append(
+            {
+                "type": "clarification",
+                "data": {
+                    "question": clarification.get("question", ""),
+                    "options": clarification.get("options", []),
+                    "trace_id": trace_id,
+                },
+            }
+        )
     return state
 
 

@@ -23,6 +23,7 @@ from server.schemas import (
     routing_response_json_schema,
 )
 from server.skills.base import SKILL_REGISTRY, QuerySkill
+from server.translation import describe_filters
 
 
 async def route_node(state: PipelineState) -> PipelineState:
@@ -31,6 +32,12 @@ async def route_node(state: PipelineState) -> PipelineState:
     Note: ``routing_input`` 事件由调用方（``handle_skill_mode``）在 graph run 前统一记录，
     以保持与原代码一致的事件顺序（routing_input → classifier_output → routing_output）。
     """
+    streaming = bool(state.extras.get("streaming"))
+    if streaming:
+        state.pending_events.append(
+            {"type": "thinking", "data": {"phase": "routing", "message": "正在理解你的问题..."}}
+        )
+
     skill_descriptions = [
         {"name": s.name, "description": s.description} for s in SKILL_REGISTRY.values() if isinstance(s, QuerySkill)
     ]
@@ -114,4 +121,17 @@ async def route_node(state: PipelineState) -> PipelineState:
     state.response_skill_name = response_skill_name
     state.target_pipeline = routing_result.get("target_pipeline", "A") or "A"
     state.extras["routing_result"] = routing_result
+
+    # 推送路由完成 thinking（与原 SSE 中文描述一致）
+    if streaming:
+        state.pending_events.append(
+            {
+                "type": "thinking",
+                "data": {
+                    "phase": "routed",
+                    "message": "意图识别完成",
+                    "detail": "、".join(describe_filters(skill_calls)),
+                },
+            }
+        )
     return state

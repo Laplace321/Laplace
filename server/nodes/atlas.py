@@ -9,10 +9,11 @@ from __future__ import annotations
 import json as _json
 import re
 import time
+from collections.abc import AsyncGenerator
 
 from server.atlas_index import AtlasQueryParams, get_atlas_index
 from server.graph.state import PipelineState
-from server.llm import chat_completion, extract_json_object
+from server.llm import StreamMetadata, chat_completion, chat_completion_stream, extract_json_object
 from server.logger import log_trace_event
 
 
@@ -202,3 +203,146 @@ async def atlas_node(state: PipelineState) -> PipelineState:
     state.count = 0
     state.query = {"mode": "atlas_pipeline"}
     return state
+
+
+async def atlas_stream_node(state: PipelineState) -> AsyncGenerator[dict | PipelineState, None]:
+    """Pipeline B（SSE 流式版） — 与 ``atlas_node`` 行为等价，差异仅在 LLM 流式 yield delta。
+
+    yield 顺序：
+    1. ``thinking phase=routing`` "识别为 Atlas 知识检索，正在检索..."
+    2. （无命中时）``delta`` 一次性 + 终态 state
+    3. 命中时：``delta`` * N（chat_completion_stream 逐 chunk）+ 终态 state
+    """
+    yield {
+        "type": "thinking",
+        "data": {"phase": "routing", "message": "识别为Atlas 知识检索，正在检索..."},
+    }
+
+    atlas = get_atlas_index()
+    query_source = "structured"
+    atlas_query = state.atlas_query
+    if atlas_query:
+        params = AtlasQueryParams(**atlas_query)
+    else:
+        query_source = "llm_extraction"
+        extracted_query = await _extract_atlas_query(state.user_message, state.trace_id)
+        if extracted_query:
+            params = AtlasQueryParams(**extracted_query)
+            atlas_query = extracted_query
+        else:
+            query_source = "raw_fallback"
+            params = AtlasQueryParams(name=state.user_message)
+
+    results = atlas.search(params)
+    await log_trace_event(
+        state.trace_id,
+        "atlas_search",
+        {
+            "query": state.user_message,
+            "result_count": len(results),
+            "query_source": query_source,
+            "atlas_query": atlas_query,
+        },
+    )
+
+    if not results and query_source == "structured":
+        query_source = "raw_fallback"
+        params = AtlasQueryParams(name=state.user_message)
+        results = atlas.search(params)
+        await log_trace_event(
+            state.trace_id,
+            "atlas_search_fallback",
+            {"query": state.user_message, "result_count": len(results), "query_source": query_source},
+        )
+
+    if not results:
+        no_match_reply = (
+            "抱歉，我在活动/卡池/主线数据库中未找到相关信息。你可以尝试更具体的关键词，如活动名称或时间段。"
+        )
+        state.reply = no_match_reply
+        state.servants = []
+        state.count = 0
+        state.query = {"mode": "atlas_pipeline"}
+        yield {"type": "delta", "data": {"text": no_match_reply}}
+        await log_trace_event(
+            state.trace_id,
+            "final",
+            {
+                "total_time_ms": round((time.monotonic() - state.request_start) * 1000, 2),
+                "result": "atlas_no_match",
+                "mode": "atlas_pipeline",
+                "total_tokens": state.trace_total_tokens,
+            },
+        )
+        yield state
+        return
+
+    context_lines = []
+    for item in results[:10]:
+        summary_parts = [f"{k}: {v}" for k, v in item.items() if k != "entry_key"]
+        context_lines.append("- " + ", ".join(summary_parts))
+    atlas_context = "\n".join(context_lines)
+
+    generation_prompt = (
+        "你是 FGO 知识助手。根据以下 Atlas 数据库检索结果回答用户问题。\n"
+        "要求：\n"
+        "1. 仅基于提供的数据回答，不要编造信息\n"
+        "2. 使用中文自然语言，面向玩家\n"
+        "3. 如果数据不足以完整回答，明确告知哪些信息缺失\n\n"
+        f"检索结果：\n{atlas_context}\n\n"
+        f"用户问题：{state.user_message}"
+    )
+
+    full_reply_parts: list[str] = []
+    metadata = StreamMetadata()
+    try:
+        async for chunk in chat_completion_stream(
+            system_prompt="You are a helpful AI assistant.",
+            user_message=generation_prompt,
+            temperature=0.3,
+            metadata=metadata,
+        ):
+            full_reply_parts.append(chunk)
+            yield {"type": "delta", "data": {"text": chunk}}
+        reply = "".join(full_reply_parts).strip()
+        if not reply:
+            raise ValueError("Empty response from LLM")
+    except Exception as gen_err:  # noqa: BLE001
+        if full_reply_parts:
+            reply = "".join(full_reply_parts).strip()
+        else:
+            reply = "抱歉，知识检索回复生成失败，请稍后重试。"
+            try:
+                yield {"type": "delta", "data": {"text": reply}}
+            except Exception:  # noqa: BLE001
+                pass
+        await log_trace_event(
+            state.trace_id,
+            "atlas_generation_error",
+            {"error": str(gen_err)},
+        )
+
+    state.trace_total_tokens += metadata.usage.get("total_tokens", 0)
+    if metadata.model:
+        state.model_used = metadata.model
+
+    verified = _verify_atlas_facts(reply, atlas)
+    await log_trace_event(state.trace_id, "fact_verify", {"verified": verified})
+
+    await log_trace_event(
+        state.trace_id,
+        "final",
+        {
+            "total_time_ms": round((time.monotonic() - state.request_start) * 1000, 2),
+            "result": "atlas_pipeline",
+            "mode": "atlas_pipeline",
+            "atlas_results": len(results),
+            "total_tokens": state.trace_total_tokens,
+        },
+    )
+
+    state.reply = reply
+    state.servants = []
+    state.count = 0
+    state.query = {"mode": "atlas_pipeline"}
+    yield state

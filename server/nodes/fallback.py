@@ -44,4 +44,8 @@ async def template_fallback_node(state: PipelineState) -> PipelineState:
     state.servants = []
     state.count = 0
     state.query = routing_result
+
+    # SSE 流式：把模板回复转换为 delta 事件
+    if state.extras.get("streaming"):
+        state.pending_events.append({"type": "delta", "data": {"text": template_reply}})
     return state

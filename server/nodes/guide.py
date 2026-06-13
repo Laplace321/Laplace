@@ -8,10 +8,11 @@ SSE 流式版本由 stream_event_generator 中的 inline 实现保留（Task 5 �
 from __future__ import annotations
 
 import time
+from collections.abc import AsyncGenerator
 
 from server.graph.state import PipelineState
 from server.guide_retriever import GuideRetriever
-from server.llm import chat_completion
+from server.llm import StreamMetadata, chat_completion, chat_completion_stream
 from server.logger import log_trace_event
 
 # 职阶关键词 → 对应 tag（优先匹配中文简称/俗称）
@@ -201,9 +202,129 @@ async def guide_node(state: PipelineState) -> PipelineState:
 # Task 5 统一后再清理。
 __all__ = [
     "guide_node",
+    "guide_stream_node",
     "_prepare_guide_context",
     "_build_guide_context_text",
     "_build_guide_generation_prompt",
     "_format_source_suffix",
     "_extract_guide_tags",
 ]
+
+
+_PROVIDER_FALLBACK_PREFIX = "抱歉，生成服务暂时不可用"
+
+
+async def guide_stream_node(state: PipelineState) -> AsyncGenerator[dict | PipelineState, None]:
+    """Pipeline C（SSE 流式版） — 与 ``guide_node`` 行为等价，差异仅在 LLM 流式 yield delta。
+
+    yield 顺序：
+    1. ``thinking phase=routing`` "识别为攻略文档检索，正在检索..."
+    2. （无命中时）``delta`` 一次性 + 终态 state
+    3. 命中时：``delta`` * N（chat_completion_stream 逐 chunk）+ 来源后缀 ``delta`` + 终态 state
+    """
+    yield {
+        "type": "thinking",
+        "data": {"phase": "routing", "message": "识别为攻略文档检索，正在检索..."},
+    }
+
+    result = _prepare_guide_context(state.user_message)
+    await log_trace_event(
+        state.trace_id,
+        "guide_search",
+        {"query": state.user_message, "result_count": len(result[0]) if result else 0},
+    )
+
+    if result is None:
+        no_match_reply = "抱歉，我在攻略库中未找到相关内容。你可以尝试更具体的关键词，如职阶名或关卡名。"
+        state.reply = no_match_reply
+        state.servants = []
+        state.count = 0
+        state.query = {"mode": "guide_pipeline"}
+        yield {"type": "delta", "data": {"text": no_match_reply}}
+        await log_trace_event(
+            state.trace_id,
+            "final",
+            {
+                "total_time_ms": round((time.monotonic() - state.request_start) * 1000, 2),
+                "result": "guide_no_match",
+                "mode": "guide_pipeline",
+                "total_tokens": state.trace_total_tokens,
+            },
+        )
+        yield state
+        return
+
+    chunks, source_labels, source_authors = result
+    guide_context = _build_guide_context_text(chunks)
+    generation_prompt = _build_guide_generation_prompt(guide_context, state.user_message)
+
+    full_reply_parts: list[str] = []
+    metadata = StreamMetadata()
+    guide_gen_failed = False
+    try:
+        async for chunk in chat_completion_stream(
+            system_prompt=generation_prompt,
+            user_message=state.user_message,
+            temperature=0.3,
+            metadata=metadata,
+        ):
+            full_reply_parts.append(chunk)
+            yield {"type": "delta", "data": {"text": chunk}}
+
+        guide_gen_reply = "".join(full_reply_parts).strip()
+        if not guide_gen_reply or guide_gen_reply.startswith(_PROVIDER_FALLBACK_PREFIX):
+            raise ValueError(f"Guide generation failed: {'provider fallback' if guide_gen_reply else 'empty response'}")
+    except Exception as guide_gen_error:  # noqa: BLE001
+        guide_gen_failed = True
+        fallback_reply = "抱歉，攻略生成服务暂时繁忙，请稍后重试。"
+        has_meaningful_output = any(part.strip() for part in full_reply_parts)
+        if not has_meaningful_output:
+            try:
+                yield {"type": "delta", "data": {"text": fallback_reply}}
+            except Exception:  # noqa: BLE001
+                pass
+            guide_gen_reply = fallback_reply
+        else:
+            guide_gen_reply = "".join(full_reply_parts).strip()
+        await log_trace_event(
+            state.trace_id,
+            "generation_output",
+            {"reply": guide_gen_reply},
+            error=str(guide_gen_error),
+        )
+    else:
+        await log_trace_event(
+            state.trace_id,
+            "generation_output",
+            {"reply": guide_gen_reply, "generation_usage": metadata.usage},
+        )
+
+    if not guide_gen_failed:
+        source_suffix = _format_source_suffix(source_labels, source_authors)
+        if source_suffix:
+            full_reply_parts.append(source_suffix)
+            guide_gen_reply = guide_gen_reply + source_suffix
+            yield {"type": "delta", "data": {"text": source_suffix}}
+
+    state.trace_total_tokens += metadata.usage.get("total_tokens", 0)
+    if metadata.model:
+        state.model_used = metadata.model
+
+    await log_trace_event(
+        state.trace_id,
+        "final",
+        {
+            "total_time_ms": round((time.monotonic() - state.request_start) * 1000, 2),
+            "result": "guide_generation_failed" if guide_gen_failed else "guide_pipeline",
+            "mode": "guide_pipeline",
+            "guide_chunks": len(chunks),
+            "sources": list(source_labels),
+            "total_tokens": state.trace_total_tokens,
+        },
+    )
+
+    state.reply = guide_gen_reply
+    state.servants = []
+    state.count = 0
+    state.query = {"mode": "guide_pipeline"}
+    yield state
