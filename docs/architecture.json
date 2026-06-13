@@ -1,13 +1,15 @@
 {
-  "version": "0.4.1",
-  "lastUpdated": "2026-06-10",
+  "version": "0.5.0",
+  "lastUpdated": "2026-06-12",
   "system": {
     "name": "Laplace",
-    "description": "AI Native 对话式 FGO（Fate/Grand Order）数据助手。用户通过自然语言提问，系统自动解析意图、检索数据库、生成结构化回答。支持 A→B→C 三级知识问答链路（精确查询/Atlas 知识/攻略文档 BM25 检索）。",
-    "coreDesign": "两阶段路由（Stage 0 分类器 + Stage 1 参数提取）+ Skill-Based Architecture 可扩展查询 + OneShot 优先 + Agent 兜底混合路由。链路 C 支持攻略文档 BM25 检索与 LLM 流式生成。",
+    "description": "AI Native 对话式 FGO（Fate/Grand Order）数据助手。用户通过自然语言提问，系统自动解析意图、检索数据库、生成结构化回答。支持 A→B→C 三级知识问答链路（精确查询/Atlas 知识/攻略文档 BM25 检索），v0.5.0 起所有处理逻辑统一通过自研声明式 DAG 图引擎驱动，并支持多轮对话状态。",
+    "coreDesign": "声明式 DAG 图引擎（节点 + 条件边）+ 两阶段路由（Stage 0 分类器 + Stage 1 参数提取）+ Skill-Based Architecture 可扩展查询 + OneShot 优先 + Agent 兜底混合路由 + SessionStore/Checkpointer 多轮对话 + StateGraph.run_stream 节点级 SSE 实时事件转发。",
     "techStack": {
       "runtime": "Python 3.12",
       "framework": "FastAPI + Uvicorn (ASGI)",
+      "graphEngine": "自研 StateGraph (~280 行，零外部依赖)",
+      "stateStore": "InMemoryCheckpointer + SqliteCheckpointer (WAL 模式，30 分钟 TTL)",
       "validation": "Pydantic v2",
       "llmSDK": ["DashScope SDK", "OpenAI SDK"],
       "frontend": "Vanilla JS + HTML/CSS + SSE",
@@ -24,8 +26,9 @@
         "description": "FastAPI 端点、CORS、Rate Limiter、Admin 路由、静态文件挂载",
         "files": ["server/main.py"],
         "endpoints": [
-          {"path": "/api/chat", "method": "POST", "description": "JSON 对话请求"},
-          {"path": "/api/chat/stream", "method": "GET", "description": "SSE 流式对话"},
+          {"path": "/api/chat", "method": "POST", "description": "JSON 对话请求（handle_skill_mode → graph.run）"},
+          {"path": "/api/chat/stream", "method": "GET", "description": "SSE 流式对话（stream_chat_events → graph.run_stream，节点级实时事件）"},
+          {"path": "/api/chat/resume", "method": "POST", "description": "pending checkpoint 恢复（多轮中断 + 用户补充信息后续跑）"},
           {"path": "/api/health", "method": "GET", "description": "健康检查"},
           {"path": "/api/admin/*", "method": "GET/POST", "description": "Admin 管理路由（需认证）"},
           {"path": "/admin/*", "method": "GET", "description": "Admin 后台静态页"},
@@ -34,9 +37,19 @@
         ]
       },
       {
+        "name": "图引擎层（v0.5.0 新增）",
+        "description": "StateGraph 声明式 DAG 引擎、PipelineState dataclass、节点编排（普通 + 流式）、条件边路由、SessionStore + Checkpointer 多轮对话状态",
+        "files": ["server/graph/engine.py", "server/graph/state.py", "server/graph/checkpointer.py", "server/graph/session.py", "server/graph/decorators.py"]
+      },
+      {
+        "name": "节点层（v0.5.0 新增）",
+        "description": "11 个独立节点文件，每个节点是 async 纯函数 State→State 或 async generator；流式版与非流式版共存复用核心逻辑",
+        "files": ["server/nodes/classify.py", "server/nodes/route.py", "server/nodes/merge_filters.py", "server/nodes/execute.py", "server/nodes/generate.py", "server/nodes/atlas.py", "server/nodes/guide.py", "server/nodes/agent.py", "server/nodes/clarify.py", "server/nodes/fallback.py"]
+      },
+      {
         "name": "路由层",
-        "description": "LLM OneShot 意图路由、Preset 展开、前端直传、Pydantic Schema 校验",
-        "files": ["server/pipeline.py", "server/prompts.py", "server/schemas.py"]
+        "description": "图构建器（6 套图实例）+ JSON/SSE 入口分发 + 集中条件边 + LLM Prompt 模板 + Pydantic Schema 契约",
+        "files": ["server/pipeline.py", "server/edges.py", "server/prompts.py", "server/schemas.py"]
       },
       {
         "name": "执行层",
@@ -45,72 +58,171 @@
       },
       {
         "name": "数据层",
-        "description": "servants_db.json (Materialized View)、knowledge/ (Schema Mirror)、config/ (可运营配置)、翻译预消化、头像本地缓存",
+        "description": "servants_db.json (Materialized View)、knowledge/ (Schema Mirror)、config/ (可运营配置)、翻译预消化、头像本地缓存、checkpoints.db (SQLite WAL)",
         "files": ["server/data_loader.py", "server/query_executor.py", "server/translation.py", "server/individuality.py", "server/face_proxy.py", "server/download_faces.py"]
       },
       {
         "name": "生成层",
-        "description": "Context 预消化构建、ResponseSkill Prompt 模板、LLM RAG 生成",
+        "description": "Context 预消化构建、ResponseSkill Prompt 模板、LLM RAG 生成（含流式 chat_completion_stream）",
         "files": ["server/context_builder.py", "server/llm/"]
       }
     ],
+    "graphTopology": {
+      "description": "v0.5.0 起所有请求处理统一通过 StateGraph 推进。共 6 套图实例，模块级缓存。",
+      "instances": [
+        {
+          "name": "_PIPELINE_A_GRAPH",
+          "purpose": "JSON 完整 Pipeline A 图（含降级分支）",
+          "entry": "classify",
+          "nodes": ["classify", "route", "merge_filters", "execute", "generate", "atlas", "guide", "agent_fallback", "clarify", "template_fallback"]
+        },
+        {
+          "name": "_PIPELINE_DIRECT_GRAPH",
+          "purpose": "JSON preset / 前端直传短图（跳过 classify/route）",
+          "entry": "execute",
+          "nodes": ["execute", "generate", "agent_fallback", "clarify"]
+        },
+        {
+          "name": "_PIPELINE_B_GRAPH",
+          "purpose": "B/C JSON 单节点图 wrapper（保留供测试）",
+          "entry": "atlas",
+          "nodes": ["atlas"]
+        },
+        {
+          "name": "_PIPELINE_C_GRAPH",
+          "purpose": "B/C JSON 单节点图 wrapper（保留供测试）",
+          "entry": "guide",
+          "nodes": ["guide"]
+        },
+        {
+          "name": "_PIPELINE_A_STREAM_GRAPH",
+          "purpose": "SSE 完整 Pipeline A 流式图（atlas/guide/generate/agent_fallback 替换为 stream 节点）",
+          "entry": "classify",
+          "nodes": ["classify", "route", "merge_filters", "execute", "generate(stream)", "atlas(stream)", "guide(stream)", "agent_fallback(stream)", "clarify", "template_fallback"]
+        },
+        {
+          "name": "_PIPELINE_DIRECT_STREAM_GRAPH",
+          "purpose": "SSE preset 直传流式短图",
+          "entry": "execute",
+          "nodes": ["execute", "generate(stream)", "agent_fallback(stream)", "clarify"]
+        },
+        {
+          "name": "_PIPELINE_CONFIRMATION_STREAM_GRAPH",
+          "purpose": "SSE confirmation_id 直达流式短图（仅 generate_stream，预填 ExecutionResult）",
+          "entry": "generate",
+          "nodes": ["generate(stream)"]
+        }
+      ],
+      "conditionalEdges": {
+        "after_classify": {
+          "B": "atlas",
+          "C": "guide",
+          "A_low_confidence": "agent_fallback",
+          "A_minor_correction_with_prev_turn": "merge_filters",
+          "A_main": "route"
+        },
+        "after_merge_filters": {
+          "merge_success": "execute",
+          "merge_failed_fallback_route": "route",
+          "other_bail_out": "_dispatch_bail_out(reason)"
+        },
+        "after_route": {
+          "ok": "execute",
+          "bail_out": "_dispatch_bail_out(reason)"
+        },
+        "after_execute": {
+          "ok": "generate",
+          "bail_out": "_dispatch_bail_out(reason)"
+        }
+      },
+      "bailOutDispatch": {
+        "agent_fallback": ["low_confidence_agent", "routing_failed", "fallback_no_match", "fallback_ambiguous", "empty_skill_calls", "execution_fallback"],
+        "clarify": ["clarification", "execution_clarification"],
+        "template_fallback": ["fallback_greeting", "fallback_out_of_scope"],
+        "default": "agent_fallback (未知 reason 兜底)"
+      }
+    },
+    "multiTurn": {
+      "description": "v0.5.0 Task 4 引入；分类器注入 prev_summary 输出 turn_type，三类后续轮次差异化处理。",
+      "turnTypes": {
+        "MAJOR": "无前轮 / 主题切换；显式清除 prev_turn + session_store.clear_session()，走完整 Pipeline A",
+        "MINOR": "追问当前主题；走 merge_filters_node 合并 delta（4 种粒度：复用管线 / 追加过滤 / 切换 response_skill / CORRECTION 修正）",
+        "CORRECTION": "纠正前轮参数；LLM 抽 delta，修正 lookup_servant.name 等参数后走 execute"
+      },
+      "stateStore": {
+        "SessionStore": "server/graph/session.py — 内存维护 session_id → TurnSnapshot（最近一轮 skill_calls/servants/response_skill/summary）",
+        "InMemoryCheckpointer": "server/graph/checkpointer.py — 测试用",
+        "SqliteCheckpointer": "server/graph/checkpointer.py — 生产用，WAL 模式落 server/data/checkpoints.db，30 分钟 TTL 应用层清理",
+        "checkpointerProtocol": "Protocol 抽象，未来可叠加 RedisCheckpointer (v0.5.4)"
+      },
+      "interruptResume": "系统主动中断：路由置信度低 / 多候选歧义 / 特性识别失败时，clarify_node yield pending_question 事件并保存 checkpoint；用户答复后通过 resume_skill_mode / engine.resume(state, from_node, ...) 恢复"
+    },
+    "sseStreaming": {
+      "description": "v0.5.0 Task 5 统一为 StateGraph.run_stream 节点级实时事件转发；旧 stream_event_generator (~934 行) 完全退役。",
+      "entryDispatch": [
+        {"path": "confirmation_id 是数字", "graph": "_PIPELINE_CONFIRMATION_STREAM_GRAPH", "note": "预填 ExecutionResult，跳过 SkillExecutor，避免名称模糊匹配死循环"},
+        {"path": "preset_name 非空", "graph": "_PIPELINE_DIRECT_STREAM_GRAPH", "note": "preset 展开 + B1 策略：用户补充文字走 LLM 解析额外 Skills 并合并"},
+        {"path": "普通对话", "graph": "_PIPELINE_A_STREAM_GRAPH", "note": "完整 Pipeline A 流式图（含降级）"}
+      ],
+      "events": [
+        {"type": "thinking", "producer": ["classify", "route", "merge_filters", "execute"], "description": "分阶段思考过程（中文化展示）"},
+        {"type": "servants", "producer": ["execute", "atlas"], "description": "从者/CE 卡片数据先行渲染"},
+        {"type": "clarification", "producer": ["clarify"], "description": "歧义场景的候选选项"},
+        {"type": "pending_question", "producer": ["clarify"], "description": "系统主动中断的补充询问（带 checkpoint）"},
+        {"type": "delta", "producer": ["generate_stream", "atlas_stream", "guide_stream", "agent_fallback_stream"], "description": "LLM 逐 token 文本增量"},
+        {"type": "done", "producer": ["engine 收尾"], "description": "终态信号（含 model / traceId / needs_confirmation 等）"},
+        {"type": "error", "producer": ["异常捕获"], "description": "服务异常兜底"}
+      ],
+      "engineMechanism": {
+        "streamNode": "yield 事件 dict → 实时透传给上层；non-event yield 视为新 state 覆盖",
+        "regularNode": "事件 append 到 state.pending_events → 节点结束后引擎统一 flush + clear",
+        "streamingFlag": "state.extras['streaming']=True 时节点才生成事件，避免 JSON 模式重复执行"
+      }
+    },
     "requestFlow": [
       {
         "step": 1,
-        "name": "请求接收与路由解析",
-        "description": "main.py 接收请求，按优先级确定 skill_calls 来源：Preset > params 直传 > LLM 路由",
+        "name": "请求接收与图分发",
+        "description": "main.py 接收请求 → handle_skill_mode (JSON) / stream_chat_events (SSE)；按 confirmation_id / preset_name / 普通对话三路分发到对应图实例",
         "details": {
-          "presetPath": "前端传入 preset_name → PRESET_REGISTRY 展开为固定 skill_calls；支持 B1 策略（用户补充文字走 LLM 路由解析额外 Skills 并合并）",
-          "directPath": "前端传入 params（skill_calls 列表），跳过 LLM 路由直接执行",
-          "llmRoutingPath": "build_routing_prompt() → chat_completion(json_mode=True) → parse_routing_response() Pydantic 校验 → 输出 skill_calls + response_skill + fallback"
+          "confirmationDirect": "confirmation_id 是数字 → 预填 ExecutionResult → confirmation_stream_graph",
+          "presetPath": "preset_name 非空 → PRESET_REGISTRY 展开 + B1 策略 → direct_(stream_)graph",
+          "fullPipeline": "普通对话 → a_(stream_)graph 从 classify_node 入图"
         }
       },
       {
         "step": 2,
-        "name": "Fallback 检查",
-        "description": "检查路由结果的 fallback 字段",
-        "rules": {
-          "greeting|out_of_scope": "直接返回 FALLBACK_TEMPLATES 模板回复",
-          "no_match|ambiguous": "进入 Agent 兜底",
-          "emptySkillCalls": "空 skill_calls 且无 fallback → Agent 兜底"
-        }
+        "name": "Stage 0 分类（classify_node）",
+        "description": "build_classifier_prompt + LLM JSON Schema 输出 → ClassifierResponse Pydantic 校验",
+        "outputs": ["classified_pipeline (A/B/C)", "classifier_confidence", "turn_type (MAJOR/MINOR/CORRECTION)", "guide_tags"],
+        "edges": "after_classify(state) → atlas / guide / merge_filters / route / agent_fallback"
       },
       {
         "step": 3,
-        "name": "SkillExecutor 执行",
-        "description": "executor.execute(skill_calls, response_skill_name)",
-        "substeps": [
-          "Pydantic params_schema 参数校验（失败跳过并记录 rejected）",
-          "按 domain 分组：servant domain 走 filter AND 合并；coronation 等走 custom_context",
-          "自定义 execute() 的 Skill 分别执行后取交集",
-          "结果按稀有度降序 → collectionNo 升序排序",
-          "空结果 → 尝试 resolve_nickname fallback → 仍空则标记 is_fallback=True"
-        ]
+        "name": "MINOR/CORRECTION 多轮合并（merge_filters_node）",
+        "description": "在 prev_turn 上做 delta 合并；4 种粒度：复用管线 / 追加过滤 / 切换 response_skill / CORRECTION 修正参数",
+        "fallback": "合并失败 → bail_out=merge_failed_fallback_route → after_merge_filters 重置 MAJOR 走 route"
       },
       {
         "step": 4,
-        "name": "Execution Fallback 处理",
-        "description": "执行结果为空时的降级处理",
-        "substeps": [
-          "先尝试异步 resolve_nickname（LLM 昵称识别）",
-          "仍失败 → build_oneshot_context() 构建已尝试条件的中文描述 → 传给 Agent 兜底"
-        ]
+        "name": "Stage 1 路由（route_node）",
+        "description": "build_routing_prompt + LLM JSON Schema → parse_routing_response Pydantic 校验 → 输出 skill_calls + response_skill + fallback"
       },
       {
         "step": 5,
-        "name": "Context 构建与 RAG 生成",
-        "description": "构建预消化 Context 并调用 LLM 生成最终回复",
-        "substeps": [
-          "build_context()：全中文 key、前 5 条代表从者详情 + 全局统计摘要",
-          "describe_filters()：将 skill_calls 转为人类可读筛选条件",
-          "ResponseSkill.build_prompt()：构建 Generation Prompt",
-          "chat_completion()：LLM 生成最终回复"
-        ]
+        "name": "Skill 执行（execute_node）",
+        "description": "SkillExecutor.execute(skill_calls, response_skill)；domain 分组 + AND 合并 + 排序 + 空结果降级",
+        "edges": "after_execute(state) → generate / clarify / agent_fallback"
       },
       {
         "step": 6,
-        "name": "响应返回",
-        "description": "JSON API 返回 ChatResponse；SSE Stream 分阶段推送 thinking/result/complete 事件"
+        "name": "RAG 生成（generate_node / generate_stream_node）",
+        "description": "ResponseSkill.build_prompt(context_json) → chat_completion_stream → 逐 token yield delta；写 TurnSnapshot 到 SessionStore"
+      },
+      {
+        "step": 7,
+        "name": "降级分发与终态",
+        "description": "agent_fallback / clarify / template_fallback 写 state.reply 后连 END；引擎收尾 yield done 事件（含 model/traceId/needs_confirmation）"
       }
     ],
     "fallbackChain": [
@@ -155,6 +267,73 @@
     ]
   },
   "modules": {
+    "graph": {
+      "description": "自研 DAG 图引擎与状态机：负责节点编排、条件分发、状态持久化和 SSE 流式编排（v0.5.0 引入）",
+      "files": [
+        {"path": "server/graph/engine.py", "description": "StateGraph 核心引擎（~280 行），提供 add_node/add_stream_node/add_edge/add_conditional_edge/set_entry/run/run_stream/resume API"},
+        {"path": "server/graph/state.py", "description": "GraphState TypedDict：定义跨节点共享的状态字段（query/skill_calls/results/turn_type/prev_turn 等）"},
+        {"path": "server/graph/checkpointer.py", "description": "InMemoryCheckpointer + SqliteCheckpointer：节点执行后持久化状态，支持 interrupt/resume；SQLite 启用 WAL 模式 + 30 分钟 TTL"},
+        {"path": "server/graph/session.py", "description": "SessionStore：基于 thread_id 的多轮会话管理，封装 save_turn/get_prev_turn/load_history"},
+        {"path": "server/graph/decorators.py", "description": "@traced_node / @async_traced_node：节点级 trace_id 自动注入，统一日志格式"}
+      ],
+      "coreApi": {
+        "add_node(name, fn)": "注册同步/异步普通节点，节点 fn 接收 state、返回 partial state 更新",
+        "add_stream_node(name, fn)": "注册流式节点，fn 是 async generator，逐条 yield SSE 事件",
+        "add_edge(src, dst)": "添加无条件静态边",
+        "add_conditional_edge(src, router_fn, mapping)": "添加条件分发边，router_fn(state) 返回 mapping 中的 key",
+        "set_entry(name)": "指定入口节点",
+        "run(state, thread_id)": "同步执行整个图，返回最终 state（用于 JSON 端点）",
+        "run_stream(state, thread_id)": "流式执行，async iterator yield 事件（用于 SSE 端点）",
+        "resume(thread_id, payload)": "从 interrupt 检查点恢复执行（用于用户确认 / clarification 续跑）"
+      }
+    },
+    "nodes": {
+      "description": "DAG 图节点目录：每个节点单一职责，由 server/pipeline.py 编排成不同的图实例",
+      "directory": "server/nodes/",
+      "nodes": [
+        {"name": "classify", "file": "classify.py", "description": "Stage 0 分类器：将查询分类为 A/B/C 三链路，附带 turn_type 与置信度"},
+        {"name": "route", "file": "route.py", "description": "Pipeline A 路由节点：调用 LLM OneShot 解析查询为 SkillCall 列表"},
+        {"name": "merge_filters", "file": "merge_filters.py", "description": "MINOR/CORRECTION 多轮节点：基于 prev_turn 复用/追加/修正过滤参数"},
+        {"name": "execute", "file": "execute.py", "description": "Skill 执行节点：调用 SkillExecutor.run() 按 domain 分组 AND 合并"},
+        {"name": "generate", "file": "generate.py", "description": "Pipeline A 生成节点（流式）：调用 LLM 生成最终中文回复，逐 token yield"},
+        {"name": "atlas", "file": "atlas.py", "description": "Pipeline B Atlas 索引节点（流式）：处理战斗/技能数据查询"},
+        {"name": "guide", "file": "guide.py", "description": "Pipeline C 攻略检索节点（流式）：BM25 检索 + LLM 总结"},
+        {"name": "agent_fallback", "file": "agent_fallback.py", "description": "Pipeline A 降级节点（流式）：OneShot 失败时切换 Agent Tool-Use 循环"},
+        {"name": "clarify", "file": "clarify.py", "description": "Clarification 节点：参数歧义/多候选时 yield clarification 事件并 interrupt"},
+        {"name": "template_fallback", "file": "template_fallback.py", "description": "模板兜底节点：所有 LLM 失败后返回 OOS 模板"},
+        {"name": "direct_response", "file": "direct_response.py", "description": "直接响应节点：preset_name 直传或 confirmation_id 直达时跳过路由生成"}
+      ]
+    },
+    "edges": {
+      "description": "DAG 条件边路由函数：决定节点间分发逻辑",
+      "file": "server/edges.py",
+      "functions": [
+        {"name": "after_classify", "description": "classify → 路由分发：A/B/C 主路径 + low_confidence → agent_fallback + MINOR/CORRECTION → merge_filters"},
+        {"name": "after_route", "description": "route → 分发：成功 → execute；clarification → clarify；bail_out → _dispatch_bail_out"},
+        {"name": "after_execute", "description": "execute → 分发：成功 → generate；空结果 + can_clarify → clarify；空结果 → template_fallback"},
+        {"name": "after_generate", "description": "generate → 分发：成功结束；超时 → agent_fallback；失败 → template_fallback"},
+        {"name": "_dispatch_bail_out", "description": "bail_out 集中分发：reason ∈ AGENT_REASONS → agent_fallback；CLARIFY → clarify；TEMPLATE → template_fallback"}
+      ],
+      "reasonSets": {
+        "AGENT_REASONS": "{routing_low_confidence, llm_timeout, schema_invalid, ...} → agent_fallback",
+        "CLARIFY_REASONS": "{ambiguous_param, multi_candidate, empty_name_with_guess, ...} → clarify",
+        "TEMPLATE_REASONS": "{empty_filter_no_relax, oos_query, ...} → template_fallback"
+      }
+    },
+    "pipeline": {
+      "description": "图实例编排与缓存",
+      "file": "server/pipeline.py",
+      "instances": [
+        {"name": "_PIPELINE_A", "description": "完整 Pipeline A 图（JSON 端点）：classify → route/merge → execute → generate"},
+        {"name": "_PIPELINE_A_STREAM", "description": "Pipeline A 流式图（SSE 端点）：generate 节点为 stream_node"},
+        {"name": "_PIPELINE_B", "description": "Pipeline B 图：classify → atlas"},
+        {"name": "_PIPELINE_C", "description": "Pipeline C 图：classify → guide"},
+        {"name": "_DIRECT_GRAPH", "description": "preset_name 直传图：跳过 classify/route，直接执行预设 Skill"},
+        {"name": "_DIRECT_STREAM_GRAPH", "description": "Direct 图的流式版本"},
+        {"name": "_CONFIRMATION_STREAM_GRAPH", "description": "confirmation_id 直达图：用户从 clarification 选项点击后续跑（resume 路径）"}
+      ],
+      "cachingStrategy": "模块级单例缓存，首次调用时构建，后续复用"
+    },
     "api": {
       "entrypoint": "server/main.py",
       "description": "FastAPI 应用入口，挂载所有路由和中间件",
@@ -441,6 +620,9 @@
     {"id": "ADR-018", "title": "Skill-Based Architecture", "summary": "查询逻辑模块化为独立 Skill，@register_skill 自动注册"},
     {"id": "ADR-020", "title": "Effect Quantitative Filter", "summary": "效果量化筛选（数值/目标/回合数三维过滤）"},
     {"id": "ADR-021", "title": "Agentic Tool-Use Routing", "summary": "OneShot 优先 + Agent 兜底混合路由策略"},
-    {"id": "ADR-023", "title": "Link-A Clarification Mechanism", "summary": "链路 A 两阶段路由：LLM 参数完整性检查 + 用户确认机制，解决歧义查询问题"}
+    {"id": "ADR-023", "title": "Link-A Clarification Mechanism", "summary": "链路 A 两阶段路由：LLM 参数完整性检查 + 用户确认机制，解决歧义查询问题"},
+    {"id": "ADR-028", "title": "Self-Built DAG Graph Engine", "summary": "v0.5.0 自研 ~280 行 StateGraph 替换硬编码三管线，零外部依赖、节点级 trace 追踪、声明式拓扑、流式与同步统一 API"},
+    {"id": "ADR-029", "title": "Multi-Turn Conversation State", "summary": "v0.5.0 引入 turn_type（MAJOR/MINOR/CORRECTION）+ SessionStore + SqliteCheckpointer，支持 4 种 MINOR 粒度复用 prev_turn"},
+    {"id": "ADR-030", "title": "SSE Per-Node Streaming", "summary": "v0.5.0 节点级实时 SSE：流式节点 yield 立即推送，普通节点 pending_events 缓冲，三套图实例统一入口 stream_chat_events"}
   ]
 }

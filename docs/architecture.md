@@ -1,14 +1,18 @@
 # Laplace 项目架构文档
 
-> 本文档完全基于源代码分析生成，最后更新：2026-06-12
+> 本文档完全基于源代码分析生成，最后更新：2026-06-12 · 版本 **v0.5.0**
 
 ## 1. 项目概览
 
 Laplace 是一个 FGO（Fate/Grand Order）游戏助手，以自然语言问答为核心交互方式。用户输入自然语言查询，系统通过 LLM 路由到合适的技能模块，执行结构化数据库查询或攻略检索，最终生成面向玩家的中文回复。
 
-**技术栈**：Python 3.12 / FastAPI / SSE / BM25 / 多 LLM 供应商（OpenAI / Obao / Dashscope）
+**技术栈**：Python 3.12 / FastAPI / SSE / BM25 / SQLite (Checkpointer) / 多 LLM 供应商（OpenAI / Obao / Dashscope）
 
 **核心设计理念**：
+- **声明式 DAG 图引擎**（v0.5.0 起，参见 [ADR-028](adr/ADR-028-declarative-pipeline-migration.md)）：所有请求处理拆为节点 + 条件边，集中式拓扑声明替代命令式 if/else 长链路
+- **节点 = 异步纯函数 `State → State`**，流式节点为 async generator；条件边集中在 [server/edges.py](../server/edges.py) 便于单测
+- **多轮对话状态**：`SessionStore` + `SqliteCheckpointer` 支持 MAJOR / MINOR / CORRECTION 三类后续轮次
+- **SSE 节点级实时**：`StateGraph.run_stream` 把节点产出的事件实时透传到前端，普通节点通过 `state.pending_events` 缓冲
 - 两阶段 LLM 路由（分类器 → 技能路由器），而非端到端生成
 - 结构化数据查询优先，LLM 仅负责理解意图和生成回复
 - 所有英文枚举在构建时预翻译为中文，运行时零翻译开销
@@ -18,64 +22,59 @@ Laplace 是一个 FGO（Fate/Grand Order）游戏助手，以自然语言问答�
 
 ## 2. 系统架构总览
 
+v0.5.0 起，所有请求处理统一通过 [StateGraph](../server/graph/engine.py) 推进。下图为 Pipeline A 完整图（含降级分支）：
+
+```mermaid
+flowchart TD
+    Start([用户输入]) --> API[FastAPI 入口<br/>main.py]
+    API -->|JSON| HSM[handle_skill_mode]
+    API -->|SSE| SCE[stream_chat_events]
+
+    HSM --> Disp{路径分发}
+    SCE --> Disp
+    Disp -->|confirmation_id 直达| ConfStream[confirmation_stream_graph<br/>execute → generate]
+    Disp -->|preset_name 直传| Direct[direct_graph<br/>execute → generate]
+    Disp -->|普通对话| FullA[Pipeline A 完整图]
+
+    FullA --> Classify[classify_node<br/>Stage 0 分类器]
+    Classify -->|B| Atlas[atlas_node<br/>Pipeline B]
+    Classify -->|C| Guide[guide_node<br/>Pipeline C]
+    Classify -->|低置信度| AgentFB[agent_fallback_node]
+    Classify -->|MINOR/CORRECTION + prev_turn| Merge[merge_filters_node]
+    Classify -->|A 主路径| Route[route_node<br/>Stage 1 路由器]
+
+    Merge -->|合并成功| Execute[execute_node<br/>SkillExecutor]
+    Merge -->|合并失败| Route
+
+    Route -->|skill_calls 有效| Execute
+    Route -->|低置信度/路由失败| AgentFB
+    Route -->|歧义/多候选| Clarify[clarify_node]
+    Route -->|greeting/out_of_scope| TmplFB[template_fallback_node]
+
+    Execute -->|查得结果| Generate[generate_node<br/>RAG 生成]
+    Execute -->|空结果/降级| AgentFB
+    Execute -->|需澄清| Clarify
+
+    Atlas --> End([END])
+    Guide --> End
+    Generate --> End
+    Clarify --> End
+    AgentFB --> End
+    TmplFB --> End
 ```
-用户输入
-  │
-  ▼
-┌──────────────┐
-│  FastAPI 入口  │  main.py — JSON(/chat) + SSE(/chat/stream)
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐     ┌──────────┐
-│ Stage 0 分类器 │────▶│ LLM 调用  │  prompts.build_classifier_prompt()
-└──────┬───────┘     └──────────┘
-       │
-       ├─── Pipeline A（结构化查询）
-       │       │
-       │       ▼
-       │    ┌──────────────┐     ┌──────────┐
-       │    │ Stage 1 路由器 │────▶│ LLM 调用  │  prompts.build_routing_prompt()
-       │    └──────┬───────┘     └──────────┘
-       │           │
-       │           ▼
-       │    ┌──────────────┐
-       │    │  技能执行器     │  skills/executor.py — 查询技能链
-       │    └──────┬───────┘
-       │           │
-       │           ▼
-       │    ┌──────────────┐     ┌──────────┐
-       │    │  回复技能       │────▶│ LLM 调用  │  响应生成
-       │    └──────────────┘     └──────────┘
-       │
-       ├─── Pipeline B（Atlas 知识问答）
-       │       │
-       │       ▼
-       │    ┌──────────────┐     ┌──────────┐
-       │    │  Agent 循环    │────▶│ LLM 调用  │  agent/agent_loop.py
-       │    └──────┬───────┘     └──────────┘
-       │           │
-       │           ▼
-       │    ┌──────────────┐
-       │    │  7 个工具调用   │  tool_handlers.py
-       │    └──────────────┘
-       │
-       └─── Pipeline C（攻略检索）
-               │
-               ▼
-            ┌──────────────┐
-            │ BM25 文档检索  │  guide_retriever.py
-            └──────┬───────┘
-                   │
-                   ▼
-            ┌──────────────┐     ┌──────────┐
-            │  攻略回复生成   │────▶│ LLM 调用  │
-            └──────────────┘     └──────────┘
-```
+
+**降级 reason 分发**（集中在 [edges._dispatch_bail_out](../server/edges.py)）：
+
+| `state.extras["bail_out"]` reason | 分发节点 |
+|:---|:---|
+| `low_confidence_agent` / `routing_failed` / `fallback_no_match` / `fallback_ambiguous` / `empty_skill_calls` / `execution_fallback` | `agent_fallback` |
+| `clarification` / `execution_clarification` | `clarify` |
+| `fallback_greeting` / `fallback_out_of_scope` | `template_fallback` |
+| 未知 reason | `agent_fallback`（保底兜底） |
 
 ---
 
-## 3. 入口层（`server/main.py`，498 行）
+## 3. 入口层（`server/main.py`，545 行）
 
 ### 3.1 FastAPI 应用配置
 
@@ -116,72 +115,151 @@ class ChatRequest:
 
 ---
 
-## 4. 三管线路由系统（`server/pipeline.py`，2318 行）
+## 4. DAG 图引擎与节点拓扑（v0.5.0 起）
 
-### 4.1 Stage 0：三路分类器
+> 自 v0.5.0 起，三管线（A/B/C）的所有路由、执行、降级逻辑统一收敛到 [server/graph/](../server/graph/) + [server/nodes/](../server/nodes/)，[server/pipeline.py](../server/pipeline.py) 从 2329 行精简至 ~970 行，仅保留图构建器 + JSON/SSE 入口分发。
 
-入口函数：`_classify_query()`
+### 4.1 图引擎核心（`server/graph/engine.py`）
 
-调用 `prompts.build_classifier_prompt()` 生成分类 prompt，LLM 返回 JSON：
+[StateGraph](../server/graph/engine.py) ~280 行实现，零外部依赖。核心 API：
 
-```json
-{
-  "pipeline": "A" | "B" | "C",
-  "reason": "分类理由",
-  "tags": ["coronation", "saber"]  // Pipeline C 专用
-}
+| 方法 | 签名 | 说明 |
+|:---|:---|:---|
+| `add_node` | `(name, async fn(state) -> state)` | 注册普通节点 |
+| `add_stream_node` | `(name, async generator fn(state))` | 注册流式节点（yield 事件 dict） |
+| `add_edge` | `(from, to)` | 静态边 |
+| `add_conditional_edge` | `(from, router(state) -> str)` | 条件边（路由函数集中在 `edges.py`） |
+| `set_entry` | `(name)` | 设置入口节点 |
+| `run(state)` | → state | 同步执行（流式节点的事件被消费但不转发） |
+| `run_stream(state)` | → AsyncGenerator[dict] | 流式执行（实时 yield 事件 dict） |
+| `resume(state, from_node, ...)` | → state | 从 checkpoint 恢复（Task 4 多轮对话用） |
+
+**事件契约**：流式节点 yield `{"type": "thinking"|"servants"|..., "data": {...}}`；非事件 yield 视为新 state。引擎 hard cap `MAX_HOPS=50` 防止死循环。
+
+### 4.2 节点目录（`server/nodes/`）
+
+| 节点 | 类型 | 职责 |
+|:---|:---|:---|
+| [classify_node](../server/nodes/classify.py) | 普通 | Stage 0 三路分类器（A/B/C），多轮场景注入 `prev_summary` 输出 `turn_type` |
+| [route_node](../server/nodes/route.py) | 普通 | Stage 1 LLM 技能路由器（`build_routing_prompt` + Pydantic 校验） |
+| [merge_filters_node](../server/nodes/merge_filters.py) | 普通 | MINOR / CORRECTION 多轮 delta 合并（4 种粒度，详见 §5） |
+| [execute_node](../server/nodes/execute.py) | 普通 | `SkillExecutor` 域分组 AND 合并 + 排序 |
+| [generate_node](../server/nodes/generate.py) | 普通 + 流式 | RAG 生成（`generate_stream_node` 逐 token yield delta） |
+| [atlas_node](../server/nodes/atlas.py) | 普通 + 流式 | Pipeline B Agent 循环（最多 8 轮工具调用 + 事实核验） |
+| [guide_node](../server/nodes/guide.py) | 普通 + 流式 | Pipeline C BM25 攻略检索 + LLM 生成 |
+| [agent_fallback_node](../server/nodes/agent.py) | 普通 + 流式 | 4 处旧 Agent 兜底合 1（routing 失败 / 空结果 / 低置信度等） |
+| [clarify_node](../server/nodes/clarify.py) | 普通 | 歧义/多候选澄清（yield `clarification` / `pending_question` 事件） |
+| [template_fallback_node](../server/nodes/fallback.py) | 普通 | greeting / out_of_scope 模板回复（不调 LLM） |
+
+### 4.3 条件边（`server/edges.py`）
+
+集中存放所有路由判断函数，**纯函数 + 无 IO**，便于单测：
+
+```python
+after_classify(state) -> "atlas" | "guide" | "merge_filters" | "route" | "agent_fallback"
+after_merge_filters(state) -> "execute" | "route"           # 合并失败降级到 route
+after_route(state) -> "execute" | "agent_fallback" | "clarify" | "template_fallback"
+after_execute(state) -> "generate" | "agent_fallback" | "clarify"
 ```
 
-**分类规则**（5 条消歧规则）：
-1. 可用结构化数据回答 → Pipeline A
-2. 需要 Atlas Academy 机制细节 → Pipeline B
-3. 攻略/配队/战术相关 → Pipeline C
-4. 混合查询偏向结构化 → Pipeline A
-5. 无法分类 → Pipeline B（Agent 兜底）
+降级 reason 通过 `_dispatch_bail_out(reason)` 单点分发到 agent / clarify / template_fallback 三类节点，未知 reason 兜底到 `agent_fallback`。
 
-### 4.2 Pipeline A：结构化查询
+### 4.4 图实例与缓存
 
-**流程**：`_classify_query()` → `_route_to_skills()` → `SkillExecutor.execute()` → 回复技能 → LLM 生成
+[pipeline.py](../server/pipeline.py) 暴露 6 个图实例（模块级缓存避免每请求重建）：
 
-1. **Stage 1 路由器**（`_route_to_skills()`）：调用 LLM 将自然语言映射为 1-3 个 SkillCall
-2. **技能执行**（`SkillExecutor`）：执行查询技能链，返回从者/CE 数据
-3. **上下文构建**（`context_builder.py`）：将查询结果格式化为 LLM 可读文本
-4. **回复生成**：选定的 ResponseSkill 构建 prompt，LLM 生成最终回复
-
-**确认直通路径**：当 `confirmation_context` 包含 `collectionNo` 时，跳过路由，直接查库。
-
-### 4.3 Pipeline B：Atlas 知识问答
-
-**流程**：`_handle_atlas_pipeline()` → `agent_route()` → 工具调用循环 → 事实核验
-
-- Agent 最多执行 8 轮工具调用
-- 返回 `AgentResult`（文本 + 可选的卡片渲染数据）
-- **事实核验**（`_verify_atlas_facts()`）：用 LLM 对比 Agent 回复与数据库中的从者数据，阈值 70%
-
-### 4.4 Pipeline C：攻略检索
-
-**流程**：`_handle_guide_pipeline()` → `GuideRetriever.search()` → LLM 生成
-
-- `_extract_guide_tags()` 从分类结果中提取 tags 用于过滤
-- 检索命中文档全文传入 LLM context
-- 生成 prompt 限制 800 字符（戴冠攻略）
-
-### 4.5 SSE 事件流
-
-`stream_event_generator()` 通过 SSE 推送 6 种事件类型：
-
-| 事件类型 | 说明 |
-|:---|:---|
-| `thinking` | 路由/分类思考过程 |
-| `servants` | 从者/CE 卡片数据（JSON） |
-| `clarification` | 澄清请求（多候选/空结果） |
-| `delta` | 文本流式增量 |
-| `done` | 完成信号 |
-| `error` | 错误信息 |
+| 图 | 用途 | 入口 |
+|:---|:---|:---|
+| `_PIPELINE_A_GRAPH` | JSON 完整 A 图（10 节点） | `classify` |
+| `_PIPELINE_DIRECT_GRAPH` | preset / 前端直传短图 | `execute` |
+| `_PIPELINE_B_GRAPH` / `_PIPELINE_C_GRAPH` | 单节点图（B/C wrapper，供测试） | `atlas` / `guide` |
+| `_PIPELINE_A_STREAM_GRAPH` | SSE 完整 A 流式图 | `classify` |
+| `_PIPELINE_DIRECT_STREAM_GRAPH` | SSE preset 直传流式短图 | `execute` |
+| `_PIPELINE_CONFIRMATION_STREAM_GRAPH` | SSE confirmation_id 直达流式短图（仅 generate_stream） | `generate` |
 
 ---
 
-## 5. 技能系统（`server/skills/`）
+## 5. 多轮对话与 SessionStore（v0.5.0 Task 4）
+
+### 5.1 turn_type 三类后续轮次
+
+[server/schemas.py::ClassifierResponse](../server/schemas.py) 新增 `turn_type` 字段，由分类器在注入 `prev_summary`（≤200 char）后输出：
+
+```mermaid
+flowchart LR
+    Input([用户新输入]) --> Cls[classify_node<br/>注入 prev_summary]
+    Cls -->|无前轮 / 主题切换| Major[MAJOR<br/>清除 prev_turn<br/>走完整 Pipeline A]
+    Cls -->|追问当前主题| Minor[MINOR<br/>delta 合并]
+    Cls -->|纠正前轮参数| Corr[CORRECTION<br/>LLM 抽 delta]
+    Minor --> Merge[merge_filters_node]
+    Corr --> Merge
+    Major --> Route[route_node]
+    Merge -->|合并成功| Exec[execute_node]
+    Merge -->|合并失败| Route
+```
+
+### 5.2 MINOR 4 种粒度（`merge_filters_node`）
+
+| 粒度 | 例子 | 操作 |
+|:---|:---|:---|
+| G1 复用管线 | "再帮我看看宝具效果" | 复用 prev `skill_calls`，仅切换 response_skill |
+| G2 追加过滤 | "其中弓阶的" | prev `skill_calls` ∪ 新增 `search_by_class` |
+| G3 切换 response_skill | "详细说说" | 复用查询结果，response_skill → `respond_servant_detail` |
+| G4 CORRECTION 修正参数 | "我说的是 Alter 版" | LLM 抽 delta，修正 `lookup_servant.name` |
+
+合并失败 → `bail_out="merge_failed_fallback_route"` → `after_merge_filters` 把状态重置为 MAJOR 重新走 `route`。
+
+### 5.3 SessionStore + Checkpointer
+
+- [SessionStore](../server/graph/session.py)：内存维护 `session_id → TurnSnapshot`（最近一轮的 `skill_calls / servants / response_skill / summary`）
+- [SqliteCheckpointer](../server/graph/checkpointer.py)：WAL 模式落 `server/data/checkpoints.db`，30 分钟 TTL 应用层清理；序列化 PipelineState 全字段
+- [InMemoryCheckpointer](../server/graph/checkpointer.py)：测试用，相同 `Checkpointer` Protocol
+
+**系统主动中断**：路由置信度低 / 特性识别失败 / 多候选歧义时，[clarify_node](../server/nodes/clarify.py) yield `pending_question` 事件并保存 checkpoint；用户答复后通过 `resume_skill_mode` / `engine.resume()` 从 `from_node` 恢复。
+
+---
+
+## 6. SSE 流式统一（v0.5.0 Task 5）
+
+### 6.1 入口与三路径分发
+
+[stream_chat_events](../server/pipeline.py) 是唯一 SSE 入口，按优先级分发到三套流式图：
+
+```mermaid
+flowchart TD
+    Req[/api/chat/stream] --> Entry[stream_chat_events]
+    Entry --> Check{参数判断}
+    Check -->|confirmation_id 是数字| P1[confirmation_stream_graph<br/>预填 ExecutionResult<br/>跳过 SkillExecutor]
+    Check -->|preset_name 非空| P2[direct_stream_graph<br/>preset 展开 + B1 LLM 补充]
+    Check -->|普通对话| P3[a_stream_graph<br/>完整 Pipeline A]
+    P1 --> Done[done 事件 + 写 SessionStore]
+    P2 --> Done
+    P3 --> Done
+```
+
+### 6.2 节点级实时事件转发
+
+[StateGraph.run_stream](../server/graph/engine.py) 的核心改造：
+
+- **流式节点**（`async generator`）：yield 的事件 dict 实时透传给上层，不必等节点结束
+- **普通节点**：把中间事件 append 到 `state.pending_events`，节点结束后引擎统一 flush 并清空缓冲区
+- **state.extras["streaming"] 标志**：节点据此决定是否生成事件（避免 JSON 模式重复执行）
+
+### 6.3 6 种 SSE 事件契约
+
+| 事件类型 | 触发节点 | 说明 |
+|:---|:---|:---|
+| `thinking` | classify / route / execute / merge_filters | 分阶段思考过程（中文化展示） |
+| `servants` | execute / atlas | 从者/CE 卡片数据先行渲染 |
+| `clarification` | clarify | 歧义场景的候选选项 |
+| `pending_question` | clarify | 系统主动中断的补充询问（带 checkpoint） |
+| `delta` | generate_stream / atlas_stream / guide_stream / agent_fallback_stream | LLM 逐 token 文本增量 |
+| `done` | 引擎收尾 | 终态信号（含 model / traceId / needs_confirmation 等） |
+| `error` | 异常捕获 | 服务异常兜底 |
+
+---
+
+## 7. 技能系统（`server/skills/`）
 
 ### 5.1 基础架构（`base.py`）
 
@@ -272,7 +350,7 @@ SKILL_REGISTRY: dict[str, BaseSkill]  # 全局技能注册表
 
 ---
 
-## 6. LLM 适配层（`server/llm/`）
+## 8. LLM 适配层（`server/llm/`）
 
 ### 6.1 基础抽象（`base.py`）
 
@@ -317,7 +395,7 @@ class BaseLLMAdapter(ABC):
 
 ---
 
-## 7. Agent 系统（`server/agent/`）
+## 9. Agent 系统（`server/agent/`）
 
 ### 7.1 Agent 循环（`agent_loop.py`）
 
@@ -355,7 +433,7 @@ async def agent_route(query, db, llm, max_rounds=8) -> AgentResult
 
 ---
 
-## 8. 数据构建层
+## 10. 数据构建层
 
 ### 8.1 主数据加载（`server/data_loader.py`，1757 行）
 
@@ -441,7 +519,7 @@ server/
 
 ---
 
-## 9. 查询执行与上下文构建
+## 11. 查询执行与上下文构建
 
 ### 9.1 查询执行器（`server/query_executor.py`，366 行）
 
@@ -467,7 +545,7 @@ server/
 
 ---
 
-## 10. 攻略检索引擎（`server/guide_retriever.py`，176 行）
+## 12. 攻略检索引擎（`server/guide_retriever.py`，176 行）
 
 **架构**：方案 D — 文档级 BM25 + 全文传入（参见 `docs/architecture-discussions/guide-retrieval-strategy-evolution.md`）
 
@@ -501,7 +579,7 @@ tokens = re.findall(r"[\u4e00-\u9fff]+|[a-zA-Z0-9]+", text.lower())
 
 ---
 
-## 11. 前端
+## 13. 前端
 
 ### 11.1 Demo 前端（`demo/`）
 
@@ -554,7 +632,7 @@ tokens = re.findall(r"[\u4e00-\u9fff]+|[a-zA-Z0-9]+", text.lower())
 
 ---
 
-## 12. 监控与基础设施
+## 14. 监控与基础设施
 
 ### 12.1 日志系统（`server/logger.py`，528 行）
 
@@ -589,7 +667,7 @@ tokens = re.findall(r"[\u4e00-\u9fff]+|[a-zA-Z0-9]+", text.lower())
 
 ---
 
-## 13. Prompt 工程（`server/prompts.py`，521 行）
+## 15. Prompt 工程（`server/prompts.py`，521 行）
 
 ### 13.1 分类器 Prompt（`build_classifier_prompt()`）
 
@@ -611,7 +689,7 @@ tokens = re.findall(r"[\u4e00-\u9fff]+|[a-zA-Z0-9]+", text.lower())
 
 ---
 
-## 14. 部署架构
+## 16. 部署架构
 
 ### 14.1 Docker 构建（`Dockerfile`）
 
@@ -646,7 +724,7 @@ Python 3.12-slim 基础镜像
 
 ---
 
-## 15. 测试
+## 17. 测试
 
 **测试文件**位于 `tests/` 目录：
 
@@ -663,7 +741,7 @@ Python 3.12-slim 基础镜像
 
 ---
 
-## 16. 关键设计决策
+## 18. 关键设计决策
 
 1. **两阶段路由而非端到端生成**：LLM 仅做意图理解，数据查询由确定性代码执行，保证准确性
 2. **构建时预消化**：所有翻译、效果匹配、物化视图在构建时完成，运行时零额外开销
@@ -673,3 +751,6 @@ Python 3.12-slim 基础镜像
 6. **两层昵称系统**：Mooncell 自动同步（基础层）+ 手工覆盖（优先层），兼顾自动化与精确性
 7. **Agent 工具调用兜底**：Pipeline B 使用 Agent 循环处理复杂/开放性问题，最多 8 轮
 8. **SSE 流式输出**：用户感知延迟低，支持 thinking 步骤实时展示
+9. **声明式 DAG 图引擎（v0.5.0，[ADR-028](adr/ADR-028-declarative-pipeline-migration.md)）**：所有处理逻辑拆为节点 + 条件边，集中式拓扑替代命令式长链路；`pipeline.py` 从 2329 行精简至 ~970 行；4 处旧 Agent 兜底合并为单一 `agent_fallback_node`
+10. **多轮对话状态（v0.5.0 Task 4）**：`SessionStore` + `SqliteCheckpointer` 支持 MAJOR / MINOR / CORRECTION 三类后续轮次；分类器注入 `prev_summary` 输出 `turn_type`；MAJOR 显式清除 `prev_turn` 避免标记位残留（ADR-026 踩坑教训）
+11. **SSE 节点级实时（v0.5.0 Task 5）**：`StateGraph.run_stream` 把流式节点的事件直接透传，普通节点通过 `state.pending_events` 缓冲；旧 `stream_event_generator` (~934 行) 完全退役

@@ -13,6 +13,9 @@ Laplace 利用大语言模型（LLM）的意图识别能力，将传统的 FGO �
 ## 功能特性
 
 - [x] 自然语言对话交互界面
+- [x] **自研 DAG 图引擎（v0.5.0）** — `server/graph/` 提供约 280 行的 StateGraph，零外部依赖，将原硬编码三管线重构为声明式节点 + 条件边，支持流式与同步统一 API、节点级 trace_id、Checkpointer 持久化与 interrupt/resume 续跑（详见 [docs/architecture.md](docs/architecture.md#4-dag-图引擎与节点拓扑v050)）。
+- [x] **多轮对话状态机（v0.5.0）** — turn_type 三类（MAJOR / MINOR / CORRECTION）+ SessionStore + SqliteCheckpointer（WAL 模式 + 30 分钟 TTL），MINOR 支持 4 种复用粒度（复用整套管线 / 追加过滤 / 切换 response_skill / 修正参数）。
+- [x] **SSE 节点级实时推送（v0.5.0）** — 三套图实例（confirmation_stream / direct_stream / a_stream）统一从 `stream_chat_events` 入口分发；流式节点立即 yield，普通节点 pending_events 缓冲，6 种事件契约（thinking / routing / data / token / clarification / done）。
 - [x] **三管线路由架构** — Stage 0 分类器自动分流到：Pipeline A（结构化技能链）/ Pipeline B（Atlas 知识 Agent 工具循环，最多 8 轮）/ Pipeline C（戴冠攻略 BM25 文档检索）。
 - [x] **Skill-Based Architecture** — 19 个查询技能 + 6 个回复技能，覆盖 servant / ce / coronation 三个域，通过 `@register_skill` 装饰器零侵入注册。
 - [x] **Atlas 知识 Agent** — Pipeline B 提供 7 个工具（search_servants / lookup_servant / list_effects / lookup_skill_detail 等）处理开放性机制询问，带事实核验。
@@ -39,6 +42,8 @@ Laplace 利用大语言模型（LLM）的意图识别能力，将传统的 FGO �
 | :--- | :--- |
 | 前端 | HTML / Vanilla CSS / Vanilla JS（SSE 流式）|
 | 后端 | Python 3.12 / FastAPI / Uvicorn / SSE / BM25 |
+| 图引擎 | 自研 StateGraph（~280 行，零外部依赖，DAG + 流式 + Checkpointer）|
+| 状态存储 | InMemoryCheckpointer + SqliteCheckpointer（WAL 模式 + 30 分钟 TTL）|
 | LLM | 多供应商适配：OpenAI / Obao / Dashscope |
 | 数据源 | Atlas Academy API（底层数据）+ Chaldea（领域知识）+ Mooncell Wiki（昵称） |
 
@@ -258,8 +263,27 @@ Laplace/
 │   └── app.js
 ├── admin/                  # 后台管理界面静态资源（index.html / admin.css / admin.js）
 ├── server/                 # Python FastAPI 后端
-│   ├── main.py             # FastAPI 入口（CORS / RateLimit / 路由注册）
-│   ├── pipeline.py         # 三管线路由核心（Stage 0 分类 + A/B/C 分流 + SSE）
+│   ├── main.py             # FastAPI 入口（CORS / RateLimit / 路由注册 / SSE 入口 stream_chat_events）
+│   ├── pipeline.py         # 图实例编排与缓存（Pipeline A/B/C + Direct + Confirmation 共 7 个图）
+│   ├── edges.py            # DAG 条件边路由函数（after_classify / after_route / _dispatch_bail_out 等）
+│   ├── graph/              # 自研 StateGraph 图引擎（v0.5.0）
+│   │   ├── engine.py       # ~280 行 StateGraph 核心（add_node / add_stream_node / run / run_stream / resume）
+│   │   ├── state.py        # GraphState TypedDict（query / skill_calls / turn_type / prev_turn 等）
+│   │   ├── checkpointer.py # InMemoryCheckpointer + SqliteCheckpointer（WAL + 30 分钟 TTL）
+│   │   ├── session.py      # SessionStore：thread_id 维度的多轮会话管理
+│   │   └── decorators.py   # @traced_node / @async_traced_node（节点级 trace_id 注入）
+│   ├── nodes/              # DAG 图节点目录（11 个节点单一职责）
+│   │   ├── classify.py     # Stage 0 分类器节点（A/B/C 链路 + turn_type 判定）
+│   │   ├── route.py        # Pipeline A 路由节点（LLM OneShot 解析 SkillCall 列表）
+│   │   ├── merge_filters.py # MINOR/CORRECTION 多轮节点（复用 prev_turn 参数）
+│   │   ├── execute.py      # Skill 执行节点（SkillExecutor 调度）
+│   │   ├── generate.py     # Pipeline A 生成节点（流式 yield token）
+│   │   ├── atlas.py        # Pipeline B Atlas 索引节点（流式）
+│   │   ├── guide.py        # Pipeline C 攻略检索节点（流式）
+│   │   ├── agent_fallback.py # Agent Tool-Use 降级节点（流式）
+│   │   ├── clarify.py      # Clarification 节点（interrupt 等待用户确认）
+│   │   ├── template_fallback.py # 模板兜底节点
+│   │   └── direct_response.py # preset_name / confirmation_id 直达节点
 │   ├── prompts.py          # 分类器 / 路由器 / 生成 Prompt 模板
 │   ├── schemas.py          # RoutingResponse / 工具结果 Pydantic 契约
 │   ├── context_builder.py  # LLM 上下文构建（从者/CE 详情格式化）

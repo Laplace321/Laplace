@@ -4,6 +4,26 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Laplace — 系统架构文档</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+window.addEventListener('DOMContentLoaded', function () {
+  if (window.mermaid) {
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        background: '#0a0e17',
+        primaryColor: '#1a2332',
+        primaryTextColor: '#e2e8f0',
+        primaryBorderColor: '#38bdf8',
+        lineColor: '#94a3b8',
+        secondaryColor: '#0d1117',
+        tertiaryColor: '#111827'
+      }
+    });
+  }
+});
+</script>
 <style>
 :root {
   --bg-primary: #0a0e17;
@@ -169,13 +189,22 @@ li { margin-bottom: 0.3rem; }
 .toc li { margin-bottom: 0.4rem; }
 .toc a { color: var(--text-secondary); font-size: 0.95rem; }
 .toc a:hover { color: var(--accent); }
+.mermaid {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  text-align: center;
+  overflow-x: auto;
+}
 </style>
 </head>
 <body>
 
-<h1>LAPLACE <span class="version-badge">v0.4.1</span></h1>
+<h1>LAPLACE <span class="version-badge">v0.5.0</span></h1>
 <p class="subtitle">系统架构与业务流转文档 — 面向开发者 &nbsp;|&nbsp; <a href="product-showcase.html" style="color:var(--green);">产品功能展示 →</a></p>
-<p style="color: var(--text-muted); font-size: 0.85rem;">最后更新：2026-06-10 &nbsp;|&nbsp; 本文档随每次架构/流程迭代同步更新</p>
+<p style="color: var(--text-muted); font-size: 0.85rem;">最后更新：2026-06-12 &nbsp;|&nbsp; 本文档随每次架构/流程迭代同步更新</p>
 
 <!-- 目录 -->
 <div class="toc">
@@ -184,6 +213,7 @@ li { margin-bottom: 0.3rem; }
   <li><a href="#overview">1. 系统概览</a></li>
   <li><a href="#tech-stack">2. 技术栈</a></li>
   <li><a href="#layered-arch">3. 分层架构</a></li>
+  <li><a href="#graph-engine">3.5 自研 DAG 图引擎与多轮对话（v0.5.0）</a></li>
   <li><a href="#request-flow">4. 核心请求处理流程</a></li>
   <li><a href="#skill-arch">5. Skill-Based Architecture</a></li>
   <li><a href="#llm-layer">6. LLM 调度层</a></li>
@@ -267,6 +297,133 @@ li { margin-bottom: 0.3rem; }
     <br><code>server/context_builder.py</code> · <code>server/llm/</code>
   </div>
 </div>
+
+<!-- 3.5 v0.5.0 图引擎升级 -->
+<h2 id="graph-engine">3.5 自研 DAG 图引擎与多轮对话（v0.5.0）</h2>
+<div class="card">
+<p>v0.5.0 引入自研 <strong>StateGraph</strong>（约 280 行，零外部依赖），将原本散落在 <code>main.py</code> / <code>pipeline.py</code> 的硬编码三管线重构为<strong>声明式 DAG 节点 + 条件边</strong>，并在此基础上实现 <strong>多轮对话状态机</strong> 与 <strong>SSE 节点级实时推送</strong>。</p>
+<p>核心收益：① 节点单一职责、可测试 ② 节点级 trace_id 追踪 ③ 流式与同步统一 API ④ Checkpointer 支持 interrupt / resume 续跑。</p>
+</div>
+
+<h3>3.5.1 Pipeline A 完整图拓扑</h3>
+<p>下图展示 Pipeline A 完整流程图（含 multi-turn 路径与 bail_out 集中分发）：</p>
+<div class="mermaid">
+flowchart TD
+    Start([用户输入]) --> API[FastAPI 入口<br/>main.py]
+    API -->|JSON /api/chat| HSM[handle_skill_mode]
+    API -->|SSE /api/chat/stream| SCE[stream_chat_events]
+    HSM --> Disp{路径分发}
+    SCE --> Disp
+    Disp -->|confirmation_id 直达| ConfStream[confirmation_stream_graph]
+    Disp -->|preset_name 直传| Direct[direct_graph]
+    Disp -->|普通对话| FullA[Pipeline A 完整图]
+
+    FullA --> Classify[classify_node<br/>Stage 0 分类器]
+    Classify -->|链路 B| Atlas[atlas_node]
+    Classify -->|链路 C| Guide[guide_node]
+    Classify -->|低置信度| AgentFB[agent_fallback_node]
+    Classify -->|MINOR/CORRECTION + prev_turn| Merge[merge_filters_node]
+    Classify -->|A 主路径| Route[route_node<br/>LLM OneShot]
+
+    Merge --> Execute[execute_node<br/>SkillExecutor]
+    Route -->|skill_calls| Execute
+    Route -->|clarification| Clarify[clarify_node]
+    Route -->|bail_out| Dispatch{_dispatch_bail_out}
+
+    Execute -->|成功| Generate[generate_node<br/>流式生成]
+    Execute -->|空 + can_clarify| Clarify
+    Execute -->|空 + 不可澄清| Template[template_fallback_node]
+
+    Generate -->|成功| End([结束])
+    Generate -->|超时/失败| AgentFB
+
+    Dispatch -->|AGENT_REASONS| AgentFB
+    Dispatch -->|CLARIFY_REASONS| Clarify
+    Dispatch -->|TEMPLATE_REASONS| Template
+
+    AgentFB --> End
+    Clarify --> End
+    Template --> End
+    Atlas --> End
+    Guide --> End
+</div>
+
+<h4>核心 API（StateGraph）</h4>
+<table>
+<tr><th>方法</th><th>说明</th></tr>
+<tr><td><code>add_node(name, fn)</code></td><td>注册同步/异步普通节点，节点 fn 接收 state 返回 partial state 更新</td></tr>
+<tr><td><code>add_stream_node(name, fn)</code></td><td>注册流式节点，fn 是 async generator，逐条 yield SSE 事件</td></tr>
+<tr><td><code>add_edge(src, dst)</code></td><td>添加无条件静态边</td></tr>
+<tr><td><code>add_conditional_edge(src, router_fn, mapping)</code></td><td>添加条件分发边，router_fn(state) 返回 mapping key</td></tr>
+<tr><td><code>run(state, thread_id)</code></td><td>同步执行整个图，返回最终 state（用于 JSON 端点）</td></tr>
+<tr><td><code>run_stream(state, thread_id)</code></td><td>流式执行，async iterator yield 事件（用于 SSE 端点）</td></tr>
+<tr><td><code>resume(thread_id, payload)</code></td><td>从 interrupt 检查点恢复执行（clarification 续跑）</td></tr>
+</table>
+
+<h4>图实例缓存</h4>
+<table>
+<tr><th>实例</th><th>用途</th></tr>
+<tr><td><code>_PIPELINE_A</code></td><td>完整 Pipeline A 图（JSON 端点）</td></tr>
+<tr><td><code>_PIPELINE_A_STREAM</code></td><td>Pipeline A 流式图（SSE 端点，generate 为 stream_node）</td></tr>
+<tr><td><code>_PIPELINE_B</code> / <code>_PIPELINE_C</code></td><td>Atlas / Guide 链路图</td></tr>
+<tr><td><code>_DIRECT_GRAPH</code> / <code>_DIRECT_STREAM_GRAPH</code></td><td>preset_name 直传图（JSON / SSE）</td></tr>
+<tr><td><code>_CONFIRMATION_STREAM_GRAPH</code></td><td>confirmation_id 续跑图（resume 路径）</td></tr>
+</table>
+
+<h3>3.5.2 多轮对话与 SessionStore</h3>
+<p>v0.5.0 引入 <code>turn_type</code>，根据上下文复用粒度自动分流：</p>
+<div class="mermaid">
+flowchart TD
+    Q[用户当前 query + thread_id] --> CL[classify_node<br/>判定 turn_type]
+    CL -->|MAJOR<br/>全新查询| Route[route_node<br/>完整 LLM OneShot]
+    CL -->|MINOR<br/>意图延续| GP[get_prev_turn]
+    CL -->|CORRECTION<br/>修正参数| GP
+    GP --> MF[merge_filters_node<br/>复用 prev_turn 参数]
+    MF -->|追加过滤| Execute[execute_node]
+    MF -->|切换 response_skill| Execute
+    MF -->|修正参数值| Execute
+    Route --> Execute
+    Execute --> Save[SessionStore.save_turn]
+    Save --> SQLite[(SqliteCheckpointer<br/>WAL + 30 分钟 TTL)]
+</div>
+
+<h4>MINOR 复用粒度（4 种）</h4>
+<table>
+<tr><th>粒度</th><th>示例</th><th>处理</th></tr>
+<tr><td>复用整套管线</td><td>"还有谁？"</td><td>沿用 prev_turn 的 skill_calls，仅追加分页参数</td></tr>
+<tr><td>追加过滤</td><td>"再加上五星限定"</td><td>合并新参数到原 skill_calls</td></tr>
+<tr><td>切换 response_skill</td><td>"详细说说"</td><td>保留 query 结果，切换为 respond_servant_detail</td></tr>
+<tr><td>CORRECTION 修正</td><td>"我说的是 Saber 不是 Archer"</td><td>定位错参字段，原地替换值后重跑</td></tr>
+</table>
+
+<h3>3.5.3 SSE 节点级实时推送</h3>
+<p>三套图实例统一从 <code>stream_chat_events</code> 入口分发，节点级实时推送事件：</p>
+<div class="mermaid">
+flowchart TD
+    Req[GET /api/chat/stream] --> SCE[stream_chat_events]
+    SCE --> Disp{路径判定}
+    Disp -->|confirmation_id| CG[confirmation_stream_graph]
+    Disp -->|preset_name| DG[direct_stream_graph]
+    Disp -->|普通对话| AG[a_stream_graph]
+    CG --> RS[engine.run_stream]
+    DG --> RS
+    AG --> RS
+    RS -->|流式节点| Yield[实时 yield SSE 事件]
+    RS -->|普通节点| Buffer[pending_events 缓冲<br/>节点结束后 flush]
+    Yield --> Client[前端 EventSource]
+    Buffer --> Client
+</div>
+
+<h4>SSE 事件契约（6 种）</h4>
+<table>
+<tr><th>事件</th><th>触发节点</th><th>含义</th></tr>
+<tr><td><code>thinking</code></td><td>classify / route / execute</td><td>节点级思考步骤展示</td></tr>
+<tr><td><code>routing</code></td><td>route_node</td><td>路由结果（skill_calls + response_skill）</td></tr>
+<tr><td><code>data</code></td><td>execute_node</td><td>查询结果数据（卡片渲染）</td></tr>
+<tr><td><code>token</code></td><td>generate_node</td><td>LLM 生成的逐 token 流</td></tr>
+<tr><td><code>clarification</code></td><td>clarify_node</td><td>歧义参数请求用户确认（携带 confirmation_id 触发 interrupt）</td></tr>
+<tr><td><code>done</code></td><td>所有终端节点</td><td>流结束标志</td></tr>
+</table>
 
 <!-- 4. 核心请求处理流程 -->
 <h2 id="request-flow">4. 核心请求处理流程</h2>
