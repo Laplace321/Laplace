@@ -137,14 +137,53 @@ class StateGraph:
         return state
 
     async def run_stream(self, state: Any) -> AsyncGenerator[dict, None]:
-        """流式执行图（Task 5 完善）。
+        """流式执行图（Task 5 完整版）。
 
-        当前最小实现：调用 run() 后把 state.pending_events 一次性 yield 出去；
-        未来会改造为节点 yield 事件实时转发。
+        语义：
+        - **普通节点**（``add_node``）：以 ``async def fn(state) -> state`` 形式执行。
+          节点可以把事件 ``{"type": ..., "data": {...}}`` 追加到 ``state.pending_events``，
+          引擎在节点结束后**统一 flush** 这些事件并清空缓冲区。适合 thinking / servants /
+          clarification 等"中间产物"事件。
+        - **流式节点**（``add_stream_node``）：以 ``async def fn(state)`` 的 async generator
+          形式执行。yield 的内容若是含 ``"type"`` 字段的 dict，引擎**实时转发**给上层；
+          否则视为新的 state 实例（覆盖当前 state，作为下一节点输入）。适合需要逐 token
+          推送 ``delta`` 事件的 LLM 流式生成节点。
+        - **事件契约**：本方法只产出形如 ``{"type": <event_name>, "data": <payload>}`` 的内部
+          事件 dict；不耦合 SSE 字符串格式。上层（如 ``main.chat_stream``）负责把它转换为
+          ``sse_event(...)`` 字符串。
+
+        Example::
+
+            async for ev in graph.run_stream(state):
+                yield sse_event(ev["type"], ev["data"])
         """
-        state = await self.run(state)
-        for event in getattr(state, "pending_events", []) or []:
-            yield event
+        cur = self._resolve_entry()
+        hops = 0
+        while cur != END:
+            if hops >= self.MAX_HOPS:
+                raise RuntimeError(f"图执行超过最大跳转次数 {self.MAX_HOPS}（最后节点 {cur!r}）")
+            hops += 1
+            if cur in self._stream_nodes:
+                # 流式节点：实时 yield 事件；non-event yield 视为新 state
+                agen = self._stream_nodes[cur](state)
+                async for produced in agen:
+                    if isinstance(produced, dict) and "type" in produced:
+                        yield produced
+                    elif produced is not None:
+                        state = produced
+            elif cur in self._nodes:
+                new_state = await self._nodes[cur](state)
+                if new_state is not None:
+                    state = new_state
+            else:
+                raise GraphConfigError(f"节点 {cur!r} 未注册")
+            # 节点结束后 flush 累积事件（普通节点的中间产物）
+            pending = getattr(state, "pending_events", None)
+            if pending:
+                for ev in pending:
+                    yield ev
+                pending.clear()
+            cur = self._next_node(cur, state)
 
     async def resume(
         self,

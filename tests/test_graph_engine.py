@@ -381,6 +381,215 @@ async def test_run_stream_yields_pending_events():
     ]
 
 
+# ──────────────────────── run_stream 实时转发（Task 5 T5-A）────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_run_stream_flushes_pending_events_after_normal_node():
+    """普通节点把事件追加到 state.pending_events，节点结束后 run_stream 统一 flush 并清空。"""
+    g = StateGraph()
+
+    async def normal_node(state):
+        state.pending_events.append({"type": "thinking", "data": {"msg": "n1-mid"}})
+        state.pending_events.append({"type": "thinking", "data": {"msg": "n1-end"}})
+        return state
+
+    g.add_node("n1", normal_node)
+    g.set_entry("n1")
+    g.add_edge("n1", END)
+
+    state = _MiniState()
+    events = [e async for e in g.run_stream(state)]
+    assert events == [
+        {"type": "thinking", "data": {"msg": "n1-mid"}},
+        {"type": "thinking", "data": {"msg": "n1-end"}},
+    ]
+    # flush 后 pending_events 已被清空，避免下一节点重复发
+    assert state.pending_events == []
+
+
+@pytest.mark.asyncio
+async def test_run_stream_emits_events_in_node_order():
+    """多节点串联：节点 A 的事件先于节点 B，pending_events 不会在节点间串扰。"""
+    g = StateGraph()
+
+    async def node_a(state):
+        state.pending_events.append({"type": "thinking", "data": {"node": "a"}})
+        state.path.append("a")
+        return state
+
+    async def node_b(state):
+        state.pending_events.append({"type": "thinking", "data": {"node": "b"}})
+        state.path.append("b")
+        return state
+
+    g.add_node("a", node_a)
+    g.add_node("b", node_b)
+    g.set_entry("a")
+    g.add_edge("a", "b")
+    g.add_edge("b", END)
+
+    events = [e async for e in g.run_stream(_MiniState())]
+    assert [(e["type"], e["data"]["node"]) for e in events] == [("thinking", "a"), ("thinking", "b")]
+
+
+@pytest.mark.asyncio
+async def test_run_stream_real_time_forwarding_for_stream_node():
+    """流式节点 yield 事件实时转发（不再走 pending 缓冲）；yield state 覆盖当前 state。"""
+    g = StateGraph()
+
+    async def streamer(state):
+        yield {"type": "thinking", "data": {"phase": "start"}}
+        state.counter = 1
+        yield {"type": "delta", "data": {"text": "a"}}
+        state.counter = 2
+        yield {"type": "delta", "data": {"text": "b"}}
+        # 显式 yield state 标记终态（也可不 yield，引擎会保留原引用）
+        yield state
+
+    g.add_stream_node("streamer", streamer)
+    g.set_entry("streamer")
+    g.add_edge("streamer", END)
+
+    state = _MiniState()
+    events = [e async for e in g.run_stream(state)]
+    # 事件按 yield 顺序原样转发
+    assert events == [
+        {"type": "thinking", "data": {"phase": "start"}},
+        {"type": "delta", "data": {"text": "a"}},
+        {"type": "delta", "data": {"text": "b"}},
+    ]
+    # state 引用一致（mutate 同一实例），最终 counter=2
+    assert state.counter == 2
+
+
+@pytest.mark.asyncio
+async def test_run_stream_stream_node_then_normal_node_event_order():
+    """流式节点（实时事件）+ 普通节点（pending flush）混合，事件全局保持节点顺序。"""
+    g = StateGraph()
+
+    async def streamer(state):
+        yield {"type": "delta", "data": {"text": "x"}}
+        yield {"type": "delta", "data": {"text": "y"}}
+
+    async def finalizer(state):
+        state.pending_events.append({"type": "done", "data": {"ok": True}})
+        return state
+
+    g.add_stream_node("streamer", streamer)
+    g.add_node("finalizer", finalizer)
+    g.set_entry("streamer")
+    g.add_edge("streamer", "finalizer")
+    g.add_edge("finalizer", END)
+
+    events = [e async for e in g.run_stream(_MiniState())]
+    assert events == [
+        {"type": "delta", "data": {"text": "x"}},
+        {"type": "delta", "data": {"text": "y"}},
+        {"type": "done", "data": {"ok": True}},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_run_stream_stream_node_yield_state_replaces_current():
+    """流式节点 yield 一个全新的 state 实例时，引擎用它替换当前 state 流入下一节点。"""
+    g = StateGraph()
+
+    async def streamer(state):
+        yield {"type": "delta", "data": {"text": "init"}}
+        # 显式 yield 一个全新的 state 实例
+        new_state = _MiniState(counter=99, branch="replaced")
+        yield new_state
+
+    seen = {}
+
+    async def consumer(state):
+        seen["counter"] = state.counter
+        seen["branch"] = state.branch
+        return state
+
+    g.add_stream_node("streamer", streamer)
+    g.add_node("consumer", consumer)
+    g.set_entry("streamer")
+    g.add_edge("streamer", "consumer")
+    g.add_edge("consumer", END)
+
+    events = [e async for e in g.run_stream(_MiniState())]
+    assert events == [{"type": "delta", "data": {"text": "init"}}]
+    assert seen == {"counter": 99, "branch": "replaced"}
+
+
+@pytest.mark.asyncio
+async def test_run_stream_conditional_edge_routes_correctly():
+    """条件边在流式执行下同样起效，事件按所选分支节点顺序产出。"""
+    g = StateGraph()
+
+    async def entry(state):
+        state.pending_events.append({"type": "thinking", "data": {"step": "entry"}})
+        state.branch = "B"
+        return state
+
+    async def branch_a(state):
+        state.pending_events.append({"type": "thinking", "data": {"step": "A"}})
+        return state
+
+    async def branch_b(state):
+        state.pending_events.append({"type": "thinking", "data": {"step": "B"}})
+        return state
+
+    g.add_node("entry", entry)
+    g.add_node("ba", branch_a)
+    g.add_node("bb", branch_b)
+    g.set_entry("entry")
+    g.add_conditional_edge("entry", lambda s: "ba" if s.branch == "A" else "bb")
+    g.add_edge("ba", END)
+    g.add_edge("bb", END)
+
+    events = [e async for e in g.run_stream(_MiniState())]
+    assert [(e["data"]["step"]) for e in events] == ["entry", "B"]
+
+
+@pytest.mark.asyncio
+async def test_run_stream_max_hops_guard():
+    """死循环保护：run_stream 同样受 MAX_HOPS 约束。"""
+    g = StateGraph()
+
+    async def loopy(state):
+        state.counter += 1
+        return state
+
+    g.add_node("loopy", loopy)
+    g.set_entry("loopy")
+    # 自循环
+    g.add_conditional_edge("loopy", lambda s: "loopy")
+
+    with pytest.raises(RuntimeError, match="跳转次数"):
+        async for _ in g.run_stream(_MiniState()):
+            pass
+
+
+@pytest.mark.asyncio
+async def test_run_stream_state_without_pending_events_attr_is_safe():
+    """state 没有 pending_events 字段时不应崩溃（getattr 兜底）。"""
+
+    @dataclass
+    class _NoPendingState:
+        counter: int = 0
+
+    g = StateGraph()
+
+    async def n(state):
+        state.counter = 7
+        return state
+
+    g.add_node("n", n)
+    g.set_entry("n")
+    g.add_edge("n", END)
+
+    events = [e async for e in g.run_stream(_NoPendingState())]
+    assert events == []
+
+
 # ──────────────────────── 装饰器集成 ────────────────────────
 
 
