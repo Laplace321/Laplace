@@ -28,9 +28,12 @@ from server.fallback import (
 from server.graph import END, PipelineState, StateGraph
 from server.llm import StreamMetadata, chat_completion, chat_completion_stream
 from server.logger import log_trace_event
+from server.nodes.agent import agent_fallback_node
 from server.nodes.atlas import atlas_node
+from server.nodes.clarify import clarify_node
 from server.nodes.classify import classify_node
 from server.nodes.execute import execute_node
+from server.nodes.fallback import template_fallback_node
 from server.nodes.generate import generate_node
 from server.nodes.guide import (
     _build_guide_context_text,
@@ -98,18 +101,23 @@ def _get_pipeline_c_graph() -> StateGraph:
 
 
 def _build_pipeline_a_graph() -> StateGraph:
-    """构建完整 Pipeline A 图（Task 2 — ADR-028）。
+    """构建完整 Pipeline A 图（Task 3 — ADR-028）。
 
-    拓扑::
+    主路径 + 降级路径全部在图内::
 
-        classify ──after_classify──┬─ "atlas"  ──> END
-                                   ├─ "guide"  ──> END
-                                   ├─ "route"  ──after_route──┬─ "execute"  ──after_execute──┬─ "generate" ──> END
-                                   │                          │                              └─ END (bail_out)
-                                   │                          └─ END (bail_out)
-                                   └─ END (bail_out: low_confidence_agent)
+        classify ─┬→ atlas    → END
+                  ├→ guide    → END
+                  ├→ route    ─┬→ execute ─┬→ generate         → END
+                  │            │           ├→ clarify          → END
+                  │            │           └→ agent_fallback   → END
+                  │            ├→ clarify          → END
+                  │            ├→ template_fallback→ END
+                  │            └→ agent_fallback   → END
+                  └→ agent_fallback   → END   (低置信度)
 
-    bail_out 路径由 ``handle_skill_mode`` 的 ``_bail_out_to_chat_response`` 接续兜底（Task 3 节点化）。
+    所有降级 reason 经 ``edges._dispatch_bail_out`` 分发到 agent / clarify /
+    template_fallback 三个节点，节点把结果写入 state 后连 END，
+    ``handle_skill_mode`` 拿到 state 直接拼装 ChatResponse。
     """
     g = StateGraph()
     g.add_node("classify", classify_node)
@@ -118,6 +126,9 @@ def _build_pipeline_a_graph() -> StateGraph:
     g.add_node("route", route_node)
     g.add_node("execute", execute_node)
     g.add_node("generate", generate_node)
+    g.add_node("agent_fallback", agent_fallback_node)
+    g.add_node("clarify", clarify_node)
+    g.add_node("template_fallback", template_fallback_node)
     g.set_entry("classify")
     g.add_conditional_edge("classify", after_classify)
     g.add_edge("atlas", END)
@@ -125,22 +136,34 @@ def _build_pipeline_a_graph() -> StateGraph:
     g.add_conditional_edge("route", after_route)
     g.add_conditional_edge("execute", after_execute)
     g.add_edge("generate", END)
+    g.add_edge("agent_fallback", END)
+    g.add_edge("clarify", END)
+    g.add_edge("template_fallback", END)
     return g
 
 
 def _build_pipeline_direct_graph() -> StateGraph:
     """构建 skill_calls 直传短图（preset / 前端直传）。
 
-    拓扑：execute ──after_execute──┬─ "generate" ──> END
-                                   └─ END (bail_out)
-    跳过 classify/route，直接从 execute 入图。
+    拓扑::
+
+        execute ─┬→ generate         → END
+                 ├→ clarify          → END
+                 └→ agent_fallback   → END
+
+    跳过 classify/route，直接从 execute 入图；执行层降级（clarification /
+    fallback）由对应节点处理后连 END。
     """
     g = StateGraph()
     g.add_node("execute", execute_node)
     g.add_node("generate", generate_node)
+    g.add_node("agent_fallback", agent_fallback_node)
+    g.add_node("clarify", clarify_node)
     g.set_entry("execute")
     g.add_conditional_edge("execute", after_execute)
     g.add_edge("generate", END)
+    g.add_edge("agent_fallback", END)
+    g.add_edge("clarify", END)
     return g
 
 
@@ -213,14 +236,16 @@ async def handle_skill_mode(
     target_pipeline: str = "A",
     confirmation_context: str | None = None,
 ) -> ChatResponse:
-    """Skill 模式核心入口（Task 2 起改为图引擎驱动 — ADR-028）。
+    """Skill 模式核心入口（Task 3 起降级路径全部节点化 — ADR-028）。
 
     主路径（Stage 0 分类 + Stage 1 路由 + Skill 执行 + RAG 生成）由
     ``_get_pipeline_a_graph()`` 完整组装；preset / 前端直传跳过路由走
     ``_get_pipeline_direct_graph()`` 短图（execute → generate）。
 
-    降级路径（routing_failed / clarification / fallback / agent fallback / execution fallback）
-    暂保留在 ``_bail_out_to_chat_response`` 中，Task 3 会节点化后彻底删除。
+    所有降级路径（routing_failed / clarification / fallback / agent fallback /
+    execution fallback）已在图内由 ``agent_fallback_node`` / ``clarify_node`` /
+    ``template_fallback_node`` 三个节点统一处理，本函数无需再判 bail_out，
+    直接把 state 拼装为 ChatResponse。
 
     Args:
         confirmation_context: 用户确认选择后回传的上下文，拼接到 user_message 进行精确路由。
@@ -288,9 +313,8 @@ async def handle_skill_mode(
                 traceId=trace_id,
             )
 
-        if not state.extras.get("bail_out"):
-            return _state_to_chat_response(state, trace_id)
-        return await _bail_out_to_chat_response(state, request_start)
+        # 降级路径节点已写入 state.reply / servants / query / model_used，无需再判 bail_out
+        return _state_to_chat_response(state, trace_id)
 
     # ── 完整 Pipeline A 图（Stage 0 → Stage 1 → execute → generate）──
     await log_trace_event(
@@ -342,310 +366,8 @@ async def handle_skill_mode(
 
     if not state.extras.get("bail_out"):
         return _state_to_chat_response(state, trace_id)
-    return await _bail_out_to_chat_response(state, request_start)
-
-
-async def _bail_out_to_chat_response(state: PipelineState, request_start: float) -> ChatResponse:
-    """Task 2 临时兜底：把图引擎 bail_out 后的降级路径处理统一收敛在此。
-
-    Task 3 会把每个 bail_out 分支节点化（Agent 兜底 4 处合 1 + clarify_node + fallback_node），
-    届时本函数将被彻底删除，handle_skill_mode 直接返回图引擎结果。
-    """
-    reason = state.extras.get("bail_out", "unknown")
-    trace_id = state.trace_id
-
-    # ── A 链路低置信度 → Agent fallback ──
-    if reason == "low_confidence_agent":
-        return await _agent_fallback_response(
-            state,
-            request_start,
-            result_label="classifier_low_confidence_agent",
-            extra_query_mode="agent_fallback",
-            extra_query_extra={"classifier_confidence": state.classifier_confidence},
-        )
-
-    # ── 路由 2 次失败 → Agent 兜底 ──
-    if reason == "routing_failed":
-        return await _agent_fallback_response(
-            state,
-            request_start,
-            result_label="routing_retry_agent_fallback",
-            extra_query_mode="routing_retry_agent_fallback",
-            extra_query_extra={"routing_error": state.extras.get("routing_error")},
-            error_fallback_reply="抱歉，Skill 路由遇到问题，请稍后重试。",
-            error_result="routing_error",
-            error_mode="routing_error",
-            error_model="error",
-        )
-
-    # ── Stage 1 用户确认（clarification）──
-    if reason == "clarification":
-        routing_result = state.extras.get("routing_result", {})
-        clarification = routing_result.get("clarification", {})
-        await log_trace_event(
-            trace_id,
-            "clarification_requested",
-            {
-                "question": clarification.get("question", ""),
-                "options": clarification.get("options", []),
-                "ambiguous_field": clarification.get("ambiguous_field", ""),
-            },
-        )
-        await log_trace_event(
-            trace_id,
-            "final",
-            {
-                "total_time_ms": (time.monotonic() - request_start) * 1000,
-                "result": "clarification_requested",
-                "mode": "clarification",
-                "total_tokens": state.trace_total_tokens,
-            },
-        )
-        return ChatResponse(
-            reply="",
-            servants=[],
-            count=0,
-            query={"mode": "clarification", "clarification": clarification},
-            model=state.model_used,
-            traceId=trace_id,
-        )
-
-    # ── greeting / out_of_scope → 模板回复 ──
-    if reason in ("fallback_greeting", "fallback_out_of_scope"):
-        routing_result = state.extras.get("routing_result", {})
-        fallback = routing_result.get("fallback", {}) or {}
-        fb_code = fallback.get("code", "no_match")
-        fb_msg = fallback.get("message", "无法理解你的问题，请尝试更具体的描述。")
-        template_reply = FALLBACK_TEMPLATES.get(fb_code.upper(), fb_msg)
-        await log_trace_event(
-            trace_id,
-            "final",
-            {
-                "total_time_ms": (time.monotonic() - request_start) * 1000,
-                "result": f"fallback_{fb_code}",
-                "mode": f"fallback_{fb_code}",
-                "total_tokens": state.trace_total_tokens,
-            },
-        )
-        return ChatResponse(
-            reply=template_reply,
-            servants=[],
-            count=0,
-            query=routing_result,
-            model=state.model_used,
-            traceId=trace_id,
-        )
-
-    # ── no_match / ambiguous → Agent 兜底 ──
-    if reason in ("fallback_no_match", "fallback_ambiguous"):
-        routing_result = state.extras.get("routing_result", {})
-        fallback = routing_result.get("fallback", {}) or {}
-        fb_msg = fallback.get("message", "无法理解你的问题，请尝试更具体的描述。")
-        return await _agent_fallback_response(
-            state,
-            request_start,
-            result_label="agent_fallback",
-            extra_query_mode="agent_fallback",
-            error_query=routing_result,
-            error_fallback_reply=fb_msg,
-            error_result="fallback",
-            error_mode="fallback_no_match",
-        )
-
-    # ── 空 skill_calls → Agent 兜底 ──
-    if reason == "empty_skill_calls":
-        routing_result = state.extras.get("routing_result", {})
-        return await _agent_fallback_response(
-            state,
-            request_start,
-            result_label="agent_fallback",
-            extra_query_mode="agent_fallback",
-            error_query=routing_result,
-            error_fallback_reply="无法从你的问题中识别出查询条件，请尝试更具体的描述。",
-            error_result="no_match",
-            error_mode="fallback_no_match",
-        )
-
-    # ── 执行层 clarification ──
-    if reason == "execution_clarification":
-        result = state.extras.get("executor_result")
-        clarification = result.clarification if result else {}
-        await log_trace_event(
-            trace_id,
-            "execution_clarification_requested",
-            {
-                "type": clarification.get("type", ""),
-                "question": clarification.get("question", ""),
-                "options": clarification.get("options", []),
-                "ambiguous_field": clarification.get("ambiguous_field", ""),
-            },
-        )
-        await log_trace_event(
-            trace_id,
-            "final",
-            {
-                "total_time_ms": (time.monotonic() - request_start) * 1000,
-                "result": "execution_clarification_requested",
-                "mode": "clarification",
-                "total_tokens": state.trace_total_tokens,
-            },
-        )
-        return ChatResponse(
-            reply="",
-            servants=[],
-            count=0,
-            query={
-                "mode": "clarification",
-                "clarification": {
-                    "question": clarification.get("question", ""),
-                    "options": clarification.get("options", []),
-                    "ambiguous_field": clarification.get("ambiguous_field", ""),
-                },
-                "source": "execution",
-            },
-            model=state.model_used,
-            traceId=trace_id,
-        )
-
-    # ── 执行层 fallback → Agent 兜底（带 oneshot 上下文）──
-    if reason == "execution_fallback":
-        result = state.extras.get("executor_result")
-        oneshot_ctx = build_oneshot_context(state.skill_calls)
-        fb_reply = (result.fallback_message if result else None) or "未找到匹配的从者。"
-        try:
-            agent_result: AgentResult = await agent_route(
-                state.user_message, TOOL_HANDLERS, trace_id, oneshot_context=oneshot_ctx
-            )
-            state.trace_total_tokens += agent_result.total_tokens
-            category, clean_reply = classify_agent_reply(agent_result.reply)
-            returned = agent_result.servants_data[:MAX_RESULTS] if agent_result.servants_data and not category else []
-            await log_trace_event(
-                trace_id,
-                "agent_detail",
-                {
-                    "rounds": agent_result.rounds,
-                    "agent_tokens": agent_result.total_tokens,
-                    "tool_trace": agent_result.tool_trace,
-                    "agent_elapsed_ms": round(agent_result.elapsed_ms, 2),
-                    "reply": clean_reply,
-                },
-            )
-            await log_trace_event(
-                trace_id,
-                "final",
-                {
-                    "total_time_ms": (time.monotonic() - request_start) * 1000,
-                    "result": "agent_fallback",
-                    "mode": "agent_fallback",
-                    "total_found": len(agent_result.servants_data),
-                    "total_tokens": state.trace_total_tokens,
-                },
-            )
-            return ChatResponse(
-                reply=clean_reply,
-                servants=returned,
-                count=len(agent_result.servants_data),
-                query={"mode": "agent_fallback"},
-                model=f"agent_{agent_result.rounds}r",
-                traceId=trace_id,
-            )
-        except Exception:
-            return ChatResponse(
-                reply=fb_reply,
-                servants=[],
-                count=0,
-                query={"mode": "execution_fallback"},
-                model=state.model_used,
-                traceId=trace_id,
-            )
-
-    # ── 兜底（未识别 reason）──
-    return ChatResponse(
-        reply="抱歉，处理你的请求时出现了问题，请稍后重试。",
-        servants=[],
-        count=0,
-        query={"mode": "unknown_bail_out", "reason": reason},
-        model=state.model_used or "error",
-        traceId=trace_id,
-    )
-
-
-async def _agent_fallback_response(
-    state: PipelineState,
-    request_start: float,
-    *,
-    result_label: str,
-    extra_query_mode: str = "agent_fallback",
-    extra_query_extra: dict | None = None,
-    error_query: dict | None = None,
-    error_fallback_reply: str = "无法处理你的请求，请稍后重试。",
-    error_result: str = "fallback",
-    error_mode: str = "fallback_no_match",
-    error_model: str | None = None,
-) -> ChatResponse:
-    """统一封装 Agent fallback 调用 + trace 记录。
-
-    成功时返回 Agent 生成的 ChatResponse；失败时返回 ``error_fallback_reply`` 模板。
-    Task 3 会把这个 helper 替换为 ``server.nodes.agent.agent_fallback_node``。
-    """
-    trace_id = state.trace_id
-    try:
-        agent_result: AgentResult = await agent_route(state.user_message, TOOL_HANDLERS, trace_id)
-        state.trace_total_tokens += agent_result.total_tokens
-        category, clean_reply = classify_agent_reply(agent_result.reply)
-        returned = agent_result.servants_data[:MAX_RESULTS] if agent_result.servants_data and not category else []
-        await log_trace_event(
-            trace_id,
-            "agent_detail",
-            {
-                "rounds": agent_result.rounds,
-                "agent_tokens": agent_result.total_tokens,
-                "tool_trace": agent_result.tool_trace,
-                "reply": clean_reply,
-            },
-        )
-        await log_trace_event(
-            trace_id,
-            "final",
-            {
-                "total_time_ms": (time.monotonic() - request_start) * 1000,
-                "result": result_label,
-                "mode": "agent_fallback",
-                "total_found": len(agent_result.servants_data),
-                "total_tokens": state.trace_total_tokens,
-            },
-        )
-        query_payload: dict = {"mode": extra_query_mode}
-        if extra_query_extra:
-            query_payload.update(extra_query_extra)
-        return ChatResponse(
-            reply=clean_reply,
-            servants=returned,
-            count=len(agent_result.servants_data),
-            query=query_payload,
-            model=f"agent_{agent_result.rounds}r",
-            traceId=trace_id,
-        )
-    except Exception as agent_err:
-        await log_trace_event(
-            trace_id,
-            "final",
-            {
-                "total_time_ms": (time.monotonic() - request_start) * 1000,
-                "result": error_result,
-                "mode": error_mode,
-                "total_tokens": state.trace_total_tokens,
-            },
-            error=str(agent_err) if error_result == "routing_error" else None,
-        )
-        return ChatResponse(
-            reply=error_fallback_reply,
-            servants=[],
-            count=0,
-            query=error_query if error_query is not None else {},
-            model=error_model or state.model_used,
-            traceId=trace_id,
-        )
+    # 降级路径节点已写入 state.reply / servants / query / model_used，无需再判 bail_out
+    return _state_to_chat_response(state, trace_id)
 
 
 async def _handle_confirmation_direct(

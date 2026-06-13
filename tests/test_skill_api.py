@@ -329,7 +329,7 @@ class TestSkillModeLLMRouting:
         )
         with (
             _patch_chat_completion_everywhere(mock_chat_completion_empty_skills),
-            patch("server.pipeline.agent_route", new=AsyncMock(return_value=mock_agent_result)),
+            patch("server.nodes.agent.agent_route", new=AsyncMock(return_value=mock_agent_result)),
         ):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
