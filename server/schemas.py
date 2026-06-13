@@ -87,7 +87,12 @@ class RoutingResponse(BaseModel):
 
 
 class ClassifierResponse(BaseModel):
-    """Stage 0 分类器输出：判断用户查询应走哪条链路。"""
+    """Stage 0 分类器输出：判断用户查询应走哪条链路。
+
+    Task 4 Batch A 新增 ``turn_type`` 字段：标识本轮相对上一轮的关系。
+    分类器尚未学会输出该字段时默认 ``MAJOR``（全新查询，等价于无多轮），
+    业务侧 Batch B 接入时会调整 prompt 显式输出。
+    """
 
     model_config = ConfigDict(extra="ignore")
 
@@ -98,6 +103,16 @@ class ClassifierResponse(BaseModel):
         ge=0.0,
         le=1.0,
         description="分类置信度，0.0~1.0。低于阈值时走 fallback",
+    )
+    turn_type: Literal["MAJOR", "MINOR", "CORRECTION"] = Field(
+        default="MAJOR",
+        description=(
+            "本轮相对上一轮的关系："
+            "MAJOR=全新查询（清空多轮状态）；"
+            "MINOR=在上一轮结果上追加过滤/切换回复粒度（如「其中弓阶的」「详细说说」）；"
+            "CORRECTION=修正上一轮关键参数（如「我说的是Alter版」）。"
+            "无多轮上下文时默认为 MAJOR。"
+        ),
     )
 
 

@@ -6,10 +6,29 @@
 - 条件边 = 纯函数 State -> 下一节点名
 - StateGraph: ~200 行图引擎，支持 run / run_stream / resume
 
-Task 1 仅落地 run() 同步执行 + 静态/条件边；run_stream() 在 Task 5 完善。
+Task 4 Batch A：新增 Checkpointer / SessionStore，支持多轮对话状态持久化与
+系统主动中断恢复（业务节点接入由 Batch B 完成）。
 """
 
+from server.graph.checkpointer import (
+    DEFAULT_TTL_SECONDS,
+    Checkpointer,
+    InMemoryCheckpointer,
+    SqliteCheckpointer,
+)
 from server.graph.engine import END, StateGraph
+from server.graph.session import PREV_SUMMARY_MAX_CHARS, SessionStore, TurnSnapshot
 from server.graph.state import PipelineState
 
-__all__ = ["END", "PipelineState", "StateGraph"]
+__all__ = [
+    "DEFAULT_TTL_SECONDS",
+    "END",
+    "PREV_SUMMARY_MAX_CHARS",
+    "Checkpointer",
+    "InMemoryCheckpointer",
+    "PipelineState",
+    "SessionStore",
+    "SqliteCheckpointer",
+    "StateGraph",
+    "TurnSnapshot",
+]
