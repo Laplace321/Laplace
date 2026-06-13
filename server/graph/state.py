@@ -32,6 +32,11 @@ class PipelineState:
     # ── B 链路（Atlas）专用 ──
     atlas_query: dict[str, Any] | None = None
 
+    # ── A 链路（Skill 路由 + 执行）────────────────────────────
+    skill_calls: list[dict] = field(default_factory=list)
+    response_skill_name: str = "respond_servant_list"
+    target_pipeline: str = "A"
+
     # ── 累计追踪 ──
     model_used: str = "skill_mode"
     trace_total_tokens: int = 0
