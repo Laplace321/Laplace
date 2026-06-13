@@ -182,7 +182,7 @@ async function sendMessage() {
 
   currentAbortController = new AbortController();
   try {
-    const url = `${STREAM_API_URL}?message=${encodeURIComponent(text)}`;
+    const url = `${STREAM_API_URL}?message=${encodeURIComponent(text)}&session_id=${encodeURIComponent(currentSessionId)}`;
     const resp = await fetch(url, { signal: currentAbortController.signal });
     if (!resp.ok) throw new Error(`服务器错误 (${resp.status})`);
 
@@ -482,7 +482,7 @@ async function sendWithConfirmation(confirmationText, confirmationId) {
 
   currentAbortController = new AbortController();
   try {
-    let url = `${STREAM_API_URL}?message=${encodeURIComponent(query)}&confirmation_context=${encodeURIComponent(confirmationText)}`;
+    let url = `${STREAM_API_URL}?message=${encodeURIComponent(query)}&confirmation_context=${encodeURIComponent(confirmationText)}&session_id=${encodeURIComponent(currentSessionId)}`;
     if (confirmationId) {
       url += `&confirmation_id=${encodeURIComponent(confirmationId)}`;
     }
