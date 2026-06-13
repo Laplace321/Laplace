@@ -58,3 +58,9 @@ class PipelineState:
 
     # ── 运行时元数据（节点间临时通信，避免循环引用业务模块）──
     extras: dict[str, Any] = field(default_factory=dict)
+
+    # ── BI 维度标签（v0.5.1 Task 3）──
+    # 各节点在自己阶段产出后回填，generate_node 的 final 事件 + 监控指标会消费这些 label。
+    # 包含：turn_type / pipeline / skill_names / clarification_type / error_reason
+    #      / latency_bucket / model / has_prev_turn / total_tokens
+    metric_labels: dict[str, str | int] = field(default_factory=dict)

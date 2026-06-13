@@ -39,6 +39,14 @@ async def execute_node(state: PipelineState) -> PipelineState:
     executor = SkillExecutor()
     result = executor.execute(state.skill_calls, state.response_skill_name)
 
+    # BI 维度回填：accepted skills（按字典序去重拼接，控制基数）
+    if result.accepted_skills:
+        skill_name_set = {
+            s.get("skill_name", "") for s in result.accepted_skills if isinstance(s, dict) and s.get("skill_name")
+        }
+        if skill_name_set:
+            state.metric_labels["skill_names"] = ",".join(sorted(skill_name_set))
+
     # ── Trace: execution ──
     await log_trace_event(
         state.trace_id,

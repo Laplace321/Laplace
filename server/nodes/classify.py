@@ -84,6 +84,14 @@ async def classify_node(state: PipelineState) -> PipelineState:
         # 多轮防御：分类失败时也按 MAJOR 处理，主动清状态避免污染
         if session_store is not None and state.session_id:
             session_store.clear_session(state.session_id)
+        # BI 维度回填（即使降级也写）
+        state.metric_labels.update(
+            {
+                "pipeline": "A",
+                "turn_type": "MAJOR",
+                "has_prev_turn": 0,
+            }
+        )
         return state
 
     classifier_model = classifier_result.pop("_model", "unknown")
@@ -110,6 +118,15 @@ async def classify_node(state: PipelineState) -> PipelineState:
         session_store.clear_session(state.session_id)
         # 已清的 prev_turn 也从 extras 中移除，下游不应再使用
         state.extras.pop("prev_turn", None)
+
+    # BI 维度回填：分类成功路径
+    state.metric_labels.update(
+        {
+            "pipeline": state.classified_pipeline,
+            "turn_type": state.turn_type,
+            "has_prev_turn": 1 if "prev_turn" in state.extras else 0,
+        }
+    )
 
     await log_trace_event(
         state.trace_id,

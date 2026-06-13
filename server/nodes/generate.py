@@ -29,6 +29,21 @@ from server.prompts import get_generation_prompt
 from server.translation import describe_filters
 
 
+def _latency_bucket(total_ms: float) -> str:
+    """将耗时映射为有限桶，控制 BI label 基数。"""
+    if total_ms < 200:
+        return "<200ms"
+    if total_ms < 500:
+        return "200-500ms"
+    if total_ms < 1000:
+        return "500-1000ms"
+    if total_ms < 3000:
+        return "1000-3000ms"
+    if total_ms < 5000:
+        return "3000-5000ms"
+    return ">=5000ms"
+
+
 @with_trace(Phase.NODE_GENERATE)
 async def generate_node(state: PipelineState) -> PipelineState:
     """RAG 生成：组装 context → LLM 调用 → 写入 state.reply / query。"""
@@ -93,6 +108,9 @@ async def generate_node(state: PipelineState) -> PipelineState:
     )
 
     final_reply = ""
+    gen_usage: dict = {}
+    gen_model: str = "unknown"
+    final_result = "success"
     try:
         gen_response = await chat_completion(
             system_prompt=(
@@ -105,10 +123,12 @@ async def generate_node(state: PipelineState) -> PipelineState:
         )
         final_reply = gen_response.get("text", "").strip()
         gen_usage = gen_response.get("_usage", {})
+        gen_model = gen_response.get("_model", "unknown")
         state.trace_total_tokens += gen_usage.get("total_tokens", 0)
         if not final_reply:
             raise ValueError("Empty response from LLM")
     except Exception as gen_err:  # noqa: BLE001
+        final_result = "generation_error"
         final_reply = (
             f"为你找到了 {total_found} 个礼装。"
             if response_skill_name == "respond_ce_list"
@@ -129,16 +149,27 @@ async def generate_node(state: PipelineState) -> PipelineState:
             {"reply": final_reply, "generation_usage": gen_usage},
         )
 
+    # ── BI 维度回填 ──
+    total_time_ms = round((time.monotonic() - state.request_start) * 1000, 2)
+    state.metric_labels.update(
+        {
+            "model": gen_model,
+            "total_tokens": int(state.trace_total_tokens),
+            "latency_bucket": _latency_bucket(total_time_ms),
+        }
+    )
+
     # ── Trace: final ──
     await log_trace_event(
         state.trace_id,
         "final",
         {
-            "total_time_ms": round((time.monotonic() - state.request_start) * 1000, 2),
+            "total_time_ms": total_time_ms,
             "total_found": total_found,
-            "result": "success",
+            "result": final_result,
             "mode": "oneshot",
             "total_tokens": state.trace_total_tokens,
+            "metric_labels": dict(state.metric_labels),
         },
     )
 
@@ -274,6 +305,7 @@ async def generate_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pi
     full_reply_parts: list[str] = []
     final_result = "success"
     gen_usage: dict = {}
+    gen_model: str = "unknown"
     final_reply = ""
     try:
         stream_metadata = StreamMetadata()
@@ -292,6 +324,7 @@ async def generate_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pi
 
         final_reply = "".join(full_reply_parts).strip()
         gen_usage = stream_metadata.usage
+        gen_model = stream_metadata.model or "unknown"
         state.trace_total_tokens += gen_usage.get("total_tokens", 0)
         if not final_reply:
             raise ValueError("Empty response from LLM")
@@ -327,6 +360,16 @@ async def generate_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pi
             {"reply": final_reply, "generation_usage": gen_usage},
         )
 
+    # ── BI 维度回填（流式版）──
+    total_time_ms = round((time.monotonic() - state.request_start) * 1000, 2)
+    state.metric_labels.update(
+        {
+            "model": gen_model,
+            "total_tokens": int(state.trace_total_tokens),
+            "latency_bucket": _latency_bucket(total_time_ms),
+        }
+    )
+
     await log_trace_event(
         state.trace_id,
         "final",
@@ -336,6 +379,7 @@ async def generate_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pi
             "result": final_result,
             "mode": "oneshot",
             "total_tokens": state.trace_total_tokens,
+            "metric_labels": dict(state.metric_labels),
         },
     )
 

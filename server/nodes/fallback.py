@@ -31,6 +31,14 @@ async def template_fallback_node(state: PipelineState) -> PipelineState:
     fb_msg = fallback.get("message", "无法理解你的问题，请尝试更具体的描述。")
     template_reply = FALLBACK_TEMPLATES.get(fb_code.upper(), fb_msg)
 
+    # ── BI 维度回填 ──
+    state.metric_labels.update(
+        {
+            "pipeline": "fallback",
+            "error_reason": f"fallback_{fb_code}",
+        }
+    )
+
     await log_trace_event(
         trace_id,
         "final",
@@ -39,6 +47,7 @@ async def template_fallback_node(state: PipelineState) -> PipelineState:
             "result": f"fallback_{fb_code}",
             "mode": f"fallback_{fb_code}",
             "total_tokens": state.trace_total_tokens,
+            "metric_labels": dict(state.metric_labels),
         },
     )
 

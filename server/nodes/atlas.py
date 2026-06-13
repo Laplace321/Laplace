@@ -144,6 +144,7 @@ async def atlas_node(state: PipelineState) -> PipelineState:
         state.servants = []
         state.count = 0
         state.query = {"mode": "atlas_pipeline"}
+        state.metric_labels.update({"pipeline": "B", "error_reason": "atlas_no_match"})
         await log_trace_event(
             state.trace_id,
             "final",
@@ -152,6 +153,7 @@ async def atlas_node(state: PipelineState) -> PipelineState:
                 "result": "atlas_no_match",
                 "mode": "atlas_pipeline",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
         )
         return state
@@ -188,6 +190,14 @@ async def atlas_node(state: PipelineState) -> PipelineState:
     verified = _verify_atlas_facts(reply, atlas)
     await log_trace_event(state.trace_id, "fact_verify", {"verified": verified})
 
+    state.metric_labels.update(
+        {
+            "pipeline": "B",
+            "model": state.model_used or "unknown",
+            "total_tokens": int(state.trace_total_tokens),
+        }
+    )
+
     await log_trace_event(
         state.trace_id,
         "final",
@@ -197,6 +207,7 @@ async def atlas_node(state: PipelineState) -> PipelineState:
             "mode": "atlas_pipeline",
             "atlas_results": len(results),
             "total_tokens": state.trace_total_tokens,
+            "metric_labels": dict(state.metric_labels),
         },
     )
 
@@ -265,6 +276,7 @@ async def atlas_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pipel
         state.servants = []
         state.count = 0
         state.query = {"mode": "atlas_pipeline"}
+        state.metric_labels.update({"pipeline": "B", "error_reason": "atlas_no_match"})
         yield {"type": "delta", "data": {"text": no_match_reply}}
         await log_trace_event(
             state.trace_id,
@@ -274,6 +286,7 @@ async def atlas_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pipel
                 "result": "atlas_no_match",
                 "mode": "atlas_pipeline",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
         )
         yield state
@@ -331,6 +344,14 @@ async def atlas_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pipel
     verified = _verify_atlas_facts(reply, atlas)
     await log_trace_event(state.trace_id, "fact_verify", {"verified": verified})
 
+    state.metric_labels.update(
+        {
+            "pipeline": "B",
+            "model": state.model_used or "unknown",
+            "total_tokens": int(state.trace_total_tokens),
+        }
+    )
+
     await log_trace_event(
         state.trace_id,
         "final",
@@ -340,6 +361,7 @@ async def atlas_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pipel
             "mode": "atlas_pipeline",
             "atlas_results": len(results),
             "total_tokens": state.trace_total_tokens,
+            "metric_labels": dict(state.metric_labels),
         },
     )
 

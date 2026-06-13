@@ -36,6 +36,8 @@ async def clarify_node(state: PipelineState) -> PipelineState:
     if reason == "clarification":
         routing_result = state.extras.get("routing_result", {}) or {}
         clarification = routing_result.get("clarification", {}) or {}
+        # BI 维度回填
+        state.metric_labels["clarification_type"] = clarification.get("type") or "routing"
         await log_trace_event(
             trace_id,
             "clarification_requested",
@@ -53,6 +55,7 @@ async def clarify_node(state: PipelineState) -> PipelineState:
                 "result": "clarification_requested",
                 "mode": "clarification",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
         )
         state.reply = ""
@@ -76,6 +79,8 @@ async def clarify_node(state: PipelineState) -> PipelineState:
     # execution_clarification
     result = state.extras.get("executor_result")
     clarification = (result.clarification if result else {}) or {}
+    # BI 维度回填
+    state.metric_labels["clarification_type"] = clarification.get("type") or "execution"
     await log_trace_event(
         trace_id,
         "execution_clarification_requested",
@@ -94,6 +99,7 @@ async def clarify_node(state: PipelineState) -> PipelineState:
             "result": "execution_clarification_requested",
             "mode": "clarification",
             "total_tokens": state.trace_total_tokens,
+            "metric_labels": dict(state.metric_labels),
         },
     )
     state.reply = ""
@@ -163,6 +169,7 @@ async def _maybe_save_pending(state: PipelineState, *, source: str) -> None:
         count=state.count,
         query=state.query,
         extras=snapshot_extras,
+        metric_labels=dict(state.metric_labels),
     )
     try:
         session_store.save_pending(state.session_id, pending_state)

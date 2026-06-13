@@ -380,6 +380,7 @@ async def handle_skill_mode(
         try:
             state = await _get_pipeline_direct_graph().run(state)
         except Exception as e:
+            state.metric_labels["error_reason"] = "routing_error"
             await log_trace_event(
                 trace_id,
                 "final",
@@ -388,6 +389,7 @@ async def handle_skill_mode(
                     "result": "routing_error",
                     "mode": "routing_error",
                     "total_tokens": state.trace_total_tokens,
+                    "metric_labels": dict(state.metric_labels),
                 },
                 error=str(e),
             )
@@ -434,6 +436,7 @@ async def handle_skill_mode(
     try:
         state = await _get_pipeline_a_graph().run(state)
     except Exception as e:
+        state.metric_labels["error_reason"] = "routing_error"
         await log_trace_event(
             trace_id,
             "final",
@@ -442,6 +445,7 @@ async def handle_skill_mode(
                 "result": "routing_error",
                 "mode": "routing_error",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
             error=str(e),
         )
@@ -609,6 +613,7 @@ async def stream_chat_events(
         async for produced in _get_pipeline_a_stream_graph().run_stream(state):
             yield sse_event(produced["type"], produced["data"])
     except Exception as e:  # noqa: BLE001
+        state.metric_labels["error_reason"] = "stream_error"
         await log_trace_event(
             trace_id,
             "final",
@@ -617,6 +622,7 @@ async def stream_chat_events(
                 "result": "stream_error",
                 "mode": "stream_error",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
             error=str(e),
         )
@@ -698,6 +704,10 @@ async def _stream_confirmation_direct(
             {
                 "total_time_ms": (time.monotonic() - stream_start) * 1000,
                 "result": "confirmation_not_found",
+                "metric_labels": {
+                    "pipeline": "confirmation",
+                    "error_reason": "confirmation_not_found",
+                },
             },
         )
         yield sse_event("done", {"model": "confirmation_direct", "traceId": trace_id})
@@ -760,6 +770,8 @@ async def _stream_confirmation_direct(
         async for produced in _get_pipeline_confirmation_stream_graph().run_stream(state):
             yield sse_event(produced["type"], produced["data"])
     except Exception as e:  # noqa: BLE001
+        state.metric_labels["error_reason"] = "confirmation_stream_error"
+        state.metric_labels.setdefault("pipeline", "confirmation")
         await log_trace_event(
             trace_id,
             "final",
@@ -768,6 +780,7 @@ async def _stream_confirmation_direct(
                 "result": "confirmation_stream_error",
                 "mode": "confirmation_direct",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
             error=str(e),
         )
@@ -910,6 +923,8 @@ async def _stream_preset(
         async for produced in _get_pipeline_direct_stream_graph().run_stream(state):
             yield sse_event(produced["type"], produced["data"])
     except Exception as e:  # noqa: BLE001
+        state.metric_labels["error_reason"] = "preset_stream_error"
+        state.metric_labels.setdefault("pipeline", "preset")
         await log_trace_event(
             trace_id,
             "final",
@@ -918,6 +933,7 @@ async def _stream_preset(
                 "result": "preset_stream_error",
                 "mode": "preset",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
             error=str(e),
         )
