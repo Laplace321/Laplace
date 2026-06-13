@@ -97,3 +97,50 @@ MINOR 追问时的回退策略：
 2. Stage 0 分类器扩展 MINOR/MAJOR 判断
 3. MINOR 时复用上一轮的管线分类和技能路由结果，只追加/修正参数
 4. 改动集中在 `pipeline.py` 和 `prompts.py`，不引入新存储依赖
+
+## 关联议题：未识别特性时的主动澄清（待实施时讨论）
+
+### 背景
+
+灵衣特性识别的修复（trait_aliases.json + prompts.py 路由提示）解决了**已知别名**的口语变体覆盖。但**未知特性词**仍存在 Agent 兜底幻觉风险：
+
+- 用户问"有 XX 特性的从者"，但 XX 不在 `trait_aliases.json` / `func_target_types.json` 任何映射中
+- Pipeline A 路由失败 → 落到 Agent 兜底
+- Agent 调用 `search_servants` 时**未传任何特征筛选参数**（traitNames/effectNames 全空）
+- LLM 仍可能生成"按 XX 特性筛选出以下从者"的回复 → 数据污染、违反 SOUL 第 6 条 Strict JSON 与"LLM 不直接操作数据"
+
+### 设计方向（与多轮状态强耦合）
+
+这本质上是 **CORRECTION/CLARIFICATION 类回合** 的一种特化场景，应纳入本 ADR 的状态机统一设计：
+
+```
+[识别失败检测]
+  └─ 触发条件：search_servants 入参 traitNames/effectNames 全空
+              且 用户问句中存在明显特性词（启发式："XX 特性"/"XX 持有者"/"有 XX 的"）
+  └─ 输出：CLARIFICATION 回合
+          - 不输出筛选结果
+          - 用 "未能识别该特性 XX，可否用其他说法描述？"
+          - 列出最近匹配的 N 个候选特性（基于 trait_aliases.json 的 fuzzy match）
+
+[用户补充答复] → MINOR 回合（CORRECTION 子类型）
+  └─ 复用上一轮 skill_call 框架，仅替换 traitNames
+  └─ 进入正常路由
+```
+
+### 关键决策点（待实施时确认）
+
+1. **检测位置**：放在 Agent 兜底前（路由层判定）还是 Agent 内部（工具调用 hook）？
+   - 路由层：覆盖率高但需要在 prompts.py 加复杂 guardrail
+   - Agent 内部：通过 search_servants 入参校验拦截，逻辑集中但可能漏掉非 Agent 路径
+
+2. **"明显特性词"的判定**：纯启发式（关键词后缀）vs 调用 LLM 二次判定？前者快但召回受限
+
+3. **候选项推荐**：是否引入轻量级编辑距离/向量召回，给用户列 3-5 个最相近的已知特性？需评估冷启动质量
+
+4. **与 MINOR/MAJOR 的关系**：CLARIFICATION 应作为 MINOR 的子类型还是独立回合类型？影响 Stage 0 分类器的 schema
+
+### 不立即实施的原因
+
+- 当前没有多轮 session 存储基础设施，澄清后的补答无法回到"上一轮 skill_call 框架"复用
+- 必须先完成本 ADR 的最小可用方案（session_id + history），再叠加这一层防幻觉
+- **暂行兜底**：通过 prompts.py 第 12 条的明确表述（如"灵衣"边界说明）和 trait_aliases.json 的别名扩展，覆盖**已知**口语变体；未知词的 Agent 防幻觉留待本 ADR 实施时统一解决

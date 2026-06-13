@@ -4,10 +4,60 @@
 以支持执行层多候选 Clarification 检测。
 """
 
+import re
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from server.query_executor import _normalize_text, load_nicknames
 from server.skills.base import QuerySkill, register_skill
+
+# 中文职阶限定词 → className 映射（用于从查询名中剥离职阶前/后缀）。
+# 严格只匹配多字词（如"狂阶"、"裁定者"），避免单字词（如"剑"/"狂"）与从者名冲突。
+_CN_CLASS_KEYWORDS: tuple[tuple[str, str], ...] = (
+    ("剑阶", "saber"), ("弓阶", "archer"), ("枪阶", "lancer"),
+    ("骑阶", "rider"), ("术阶", "caster"), ("杀阶", "assassin"),
+    ("狂阶", "berserker"), ("裁阶", "ruler"), ("复阶", "avenger"),
+    ("盾阶", "shielder"), ("兽阶", "beast"),
+    ("降阶", "foreigner"), ("伪阶", "pretender"),
+    ("裁定者", "ruler"), ("复仇者", "avenger"),
+    ("降临者", "foreigner"), ("伪装者", "pretender"),
+    ("月癌", "mooncancer"), ("他人格", "alterego"),
+)
+
+
+def _extract_class_constraint(query_name: str) -> tuple[str, str | None]:
+    """从查询名中识别中文职阶限定词，返回 (剥离后名称, className 或 None)。
+
+    支持形式：
+    - 前缀：「狂阶宫本武藏」→ ("宫本武藏", "berserker")
+    - 括号后缀：「宫本武藏（狂阶）」→ ("宫本武藏", "berserker")
+    - 星级前缀：「★★★★★ 宫本武藏（狂阶）」→ ("宫本武藏", "berserker")
+    """
+    name = query_name.strip()
+    # 剥离星级前缀（兼容 confirmation_direct 传入的 label）
+    name = re.sub(r"^[★☆\s]+", "", name).strip()
+
+    cn_class: str | None = None
+
+    # 1) 括号后缀：「XXX（剑阶）」 / 「XXX(剑阶)」
+    m = re.search(r"[（(]([^（）()]+)[)）]\s*$", name)
+    if m:
+        bracket_content = m.group(1).strip()
+        for kw, en_class in _CN_CLASS_KEYWORDS:
+            if kw in bracket_content:
+                cn_class = en_class
+                name = name[: m.start()].strip()
+                break
+
+    # 2) 前缀：「狂阶XXX」
+    if cn_class is None:
+        for kw, en_class in _CN_CLASS_KEYWORDS:
+            if name.startswith(kw) and len(name) > len(kw):
+                cn_class = en_class
+                name = name[len(kw):].strip()
+                break
+
+    return name, cn_class
 
 
 class Params(BaseModel):
@@ -60,6 +110,16 @@ def find_servant_candidates(db: list[dict], query_name: str) -> list[dict]:
     query_name = query_name.strip()
     if not query_name:
         return []
+
+    # 预处理：识别中文职阶限定词（如"狂阶宫本武藏"/"宫本武藏（狂阶）"）。
+    # 剥离职阶词后用仅剩名称部分做模糊匹配，并用 className 二次过滤。
+    stripped_name, class_constraint = _extract_class_constraint(query_name)
+    if class_constraint and stripped_name and stripped_name != query_name:
+        candidates = find_servant_candidates(db, stripped_name)
+        return [
+            s for s in candidates
+            if str(s.get("className", "")).lower() == class_constraint
+        ]
 
     normalized_query = _normalize_text(query_name)
     nickname_mappings = _resolve_nickname(query_name)

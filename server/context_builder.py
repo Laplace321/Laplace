@@ -16,6 +16,7 @@ from server.translation import (
     get_effect_translation,
     get_np_card_map,
     get_np_target_map,
+    translate_traits,
 )
 
 # === 常量 ===
@@ -343,7 +344,11 @@ def build_context(
                 entry["技能详情"] = skill_details
             if np_details:
                 entry["宝具详情"] = np_details
-
+        # 投影特性（traits）—— 详情/列表模式均投影，支持反向特性查询与
+        # 生成阶段描述从者的特性能力（已在 translate_traits 中过滤性别/职阶/属性等元数据）
+        trait_names = translate_traits(s.get("traits", []))
+        if trait_names:
+            entry["特性"] = trait_names
         # 列表模式下：如果查询含数值条件，附带匹配效果的具体数值摘要
         if not detail_mode and skill_calls:
             value_hints = extract_value_hints(s, skill_calls)
