@@ -8,14 +8,19 @@
 - run_stream(): 流式执行（async generator 节点支持，Task 5 完善）
 - resume(): 从 checkpoint 恢复（Task 4 启用）
 
-本期 Task 1 仅启用 run()；run_stream / resume 留接口位避免 Task 5 大改。
+Task 4 Batch A 扩展 resume：可选传入 ``checkpointer`` + ``session_id``，
+引擎自动 load state 再从 ``from_node`` 推进；业务侧（如 supplement 注入）由调用方
+在传入 state.extras 时完成，避免引擎层耦合 SessionStore 语义。
 """
 
 from __future__ import annotations
 
 import inspect
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # 仅类型检查需要，运行时不引入循环依赖
+    from server.graph.checkpointer import Checkpointer
 
 # ────────────────────────────────────────────────────────────
 # 类型别名
@@ -141,13 +146,45 @@ class StateGraph:
         for event in getattr(state, "pending_events", []) or []:
             yield event
 
-    async def resume(self, state: Any, from_node: str) -> Any:
-        """从指定节点恢复执行（Task 4 启用）。
+    async def resume(
+        self,
+        state: Any,
+        from_node: str,
+        *,
+        checkpointer: Checkpointer | None = None,
+        session_id: str | None = None,
+    ) -> Any:
+        """从指定节点恢复执行。
 
-        Task 1 提供基础实现：直接以 from_node 为新入口推进。
-        Task 4 会接入 Checkpointer 加载 state。
+        两种使用方式：
+
+        1. 直接传入 state（用于测试或调用方已自行加载快照）::
+
+               state = await graph.resume(state, "execute")
+
+        2. 传入 checkpointer + session_id，由引擎从 checkpointer 加载 state::
+
+               state = await graph.resume(None, "execute",
+                                          checkpointer=cp, session_id=sid)
+
+        Args:
+            state: 要恢复的 PipelineState；若为 None，则从 checkpointer 加载。
+            from_node: 恢复入口节点（必须已注册）。
+            checkpointer: 可选，从中加载 state；与 session_id 配合使用。
+            session_id: 可选，加载时使用的 key；不能为空字符串。
+
+        Raises:
+            GraphConfigError: from_node 未注册。
+            ValueError: state 为 None 且未提供有效的 checkpointer + session_id。
+            LookupError: checkpointer 中找不到对应 session_id 的快照。
         """
         self._validate_node_exists(from_node, where="resume.from_node")
+        if state is None:
+            if checkpointer is None or not session_id:
+                raise ValueError("resume: state 为 None 时必须同时提供 checkpointer 与 session_id")
+            state = checkpointer.load(session_id)
+            if state is None:
+                raise LookupError(f"resume: checkpointer 中未找到 session_id={session_id!r} 的快照（可能已过期）")
         cur = from_node
         hops = 0
         while cur != END:

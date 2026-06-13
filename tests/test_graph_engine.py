@@ -272,6 +272,68 @@ async def test_resume_starts_from_specified_node():
     assert final.path == ["external", "step2"]
 
 
+@pytest.mark.asyncio
+async def test_resume_loads_state_from_checkpointer():
+    """state=None + checkpointer + session_id 时引擎从 checkpointer 加载。"""
+    from server.graph.checkpointer import InMemoryCheckpointer
+
+    g = StateGraph()
+
+    async def step2(s):
+        s.path.append("step2")
+        return s
+
+    async def step3(s):
+        s.path.append("step3")
+        return s
+
+    g.add_node("step2", step2)
+    g.add_node("step3", step3)
+    g.set_entry("step2")
+    g.add_edge("step2", "step3")
+    g.add_edge("step3", END)
+
+    cp = InMemoryCheckpointer()
+    saved_state = _MiniState(path=["from_ckpt"])
+    cp.save("sid-1", saved_state)
+
+    final = await g.resume(None, from_node="step2", checkpointer=cp, session_id="sid-1")
+    assert final.path == ["from_ckpt", "step2", "step3"]
+
+
+@pytest.mark.asyncio
+async def test_resume_state_none_without_checkpointer_raises():
+    g = StateGraph()
+
+    async def step(s):
+        return s
+
+    g.add_node("step", step)
+    g.set_entry("step")
+    g.add_edge("step", END)
+
+    with pytest.raises(ValueError, match="checkpointer 与 session_id"):
+        await g.resume(None, from_node="step")
+
+
+@pytest.mark.asyncio
+async def test_resume_state_none_with_missing_session_raises():
+    from server.graph.checkpointer import InMemoryCheckpointer
+
+    g = StateGraph()
+
+    async def step(s):
+        return s
+
+    g.add_node("step", step)
+    g.set_entry("step")
+    g.add_edge("step", END)
+
+    cp = InMemoryCheckpointer()
+    with pytest.raises(LookupError, match="未找到"):
+        await g.resume(None, from_node="step", checkpointer=cp, session_id="missing")
+
+
 # ──────────────────────── 流式节点 ────────────────────────
 
 
