@@ -236,13 +236,24 @@ async def log_trace_event(
     event = _build_trace_event(trace_id, phase, data, error)
     await asyncio.to_thread(_write_event_sync, event)
     if phase == Phase.FINAL and trace_id and trace_id != "unknown":
-        # 延迟导入避免循环：bi_index 反向引用 logger.find_trace_events
+        # 1) BI 索引层 upsert（写 SQLite）
         from server.bi_index import upsert_turn
 
         try:
             await asyncio.to_thread(upsert_turn, trace_id)
         except Exception:  # noqa: BLE001
             # upsert_turn 内部已 try/except，此处 belt-and-suspenders
+            pass
+        # 2) Prometheus pipeline_requests counter
+        try:
+            from server.monitor.metrics import get_collector
+
+            labels = (data or {}).get("metric_labels") or {}
+            pipeline = labels.get("pipeline") or "unknown"
+            turn_type = labels.get("turn_type") or "unknown"
+            status = (data or {}).get("result") or "unknown"
+            get_collector().record_pipeline_request(pipeline, turn_type, status)
+        except Exception:  # noqa: BLE001
             pass
 
 

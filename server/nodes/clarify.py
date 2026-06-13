@@ -25,6 +25,16 @@ from server.graph.state import PipelineState
 from server.logger import Phase, log_trace_event
 
 
+def _record_clarification_metric(clarification_type: str) -> None:
+    """软依赖：失败不影响主流程。"""
+    try:
+        from server.monitor.metrics import get_collector
+
+        get_collector().record_clarification(clarification_type)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 @with_trace(Phase.NODE_CLARIFY)
 async def clarify_node(state: PipelineState) -> PipelineState:
     """澄清提示节点：把 routing/execution 层的 clarification 数据写入 state.query。"""
@@ -38,6 +48,8 @@ async def clarify_node(state: PipelineState) -> PipelineState:
         clarification = routing_result.get("clarification", {}) or {}
         # BI 维度回填
         state.metric_labels["clarification_type"] = clarification.get("type") or "routing"
+        # Prometheus 计数（routing 层澄清，type 字段优先，fallback 为 'routing'）
+        _record_clarification_metric(state.metric_labels["clarification_type"])
         await log_trace_event(
             trace_id,
             "clarification_requested",
@@ -81,6 +93,7 @@ async def clarify_node(state: PipelineState) -> PipelineState:
     clarification = (result.clarification if result else {}) or {}
     # BI 维度回填
     state.metric_labels["clarification_type"] = clarification.get("type") or "execution"
+    _record_clarification_metric(state.metric_labels["clarification_type"])
     await log_trace_event(
         trace_id,
         "execution_clarification_requested",
