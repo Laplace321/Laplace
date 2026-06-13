@@ -14,14 +14,25 @@ from server.skills.base import QuerySkill, register_skill
 # 中文职阶限定词 → className 映射（用于从查询名中剥离职阶前/后缀）。
 # 严格只匹配多字词（如"狂阶"、"裁定者"），避免单字词（如"剑"/"狂"）与从者名冲突。
 _CN_CLASS_KEYWORDS: tuple[tuple[str, str], ...] = (
-    ("剑阶", "saber"), ("弓阶", "archer"), ("枪阶", "lancer"),
-    ("骑阶", "rider"), ("术阶", "caster"), ("杀阶", "assassin"),
-    ("狂阶", "berserker"), ("裁阶", "ruler"), ("复阶", "avenger"),
-    ("盾阶", "shielder"), ("兽阶", "beast"),
-    ("降阶", "foreigner"), ("伪阶", "pretender"),
-    ("裁定者", "ruler"), ("复仇者", "avenger"),
-    ("降临者", "foreigner"), ("伪装者", "pretender"),
-    ("月癌", "mooncancer"), ("他人格", "alterego"),
+    ("剑阶", "saber"),
+    ("弓阶", "archer"),
+    ("枪阶", "lancer"),
+    ("骑阶", "rider"),
+    ("术阶", "caster"),
+    ("杀阶", "assassin"),
+    ("狂阶", "berserker"),
+    ("裁阶", "ruler"),
+    ("复阶", "avenger"),
+    ("盾阶", "shielder"),
+    ("兽阶", "beast"),
+    ("降阶", "foreigner"),
+    ("伪阶", "pretender"),
+    ("裁定者", "ruler"),
+    ("复仇者", "avenger"),
+    ("降临者", "foreigner"),
+    ("伪装者", "pretender"),
+    ("月癌", "mooncancer"),
+    ("他人格", "alterego"),
 )
 
 
@@ -54,7 +65,7 @@ def _extract_class_constraint(query_name: str) -> tuple[str, str | None]:
         for kw, en_class in _CN_CLASS_KEYWORDS:
             if name.startswith(kw) and len(name) > len(kw):
                 cn_class = en_class
-                name = name[len(kw):].strip()
+                name = name[len(kw) :].strip()
                 break
 
     return name, cn_class
@@ -116,10 +127,7 @@ def find_servant_candidates(db: list[dict], query_name: str) -> list[dict]:
     stripped_name, class_constraint = _extract_class_constraint(query_name)
     if class_constraint and stripped_name and stripped_name != query_name:
         candidates = find_servant_candidates(db, stripped_name)
-        return [
-            s for s in candidates
-            if str(s.get("className", "")).lower() == class_constraint
-        ]
+        return [s for s in candidates if str(s.get("className", "")).lower() == class_constraint]
 
     normalized_query = _normalize_text(query_name)
     nickname_mappings = _resolve_nickname(query_name)
