@@ -227,11 +227,23 @@ async def log_trace_event(
     ``trace_id`` 传 None 时自动从 ContextVar ``current_trace_id`` 读取；如未
     绑定则回落为 ``"unknown"``。调用方通常应在请求入口先 ``bind_trace_id``，
     后续节点可显式传 None 让其自动传播。
+
+    phase == "final" 时同步触发 BI 索引层 upsert（写 SQLite），失败仅记 ERROR
+    日志，不影响 JSONL 落盘。
     """
     if trace_id is None:
         trace_id = get_trace_id()
     event = _build_trace_event(trace_id, phase, data, error)
     await asyncio.to_thread(_write_event_sync, event)
+    if phase == Phase.FINAL and trace_id and trace_id != "unknown":
+        # 延迟导入避免循环：bi_index 反向引用 logger.find_trace_events
+        from server.bi_index import upsert_turn
+
+        try:
+            await asyncio.to_thread(upsert_turn, trace_id)
+        except Exception:  # noqa: BLE001
+            # upsert_turn 内部已 try/except，此处 belt-and-suspenders
+            pass
 
 
 def log_trace_event_sync(
@@ -498,16 +510,23 @@ def read_trace_summaries(
 def compute_log_stats(days: int = 7) -> dict:
     """计算最近 N 天的日志统计数据。
 
-    Returns:
-        {
-            "pv": int,              # 总请求数
-            "uv": int,              # 独立 IP 数
-            "paths": [{"path": str, "count": int}, ...],  # 路径分布 Top 10
-            "daily": [{"date": str, "pv": int, "uv": int}, ...],  # 每日趋势
-            "ratings": {"bad": int, "ok": int, "good": int},  # 评分分布
-            "modes": [{"mode": str, "count": int}, ...],  # 模式分布
-        }
+    v0.5.1 起改走 SQLite 索引层（``server.bi_index.query_stats``），输出 schema
+    与历史完全一致以兼容 admin 后台。SQLite 缺失或聚合异常时回退到 JSONL 全表
+    扫描（_legacy 实现）。
     """
+    try:
+        from server.bi_index import DB_PATH, query_stats
+
+        if DB_PATH.exists():
+            return query_stats(days=days)
+    except Exception:  # noqa: BLE001
+        # bi_index 异常时不阻塞 admin，回退到 legacy 路径
+        pass
+    return _compute_log_stats_legacy(days=days)
+
+
+def _compute_log_stats_legacy(days: int = 7) -> dict:
+    """旧 JSONL 全表扫描实现（fallback / 单测对照用）。"""
     from collections import defaultdict
 
     if not LOG_FILE.exists():
