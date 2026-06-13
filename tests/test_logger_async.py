@@ -24,16 +24,23 @@ def _patch_log_file():
 
 # ── 导入被测模块（必须在 patch fixture 之后，否则 LOG_FILE 无法被替换） ──
 from server.logger import (  # noqa: E402
+    PHASES,
+    Phase,
     _build_trace_data,
     _write_event_sync,
+    bind_trace_id,
+    current_trace_id,
     find_trace,
     find_trace_events,
+    get_trace_id,
     log_chat_trace,
     log_chat_trace_async,
     log_trace_event,
     log_trace_event_sync,
     read_trace_summaries,
     read_traces,
+    reset_trace_id,
+    validate_phase,
 )
 
 # 向后兼容别名
@@ -282,3 +289,203 @@ class TestModeAndTokensInSummary:
         assert result is not None
         assert result["mode"] == "agent_fallback"
         assert result["total_tokens"] == 5678
+
+
+# ============================================================
+# v0.5.1 全链路埋点改造：ContextVar / Phase / with_trace
+# ============================================================
+
+
+class TestPhaseConstants:
+    """Phase 常量类与 validate_phase 校验。"""
+
+    def test_phase_constants_in_phases_set(self):
+        assert Phase.ROUTING_INPUT in PHASES
+        assert Phase.FINAL in PHASES
+        assert Phase.CLASSIFIER_OUTPUT in PHASES
+        assert Phase.GENERATION_OUTPUT in PHASES
+
+    def test_validate_phase_accepts_known(self):
+        assert validate_phase(Phase.ROUTING_INPUT) is True
+        assert validate_phase(Phase.FINAL) is True
+
+    def test_validate_phase_accepts_node_decorator_suffixes(self):
+        # 装饰器自动产生的 {name}_input/_output/_error 视为合法
+        assert validate_phase("classifier_output_input") is True
+        assert validate_phase("classifier_output_output") is True
+        assert validate_phase("classifier_output_error") is True
+
+    def test_validate_phase_rejects_unknown(self):
+        assert validate_phase("totally_unknown_phase") is False
+        assert validate_phase("") is False
+
+
+class TestContextVarPropagation:
+    """trace_id ContextVar 在协程间自动传播。"""
+
+    def test_get_trace_id_default_unknown(self):
+        # 未绑定时返回 "unknown"
+        assert get_trace_id() == "unknown"
+
+    def test_bind_and_reset(self):
+        token = bind_trace_id("ctx-001")
+        try:
+            assert get_trace_id() == "ctx-001"
+        finally:
+            reset_trace_id(token)
+        assert get_trace_id() == "unknown"
+
+    async def test_log_trace_event_picks_contextvar(self):
+        """log_trace_event(trace_id=None, ...) 自动从 ContextVar 取 trace_id。"""
+        token = bind_trace_id("ctx-async-1")
+        try:
+            await log_trace_event(None, Phase.ROUTING_INPUT, {"query": "ctx test"})
+        finally:
+            reset_trace_id(token)
+        events = find_trace_events("ctx-async-1")
+        assert len(events) == 1
+        assert events[0]["phase"] == Phase.ROUTING_INPUT
+        assert events[0]["data"]["query"] == "ctx test"
+
+    def test_log_trace_event_sync_picks_contextvar(self):
+        token = bind_trace_id("ctx-sync-1")
+        try:
+            log_trace_event_sync(None, Phase.FINAL, {"result": "success"})
+        finally:
+            reset_trace_id(token)
+        events = find_trace_events("ctx-sync-1")
+        assert len(events) == 1
+        assert events[0]["data"]["result"] == "success"
+
+    def test_explicit_trace_id_overrides_contextvar(self):
+        """显式传入的 trace_id 优先于 ContextVar。"""
+        token = bind_trace_id("ctx-bg")
+        try:
+            log_trace_event_sync("explicit-001", Phase.FINAL, {})
+        finally:
+            reset_trace_id(token)
+        assert find_trace_events("explicit-001")
+        assert not find_trace_events("ctx-bg")
+
+    async def test_concurrent_contexts_isolated(self):
+        """并发协程的 ContextVar 相互隔离。"""
+
+        async def task(tid: str):
+            token = bind_trace_id(tid)
+            try:
+                await asyncio.sleep(0)  # 让出，验证 ContextVar 跨切片不串
+                await log_trace_event(None, Phase.ROUTING_INPUT, {"q": tid})
+            finally:
+                reset_trace_id(token)
+
+        await asyncio.gather(*(task(f"iso-{i}") for i in range(10)))
+        for i in range(10):
+            evs = find_trace_events(f"iso-{i}")
+            assert len(evs) == 1
+            assert evs[0]["data"]["q"] == f"iso-{i}"
+
+
+class TestWithTraceDecorator:
+    """server.graph.decorators.with_trace 集成测试。"""
+
+    async def test_with_trace_writes_input_and_output(self):
+        from dataclasses import dataclass, field
+
+        from server.graph.decorators import with_trace
+
+        @dataclass
+        class FakeState:
+            trace_id: str = "wt-001"
+            user_message: str = "hi"
+            turn_type: str = "MAJOR"
+            session_id: str = "sess-1"
+            reply: str = ""
+            count: int = 0
+            metric_labels: dict = field(default_factory=dict)
+
+        @with_trace(Phase.CLASSIFIER_OUTPUT)
+        async def fake_node(state: FakeState) -> FakeState:
+            state.reply = "world"
+            state.count = 5
+            state.metric_labels["pipeline"] = "A"
+            return state
+
+        result = await fake_node(FakeState())
+        assert result.reply == "world"
+
+        events = find_trace_events("wt-001")
+        phases = [e["phase"] for e in events]
+        assert phases == [
+            f"{Phase.CLASSIFIER_OUTPUT}_input",
+            f"{Phase.CLASSIFIER_OUTPUT}_output",
+        ]
+        in_data = events[0]["data"]
+        assert in_data["node_name"] == "fake_node"
+        assert in_data["user_message_preview"] == "hi"
+        assert in_data["turn_type"] == "MAJOR"
+
+        out_data = events[1]["data"]
+        assert out_data["result"] == "success"
+        assert out_data["latency_ms"] >= 0
+        assert out_data["metric_labels"]["pipeline"] == "A"
+        assert out_data["reply_preview"] == "world"
+        assert out_data["count"] == 5
+
+    async def test_with_trace_records_error_event(self):
+        from dataclasses import dataclass
+
+        from server.graph.decorators import with_trace
+
+        @dataclass
+        class FakeState:
+            trace_id: str = "wt-err"
+            user_message: str = ""
+            turn_type: str = ""
+            session_id: str = ""
+
+        @with_trace(Phase.EXECUTION)
+        async def boom_node(state: FakeState) -> FakeState:
+            raise ValueError("synthetic-failure")
+
+        with pytest.raises(ValueError, match="synthetic-failure"):
+            await boom_node(FakeState())
+
+        events = find_trace_events("wt-err")
+        phases = [e["phase"] for e in events]
+        assert phases == [
+            f"{Phase.EXECUTION}_input",
+            f"{Phase.EXECUTION}_error",
+        ]
+        err_event = events[1]
+        assert err_event["level"] == "ERROR"
+        assert "synthetic-failure" in err_event["error"]
+        assert err_event["data"]["error_type"] == "ValueError"
+        assert err_event["data"]["latency_ms"] >= 0
+
+    async def test_with_trace_uses_contextvar_when_state_missing(self):
+        """state.trace_id 为空时，从 ContextVar 取 trace_id。"""
+        from dataclasses import dataclass
+
+        from server.graph.decorators import with_trace
+
+        @dataclass
+        class FakeState:
+            trace_id: str = ""
+            user_message: str = ""
+            turn_type: str = ""
+            session_id: str = ""
+
+        @with_trace(Phase.ROUTING_OUTPUT)
+        async def node(state: FakeState) -> FakeState:
+            return state
+
+        token = bind_trace_id("ctx-decorator")
+        try:
+            await node(FakeState())
+        finally:
+            reset_trace_id(token)
+
+        events = find_trace_events("ctx-decorator")
+        assert len(events) == 2  # input + output
+        # current_trace_id 仅作为 import 引用使用，避免 ruff 未使用告警
+        assert current_trace_id is not None

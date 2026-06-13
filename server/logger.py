@@ -5,21 +5,19 @@ Laplace — 结构化 Trace 日志
 1. 旧模式（向后兼容）：log_chat_trace_async / log_chat_trace — 单条最终 trace
 2. 新模式（多阶段事件流）：log_trace_event — 同一 traceId 下按阶段记录事件
 
-Phase 枚举：
-  routing_input  → 路由前（query、mode、skill 列表数量）
-  routing_output → 路由后（skill_calls、model、routing_usage）
-  execution      → Skill 执行结果（accepted/rejected、耗时）
-  context_build  → Context 构建（applied_filters、context 大小）
-  generation_input  → 生成 Prompt 元数据
-  generation_output → 生成结果（reply、generation_usage）
-  agent_detail   → Agent 兜底详情（rounds、agent_tokens、tool_trace）
-  rating         → 用户评分（bad/ok/good）
-  final          → 请求结束（总耗时、mode、total_tokens）
+Phase 命名统一在 ``Phase`` 字符串常量类，所有节点和 pipeline.py 必须引用常量
+而非裸字符串字面量；新增 phase 时同步加入 ``PHASES`` 集合，便于通过
+``validate_phase()`` 在测试中检查未声明的 phase。
+
+trace_id 通过 ``current_trace_id`` ContextVar 在协程间自动传播，节点和
+pipeline.py 调用 log_trace_event 时可以省略 trace_id 参数。入口处必须
+显式调用 ``bind_trace_id(trace_id)`` 注入当前请求的 trace_id。
 """
 
 import asyncio
 import json
 import os
+from contextvars import ContextVar, Token
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -31,6 +29,138 @@ LOG_FILE = LOG_DIR / "query_trace.jsonl"
 
 # 确保日志目录存在
 os.makedirs(LOG_DIR, exist_ok=True)
+
+
+# ============================================================
+# Phase 常量（统一命名）
+# ============================================================
+
+
+class Phase:
+    """节点埋点的 phase 字符串常量。
+
+    所有 ``log_trace_event(phase=...)`` 调用必须引用此处常量，禁止裸字面量。
+    新增 phase 时同步追加到 ``PHASES`` frozenset，便于 ``validate_phase()`` 校验。
+    """
+
+    # ── 路由 / 分类 ──
+    ROUTING_INPUT = "routing_input"
+    ROUTING_OUTPUT = "routing_output"
+    CLASSIFIER_OUTPUT = "classifier_output"
+
+    # ── Skill 执行 ──
+    EXECUTION = "execution"
+    EXECUTION_RESOLVE_NICKNAME = "execution_resolve_nickname"
+    EXECUTION_CLARIFICATION_REQUESTED = "execution_clarification_requested"
+
+    # ── 生成阶段 ──
+    CONTEXT_BUILD = "context_build"
+    GENERATION_INPUT = "generation_input"
+    GENERATION_OUTPUT = "generation_output"
+    AGENT_DETAIL = "agent_detail"
+
+    # ── 澄清 / 多轮 ──
+    CLARIFICATION_REQUESTED = "clarification_requested"
+    MINOR_MERGE_SKIPPED = "minor_merge_skipped"
+    MINOR_MERGE_FAILED = "minor_merge_failed"
+    MINOR_MERGE_OUTPUT = "minor_merge_output"
+
+    # ── 知识检索 ──
+    ATLAS_SEARCH = "atlas_search"
+    ATLAS_SEARCH_FALLBACK = "atlas_search_fallback"
+    FACT_VERIFY = "fact_verify"
+    GUIDE_SEARCH = "guide_search"
+
+    # ── 会话持久化 ──
+    SESSION_SAVE_TURN_FAILED = "session_save_turn_failed"
+    PENDING_QUESTION_SAVED = "pending_question_saved"
+    RESUME_LOADED = "resume_loaded"
+
+    # ── 终态 ──
+    RATING = "rating"
+    FINAL = "final"
+
+    # ── 前端事件 ──
+    FRONTEND_FEEDBACK = "frontend_feedback"
+    FRONTEND_VISIT = "frontend_visit"
+
+    # ── 节点装饰器自动事件（with_trace 写入）──
+    NODE_INPUT_SUFFIX = "_input"
+    NODE_OUTPUT_SUFFIX = "_output"
+    NODE_ERROR_SUFFIX = "_error"
+
+
+PHASES: frozenset[str] = frozenset(
+    {
+        Phase.ROUTING_INPUT,
+        Phase.ROUTING_OUTPUT,
+        Phase.CLASSIFIER_OUTPUT,
+        Phase.EXECUTION,
+        Phase.EXECUTION_RESOLVE_NICKNAME,
+        Phase.EXECUTION_CLARIFICATION_REQUESTED,
+        Phase.CONTEXT_BUILD,
+        Phase.GENERATION_INPUT,
+        Phase.GENERATION_OUTPUT,
+        Phase.AGENT_DETAIL,
+        Phase.CLARIFICATION_REQUESTED,
+        Phase.MINOR_MERGE_SKIPPED,
+        Phase.MINOR_MERGE_FAILED,
+        Phase.MINOR_MERGE_OUTPUT,
+        Phase.ATLAS_SEARCH,
+        Phase.ATLAS_SEARCH_FALLBACK,
+        Phase.FACT_VERIFY,
+        Phase.GUIDE_SEARCH,
+        Phase.SESSION_SAVE_TURN_FAILED,
+        Phase.PENDING_QUESTION_SAVED,
+        Phase.RESUME_LOADED,
+        Phase.RATING,
+        Phase.FINAL,
+        Phase.FRONTEND_FEEDBACK,
+        Phase.FRONTEND_VISIT,
+    }
+)
+
+
+def validate_phase(phase: str) -> bool:
+    """校验 phase 是否在已声明集合中。
+
+    装饰器自动产生的 ``{name}_input/_output/_error`` 事件视为合法。
+    返回 False 时上层可选择记录 warning 但不阻塞主流程。
+    """
+    if phase in PHASES:
+        return True
+    for suffix in (Phase.NODE_INPUT_SUFFIX, Phase.NODE_OUTPUT_SUFFIX, Phase.NODE_ERROR_SUFFIX):
+        if phase.endswith(suffix):
+            return True
+    return False
+
+
+# ============================================================
+# trace_id ContextVar（协程级自动传播）
+# ============================================================
+
+
+current_trace_id: ContextVar[str | None] = ContextVar("current_trace_id", default=None)
+
+
+def bind_trace_id(trace_id: str) -> Token:
+    """将 trace_id 绑定到当前 ContextVar，返回 reset Token。
+
+    入口处（main.py / pipeline.py）必须显式调用，节点内通过 ``get_trace_id()``
+    或 log_trace_event 缺省 trace_id 自动获取。
+    """
+    return current_trace_id.set(trace_id)
+
+
+def reset_trace_id(token: Token) -> None:
+    """通过 Token 还原 ContextVar（成对调用）。"""
+    current_trace_id.reset(token)
+
+
+def get_trace_id() -> str:
+    """读取当前 ContextVar 中的 trace_id；未绑定时返回 ``"unknown"``。"""
+    tid = current_trace_id.get()
+    return tid if tid else "unknown"
 
 
 # ============================================================
@@ -65,23 +195,32 @@ def _write_event_sync(event_data: dict):
 
 
 async def log_trace_event(
-    trace_id: str,
+    trace_id: str | None,
     phase: str,
     data: dict | None = None,
     error: str | None = None,
 ):
-    """异步写入单阶段事件（通过线程池避免阻塞 Event Loop）。"""
+    """异步写入单阶段事件（通过线程池避免阻塞 Event Loop）。
+
+    ``trace_id`` 传 None 时自动从 ContextVar ``current_trace_id`` 读取；如未
+    绑定则回落为 ``"unknown"``。调用方通常应在请求入口先 ``bind_trace_id``，
+    后续节点可显式传 None 让其自动传播。
+    """
+    if trace_id is None:
+        trace_id = get_trace_id()
     event = _build_trace_event(trace_id, phase, data, error)
     await asyncio.to_thread(_write_event_sync, event)
 
 
 def log_trace_event_sync(
-    trace_id: str,
+    trace_id: str | None,
     phase: str,
     data: dict | None = None,
     error: str | None = None,
 ):
     """同步写入单阶段事件（供测试和非异步上下文使用）。"""
+    if trace_id is None:
+        trace_id = get_trace_id()
     event = _build_trace_event(trace_id, phase, data, error)
     _write_event_sync(event)
 
