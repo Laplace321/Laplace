@@ -13,30 +13,34 @@ Laplace 利用大语言模型（LLM）的意图识别能力，将传统的 FGO �
 ## 功能特性
 
 - [x] 自然语言对话交互界面
-- [x] AI Native 生成式响应 — **(新)** Two-Step RAG 架构。大模型不仅能检索数据，还能真正“看到”数据并进行拟人化总结回答。
+- [x] **三管线路由架构** — Stage 0 分类器自动分流到：Pipeline A（结构化技能链）/ Pipeline B（Atlas 知识 Agent 工具循环，最多 8 轮）/ Pipeline C（戴冠攻略 BM25 文档检索）。
+- [x] **Skill-Based Architecture** — 19 个查询技能 + 6 个回复技能，覆盖 servant / ce / coronation 三个域，通过 `@register_skill` 装饰器零侵入注册。
+- [x] **Atlas 知识 Agent** — Pipeline B 提供 7 个工具（search_servants / lookup_servant / list_effects / lookup_skill_detail 等）处理开放性机制询问，带事实核验。
+- [x] **戴冠攻略检索** — Pipeline C 基于中文 bigram + BM25 的文档级评分 + Tag 过滤，命中文档全文传入 LLM。
 - [x] LLM Skill 路由 — 自然语言 → Skill 调用组合（RoutingResponse JSON 契约）
 - [x] Schema Mirror 架构 — 同步提取开源项目 Chaldea 的游戏效果领域知识
 - [x] 全面从者查询 — 支持 30% NP 自充、55 种复杂技能效果（如无敌、毅力、加攻）、目标类型组合筛选
 - [x] 从者与特性深度解析 — 性别、阵营、配卡、宝具颜色类型、特性（Trait，如秩序善）
-- [x] 从者别名系统 — 自动拉取最新的社区别名与中文词典
-- [x] 数据后端预消化 (Pre-digestion) — 彻底根除大模型翻译幻觉，节省 Token。
-- [x] 全链路日志追踪 (Tracing) — 支持通过 TraceID 回溯每一条查询的原始解析状态。
-- [x] LLM Contract — 使用 JSON Schema + Pydantic 校验约束 Skill 路由输出（RoutingResponse），默认回归测试不消耗 LLM quota。
-- [x] Thinking Steps 流式交互 — SSE 分阶段展示 AI 思考过程（解析→检索→生成），从者卡片先行渲染，零额外 Token 消耗。
-- [x] **(新)** Skill-Based Architecture — 两阶段 LLM 路由（Stage 1 路由选 Skill → Stage 2 精填参数），查询逻辑拆分为独立 Skill 模块，可扩展性大幅提升。
-- [x] **(新)** Preset 快捷查询 — 前端提供「周回筛选」「从者查询」「从者对比」「辅助推荐」四个快捷入口，一键触发预定义查询流程。
-- [x] **(新)** OneShot + Agent 混合路由 — OneShot 路由为主路径（1 次 LLM + SkillExecutor），3 个 fallback 点位最小侵入接入 Agent 多轮工具调用兜底。
-- [x] **(新)** 职阶克制查询 — 支持"克制伪装者的从者"等基于 Atlas API 克制关系数据的查询维度。
-- [x] **(新)** 空结果智能提示 — 当筛选条件组合无匹配时，明确列出已识别条件并给出放宽建议，而非返回不相关结果。
+- [x] 概念礼装（CE）查询 — 按名称/效果/稀有度/攻击血量类型/获取方式查找礼装
+- [x] 从者别名系统 — 两层昵称（Mooncell 自动同步基础层 + 手工覆盖优先层）
+- [x] 数据后端预消化 (Pre-digestion) — 所有英文枚举值构建时完成中文翻译，运行时零翻译开销，根除 LLM 翻译幻觉。
+- [x] 全链路日志追踪 (Tracing) — JSONL 结构化日志，15 种 Phase 覆盖完整请求生命周期，支持通过 TraceID 回溯。
+- [x] LLM Contract — 使用 JSON Schema + Pydantic 校验约束 Skill 路由输出，默认回归测试不消耗 LLM quota。
+- [x] Thinking Steps 流式交互 — SSE 6 种事件类型（thinking / servants / clarification / delta / done / error）分阶段展示 AI 思考过程，从者卡片先行渲染。
+- [x] **多供应商 LLM 容灾** — OpenAI / Obao / Dashscope 三个适配器，两层降级（同供应商多模型轮转 → 跨供应商降级）。
+- [x] **Preset 快捷查询** — 前端提供「周回筛选」「从者查询」「从者对比」「辅助推荐」四个快捷入口。
+- [x] **职阶克制查询** — 支持“克制伪装者的从者”等基于 Atlas API 克制关系数据的查询维度。
+- [x] **空结果智能提示** — 筛选无匹配时明确列出已识别条件并给出放宽建议。
+- [x] **监控与告警** — LLM 主动健康探测 + Prometheus 指标输出 + Bark / Telegram 双通道告警。
 
 ## 技术栈
 
 | 类别 | 技术 |
 | :--- | :--- |
-| 前端 | HTML / Vanilla CSS / Vanilla JS |
-| 后端 | Python (FastAPI, Uvicorn) |
-| LLM | API 兼容模型 (如 Claude/Deepseek) 托管于 Obao Cloud |
-| 数据源 | Atlas Academy API (底层数据) + Chaldea (领域知识) |
+| 前端 | HTML / Vanilla CSS / Vanilla JS（SSE 流式）|
+| 后端 | Python 3.12 / FastAPI / Uvicorn / SSE / BM25 |
+| LLM | 多供应商适配：OpenAI / Obao / Dashscope |
+| 数据源 | Atlas Academy API（底层数据）+ Chaldea（领域知识）+ Mooncell Wiki（昵称） |
 
 ## 快速开始
 
@@ -146,7 +150,7 @@ cp .env.example .env
 LLM_PROVIDERS=obao,openai
 
 # 每个提供商的配置（命名约定：LLM_{NAME}_URL / LLM_{NAME}_KEY / LLM_{NAME}_MODELS）
-LLM_OBAO_URL=https://x.obao.cloud/v1
+LLM_OBAO_URL=https://api.obao.cloud/v1
 LLM_OBAO_KEY=your-obao-api-key
 LLM_OBAO_MODELS=claude-sonnet-4-6,Deepseek-V4-Flash,gpt-5.4
 
@@ -169,6 +173,13 @@ LLM_OPENAI_MODELS=gpt-4o,gpt-4o-mini
 | `CHALDEA_SRC_PATH` | Chaldea 源码路径（仅 sync 时使用） | `chaldea-center/chaldea` |
 | `ADMIN_PASSWORD_HASH` | 管理员密码 SHA256 哈希（后台登录） | （空，未设置时不可登录） |
 | `CONTAINER_NAME` | Docker 容器名称（后台重启功能） | `laplace` |
+| `BARK_URL` | Bark 推送 URL（iOS 告警主通道） | （空，不启用 Bark） |
+| `TELEGRAM_BOT_TOKEN` | Telegram Bot Token（告警备选通道） | （空） |
+| `TELEGRAM_CHAT_ID` | Telegram Chat ID（告警接收者） | （空） |
+| `ALERT_CONSECUTIVE_THRESHOLD` | 连续失败触发告警阈值 | `5` |
+| `MONITOR_PROBE_INTERVAL` | LLM 健康探测间隔（秒，0=禁用） | 代码内默认 |
+
+> **开发机提示**：开发机本地 `.env` **不应该包含真实的** `BARK_URL` / `TELEGRAM_*`，否则本机跑测试/启动 server 时会向运维通道误发告警。这三个凭据应只在生产/部署侧的 `.env` 中设置。
 
 > **本地开发提示**：如果在其他设备上测试时 uvicorn 绑定了非默认地址（如 `http://192.168.x.x:8000`），需要将该地址添加到 `CORS_ORIGINS` 中，否则浏览器会因 CORS 策略拦截请求。示例：
 > ```bash
@@ -235,37 +246,53 @@ echo -n "your-password" | sha256sum | awk '{print $1}'
 ```
 Laplace/
 ├── README.md              # 项目主页
-├── SOUL.md / AGENTS.md / USER.md / MEMORY.md # AI 系统级 Prompt 与记忆
+├── SOUL.md / AGENTS.md / USER.md / MEMORY.md  # AI 系统级 Prompt 与记忆
 ├── 需求描述.md             # 详细需求与架构规划
-├── demo/                  # Web 前端界面
+├── docs/                   # 架构文档
+│   ├── architecture.md             # 项目架构总览（基于源码生成）
+│   ├── adr/ + architecture-discussions/  # ADR 决策记录
+│   └── 产品/部署/展示等补充文档
+├── demo/                   # Web 前端（SSE 流式 + 卡片渲染）
 │   ├── index.html
 │   ├── style.css
 │   └── app.js
-├── admin/                 # 后台管理界面（密码认证 + 配置管理 + 日志查看）
-├── server/                # Python FastAPI 后端
-│   ├── main.py            # API 入口（Skill 模式路由）
-│   ├── llm/               # LLM 多适配器架构（base + openai/dashscope/obao 适配器）
-│   ├── llm_client.py      # 大模型交互客户端（向后兼容入口）
-│   ├── schemas.py         # RoutingResponse Pydantic 契约
-│   ├── prompts.py         # Skill 路由 Prompt 模板
-│   ├── query_executor.py  # 共享工具函数（load_database / 昵称解析）
-│   ├── data_loader.py     # 从者数据提取构建
-│   ├── sync_chaldea.py    # Schema Mirror 领域知识解析器
-│   ├── skills/            # Skill-Based Architecture 模块
-│   │   ├── __init__.py    # Skill 注册表
-│   │   ├── executor.py    # Skill 执行引擎
-│   │   ├── presets.py     # Preset 快捷查询定义
-│   │   ├── query/         # 查询类 Skill（search_by_class / rarity / np_charge 等）
-│   │   └── response/      # 响应类 Skill（servant_list / detail / compare 等）
-│   ├── data/              # 生成的从者数据库
-│   └── knowledge/         # 提取的 JSON 格式领域知识
-├── tests/                 # pytest 回归测试
-└── chaldea-center/        # Chaldea 参考源码（可选，仅 sync_chaldea.py 需要）
+├── admin/                  # 后台管理界面静态资源（index.html / admin.css / admin.js）
+├── server/                 # Python FastAPI 后端
+│   ├── main.py             # FastAPI 入口（CORS / RateLimit / 路由注册）
+│   ├── pipeline.py         # 三管线路由核心（Stage 0 分类 + A/B/C 分流 + SSE）
+│   ├── prompts.py          # 分类器 / 路由器 / 生成 Prompt 模板
+│   ├── schemas.py          # RoutingResponse / 工具结果 Pydantic 契约
+│   ├── context_builder.py  # LLM 上下文构建（从者/CE 详情格式化）
+│   ├── translation.py      # 职阶中英映射、效果翻译、过滤条件中文化
+│   ├── query_executor.py   # 数据加载 + 效果匹配 + 昵称解析
+│   ├── guide_retriever.py  # Pipeline C 戴冠攻略 BM25 检索
+│   ├── data_loader.py      # 从 Atlas API 构建从者/CE 数据库
+│   ├── sync_chaldea.py     # 从 Chaldea Dart 源码同步 Schema 知识
+│   ├── fallback.py         # Agent 标签解析（GREETING/OUT_OF_SCOPE/UNSUPPORTED）
+│   ├── face_proxy.py       # 从者头像反代
+│   ├── logger.py           # JSONL 结构化日志（15 种 Phase）
+│   ├── rate_limiter.py     # 滑动窗口速率限制中间件
+│   ├── llm/                # LLM 多适配器（base / openai / obao / dashscope / provider）
+│   ├── skills/             # Skill-Based Architecture 模块
+│   │   ├── base.py         # QuerySkill / ResponseSkill 基类 + @register_skill
+│   │   ├── executor.py     # 技能执行器（域分组 + AND 合并 + 四级降级）
+│   │   ├── presets.py      # 4 个 Preset 快捷查询定义
+│   │   ├── query/          # 19 个查询技能（servant / ce / coronation 三个域）
+│   │   └── response/       # 6 个回复技能
+│   ├── agent/              # Pipeline B Agent 系统（agent_loop / tool_defs / tool_handlers）
+│   ├── admin/              # Admin 路由（routes.py）+ 认证（auth.py）
+│   ├── monitor/            # 监控（metrics + alerter + health_checker）
+│   ├── data/               # 生成的数据库（servants_db / craft_essences_db / atlas_index / guides/）
+│   ├── config/             # 可热更新配置（昵称、术语别名、效果覆盖、戴冠攻略元数据）
+│   └── knowledge/          # Chaldea 派生知识（class_mapping / effect_schema / mappings）
+├── extractor/              # 数据提取脚本（sync_mooncell_nicknames.py / np_charge_filter.py）
+├── tests/                  # pytest 回归测试
+└── chaldea-center/         # Chaldea 参考源码（可选，仅 sync_chaldea.py 需要）
 ```
 
 **可选目录说明**：
 - `chaldea-center/` — 仅在需要更新领域知识时存在，普通运行不需要
-- `extractor/` — 早期 NP 充能筛选器原型，已迁移至 `server/data_loader.py`，保留仅用于向后兼容
+- `extractor/` — 独立的数据提取脚本集（如 Mooncell 昵称同步），不参与 runtime
 
 ## 如何新增 Skill
 
@@ -295,7 +322,7 @@ class Params(BaseModel):
 class SearchByCraftEssence(QuerySkill):
     name = "search_by_craft_essence"          # 唯一标识，LLM 路由使用
     description = "按礼装名称筛选从者"          # LLM 路由时的能力描述
-    domain = "servant"                         # 数据域（目前只有 servant）
+    domain = "servant"                         # 数据域（servant / ce / coronation）
 
     @property
     def params_schema(self) -> type[BaseModel]:
