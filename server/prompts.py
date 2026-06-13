@@ -315,7 +315,7 @@ def build_routing_prompt(
     c) 语义歧义：用户措辞可解读为不同的 Skill 或不同的效果（如"辅助"可能指 Caster 职阶或 supportSkill 效果）
     **不需要确认的场景（直接用默认值或查全部）**：
     - rarity 未指定 → 默认查全部
-    - className 未指定 → 默认查全部
+    - className 未指定 → 默认查全部；指定时**传中文**（如「狂阶」「剑阶」「术阶」「裁定者」），系统也兼容英文（Caster/berserker/saber）
     - minValue/maxValue 未指定 → 默认不限
     - 用户明确说了"自充"/"群充"/"全队" → 已有明确 targetType，无需确认
     - 用户查询的效果仅有单一合理 targetType（如"无敌"默认是自身）→ 无需确认

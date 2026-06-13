@@ -203,7 +203,13 @@ def describe_filters(skill_calls: list[dict]) -> list[str]:
             op_map = {"eq": "=", "gte": "≥", "lte": "≤", "gt": ">", "lt": "<"}
             descriptions.append(f"稀有度 {op_map.get(op, op)} {val}星")
         elif name == "search_by_class":
-            descriptions.append(f"职阶 = {params.get('className', '')}")
+            # 兼容 routing(camelCase) 与 execution(snake_case)
+            cls_val = params.get("className") or params.get("class_name", "")
+            # 若为英文枚举（Caster/berserker），反查中文展示
+            if cls_val:
+                cls_lower = cls_val.strip().lower()
+                cls_val = get_class_map().get(cls_lower, cls_val)
+            descriptions.append(f"职阶 = {cls_val}")
         elif name == "search_by_cards":
             parts = []
             card = params.get("cardType") or params.get("cards")
