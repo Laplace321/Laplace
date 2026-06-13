@@ -7,6 +7,9 @@
 - 调用 chat_completion (非流式) 生成回复，失败时降级为模板文案
 - 写 state.reply / state.servants / state.count / state.query / state.model_used
 
+Task 4 Batch B：节点末尾若 ``state.extras["session_store"]`` 与 ``state.session_id`` 同时存在，
+则把本轮关键字段封装为 TurnSnapshot 写入 SessionStore，供下一轮分类器加载 prev_summary。
+
 Note: 本节点对应 JSON 模式下的 handle_skill_mode；SSE 流式版本在 Task 5 完善。
 """
 
@@ -16,6 +19,7 @@ import json
 import time
 
 from server.context_builder import MAX_RESULTS, build_ce_context, build_context
+from server.graph.session import PREV_SUMMARY_MAX_CHARS, SessionStore, TurnSnapshot
 from server.graph.state import PipelineState
 from server.llm import chat_completion
 from server.logger import log_trace_event
@@ -143,4 +147,41 @@ async def generate_node(state: PipelineState) -> PipelineState:
     state.servants = returned_servants
     state.count = total_found
     state.query = query_info
+
+    # ── Task 4 Batch B：把本轮快照写入 SessionStore，供下一轮 classifier 注入 prev_summary ──
+    session_store: SessionStore | None = state.extras.get("session_store")
+    if session_store is not None and state.session_id:
+        # summary：截断 reply 作为对下一轮分类器的精简摘要（≤200 char）。
+        # 保留筛选条件简介，便于 LLM 理解延续语境。
+        applied_brief = applied_filters or "（无筛选条件）"
+        raw_summary = f"上一轮：{applied_brief}；命中 {total_found} 条；回复要点：{final_reply}"
+        if len(raw_summary) > PREV_SUMMARY_MAX_CHARS:
+            raw_summary = raw_summary[: PREV_SUMMARY_MAX_CHARS - 1] + "…"
+        try:
+            snapshot = TurnSnapshot(
+                session_id=state.session_id,
+                user_message=state.user_message,
+                reply=final_reply,
+                summary=raw_summary,
+                pipeline=state.classified_pipeline or "A",
+                skill_calls=list(skill_calls or []),
+                response_skill_name=response_skill_name or "respond_servant_list",
+                servants=[
+                    {"collectionNo": s.get("collectionNo"), "name": s.get("name", "")}
+                    for s in returned_servants
+                    if isinstance(s, dict)
+                ],
+                query=query_info,
+                turn_type=state.turn_type or "MAJOR",
+                timestamp=time.time(),
+            )
+            session_store.save_turn(snapshot)
+        except Exception as save_err:  # noqa: BLE001
+            # 写快照失败不应影响本轮回复；仅记录日志
+            await log_trace_event(
+                state.trace_id,
+                "session_save_turn_failed",
+                {"error": str(save_err)},
+            )
+
     return state

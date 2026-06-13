@@ -41,6 +41,12 @@ class PipelineState:
     model_used: str = "skill_mode"
     trace_total_tokens: int = 0
 
+    # ── 多轮对话（Task 4 Batch B）─────────────────────────────
+    # session_id：前端 UUID，标识跨请求会话；为空时按单轮处理（不查 prev_turn / 不写 save_turn）
+    session_id: str = ""
+    # turn_type：本轮分类后的语义类型（MAJOR/MINOR/CORRECTION），由 classify_node 写入
+    turn_type: str = "MAJOR"
+
     # ── 节点输出（最终拼装为 ChatResponse 的字段）──
     reply: str = ""
     servants: list[dict] = field(default_factory=list)

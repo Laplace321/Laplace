@@ -8,8 +8,10 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 import uuid
+from pathlib import Path
 
 # ChatResponse 在 main.py 中定义，这里用 Pydantic BaseModel 重新定义一个兼容类型
 # 避免循环导入（pipeline 被 main 导入，main 定义 ChatResponse）
@@ -18,7 +20,7 @@ from pydantic import BaseModel
 from server.agent.agent_loop import AgentResult, agent_route
 from server.agent.tool_handlers import TOOL_HANDLERS
 from server.context_builder import MAX_RESULTS, build_ce_context, build_context
-from server.edges import after_classify, after_execute, after_route
+from server.edges import after_classify, after_execute, after_merge_filters, after_route
 from server.fallback import (
     FALLBACK_TEMPLATES,
     build_oneshot_context,
@@ -26,6 +28,8 @@ from server.fallback import (
     sse_event,
 )
 from server.graph import END, PipelineState, StateGraph
+from server.graph.checkpointer import SqliteCheckpointer
+from server.graph.session import SessionStore
 from server.llm import StreamMetadata, chat_completion, chat_completion_stream
 from server.logger import log_trace_event
 from server.nodes.agent import agent_fallback_node
@@ -42,6 +46,7 @@ from server.nodes.guide import (
     _prepare_guide_context,
     guide_node,
 )
+from server.nodes.merge_filters import merge_filters_node
 from server.nodes.route import route_node
 from server.prompts import build_classifier_prompt, build_routing_prompt, get_generation_prompt
 from server.schemas import (
@@ -101,19 +106,21 @@ def _get_pipeline_c_graph() -> StateGraph:
 
 
 def _build_pipeline_a_graph() -> StateGraph:
-    """构建完整 Pipeline A 图（Task 3 — ADR-028）。
+    """构建完整 Pipeline A 图（Task 3 — ADR-028；Task 4 Batch B 加入 merge_filters）。
 
     主路径 + 降级路径全部在图内::
 
-        classify ─┬→ atlas    → END
-                  ├→ guide    → END
-                  ├→ route    ─┬→ execute ─┬→ generate         → END
-                  │            │           ├→ clarify          → END
-                  │            │           └→ agent_fallback   → END
-                  │            ├→ clarify          → END
-                  │            ├→ template_fallback→ END
-                  │            └→ agent_fallback   → END
-                  └→ agent_fallback   → END   (低置信度)
+        classify ─┬→ atlas         → END
+                  ├→ guide         → END
+                  ├→ merge_filters ─┬→ execute (MINOR/CORRECTION 合并成功)
+                  │                 └→ route   (合并失败降级)
+                  ├→ route          ─┬→ execute ─┬→ generate         → END
+                  │                  │           ├→ clarify          → END
+                  │                  │           └→ agent_fallback   → END
+                  │                  ├→ clarify          → END
+                  │                  ├→ template_fallback→ END
+                  │                  └→ agent_fallback   → END
+                  └→ agent_fallback  → END   (低置信度)
 
     所有降级 reason 经 ``edges._dispatch_bail_out`` 分发到 agent / clarify /
     template_fallback 三个节点，节点把结果写入 state 后连 END，
@@ -123,6 +130,7 @@ def _build_pipeline_a_graph() -> StateGraph:
     g.add_node("classify", classify_node)
     g.add_node("atlas", atlas_node)
     g.add_node("guide", guide_node)
+    g.add_node("merge_filters", merge_filters_node)
     g.add_node("route", route_node)
     g.add_node("execute", execute_node)
     g.add_node("generate", generate_node)
@@ -133,6 +141,7 @@ def _build_pipeline_a_graph() -> StateGraph:
     g.add_conditional_edge("classify", after_classify)
     g.add_edge("atlas", END)
     g.add_edge("guide", END)
+    g.add_conditional_edge("merge_filters", after_merge_filters)
     g.add_conditional_edge("route", after_route)
     g.add_conditional_edge("execute", after_execute)
     g.add_edge("generate", END)
@@ -179,6 +188,33 @@ def _get_pipeline_direct_graph() -> StateGraph:
     if _PIPELINE_DIRECT_GRAPH is None:
         _PIPELINE_DIRECT_GRAPH = _build_pipeline_direct_graph()
     return _PIPELINE_DIRECT_GRAPH
+
+
+# ────────────────────────────────────────────────────────────
+# Task 4 Batch B：全局 SessionStore（多轮对话 + 系统主动中断）
+# ────────────────────────────────────────────────────────────
+
+_SESSION_STORE: SessionStore | None = None
+
+
+def _get_session_store() -> SessionStore:
+    """惰性构造全局 SessionStore（SqliteCheckpointer 落地 server/data/checkpoints.db）。
+
+    通过 ``LAPLACE_CHECKPOINT_DB`` 环境变量可覆盖路径（用于测试 / 容器卷映射）；
+    默认路径与持久化数据共用 ``server/data/`` 目录，30 分钟 TTL（应用层惰性清理）。
+    """
+    global _SESSION_STORE
+    if _SESSION_STORE is None:
+        db_path = os.environ.get("LAPLACE_CHECKPOINT_DB")
+        if not db_path:
+            db_path = str(Path(__file__).parent / "data" / "checkpoints.db")
+        _SESSION_STORE = SessionStore(SqliteCheckpointer(db_path))
+    return _SESSION_STORE
+
+
+def get_session_store() -> SessionStore:
+    """对外暴露的 SessionStore 访问器（main.py 的 /chat/resume 路由复用）。"""
+    return _get_session_store()
 
 
 def _state_to_chat_response(state: PipelineState, trace_id: str) -> ChatResponse:
@@ -235,6 +271,7 @@ async def handle_skill_mode(
     client_ip: str = "unknown",
     target_pipeline: str = "A",
     confirmation_context: str | None = None,
+    session_id: str = "",
 ) -> ChatResponse:
     """Skill 模式核心入口（Task 3 起降级路径全部节点化 — ADR-028）。
 
@@ -249,6 +286,9 @@ async def handle_skill_mode(
 
     Args:
         confirmation_context: 用户确认选择后回传的上下文，拼接到 user_message 进行精确路由。
+        session_id: 多轮对话会话 ID（前端 UUID）。非空时把 SessionStore 注入 state.extras，
+            classify_node 会加载 prev_summary，generate_node 末尾会写 TurnSnapshot；
+            为空时按单轮处理，行为完全等价于 Task 3。
     """
     if confirmation_context:
         user_message = f"{user_message}\n[用户确认：{confirmation_context}]"
@@ -289,7 +329,10 @@ async def handle_skill_mode(
             skill_calls=list(skill_calls),
             response_skill_name=response_skill_name,
             target_pipeline=target_pipeline,
+            session_id=session_id,
         )
+        if session_id:
+            state.extras["session_store"] = _get_session_store()
         try:
             state = await _get_pipeline_direct_graph().run(state)
         except Exception as e:
@@ -337,9 +380,12 @@ async def handle_skill_mode(
         client_ip=client_ip,
         model_used="skill_mode",
         response_skill_name=response_skill_name,
+        session_id=session_id,
     )
     state.extras["is_confirmation"] = confirmation_context is not None
     state.extras["confirmation_context_preview"] = confirmation_context[:200] if confirmation_context else None
+    if session_id:
+        state.extras["session_store"] = _get_session_store()
 
     try:
         state = await _get_pipeline_a_graph().run(state)
@@ -368,6 +414,66 @@ async def handle_skill_mode(
         return _state_to_chat_response(state, trace_id)
     # 降级路径节点已写入 state.reply / servants / query / model_used，无需再判 bail_out
     return _state_to_chat_response(state, trace_id)
+
+
+async def resume_skill_mode(
+    *,
+    session_id: str,
+    supplement_message: str,
+    trace_id: str,
+    client_ip: str = "unknown",
+) -> ChatResponse:
+    """从 pending checkpoint 恢复执行（用户补充答复后续做 — Task 4 Batch B）。
+
+    工作流程：
+    1. 从 SessionStore 加载 pending PipelineState；不存在或已过期则返回错误响应。
+    2. 清掉 pending checkpoint，避免重复消费。
+    3. 把用户原问题作为 ``confirmation_context``，新答复作为 ``user_message``，
+       重新调用 ``handle_skill_mode`` 走一次完整管线（与现有 confirmation_context
+       机制对齐，路由层会把上下文拼接到 prompt）。
+    4. 多轮链路（session_id）保持，下一轮 prev_summary 仍可命中。
+
+    Args:
+        session_id: 前端 UUID，必须与系统 yield pending_question 时的 session_id 一致。
+        supplement_message: 用户补充的答复文本（如选择某个 clarification 选项）。
+        trace_id: 本次 resume 的 trace_id（与原中断 trace 不同，便于审计）。
+        client_ip: 客户端 IP，用于日志。
+    """
+    store = _get_session_store()
+    pending = store.load_pending(session_id)
+    if pending is None:
+        await log_trace_event(
+            trace_id,
+            "resume_no_pending",
+            {"session_id": session_id},
+        )
+        return ChatResponse(
+            reply="对话已超时或不存在待恢复的状态，请重新开始一次提问。",
+            servants=[],
+            count=0,
+            query={"error": "no_pending", "session_id": session_id},
+            model="error",
+            traceId=trace_id,
+        )
+    # 取出原始用户输入作为 confirmation_context
+    original_message = getattr(pending, "user_message", "") or ""
+    store.clear_pending(session_id)
+    await log_trace_event(
+        trace_id,
+        "resume_loaded",
+        {
+            "session_id": session_id,
+            "original_message_preview": original_message[:200],
+            "supplement_preview": supplement_message[:200],
+        },
+    )
+    return await handle_skill_mode(
+        user_message=supplement_message,
+        trace_id=trace_id,
+        client_ip=client_ip,
+        confirmation_context=original_message or None,
+        session_id=session_id,
+    )
 
 
 async def _handle_confirmation_direct(

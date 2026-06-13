@@ -30,7 +30,7 @@ from server.admin.routes import router as admin_routes_router
 # ── 业务模块 ──
 from server.llm import chat_completion
 from server.logger import find_trace, read_trace_summaries, read_traces
-from server.pipeline import ChatResponse, handle_skill_mode, stream_event_generator
+from server.pipeline import ChatResponse, handle_skill_mode, resume_skill_mode, stream_event_generator
 from server.prompts import build_routing_prompt
 from server.query_executor import load_database
 from server.rate_limiter import RateLimitMiddleware
@@ -86,6 +86,19 @@ class ChatRequest(BaseModel):
     params: dict | list | None = None
     response_skill: str | None = None
     confirmation_context: str | None = None
+    # Task 4 Batch B：多轮对话会话 ID（前端 UUID）。空字符串=单轮模式。
+    session_id: str = ""
+
+
+class ResumeRequest(BaseModel):
+    """从 pending checkpoint 恢复执行的请求（Task 4 Batch B）。
+
+    系统在 clarify_node 主动中断时会把 PipelineState 保存到 SessionStore，
+    前端拿到带 ``query.pending=True`` 的响应后让用户补充答复，再调 ``/api/chat/resume``。
+    """
+
+    session_id: str
+    message: str
 
 
 @app.get("/api/traces")
@@ -407,6 +420,36 @@ async def chat(request: ChatRequest, raw_request: Request):
         client_ip=client_ip,
         target_pipeline=resolved_target_pipeline,
         confirmation_context=request.confirmation_context,
+        session_id=request.session_id or "",
+    )
+
+
+@app.post("/api/chat/resume", response_model=ChatResponse)
+async def chat_resume(request: ResumeRequest, raw_request: Request):
+    """从 pending checkpoint 恢复执行（Task 4 Batch B）。
+
+    场景：``/api/chat`` 返回 ``query.pending=True`` 的 clarification 响应后，
+    用户在前端补充答复（如选择某个选项），调本端口续做。
+    与 ``confirmation_context`` 机制等价但保留多轮 ``session_id`` 链路。
+    """
+    if not request.session_id:
+        return ChatResponse(
+            reply="缺少 session_id，无法恢复对话。",
+            servants=[],
+            count=0,
+            query={"error": "missing_session_id"},
+            model="error",
+            traceId=None,
+        )
+    trace_id = uuid.uuid4().hex[:8]
+    client_ip = raw_request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
+        raw_request.client.host if raw_request.client else "unknown"
+    )
+    return await resume_skill_mode(
+        session_id=request.session_id,
+        supplement_message=request.message or "",
+        trace_id=trace_id,
+        client_ip=client_ip,
     )
 
 
@@ -417,6 +460,7 @@ async def chat_stream(
     preset_name: str | None = None,
     confirmation_context: str | None = None,
     confirmation_id: str | None = None,
+    session_id: str = "",
 ):
     """SSE 流式对话端点 — 分阶段推送思考过程和结果。
 
@@ -424,7 +468,11 @@ async def chat_stream(
     支持 preset_name 参数：有值时跳过 LLM 路由，直接展开预设 skill_calls。
     支持 confirmation_context 参数：用户确认选择后携带的上下文，用于精确路由。
     支持 confirmation_id 参数：用户选择的选项 ID（collectionNo），用于精确定位实体。
+    支持 session_id 参数：前端会话 ID，用于多轮对话状态关联（当前 SSE 路径暂不消费，
+    Task 5 中将统一接通 SessionStore 完成多轮闭环）。
     """
+    # session_id 当前 SSE 路径暂不消费，仅作前向兼容占位
+    _ = session_id
     client_ip = (
         request.headers.get("x-forwarded-for", "").split(",")[0].strip() or request.client.host
         if request.client

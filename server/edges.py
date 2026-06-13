@@ -43,7 +43,11 @@ def _dispatch_bail_out(reason: str) -> str:
 
 
 def after_classify(state: PipelineState) -> str:
-    """Stage 0 分类后路由：A→route / B→atlas / C→guide / 低置信度→agent_fallback。"""
+    """Stage 0 分类后路由：A→route / B→atlas / C→guide / 低置信度→agent_fallback。
+
+    Task 4 Batch B：当 turn_type ∈ {MINOR, CORRECTION} 且存在 prev_turn 时，
+    跳过 route_node 直接走 merge_filters 节点合并 delta。
+    """
     pipeline = state.classified_pipeline
     if pipeline == "B":
         return "atlas"
@@ -52,12 +56,31 @@ def after_classify(state: PipelineState) -> str:
     if pipeline == "A" and state.classifier_confidence < 0.6:
         state.extras["bail_out"] = "low_confidence_agent"
         return "agent_fallback"
+    # 多轮 MINOR / CORRECTION：在 prev_turn 上做 delta 合并，跳过 route 重排
+    if pipeline == "A" and state.turn_type in ("MINOR", "CORRECTION") and "prev_turn" in state.extras:
+        return "merge_filters"
     return "route"
 
 
 def after_route(state: PipelineState) -> str:
     """Stage 1 路由后：bail_out → 对应降级节点；否则 → execute。"""
     reason = state.extras.get("bail_out")
+    if reason:
+        return _dispatch_bail_out(reason)
+    return "execute"
+
+
+def after_merge_filters(state: PipelineState) -> str:
+    """MINOR 合并后：成功 → execute；失败 → route（按 MAJOR 重新走标准路由）。
+
+    merge_filters_node 失败时会 ``state.extras["bail_out"]="merge_failed_fallback_route"``，
+    此处特判把它转成 route 重路由（其余 bail_out 走标准降级分发）。
+    """
+    reason = state.extras.get("bail_out")
+    if reason == "merge_failed_fallback_route":
+        # 已由 merge_filters_node 清掉 prev_turn 并把 turn_type 重置为 MAJOR
+        state.extras.pop("bail_out", None)
+        return "route"
     if reason:
         return _dispatch_bail_out(reason)
     return "execute"
