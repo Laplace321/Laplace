@@ -3,7 +3,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 from server.skills.base import QuerySkill, register_skill
-from server.translation import get_class_map
 
 
 class Params(BaseModel):
@@ -26,7 +25,9 @@ class SearchByClass(QuerySkill):
         if class_name is None:
             return True
         # 防御层：LLM 可能输出中文（「狂阶」），需反查回英文（berserker）再与 DB 比较。
-        # 见 ADR / hotfix v0.4.5。
+        # lazy import 避免 server.translation 循环依赖（translation 同时依赖 skills.base）。
+        from server.translation import get_class_map
+
         raw = class_name.strip()
         cn_to_en = {cn: en for en, cn in get_class_map().items()}
         target = cn_to_en.get(raw, raw)
