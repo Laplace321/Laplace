@@ -100,6 +100,16 @@ def load_svt_names_mapping() -> dict:
     return data.get("svt_names", {})
 
 
+def load_traits_mapping() -> dict:
+    """加载 mappings.json 中的特性 ID→多语言名称映射。"""
+    mappings_path = KNOWLEDGE_DIR / "mappings.json"
+    if not mappings_path.exists():
+        return {}
+    with open(mappings_path, encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("traits", {})
+
+
 # CN 服从者数据 URL（用于获取中文技能名/宝具名）
 CN_SERVANT_URL = f"{API_BASE}/export/CN/nice_servant.json"
 # CN 服礼装数据 URL（用于获取中文礼装名和效果描述）
@@ -1192,6 +1202,7 @@ def build_database(
     total_with_effects = 0
     cn_skills = (skill_cn_map or {}).get("skills", {})
     cn_tds = (skill_cn_map or {}).get("tds", {})
+    traits_mapping = load_traits_mapping()
 
     for svt in servants:
         skill_effects, skill_details = extract_skill_effects(svt, matcher, conditional_skill_map)
@@ -1304,15 +1315,55 @@ def build_database(
                         np_entry["damageClass"] = damage_class
                     # antiTarget: D类宝具特攻（damageNpSP）
                     # Atlas API 中特攻目标存储在 svals[].Target（trait ID）
+                    # 对于 damageNpSP，特攻倍率才是用户关心的数值（Correction 字段）：
+                    #  - npValues 维度：NP Lv1~5 在 OC1 下的 Correction（通常恒定）
+                    #  - ocValues 维度：OC1~5 在 NP1 下的 Correction（OC 影响特攻倍率）
                     if eff_name == "damageNpSP":
                         target_trait_id = lv1_sval.get("Target", 0)
                         if target_trait_id:
+                            trait_meta = (traits_mapping or {}).get(str(target_trait_id), {})
+                            trait_name_cn = trait_meta.get("CN") or trait_meta.get("JP") or ""
                             np_entry["antiTarget"] = {
                                 "traitId": target_trait_id,
+                                "trait": trait_name_cn,
                             }
+                        # 重写 npValues / ocValues 为 Correction 维度
+                        sp_np_values = (
+                            [(raw_svals[i].get("Correction", 0) if i < len(raw_svals) else 0) for i in range(5)]
+                            if isinstance(raw_svals, list)
+                            else [lv1_sval.get("Correction", 0)] * 5
+                        )
+                        sp_oc_values = []
+                        for oc_key in oc_keys:
+                            oc_svals = func.get(oc_key, [])
+                            oc_corr = (
+                                oc_svals[0].get("Correction", 0)
+                                if isinstance(oc_svals, list) and oc_svals and isinstance(oc_svals[0], dict)
+                                else 0
+                            )
+                            sp_oc_values.append(oc_corr)
+                        if any(sp_np_values) or any(sp_oc_values):
+                            np_entry["npValues"] = sp_np_values
+                            np_entry["ocValues"] = sp_oc_values
                         correction = lv1_sval.get("Correction", 0)
                         if correction:
                             np_entry["correction"] = correction
+                    # antiTarget: C类特攻状态（upDamage + ckOpIndv），从 buff 提取特攻特性
+                    elif eff_name == "upDamage":
+                        for buff in func.get("buffs", []):
+                            if buff.get("type") != "upDamage":
+                                continue
+                            ck_op = buff.get("ckOpIndv", [])
+                            if ck_op:
+                                trait = ck_op[0]
+                                trait_id = trait.get("id", trait) if isinstance(trait, dict) else trait
+                                trait_meta = (traits_mapping or {}).get(str(trait_id), {})
+                                trait_name_cn = trait_meta.get("CN") or trait_meta.get("JP") or ""
+                                np_entry["antiTarget"] = {
+                                    "traitId": trait_id,
+                                    "trait": trait_name_cn,
+                                }
+                                break
                     np_effect_entries.append(np_entry)
 
                 if "damage" in ftype.lower():

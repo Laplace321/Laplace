@@ -22,6 +22,8 @@ def _match_np_value(servant: dict, effect_name: str, min_val: int | None, max_va
     """检查从者的宝具效果是否满足数值阈值条件。
 
     对 npDamage 使用 npValues[4]（NP5 倍率）作为参考值；
+    对 damageNpSP（宝具特攻）npValues 存储的是 OC1 特攻倍率（Correction，千分比，
+    如 1500=150%），取 npValues[0] 即 OC1 特攻倍率；
     其他效果使用 npValues[0]（NP1 OC1 数值）。
     """
     for np_detail in servant.get("npDetails", []):
