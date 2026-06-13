@@ -28,7 +28,7 @@ from server.graph import END, PipelineState, StateGraph
 from server.graph.checkpointer import SqliteCheckpointer
 from server.graph.session import SessionStore
 from server.llm import chat_completion
-from server.logger import log_trace_event
+from server.logger import bind_trace_id, log_trace_event
 from server.nodes.agent import agent_fallback_node, agent_fallback_stream_node
 from server.nodes.atlas import atlas_node, atlas_stream_node
 from server.nodes.clarify import clarify_node
@@ -336,6 +336,7 @@ async def handle_skill_mode(
     if confirmation_context:
         user_message = f"{user_message}\n[用户确认：{confirmation_context}]"
     request_start = time.monotonic()
+    bind_trace_id(trace_id)
 
     # ── 直传 skill_calls 路径（preset / 前端直传）──
     if skill_calls is not None:
@@ -543,6 +544,7 @@ async def stream_chat_events(
     """
     trace_id = uuid.uuid4().hex[:8]
     stream_start = time.monotonic()
+    bind_trace_id(trace_id)
 
     # ── 路径 1：confirmation_id 直达（用户选择具体实体，跳过路由+执行）──
     if confirmation_id and confirmation_id.isdigit():
@@ -657,6 +659,7 @@ async def _stream_confirmation_direct(
     事件顺序：thinking routing → thinking routed → thinking querying →
     （由 generate_stream_node 接管）servants → thinking generating → delta * N → done。
     """
+    bind_trace_id(trace_id)
     from server.query_executor import load_ce_database, load_database
 
     yield sse_event("thinking", {"phase": "routing", "message": "正在理解你的问题..."})
@@ -792,6 +795,7 @@ async def _stream_preset(
 
     支持 B1 策略：用户补充文字时通过 Stage 2 LLM 合并额外 skill_calls。
     """
+    bind_trace_id(trace_id)
     yield sse_event("thinking", {"phase": "routing", "message": "正在解析预设..."})
 
     preset = PRESET_REGISTRY.get(preset_name)

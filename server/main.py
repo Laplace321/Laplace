@@ -29,7 +29,7 @@ from server.admin.routes import router as admin_routes_router
 
 # ── 业务模块 ──
 from server.llm import chat_completion
-from server.logger import find_trace, read_trace_summaries, read_traces
+from server.logger import bind_trace_id, find_trace, read_trace_summaries, read_traces
 from server.pipeline import ChatResponse, handle_skill_mode, resume_skill_mode, stream_chat_events
 from server.prompts import build_routing_prompt
 from server.query_executor import load_database
@@ -321,6 +321,7 @@ async def chat(request: ChatRequest, raw_request: Request):
     """处理用户对话请求（Skill-Based Architecture）。"""
     user_message = request.message
     trace_id = uuid.uuid4().hex[:8]
+    bind_trace_id(trace_id)
     client_ip = raw_request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
         raw_request.client.host if raw_request.client else "unknown"
     )
@@ -442,6 +443,7 @@ async def chat_resume(request: ResumeRequest, raw_request: Request):
             traceId=None,
         )
     trace_id = uuid.uuid4().hex[:8]
+    bind_trace_id(trace_id)
     client_ip = raw_request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
         raw_request.client.host if raw_request.client else "unknown"
     )

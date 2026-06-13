@@ -24,10 +24,11 @@ from __future__ import annotations
 
 import copy
 
+from server.graph.decorators import with_trace
 from server.graph.session import TurnSnapshot
 from server.graph.state import PipelineState
 from server.llm import chat_completion
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 from server.prompts import build_minor_merge_prompt
 from server.schemas import (
     minor_merge_response_json_schema,
@@ -35,6 +36,7 @@ from server.schemas import (
 )
 
 
+@with_trace(Phase.NODE_MERGE_FILTERS)
 async def merge_filters_node(state: PipelineState) -> PipelineState:
     """MINOR/CORRECTION 多轮合并节点。
 

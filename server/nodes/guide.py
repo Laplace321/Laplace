@@ -10,10 +10,11 @@ from __future__ import annotations
 import time
 from collections.abc import AsyncGenerator
 
+from server.graph.decorators import with_trace
 from server.graph.state import PipelineState
 from server.guide_retriever import GuideRetriever
 from server.llm import StreamMetadata, chat_completion, chat_completion_stream
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 
 # 职阶关键词 → 对应 tag（优先匹配中文简称/俗称）
 _CLASS_TAG_MAP: dict[str, str] = {
@@ -134,6 +135,7 @@ def _format_source_suffix(source_labels: set[str], source_authors: dict[str, str
     return "\n\n📖 参考：" + ", ".join(labels_with_author)
 
 
+@with_trace(Phase.NODE_GUIDE)
 async def guide_node(state: PipelineState) -> PipelineState:
     """Pipeline C 主节点：BM25 检索攻略文档 → LLM 生成回复 → 来源标注。"""
     result = _prepare_guide_context(state.user_message)

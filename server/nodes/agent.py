@@ -23,8 +23,9 @@ from server.agent.agent_loop import AgentResult, agent_route
 from server.agent.tool_handlers import TOOL_HANDLERS
 from server.context_builder import MAX_RESULTS
 from server.fallback import build_oneshot_context, classify_agent_reply
+from server.graph.decorators import with_trace
 from server.graph.state import PipelineState
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 
 
 def _build_agent_config(state: PipelineState) -> dict:
@@ -129,6 +130,7 @@ def _build_agent_config(state: PipelineState) -> dict:
     }
 
 
+@with_trace(Phase.NODE_AGENT)
 async def agent_fallback_node(state: PipelineState) -> PipelineState:
     """统一 Agent 兜底节点（4 处合 1）。
 

@@ -20,14 +20,16 @@ import time
 from collections.abc import AsyncGenerator
 
 from server.context_builder import MAX_RESULTS, build_ce_context, build_context
+from server.graph.decorators import with_trace
 from server.graph.session import PREV_SUMMARY_MAX_CHARS, SessionStore, TurnSnapshot
 from server.graph.state import PipelineState
 from server.llm import StreamMetadata, chat_completion, chat_completion_stream
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 from server.prompts import get_generation_prompt
 from server.translation import describe_filters
 
 
+@with_trace(Phase.NODE_GENERATE)
 async def generate_node(state: PipelineState) -> PipelineState:
     """RAG 生成：组装 context → LLM 调用 → 写入 state.reply / query。"""
     result = state.extras.get("executor_result")

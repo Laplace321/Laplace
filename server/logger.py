@@ -1,9 +1,7 @@
 """
 Laplace — 结构化 Trace 日志
 
-支持两种日志模式：
-1. 旧模式（向后兼容）：log_chat_trace_async / log_chat_trace — 单条最终 trace
-2. 新模式（多阶段事件流）：log_trace_event — 同一 traceId 下按阶段记录事件
+多阶段事件流模式：log_trace_event — 同一 traceId 下按阶段记录事件。
 
 Phase 命名统一在 ``Phase`` 字符串常量类，所有节点和 pipeline.py 必须引用常量
 而非裸字符串字面量；新增 phase 时同步加入 ``PHASES`` 集合，便于通过
@@ -89,6 +87,19 @@ class Phase:
     NODE_OUTPUT_SUFFIX = "_output"
     NODE_ERROR_SUFFIX = "_error"
 
+    # ── 节点级 phase 前缀（仅供 @with_trace 装饰器使用，与业务 phase 命名隔离）──
+    NODE_CLASSIFY = "node_classify"
+    NODE_ROUTE = "node_route"
+    NODE_EXECUTE = "node_execute"
+    NODE_GENERATE = "node_generate"
+    NODE_GUIDE = "node_guide"
+    NODE_CLARIFY = "node_clarify"
+    NODE_ATLAS = "node_atlas"
+    NODE_FACT_VERIFY = "node_fact_verify"
+    NODE_MERGE_FILTERS = "node_merge_filters"
+    NODE_FALLBACK = "node_fallback"
+    NODE_AGENT = "node_agent"
+
 
 PHASES: frozenset[str] = frozenset(
     {
@@ -117,6 +128,17 @@ PHASES: frozenset[str] = frozenset(
         Phase.FINAL,
         Phase.FRONTEND_FEEDBACK,
         Phase.FRONTEND_VISIT,
+        Phase.NODE_CLASSIFY,
+        Phase.NODE_ROUTE,
+        Phase.NODE_EXECUTE,
+        Phase.NODE_GENERATE,
+        Phase.NODE_GUIDE,
+        Phase.NODE_CLARIFY,
+        Phase.NODE_ATLAS,
+        Phase.NODE_FACT_VERIFY,
+        Phase.NODE_MERGE_FILTERS,
+        Phase.NODE_FALLBACK,
+        Phase.NODE_AGENT,
     }
 )
 
@@ -242,64 +264,6 @@ def find_trace_events(trace_id: str) -> list[dict]:
             except json.JSONDecodeError:
                 continue
     return events
-
-
-# ============================================================
-# 旧模式（向后兼容）
-# ============================================================
-
-
-def _build_trace_data(
-    trace_id: str,
-    user_message: str,
-    parsed_intent: dict,
-    found_count: int,
-    final_reply: str,
-    context: dict = None,
-    error: str = None,
-) -> dict:
-    """构建 trace 日志数据结构（旧模式）。"""
-    trace_data = {
-        "timestamp": datetime.now(_BEIJING_TZ).isoformat(),
-        "level": "ERROR" if error else "INFO",
-        "traceId": trace_id,
-        "query": user_message,
-        "intent": parsed_intent,
-        "results_count": found_count,
-        "reply": final_reply,
-        "context": context,
-    }
-    if error:
-        trace_data["error"] = error
-    return trace_data
-
-
-async def log_chat_trace_async(
-    trace_id: str,
-    user_message: str,
-    parsed_intent: dict,
-    found_count: int,
-    final_reply: str,
-    context: dict = None,
-    error: str = None,
-):
-    """异步版 trace 日志写入（旧模式，向后兼容）。"""
-    trace_data = _build_trace_data(trace_id, user_message, parsed_intent, found_count, final_reply, context, error)
-    await asyncio.to_thread(_write_event_sync, trace_data)
-
-
-def log_chat_trace(
-    trace_id: str,
-    user_message: str,
-    parsed_intent: dict,
-    found_count: int,
-    final_reply: str,
-    context: dict = None,
-    error: str = None,
-):
-    """同步版 trace 日志写入（旧模式，向后兼容）。"""
-    trace_data = _build_trace_data(trace_id, user_message, parsed_intent, found_count, final_reply, context, error)
-    _write_event_sync(trace_data)
 
 
 # ============================================================

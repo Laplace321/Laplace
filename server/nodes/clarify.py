@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import time
 
+from server.graph.decorators import with_trace
 from server.graph.session import SessionStore
 from server.graph.state import PipelineState
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 
 
+@with_trace(Phase.NODE_CLARIFY)
 async def clarify_node(state: PipelineState) -> PipelineState:
     """澄清提示节点：把 routing/execution 层的 clarification 数据写入 state.query。"""
     reason = state.extras.get("bail_out", "unknown")

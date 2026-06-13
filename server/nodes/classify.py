@@ -17,14 +17,16 @@ Task 4 Batch B 多轮对话扩展：
 
 from __future__ import annotations
 
+from server.graph.decorators import with_trace
 from server.graph.session import SessionStore
 from server.graph.state import PipelineState
 from server.llm import chat_completion
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 from server.prompts import build_classifier_prompt
 from server.schemas import classifier_response_json_schema, parse_classifier_response
 
 
+@with_trace(Phase.NODE_CLASSIFY)
 async def classify_node(state: PipelineState) -> PipelineState:
     """Stage 0：链路分类（A=Skill 查询 / B=Atlas 知识 / C=攻略文档）。
 

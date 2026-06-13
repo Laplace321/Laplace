@@ -11,11 +11,13 @@
 from __future__ import annotations
 
 from server.context_builder import MAX_RESULTS
+from server.graph.decorators import with_trace
 from server.graph.state import PipelineState
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 from server.skills.executor import SkillExecutor
 
 
+@with_trace(Phase.NODE_EXECUTE)
 async def execute_node(state: PipelineState) -> PipelineState:
     """Skill 执行：调度 QuerySkill → 收敛 servants/total_found。"""
     streaming = bool(state.extras.get("streaming"))
