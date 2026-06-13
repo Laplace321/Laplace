@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方案 A · 迦勒底档案室 / Chaldea Archive</title>
+<link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700&family=Cinzel:wght@500;700&family=Cormorant+Garamond:wght@600;700&family=Orbitron:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F6F8; --paper:#FFFFFF; --ink:#0A1F4A; --ink-deep:#051333;
+  --ink-soft:#3A4A6E; --gold:#C9A961; --gold-deep:#A8893E;
+  --cyan:#2E7BC4; --cyan-soft:#EAF1FB; --rule:#D5DAE3; --grid:rgba(10,31,74,0.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Noto Sans SC',sans-serif;background:var(--bg);color:var(--ink-deep);
+  background-image:repeating-linear-gradient(0deg,transparent 0,transparent 23px,var(--grid) 23px,var(--grid) 24px),repeating-linear-gradient(90deg,transparent 0,transparent 23px,var(--grid) 23px,var(--grid) 24px);
+  min-height:100vh;display:flex;flex-direction:column;
+}
+
+/* ===== Top blue band ===== */
+.top-band{height:6px;background:var(--ink);position:sticky;top:0;z-index:30}
+
+/* ===== Header ===== */
+.header{background:var(--paper);border-bottom:1px solid var(--rule);position:sticky;top:6px;z-index:20}
+.header-inner{max-width:1180px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;gap:24px}
+.logo{display:flex;align-items:center;gap:14px}
+.logo-mark{width:42px;height:42px;background:var(--ink);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:22px;clip-path:polygon(0 0,100% 0,100% 75%,75% 100%,0 100%);font-family:serif}
+.logo-text h1{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:700;letter-spacing:6px;color:var(--ink-deep);line-height:1}
+.logo-text .sub{font-size:10px;letter-spacing:3px;color:var(--ink-soft);font-family:'Cinzel',serif;margin-top:4px}
+.report-num{margin-left:auto;font-family:'Cinzel',serif;font-size:11px;letter-spacing:3px;color:var(--ink-soft);padding-right:16px;border-right:1px solid var(--rule)}
+.report-num strong{color:var(--ink);font-weight:700}
+.actions{display:flex;gap:6px}
+.icon-btn{width:36px;height:36px;background:transparent;border:1px solid var(--rule);color:var(--ink-soft);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s}
+.icon-btn:hover{border-color:var(--ink);color:var(--ink)}
+
+/* ===== Main ===== */
+main{max-width:1180px;width:100%;margin:0 auto;padding:32px 28px 24px;flex:1}
+
+.report-header{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:32px}
+.report-header h2{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:700;color:var(--ink-deep);letter-spacing:2px}
+.report-header h2 .roman{color:var(--gold);font-style:italic;margin-right:10px}
+.report-header .stamp{font-family:'Cinzel',serif;font-size:11px;letter-spacing:3px;color:var(--ink-soft)}
+.report-header .stamp em{color:var(--cyan);font-style:normal;font-weight:700}
+
+/* ===== Chat ===== */
+.chat{display:flex;flex-direction:column;gap:24px;margin-bottom:32px}
+.msg-user{align-self:flex-end;max-width:70%;background:var(--paper);border:1.5px solid var(--ink);padding:14px 18px 14px 18px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,0 100%);position:relative}
+.msg-user::before{content:"#0001 / 御主询问";position:absolute;top:-18px;right:0;font-family:'Cinzel',serif;font-size:10px;letter-spacing:2px;color:var(--ink-soft)}
+.msg-user p{font-size:15px;line-height:1.7;color:var(--ink-deep)}
+
+.msg-ai{align-self:flex-start;max-width:88%;background:var(--cyan-soft);border-left:4px solid var(--ink);padding:18px 22px}
+.msg-ai .ai-head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(10,31,74,0.15);padding-bottom:10px;margin-bottom:12px}
+.msg-ai .ai-head .ai-title{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:16px;letter-spacing:2px;color:var(--ink-deep)}
+.msg-ai .ai-head .ai-title em{color:var(--gold);font-style:normal;margin-right:6px}
+.msg-ai .ai-head .ai-meta{font-family:'Cinzel',serif;font-size:10px;letter-spacing:2px;color:var(--ink-soft)}
+
+.thinking{background:rgba(255,255,255,0.6);border:1px dashed var(--cyan);padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--ink-soft);line-height:1.8;font-family:'Noto Sans SC'}
+.thinking .step{display:flex;gap:8px;align-items:flex-start}
+.thinking .step::before{content:"▸";color:var(--cyan);font-weight:700;flex-shrink:0}
+.thinking .step.done::before{content:"✓";color:var(--gold-deep)}
+
+.msg-ai p{font-size:15px;line-height:1.85;color:var(--ink-deep);margin-bottom:8px}
+.msg-ai p:last-child{margin-bottom:0}
+.msg-ai strong{color:var(--ink)}
+
+/* ===== Servant cards (compact list-row, 2-col) ===== */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;margin-top:18px}
+.servant-card{background:var(--paper);border:1px solid var(--rule);position:relative;padding:12px 14px;transition:all .2s;cursor:pointer;display:flex;flex-direction:column;gap:10px}
+.servant-card::before{content:"";position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--ink)}
+.servant-card:hover{border-color:var(--ink);box-shadow:4px 4px 0 var(--ink-deep);transform:translate(-2px,-2px)}
+.servant-card:hover::before{background:var(--gold)}
+.row{display:flex;align-items:center;gap:12px}
+.portrait{width:56px;height:56px;flex-shrink:0;background:linear-gradient(180deg,var(--cyan-soft),#dbe6f5);border:1.5px solid var(--ink);position:relative;display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-weight:700;font-style:italic;font-size:24px;color:var(--ink-deep);overflow:hidden}
+.portrait::after{content:"";position:absolute;inset:2px;border:1px solid rgba(10,31,74,0.12);pointer-events:none}
+.portrait.p1{background:linear-gradient(135deg,#e8d4f0,#c8a8e0)}
+.portrait.p2{background:linear-gradient(135deg,#f5d4d4,#f0a8b0)}
+.portrait.p3{background:linear-gradient(135deg,#d4e8f0,#a8c8e0)}
+.portrait.p4{background:linear-gradient(135deg,#f0e8d4,#e0c8a8)}
+.portrait.p5{background:linear-gradient(135deg,#d4f0e0,#a8d8b8)}
+.portrait.p6{background:linear-gradient(135deg,#e0d8f0,#b8a8d8)}
+.info{flex:1;min-width:0}
+.name-row{display:flex;align-items:baseline;gap:8px;margin-bottom:3px;flex-wrap:wrap}
+.servant-card .name{font-family:'Cormorant Garamond','Noto Serif SC',serif;font-weight:700;font-size:17px;color:var(--ink-deep);letter-spacing:0.5px;line-height:1.2}
+.servant-card .name-en{font-family:'Cinzel',serif;font-size:10px;color:var(--ink-soft);letter-spacing:2px;text-transform:uppercase}
+.meta-row{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-soft)}
+.stars{color:var(--gold);letter-spacing:1px;font-size:11px}
+.meta-row .cls{font-family:'Cinzel',serif;font-size:11px;letter-spacing:1.5px;color:var(--ink);font-weight:600}
+.meta-row .dot{color:var(--rule)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding-top:8px;border-top:1px dashed var(--rule)}
+.chip{display:inline-flex;align-items:center;font-family:'Orbitron','Noto Sans SC',sans-serif;font-size:11px;font-weight:600;padding:3px 9px;background:var(--cyan-soft);color:var(--cyan);border:1px solid rgba(46,123,196,0.3);letter-spacing:0.5px;clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%)}
+.chip.gold{background:rgba(201,169,97,0.12);color:var(--gold-deep);border-color:rgba(201,169,97,0.4)}
+
+/* ===== Input ===== */
+.input-area{background:var(--paper);border:1px solid var(--rule);position:sticky;bottom:0;z-index:20}
+.input-area::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--ink) 0%,var(--ink) 30%,var(--gold) 30%,var(--gold) 35%,var(--ink) 35%,var(--ink) 100%)}
+.input-inner{max-width:1180px;margin:0 auto;padding:18px 28px}
+.input-label{font-family:'Cinzel',serif;font-size:10px;letter-spacing:3px;color:var(--ink-soft);margin-bottom:8px}
+.input-label em{color:var(--gold-deep);font-style:normal;font-weight:700}
+.input-row{display:flex;gap:10px;align-items:center}
+.input-box{flex:1;display:flex;align-items:center;border:1.5px solid var(--ink);background:var(--paper);padding:0 14px;height:46px;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px))}
+.input-box span.prompt{color:var(--cyan);font-family:'Orbitron';font-weight:600;margin-right:8px}
+.input-box input{flex:1;border:0;outline:0;background:transparent;font-size:15px;font-family:'Noto Sans SC';color:var(--ink-deep)}
+.input-box input::placeholder{color:#9aa6bf}
+.send-btn{height:46px;padding:0 24px;background:var(--ink);color:var(--gold);border:1.5px solid var(--ink);font-family:'Cormorant Garamond',serif;font-weight:700;font-size:16px;letter-spacing:4px;cursor:pointer;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%);transition:all .2s}
+.send-btn:hover{background:var(--ink-deep)}
+
+/* ===== Footer envelope ===== */
+.footer{margin-top:14px;background:var(--paper);border:1px solid var(--rule);padding:14px 28px;font-size:11px;color:var(--ink-soft);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;font-family:'Cinzel',serif;letter-spacing:1px}
+.footer span em{color:var(--cyan);font-style:normal;font-weight:600}
+.footer a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+
+.back{position:fixed;top:18px;right:18px;z-index:50;background:var(--paper);border:1px solid var(--ink);padding:6px 14px;font-size:11px;letter-spacing:2px;color:var(--ink);text-decoration:none;font-family:'Cinzel',serif}
+.back:hover{background:var(--ink);color:var(--gold)}
+</style>
+</head>
+<body>
+<a href="index.html" class="back">← BACK</a>
+<div class="top-band"></div>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-mark">⧫</div>
+      <div class="logo-text"><h1>LAPLACE</h1><div class="sub">CHALDEA ARCHIVE TERMINAL</div></div>
+    </div>
+    <div class="report-num">REPORT NO. <strong>0,0,0,1</strong> · 2026.06.10</div>
+    <div class="actions">
+      <div class="icon-btn">＋</div><div class="icon-btn">⌖</div><div class="icon-btn">✦</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="report-header">
+    <h2><span class="roman">Ⅰ</span>从者数据库 · 召唤记录</h2>
+    <div class="stamp">SESSION · <em>ACTIVE</em> · 04:21</div>
+  </div>
+
+  <div class="chat">
+    <div class="msg-user"><p>30NP 自充以上的 Caster 有哪些？最好五星。</p></div>
+
+    <div class="msg-ai">
+      <div class="ai-head">
+        <div class="ai-title"><em>※</em>报告 No.001 · 数据库检索结果</div>
+        <div class="ai-meta">12:34:21 · GPT-4o</div>
+      </div>
+      <div class="thinking">
+        <div class="step done">解析意图：职阶 = Caster · 自充 NP ≥ 30 · 星级 = ★5</div>
+        <div class="step done">召唤 search_by_np_charge 模块（373 名从者中筛选）</div>
+        <div class="step done">召唤 search_by_class · search_by_rarity</div>
+        <div class="step">合并结果集 · AND 交集 · 共 6 名候选</div>
+      </div>
+      <p>御主，已为您从迦勒底数据库中检索到 <strong>6 位</strong>符合条件的 Caster 职阶五星从者。下方按自充 NP 量排序：</p>
+      <div class="cards">
+        <div class="servant-card">
+          <div class="row">
+            <div class="portrait p1">
+              梅
+            </div>
+            <div class="info">
+              <div class="name-row">
+                <span class="name">梅林</span>
+                <span class="name-en">Merlin</span>
+              </div>
+              <div class="meta-row">
+                <span class="stars">★★★★★</span>
+                <span class="dot">·</span>
+                <span class="cls">CASTER</span>
+              </div>
+            </div>
+          </div>
+          <div class="chips">
+            <span class="chip">50 自充</span>
+            <span class="chip gold">Buster 宝具</span>
+          </div>
+        </div>
+
+        <div class="servant-card">
+          <div class="row">
+            <div class="portrait p2">
+              玉
+            </div>
+            <div class="info">
+              <div class="name-row">
+                <span class="name">玉藻前</span>
+                <span class="name-en">Tamamo</span>
+              </div>
+              <div class="meta-row">
+                <span class="stars">★★★★★</span>
+                <span class="dot">·</span>
+                <span class="cls">CASTER</span>
+              </div>
+            </div>
+          </div>
+          <div class="chips">
+            <span class="chip">50 自充</span>
+            <span class="chip gold">Arts 宝具</span>
+          </div>
+        </div>
+
+        <div class="servant-card">
+          <div class="row">
+            <div class="portrait p3">
+              玄
+            </div>
+            <div class="info">
+              <div class="name-row">
+                <span class="name">玄奘三藏</span>
+                <span class="name-en">Xuanzang</span>
+              </div>
+              <div class="meta-row">
+                <span class="stars">★★★★★</span>
+                <span class="dot">·</span>
+                <span class="cls">CASTER</span>
+              </div>
+            </div>
+          </div>
+          <div class="chips">
+            <span class="chip">80 自充</span>
+            <span class="chip gold">Buster 宝具</span>
+          </div>
+        </div>
+
+        <div class="servant-card">
+          <div class="row">
+            <div class="portrait p4">
+              达
+            </div>
+            <div class="info">
+              <div class="name-row">
+                <span class="name">达·芬奇</span>
+                <span class="name-en">Da Vinci</span>
+              </div>
+              <div class="meta-row">
+                <span class="stars">★★★★★</span>
+                <span class="dot">·</span>
+                <span class="cls">CASTER</span>
+              </div>
+            </div>
+          </div>
+          <div class="chips">
+            <span class="chip">50 自充</span>
+            <span class="chip gold">Arts 宝具</span>
+          </div>
+        </div>
+
+        <div class="servant-card">
+          <div class="row">
+            <div class="portrait p5">
+              孔
+            </div>
+            <div class="info">
+              <div class="name-row">
+                <span class="name">诸葛孔明〔埃尔梅罗Ⅱ世〕</span>
+                <span class="name-en">El-Melloi II</span>
+              </div>
+              <div class="meta-row">
+                <span class="stars">★★★★★</span>
+                <span class="dot">·</span>
+                <span class="cls">CASTER</span>
+              </div>
+            </div>
+          </div>
+          <div class="chips">
+            <span class="chip">30 他充 + 10 群充 + 10 群充</span>
+          </div>
+        </div>
+
+        <div class="servant-card">
+          <div class="row">
+            <div class="portrait p6">
+              呆
+            </div>
+            <div class="info">
+              <div class="name-row">
+                <span class="name">阿尔托莉雅·Caster</span>
+                <span class="name-en">Castoria</span>
+              </div>
+              <div class="meta-row">
+                <span class="stars">★★★★★</span>
+                <span class="dot">·</span>
+                <span class="cls">CASTER</span>
+              </div>
+            </div>
+          </div>
+          <div class="chips">
+            <span class="chip">20 群充 + 10 群充</span>
+            <span class="chip gold">Arts 宝具</span>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top:14px">建议 <strong>玄奘三藏（80 自充）</strong>作为爆发轴心，<strong>梅林 / 玉藻前 / 达·芬奇</strong>作为 50% 自充辅助首选，<strong>呆毛 Caster</strong>则适合 Arts 周回。需要更详细的技能解析，可继续询问。</p>
+    </div>
+  </div>
+</main>
+
+<div class="input-area">
+  <div class="input-inner">
+    <div class="input-label">COMMAND INPUT · <em>ENTER QUERY</em></div>
+    <div class="input-row">
+      <div class="input-box">
+        <span class="prompt">&gt;</span>
+        <input type="text" placeholder="输入你的问题... 例如「分析下 Castoria 的技能优势」">
+      </div>
+      <button class="send-btn">提 交</button>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <span>ATLAS ACADEMY · CHALDEA SOURCE</span>
+  <span>攻略合作 · <em>怀旧大金 / 咕哒子</em></span>
+  <span>SUPPORT THE PROJECT · <a href="#">☕ 打赏</a></span>
+  <span>v0.3.0 · INTERNAL TEST</span>
+</div>
+
+</body>
+</html>

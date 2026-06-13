@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方案 D · 魔术协会公文 / Mage's Bulletin</title>
+<link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700;900&family=Playfair+Display:wght@700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FAFAF7; --paper-dark:#F2F0E8;
+  --ink:#0E1A33; --ink-deep:#06122A; --ink-soft:#566687;
+  --rule:#C8CDD8; --rule-soft:#E5E7EE;
+  --accent:#1454B8; --accent-deep:#0D3D8A;
+  --seal:#B23A3A; --seal-deep:#8E2828;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans SC',sans-serif;background:var(--paper);color:var(--ink-deep);min-height:100vh}
+
+/* ===== Newspaper masthead ===== */
+.masthead{background:var(--paper);border-bottom:4px solid var(--ink-deep);position:relative}
+.masthead::after{content:"";position:absolute;left:0;right:0;bottom:-8px;height:1px;background:var(--ink-deep)}
+.mast-meta{display:flex;justify-content:space-between;padding:8px 36px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--ink-soft);border-bottom:1px solid var(--rule-soft);text-transform:uppercase}
+.mast-meta span em{color:var(--accent);font-style:normal;font-weight:600}
+.mast-main{display:flex;align-items:center;justify-content:space-between;padding:18px 36px;gap:24px;max-width:1280px;margin:0 auto;width:100%}
+.mast-left,.mast-right{flex:1;display:flex;align-items:center;gap:16px;font-size:11px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;letter-spacing:1px}
+.mast-right{justify-content:flex-end}
+.mast-right .ico{width:32px;height:32px;border:1px solid var(--rule);display:flex;align-items:center;justify-content:center;color:var(--ink);cursor:pointer}
+.mast-right .ico:hover{background:var(--ink);color:var(--paper)}
+.mast-title{text-align:center}
+.mast-title h1{font-family:'Playfair Display',serif;font-size:56px;font-weight:900;letter-spacing:14px;color:var(--ink-deep);line-height:1;padding-left:14px}
+.mast-title .sub{font-family:'Noto Serif SC';font-size:11px;letter-spacing:8px;color:var(--ink-soft);margin-top:6px;text-transform:uppercase}
+
+/* ===== Section heading ===== */
+.section-bar{max-width:1280px;margin:0 auto;padding:14px 36px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--rule);background:var(--paper)}
+.section-bar .label{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:3px;color:var(--accent);text-transform:uppercase;background:rgba(20,84,184,0.08);padding:4px 10px;border:1px solid var(--accent)}
+.section-bar h2{font-family:'Playfair Display',serif;font-weight:700;font-size:22px;letter-spacing:2px;color:var(--ink-deep)}
+.section-bar .meta{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--ink-soft)}
+
+/* ===== Main column layout ===== */
+main{max-width:1280px;margin:0 auto;padding:32px 36px 40px;display:grid;grid-template-columns:1fr 280px;gap:36px}
+
+/* ===== Article (chat) ===== */
+.article{}
+.entry{padding-bottom:32px;margin-bottom:32px;border-bottom:1px double var(--rule)}
+.entry:last-child{border:0;margin-bottom:0}
+
+.headline{font-family:'Playfair Display','Noto Serif SC',serif;font-weight:900;font-size:32px;line-height:1.25;color:var(--ink-deep);margin-bottom:8px;letter-spacing:0}
+.byline{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--ink-soft);text-transform:uppercase;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--rule-soft);display:flex;gap:18px}
+.byline em{font-style:normal;color:var(--accent);font-weight:600}
+
+.q-block{margin-bottom:18px;padding-left:18px;border-left:2px solid var(--accent)}
+.q-block .lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:4px;font-weight:600}
+.q-block p{font-family:'Noto Serif SC';font-size:18px;font-weight:500;line-height:1.7;color:var(--ink-deep)}
+
+.thinking{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);background:var(--paper-dark);padding:10px 14px;margin-bottom:18px;border-left:3px solid var(--ink);line-height:1.9;letter-spacing:0.5px}
+.thinking .step{display:block}
+.thinking .step::before{content:"$ ";color:var(--accent)}
+.thinking .step.done::before{content:"✓ ";color:#2c7c4f}
+
+.lead{font-family:'Noto Serif SC';font-size:17px;line-height:1.85;color:var(--ink-deep);margin-bottom:14px;font-weight:500}
+.lead::first-letter{font-family:'Playfair Display',serif;font-size:54px;font-weight:900;float:left;line-height:1;padding:6px 10px 0 0;color:var(--accent)}
+
+.body-p{font-family:'Noto Serif SC';font-size:14px;line-height:1.85;color:var(--ink-deep);margin-bottom:10px}
+.body-p strong{color:var(--accent)}
+
+/* ===== Data table (servants) ===== */
+.data-title{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;letter-spacing:3px;color:var(--ink-deep);text-transform:uppercase;margin:24px 0 4px;padding-bottom:6px;border-bottom:2px solid var(--ink-deep)}
+.data-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);margin-bottom:14px;letter-spacing:1px}
+
+.servant-table{width:100%;border-collapse:collapse;font-family:'Noto Sans SC';margin-bottom:18px}
+.servant-table thead th{text-align:left;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:10px;letter-spacing:2px;color:var(--ink-soft);text-transform:uppercase;padding:10px 12px;border-top:2px solid var(--ink);border-bottom:1px solid var(--ink)}
+.servant-table tbody td{padding:14px 12px;border-bottom:1px solid var(--rule-soft);font-size:14px;vertical-align:middle}
+.servant-table tbody tr:hover{background:var(--paper-dark)}
+.servant-table .roman{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;background:var(--ink);color:var(--paper);font-family:'Playfair Display',serif;font-weight:700;font-size:13px;font-style:italic}
+.servant-table .name{font-family:'Playfair Display',serif;font-weight:700;font-size:16px;letter-spacing:1px;color:var(--ink-deep)}
+.servant-table .alias{font-size:11px;color:var(--ink-soft);font-family:'Noto Serif SC';display:block;margin-top:2px}
+.servant-table .num{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--accent);font-size:14px}
+.servant-table .stars{color:#C9A961;letter-spacing:1px;font-size:12px}
+.tag{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:1px;padding:2px 8px;border:1px solid currentColor;color:var(--accent);text-transform:uppercase}
+.tag.cls{color:var(--ink)}
+
+.kicker-quote{font-family:'Playfair Display',serif;font-style:italic;font-size:18px;color:var(--ink);border-left:3px solid var(--accent);padding:8px 0 8px 18px;margin:18px 0;line-height:1.6}
+.kicker-quote::before{content:"❝ ";color:var(--accent)}
+
+/* ===== Sidebar ===== */
+.aside{position:sticky;top:24px;align-self:start}
+.aside-card{background:var(--paper-dark);padding:18px;border:1px solid var(--rule);margin-bottom:16px}
+.aside-card h3{font-family:'Playfair Display',serif;font-weight:700;font-size:13px;letter-spacing:2px;color:var(--ink-deep);text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--ink)}
+.aside-card ul{list-style:none}
+.aside-card li{font-family:'Noto Serif SC';font-size:13px;color:var(--ink-deep);padding:6px 0;border-bottom:1px dotted var(--rule);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.aside-card li:hover{color:var(--accent)}
+.aside-card li:last-child{border:0}
+.aside-card li .num{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);font-weight:600}
+
+.seal{background:var(--paper);border:1px solid var(--seal);padding:16px;text-align:center;position:relative}
+.seal::before{content:"";position:absolute;inset:4px;border:1px solid var(--seal);pointer-events:none}
+.seal .seal-en{font-family:'Playfair Display',serif;font-style:italic;font-size:12px;color:var(--seal);letter-spacing:3px;text-transform:uppercase;font-weight:700;margin-bottom:4px}
+.seal .seal-cn{font-family:'Noto Serif SC';font-size:14px;font-weight:700;color:var(--seal-deep);letter-spacing:2px}
+.seal .seal-num{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--seal);margin-top:6px;letter-spacing:1px}
+
+/* ===== Input ===== */
+.input-area{position:sticky;bottom:0;background:var(--paper);border-top:4px solid var(--ink-deep);box-shadow:0 -8px 24px rgba(0,0,0,0.04)}
+.input-inner{max-width:1280px;margin:0 auto;padding:14px 36px}
+.input-row{display:flex;gap:0;align-items:stretch}
+.input-prefix{display:flex;align-items:center;padding:0 14px;background:var(--ink);color:var(--paper);font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;letter-spacing:2px}
+.input-box{flex:1;border:1px solid var(--ink);border-left:0;padding:0 14px;height:44px;display:flex;align-items:center;background:var(--paper)}
+.input-box input{flex:1;border:0;outline:0;background:transparent;font-size:14px;font-family:'Noto Serif SC';color:var(--ink-deep)}
+.send-btn{padding:0 24px;background:var(--accent);color:var(--paper);border:1px solid var(--accent);font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;letter-spacing:3px;cursor:pointer;text-transform:uppercase}
+.send-btn:hover{background:var(--accent-deep)}
+
+/* ===== Footer ===== */
+.footer{max-width:1280px;margin:0 auto;padding:14px 36px 18px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;letter-spacing:1px;text-transform:uppercase;border-top:1px solid var(--rule)}
+.footer a{color:var(--accent);text-decoration:none}
+
+.back{position:fixed;top:18px;right:18px;z-index:50;background:var(--paper);border:1px solid var(--ink);padding:6px 14px;font-size:11px;letter-spacing:2px;color:var(--ink);text-decoration:none;font-family:'IBM Plex Mono',monospace}
+.back:hover{background:var(--ink);color:var(--paper)}
+</style>
+</head>
+<body>
+<a href="index.html" class="back">← BACK</a>
+
+<header class="masthead">
+  <div class="mast-meta">
+    <span>VOL. <em>0.3</em> · ISSUE No. <em>0001</em></span>
+    <span>WEDNESDAY · JUNE 10 · 2026</span>
+    <span>STATUS · <em>INTERNAL TEST</em></span>
+  </div>
+  <div class="mast-main">
+    <div class="mast-left">
+      <span>EST. 2025</span><span>·</span><span>魔术协会内部</span>
+    </div>
+    <div class="mast-title">
+      <h1>LAPLACE</h1>
+      <div class="sub">— 迦勒底·公文公报 —</div>
+    </div>
+    <div class="mast-right">
+      <div class="ico">＋</div><div class="ico">⌖</div><div class="ico">✦</div>
+    </div>
+  </div>
+</header>
+
+<div class="section-bar">
+  <span class="label">SECTION Ⅰ</span>
+  <h2>从者检索·询问应答</h2>
+  <span class="meta">PAGE 01 · WORDS 1,420</span>
+</div>
+
+<main>
+  <article class="article">
+    <div class="entry">
+      <h2 class="headline">检索完毕：四位 ★5 Caster 自充均达 30NP 以上</h2>
+      <div class="byline">
+        <span>FILED BY <em>LAPLACE</em></span>
+        <span>2026.06.10 · 12:34</span>
+        <span>TRACE-ID <em>a8f3-7c91</em></span>
+      </div>
+
+      <div class="q-block">
+        <div class="lbl">QUERY · 御主询问</div>
+        <p>30NP 自充以上的 Caster 有哪些？最好五星。</p>
+      </div>
+
+      <div class="thinking">
+        <span class="step done">parse_intent → class=Caster, np_charge≥30, rarity=5</span>
+        <span class="step done">skill::search_by_np_charge → 4 candidates</span>
+        <span class="step done">skill::filter_by_class · filter_by_rarity</span>
+        <span class="step">merge_results → 4 returned</span>
+      </div>
+
+      <p class="lead">检索完毕。自迦勒底数据库 373 名英灵之中，共筛得 <strong>四位</strong> 符合「Caster 职阶 · 自充 NP ≥ 30 · ★5」之候选。结果按自充量降序排列如下表，并附宝具色与综合评级。</p>
+
+      <h3 class="data-title">CANDIDATES · DATA TABLE</h3>
+      <div class="data-sub">SOURCE: ATLAS / CHALDEA · LAST SYNC: 2026.06.10</div>
+
+      <table class="servant-table">
+        <thead>
+          <tr><th>NO.</th><th>NAME</th><th>CLASS</th><th>★</th><th>NP CHARGE</th><th>NP TYPE</th><th>RANK</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="roman">Ⅰ</span></td>
+            <td><span class="name">Merlin</span><span class="alias">梅林·花之魔术师</span></td>
+            <td><span class="tag cls">Caster</span></td>
+            <td><span class="stars">★★★★★</span></td>
+            <td><span class="num">+ 50</span></td>
+            <td><span class="tag">Buster</span></td>
+            <td><span class="num" style="color:var(--seal)">EX</span></td>
+          </tr>
+          <tr>
+            <td><span class="roman">Ⅱ</span></td>
+            <td><span class="name">Tamamo no Mae</span><span class="alias">玉藻前·妖狐</span></td>
+            <td><span class="tag cls">Caster</span></td>
+            <td><span class="stars">★★★★★</span></td>
+            <td><span class="num">+ 50</span></td>
+            <td><span class="tag">Arts</span></td>
+            <td><span class="num" style="color:var(--seal)">A+</span></td>
+          </tr>
+          <tr>
+            <td><span class="roman">Ⅲ</span></td>
+            <td><span class="name">Caster of Limbo</span><span class="alias">芦屋道满</span></td>
+            <td><span class="tag cls">Caster</span></td>
+            <td><span class="stars">★★★★★</span></td>
+            <td><span class="num">+ 30</span></td>
+            <td><span class="tag">Arts</span></td>
+            <td><span class="num">A</span></td>
+          </tr>
+          <tr>
+            <td><span class="roman">Ⅳ</span></td>
+            <td><span class="name">Castoria</span><span class="alias">阿尔托莉雅·Caster</span></td>
+            <td><span class="tag cls">Caster</span></td>
+            <td><span class="stars">★★★★★</span></td>
+            <td><span class="num">+ 30</span></td>
+            <td><span class="tag">Arts</span></td>
+            <td><span class="num">A</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="kicker-quote">建议梅林与玉藻前作为 50% 自充辅助首选，呆毛 Caster 则为 Arts 周回轴心之最优解。</p>
+
+      <p class="body-p">如御主欲深入考察其技能详情或继承关系，可于下方继续提交询问。本协会档案部将以更高密度之数据回应。</p>
+    </div>
+  </article>
+
+  <aside class="aside">
+    <div class="aside-card">
+      <h3>RECENT QUERIES</h3>
+      <ul>
+        <li><span>戴冠战 · Berserker</span><span class="num">12:30</span></li>
+        <li><span>蓝卡 50NP 礼装</span><span class="num">11:42</span></li>
+        <li><span>玉藻前 技能解析</span><span class="num">10:15</span></li>
+        <li><span>狂阶戴冠攻略</span><span class="num">09:50</span></li>
+      </ul>
+    </div>
+
+    <div class="aside-card">
+      <h3>STATS · 数据库</h3>
+      <ul>
+        <li><span>从者总数</span><span class="num">373</span></li>
+        <li><span>效果维度</span><span class="num">55+</span></li>
+        <li><span>社区昵称</span><span class="num">623</span></li>
+        <li><span>攻略文档</span><span class="num">8</span></li>
+      </ul>
+    </div>
+
+    <div class="seal">
+      <div class="seal-en">CHALDEA · CONFIDENTIAL</div>
+      <div class="seal-cn">迦勒底机密</div>
+      <div class="seal-num">No. 0001 / 2026</div>
+    </div>
+  </aside>
+</main>
+
+<div class="input-area">
+  <div class="input-inner">
+    <div class="input-row">
+      <div class="input-prefix">QUERY ›</div>
+      <div class="input-box">
+        <input type="text" placeholder="提交您的询问... 例如「分析下 Castoria 的技能优势」">
+      </div>
+      <button class="send-btn">SUBMIT</button>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <span>ATLAS ACADEMY · CHALDEA</span>
+  <span>合作 怀旧大金 / 咕哒子</span>
+  <span><a href="#">☕ DONATE</a></span>
+  <span>© LAPLACE · v0.3.0</span>
+</div>
+
+</body>
+</html>

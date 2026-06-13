@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方案 E · 异闻带 / Lostbelt</title>
+<link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Noto+Sans+SC:wght@400;500;700&family=Cinzel:wght@500;700;900&family=Cormorant+Garamond:wght@600;700&family=Orbitron:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-1:#070D1C; --bg-2:#0A1426; --bg-3:#122446; --bg-4:#1E3057;
+  --surface:#0F1B33; --surface-2:#162640;
+  --ice:#5BC8E6; --ice-deep:#3FA8D0; --ice-soft:rgba(91,200,230,0.1);
+  --silver:#E8EEF8; --silver-soft:#AAB6CC; --silver-dim:#7A8AA8;
+  --gold:#D4AF37; --gold-soft:#E5C76A;
+  --rule:rgba(91,200,230,0.18);
+  --hot:#FF6B7A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans SC',sans-serif;background:var(--bg-2);color:var(--silver);min-height:100vh;background-image:radial-gradient(ellipse at 30% 0%,var(--bg-3) 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,#1a1d4a 0%,transparent 50%),radial-gradient(circle at 20% 30%,rgba(91,200,230,0.04) 0%,transparent 50%);position:relative}
+body::before{content:"";position:fixed;inset:0;background-image:radial-gradient(circle at 15% 20%,rgba(255,255,255,0.4) 1px,transparent 1px),radial-gradient(circle at 70% 60%,rgba(91,200,230,0.5) 1px,transparent 1px),radial-gradient(circle at 40% 80%,rgba(212,175,55,0.3) 1px,transparent 1px),radial-gradient(circle at 90% 30%,rgba(255,255,255,0.2) 1px,transparent 1px);background-size:140px 140px,200px 200px,160px 160px,180px 180px;opacity:.4;pointer-events:none;z-index:0}
+
+/* ===== Header ===== */
+.header{position:sticky;top:0;z-index:30;background:rgba(10,20,38,0.85);backdrop-filter:blur(16px);border-bottom:1px solid var(--rule)}
+.header-inner{max-width:1200px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;gap:24px}
+.logo{display:flex;align-items:center;gap:14px}
+.logo-mark{width:42px;height:42px;border:1.5px solid var(--ice);color:var(--ice);display:flex;align-items:center;justify-content:center;font-size:18px;transform:rotate(45deg);box-shadow:0 0 20px rgba(91,200,230,0.4),inset 0 0 12px rgba(91,200,230,0.15)}
+.logo-mark span{transform:rotate(-45deg);font-family:serif}
+.logo-text h1{font-family:'Cinzel',serif;font-size:20px;font-weight:700;letter-spacing:6px;color:var(--silver);line-height:1}
+.logo-text .sub{font-size:10px;letter-spacing:3px;color:var(--ice);font-family:'Cinzel',serif;margin-top:4px;text-shadow:0 0 8px rgba(91,200,230,0.5)}
+.model-pill{margin-left:auto;display:flex;align-items:center;gap:8px;padding:6px 14px;background:var(--ice-soft);border:1px solid var(--rule);font-size:11px;font-family:'Orbitron';letter-spacing:2px;color:var(--ice)}
+.model-pill .dot{width:6px;height:6px;background:#22cc88;border-radius:50%;box-shadow:0 0 8px #22cc88}
+.actions{display:flex;gap:6px}
+.icon-btn{width:36px;height:36px;background:transparent;border:1px solid var(--rule);color:var(--silver-soft);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .25s}
+.icon-btn:hover{border-color:var(--ice);color:var(--ice);box-shadow:0 0 12px rgba(91,200,230,0.3)}
+
+/* ===== Main ===== */
+main{max-width:1200px;margin:0 auto;padding:32px 28px 28px;position:relative;z-index:1}
+
+/* Roman section heading */
+.roman-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:32px;padding-bottom:14px;border-bottom:1px solid var(--rule);position:relative}
+.roman-head::after{content:"";position:absolute;left:0;bottom:-1px;width:120px;height:1px;background:var(--ice);box-shadow:0 0 8px var(--ice)}
+.roman-head .title{display:flex;align-items:flex-end;gap:18px}
+.roman-head .roman{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:700;font-size:64px;line-height:.9;color:var(--ice);text-shadow:0 0 20px rgba(91,200,230,0.5)}
+.roman-head .text h2{font-family:'Cinzel',serif;font-size:14px;font-weight:700;letter-spacing:6px;color:var(--silver);text-transform:uppercase;margin-bottom:6px}
+.roman-head .text .cn{font-family:'Noto Sans SC';font-size:18px;font-weight:500;color:var(--silver-soft);letter-spacing:2px}
+.roman-head .stat{font-family:'Orbitron';font-size:11px;color:var(--ice);letter-spacing:2px}
+.roman-head .stat em{color:var(--gold);font-style:normal;font-weight:600;margin:0 4px}
+
+/* ===== Chat ===== */
+.chat{display:flex;flex-direction:column;gap:28px;margin-bottom:48px}
+.msg-user{align-self:flex-end;max-width:70%;background:linear-gradient(135deg,var(--bg-4),var(--bg-3));border:1px solid var(--ice);padding:14px 20px;color:var(--silver);position:relative;clip-path:polygon(0 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%)}
+.msg-user::before{content:"";position:absolute;top:0;right:0;width:12px;height:12px;border-top:2px solid var(--ice);border-right:2px solid var(--ice);box-shadow:0 0 8px var(--ice)}
+.msg-user p{font-size:15px;line-height:1.7}
+
+.msg-ai{align-self:flex-start;max-width:90%;background:linear-gradient(135deg,rgba(15,27,51,0.8),rgba(22,38,64,0.6));backdrop-filter:blur(8px);border:1px solid var(--rule);padding:22px 26px;position:relative}
+.msg-ai::before{content:"";position:absolute;top:-1px;left:-1px;width:24px;height:24px;border-top:2px solid var(--ice);border-left:2px solid var(--ice);box-shadow:0 0 12px rgba(91,200,230,0.5)}
+.msg-ai::after{content:"";position:absolute;bottom:-1px;right:-1px;width:24px;height:24px;border-bottom:2px solid var(--ice);border-right:2px solid var(--ice);box-shadow:0 0 12px rgba(91,200,230,0.5)}
+.msg-ai .ai-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--rule)}
+.msg-ai .avatar{width:32px;height:32px;border:1.5px solid var(--ice);color:var(--ice);display:flex;align-items:center;justify-content:center;font-size:14px;transform:rotate(45deg);box-shadow:0 0 12px rgba(91,200,230,0.4)}
+.msg-ai .avatar span{transform:rotate(-45deg);font-family:serif}
+.msg-ai .ai-name{font-family:'Cinzel',serif;font-weight:700;font-size:13px;letter-spacing:3px;color:var(--silver);text-shadow:0 0 8px rgba(91,200,230,0.3)}
+.msg-ai .ai-meta{margin-left:auto;font-family:'Orbitron';font-size:11px;color:var(--ice);letter-spacing:2px}
+
+.thinking{background:rgba(91,200,230,0.04);border:1px solid var(--rule);padding:12px 16px;margin-bottom:16px;font-family:'Orbitron';font-size:11px;color:var(--silver-dim);line-height:2;letter-spacing:0.5px}
+.thinking .step{display:block}
+.thinking .step::before{content:"› ";color:var(--ice);font-weight:600}
+.thinking .step.done::before{content:"✓ ";color:#22cc88}
+
+.msg-ai p{font-size:15px;line-height:1.85;color:var(--silver);margin-bottom:8px}
+.msg-ai p:last-child{margin-bottom:0}
+.msg-ai strong{color:var(--ice);text-shadow:0 0 8px rgba(91,200,230,0.4);font-weight:600}
+
+/* ===== Servant cards (Lostbelt vertical) ===== */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-top:18px}
+.servant-card{background:linear-gradient(180deg,rgba(30,48,87,0.4),rgba(15,27,51,0.6));border:1px solid var(--rule);overflow:hidden;cursor:pointer;transition:all .35s;position:relative}
+.servant-card:hover{transform:translateY(-6px);border-color:var(--ice);box-shadow:0 12px 32px rgba(91,200,230,0.2),0 0 24px rgba(91,200,230,0.15)}
+.servant-card::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--ice),transparent);opacity:0;transition:opacity .35s}
+.servant-card:hover::before{opacity:1}
+
+.card-art{height:200px;background:linear-gradient(180deg,#1e2c52 0%,#0a1426 100%);position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.card-art::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 30% 30%,rgba(91,200,230,0.15) 0%,transparent 50%),radial-gradient(circle at 70% 70%,rgba(212,175,55,0.1) 0%,transparent 50%)}
+.card-art::after{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 25% 25%,rgba(255,255,255,0.4) 1px,transparent 1px),radial-gradient(circle at 65% 70%,rgba(91,200,230,0.5) 1px,transparent 1px);background-size:60px 60px,80px 80px}
+.card-art .roman{position:relative;font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:700;font-size:72px;color:var(--ice);text-shadow:0 0 24px rgba(91,200,230,0.7),0 0 8px rgba(91,200,230,1);z-index:2}
+.card-art .lostbelt-tag{position:absolute;top:10px;left:10px;font-family:'Cinzel',serif;font-size:9px;letter-spacing:3px;color:var(--gold);padding:3px 8px;border:1px solid var(--gold);background:rgba(0,0,0,0.4);z-index:2}
+.card-art .star-tag{position:absolute;top:10px;right:10px;font-family:'Orbitron';font-size:11px;color:var(--gold);text-shadow:0 0 8px rgba(212,175,55,0.6);z-index:2}
+
+.card-info{padding:14px 16px 16px;background:linear-gradient(180deg,transparent,rgba(15,27,51,0.9));backdrop-filter:blur(6px);border-top:1px solid var(--rule)}
+.card-info .name{font-family:'Cinzel',serif;font-weight:700;font-size:15px;letter-spacing:2px;color:var(--silver);margin-bottom:2px}
+.card-info .alias{font-size:11px;color:var(--silver-dim);margin-bottom:10px;font-family:'Noto Sans SC'}
+.card-info .stats{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-family:'Orbitron';font-size:10px;padding:2px 8px;background:var(--ice-soft);color:var(--ice);border:1px solid var(--rule);letter-spacing:1px}
+.tag.gold-tag{background:rgba(212,175,55,0.12);color:var(--gold);border-color:rgba(212,175,55,0.4);text-shadow:0 0 6px rgba(212,175,55,0.4)}
+
+/* ===== Input ===== */
+.input-area{position:sticky;bottom:0;background:linear-gradient(180deg,transparent,var(--bg-2) 30%,var(--bg-2));padding:24px 28px 24px;border-top:0;z-index:10}
+.input-wrap{max-width:1200px;margin:0 auto;display:flex;gap:12px}
+.input-box{flex:1;background:rgba(15,27,51,0.8);backdrop-filter:blur(12px);border:1px solid var(--ice);padding:0 22px;height:52px;display:flex;align-items:center;position:relative;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));box-shadow:0 0 16px rgba(91,200,230,0.15),inset 0 0 12px rgba(91,200,230,0.05)}
+.input-box:focus-within{box-shadow:0 0 24px rgba(91,200,230,0.4),inset 0 0 16px rgba(91,200,230,0.1)}
+.input-box .prompt{color:var(--ice);margin-right:10px;font-family:'Orbitron';font-weight:600;text-shadow:0 0 8px var(--ice)}
+.input-box input{flex:1;border:0;outline:0;background:transparent;font-size:15px;font-family:'Noto Sans SC';color:var(--silver)}
+.input-box input::placeholder{color:var(--silver-dim)}
+.send-btn{height:52px;padding:0 28px;background:transparent;border:1px solid var(--ice);color:var(--ice);font-family:'Cinzel',serif;font-weight:700;font-size:13px;letter-spacing:4px;cursor:pointer;transition:all .25s;clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%);box-shadow:0 0 16px rgba(91,200,230,0.2),inset 0 0 8px rgba(91,200,230,0.1);position:relative}
+.send-btn:hover{background:rgba(91,200,230,0.12);box-shadow:0 0 24px rgba(91,200,230,0.5),inset 0 0 12px rgba(91,200,230,0.2);color:#fff}
+
+/* ===== Footer ===== */
+.footer{max-width:1200px;margin:0 auto;padding:0 28px 24px;font-family:'Cinzel',serif;font-size:11px;color:var(--silver-dim);display:flex;justify-content:center;gap:18px;flex-wrap:wrap;letter-spacing:2px;position:relative;z-index:1}
+.footer span em{color:var(--ice);font-style:normal;font-weight:600}
+.footer a{color:var(--ice);text-decoration:none;border-bottom:1px solid var(--rule);padding-bottom:1px}
+.footer a:hover{color:var(--gold);border-color:var(--gold)}
+
+.back{position:fixed;top:18px;right:18px;z-index:50;background:rgba(10,20,38,0.6);border:1px solid var(--ice);color:var(--ice);padding:6px 14px;font-size:11px;letter-spacing:2px;text-decoration:none;font-family:'Cinzel',serif;backdrop-filter:blur(10px)}
+.back:hover{background:rgba(91,200,230,0.15);box-shadow:0 0 16px rgba(91,200,230,0.3)}
+</style>
+</head>
+<body>
+<a href="index.html" class="back">← BACK</a>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-mark"><span>⧫</span></div>
+      <div class="logo-text"><h1>LAPLACE</h1><div class="sub">— LOSTBELT TERMINAL —</div></div>
+    </div>
+    <div class="model-pill">
+      <span class="dot"></span>
+      <span>GPT-4o · READY</span>
+    </div>
+    <div class="actions">
+      <div class="icon-btn">＋</div><div class="icon-btn">⌖</div><div class="icon-btn">✦</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="roman-head">
+    <div class="title">
+      <div class="roman">Ⅰ</div>
+      <div class="text">
+        <h2>SUMMONING SESSION</h2>
+        <div class="cn">从者数据库 · 召唤检索</div>
+      </div>
+    </div>
+    <div class="stat">SERVANTS <em>373</em> · NICKNAMES <em>623</em> · EFFECTS <em>55+</em></div>
+  </div>
+
+  <div class="chat">
+    <div class="msg-user"><p>30NP 自充以上的 Caster 有哪些？最好五星。</p></div>
+
+    <div class="msg-ai">
+      <div class="ai-head">
+        <div class="avatar"><span>⧫</span></div>
+        <div class="ai-name">LAPLACE</div>
+        <div class="ai-meta">12:34:21 · 1.2s</div>
+      </div>
+      <div class="thinking">
+        <span class="step done">parse_intent → class=Caster, np≥30, ★5</span>
+        <span class="step done">skill::search_by_np_charge → 4 found</span>
+        <span class="step done">filter_by_class · filter_by_rarity</span>
+        <span class="step">merge_results → 4 candidates</span>
+      </div>
+      <p>御主，已从 <strong>373 名</strong>英灵中检索到 <strong>4 位</strong>符合条件的 Caster：</p>
+      <div class="cards">
+        <div class="servant-card">
+          <div class="card-art">
+            <div class="lostbelt-tag">CASTER</div>
+            <div class="star-tag">★ 5</div>
+            <div class="roman">Ⅰ</div>
+          </div>
+          <div class="card-info"><div class="name">MERLIN</div><div class="alias">梅林·花之魔术师</div><div class="stats"><span class="tag gold-tag">+50 NP</span><span class="tag">Buster</span></div></div>
+        </div>
+        <div class="servant-card">
+          <div class="card-art">
+            <div class="lostbelt-tag">CASTER</div>
+            <div class="star-tag">★ 5</div>
+            <div class="roman">Ⅱ</div>
+          </div>
+          <div class="card-info"><div class="name">TAMAMO</div><div class="alias">玉藻前·妖狐</div><div class="stats"><span class="tag gold-tag">+50 NP</span><span class="tag">Arts</span></div></div>
+        </div>
+        <div class="servant-card">
+          <div class="card-art">
+            <div class="lostbelt-tag">CASTER</div>
+            <div class="star-tag">★ 5</div>
+            <div class="roman">Ⅲ</div>
+          </div>
+          <div class="card-info"><div class="name">LIMBO</div><div class="alias">芦屋道满</div><div class="stats"><span class="tag gold-tag">+30 NP</span><span class="tag">Arts</span></div></div>
+        </div>
+        <div class="servant-card">
+          <div class="card-art">
+            <div class="lostbelt-tag">CASTER</div>
+            <div class="star-tag">★ 5</div>
+            <div class="roman">Ⅳ</div>
+          </div>
+          <div class="card-info"><div class="name">CASTORIA</div><div class="alias">呆毛 Caster</div><div class="stats"><span class="tag gold-tag">+30 NP</span><span class="tag">Arts</span></div></div>
+        </div>
+      </div>
+      <p style="margin-top:14px">建议 <strong>梅林 / 玉藻前</strong> 为 50% 自充辅助首选，<strong>Castoria</strong> 为 Arts 周回轴心。</p>
+    </div>
+  </div>
+</main>
+
+<div class="input-area">
+  <div class="input-wrap">
+    <div class="input-box">
+      <span class="prompt">&gt;</span>
+      <input type="text" placeholder="提交你的询问 · 例如「分析 Castoria 技能」">
+    </div>
+    <button class="send-btn">SUMMON</button>
+  </div>
+</div>
+
+<div class="footer">
+  <span>ATLAS · CHALDEA</span>
+  <span>合作 <em>怀旧大金</em></span>
+  <span><a href="#">☕ 打赏项目</a></span>
+  <span>v0.3.0 · INTERNAL</span>
+</div>
+
+</body>
+</html>

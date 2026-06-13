@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方案 B · 圣杯仪式 / Holy Grail Ritual</title>
+<link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Noto+Sans+SC:wght@400;500;700&family=Cinzel:wght@500;700;900&family=Cormorant+Garamond:wght@600;700&family=Orbitron:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --hero-1:#0B1736; --hero-2:#1A2C5C; --hero-3:#2A3D7A;
+  --gold:#D4AF37; --gold-soft:#E5C76A;
+  --paper:#FFFFFF; --bg:#FAFBFD;
+  --ink:#0A1F4A; --ink-deep:#051333; --ink-soft:#3A4A6E;
+  --rule:#D5DAE3;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans SC',sans-serif;background:var(--bg);color:var(--ink-deep);min-height:100vh}
+
+/* ===== Top nav (transparent over hero) ===== */
+.nav{position:absolute;top:0;left:0;right:0;z-index:10;padding:18px 36px;display:flex;align-items:center;gap:24px}
+.nav .logo{display:flex;align-items:center;gap:12px}
+.nav .logo-mark{width:36px;height:36px;border:1.5px solid var(--gold);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:18px;transform:rotate(45deg)}
+.nav .logo-mark span{transform:rotate(-45deg)}
+.nav .logo-text{font-family:'Cinzel',serif;font-size:18px;font-weight:700;letter-spacing:6px;color:#fff}
+.nav .actions{margin-left:auto;display:flex;gap:6px}
+.nav .ico{width:36px;height:36px;border:1px solid rgba(255,255,255,0.25);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(10px);background:rgba(255,255,255,0.04)}
+.nav .ico:hover{border-color:var(--gold);color:var(--gold)}
+
+/* ===== Hero ===== */
+.hero{min-height:560px;background:radial-gradient(ellipse at 50% 30%,var(--hero-3) 0%,var(--hero-2) 35%,var(--hero-1) 80%);position:relative;display:flex;align-items:center;justify-content:center;flex-direction:column;overflow:hidden;padding:120px 24px 80px;text-align:center}
+.hero::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 20% 20%,rgba(255,255,255,0.4) 1px,transparent 1px),radial-gradient(circle at 70% 60%,rgba(255,255,255,0.3) 1px,transparent 1px),radial-gradient(circle at 40% 80%,rgba(212,175,55,0.4) 1px,transparent 1px),radial-gradient(circle at 90% 30%,rgba(255,255,255,0.2) 1px,transparent 1px);background-size:120px 120px,200px 200px,160px 160px,180px 180px;opacity:.7}
+.hero::after{content:"";position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(180deg,transparent,var(--bg))}
+
+.hero-mark{font-size:96px;color:var(--gold);text-shadow:0 0 60px rgba(212,175,55,0.6),0 0 16px rgba(212,175,55,0.8);font-family:serif;line-height:1;margin-bottom:24px;position:relative;z-index:2}
+.hero-title{font-family:'Cinzel',serif;font-size:64px;font-weight:900;letter-spacing:18px;color:#fff;text-shadow:0 4px 24px rgba(0,0,0,0.5);position:relative;z-index:2;margin-bottom:14px;padding-left:18px}
+.hero-sub{font-family:'Cormorant Garamond',serif;font-size:22px;font-style:italic;color:var(--gold-soft);letter-spacing:2px;position:relative;z-index:2;margin-bottom:32px}
+.hero-tags{display:flex;gap:14px;justify-content:center;position:relative;z-index:2;margin-bottom:32px}
+.hero-tags span{font-family:'Cinzel',serif;font-size:11px;letter-spacing:3px;color:#fff;padding:8px 16px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.04);backdrop-filter:blur(8px)}
+.hero-cta{display:inline-flex;align-items:center;gap:12px;color:var(--gold);font-family:'Cinzel',serif;font-size:13px;letter-spacing:4px;position:relative;z-index:2;cursor:pointer;animation:bob 2s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
+.hero-cta::after{content:"↓";font-size:18px}
+
+/* ===== Main ===== */
+main{max-width:1100px;margin:0 auto;padding:48px 28px 24px}
+
+.section-title{display:flex;align-items:center;gap:18px;margin-bottom:36px}
+.section-title .line{flex:1;height:1px;background:var(--rule)}
+.section-title h2{font-family:'Cinzel',serif;font-size:14px;font-weight:700;letter-spacing:6px;color:var(--ink-deep)}
+.section-title h2 em{color:var(--gold);font-style:normal;margin-right:8px}
+
+/* ===== Chat ===== */
+.chat{display:flex;flex-direction:column;gap:28px;margin-bottom:48px}
+.msg-user{align-self:flex-end;max-width:70%;background:var(--paper);border:1px solid var(--ink);border-radius:18px 18px 4px 18px;padding:14px 20px;box-shadow:0 4px 24px rgba(10,31,74,0.08)}
+.msg-user p{font-size:15px;line-height:1.7;color:var(--ink-deep)}
+
+.msg-ai{align-self:flex-start;max-width:90%;background:var(--paper);border:1px solid var(--rule);border-radius:18px 18px 18px 4px;padding:24px 26px;box-shadow:0 8px 32px rgba(10,31,74,0.06);position:relative}
+.msg-ai::before{content:"";position:absolute;top:24px;left:-1px;width:4px;height:36px;background:var(--gold)}
+.msg-ai .ai-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.msg-ai .avatar{width:32px;height:32px;background:linear-gradient(135deg,var(--hero-2),var(--hero-1));color:var(--gold);display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:18px;font-family:serif}
+.msg-ai .ai-name{font-family:'Cinzel',serif;font-weight:700;font-size:13px;letter-spacing:3px;color:var(--ink-deep)}
+.msg-ai .ai-time{margin-left:auto;font-size:11px;color:var(--ink-soft);font-family:'Orbitron'}
+
+.thinking{background:linear-gradient(135deg,#F0F4FB,#FAFBFD);border:1px solid var(--rule);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:var(--ink-soft);line-height:2}
+.thinking .step{display:flex;gap:10px}
+.thinking .step::before{content:"◇";color:var(--gold);flex-shrink:0}
+.thinking .step.done::before{content:"◆";color:var(--ink)}
+
+.msg-ai p{font-size:15px;line-height:1.85;color:var(--ink-deep);margin-bottom:8px}
+.msg-ai p:last-child{margin-bottom:0}
+.msg-ai strong{color:var(--ink)}
+
+/* ===== Servant cards (Lostbelt-like vertical) ===== */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-top:18px}
+.servant-card{background:var(--paper);border-radius:8px;overflow:hidden;cursor:pointer;transition:all .35s;position:relative;border:1px solid var(--rule)}
+.servant-card:hover{transform:translateY(-6px);box-shadow:0 16px 40px rgba(10,31,74,0.18);border-color:var(--gold)}
+.card-art{height:140px;background:linear-gradient(180deg,var(--hero-2),var(--hero-1));position:relative;display:flex;align-items:flex-end;justify-content:center;padding:14px;color:var(--gold)}
+.card-art::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 30% 30%,rgba(255,255,255,0.18) 1px,transparent 1px),radial-gradient(circle at 70% 60%,rgba(212,175,55,0.4) 1px,transparent 1px);background-size:60px 60px,80px 80px}
+.card-art .roman{position:relative;font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:700;font-size:48px;color:var(--gold);text-shadow:0 0 16px rgba(212,175,55,0.6)}
+.card-info{padding:14px 16px 16px}
+.card-info .name{font-family:'Cinzel',serif;font-weight:700;font-size:15px;letter-spacing:2px;color:var(--ink-deep);margin-bottom:2px}
+.card-info .alias{font-size:11px;color:var(--ink-soft);margin-bottom:10px}
+.card-info .stats{display:flex;gap:10px;flex-wrap:wrap}
+.tag{font-size:10px;padding:2px 8px;background:rgba(212,175,55,0.12);color:var(--ink);border-radius:3px;font-family:'Cinzel',serif;letter-spacing:1px;font-weight:500}
+.tag.gold-tag{background:var(--gold);color:#fff}
+
+/* ===== Input ===== */
+.input-area{position:sticky;bottom:0;background:linear-gradient(180deg,transparent,var(--bg) 30%,var(--bg));padding:24px 28px 28px;border-top:0}
+.input-wrap{max-width:1100px;margin:0 auto;display:flex;gap:12px}
+.input-box{flex:1;background:var(--paper);border:1px solid var(--rule);border-radius:30px;padding:0 22px;height:52px;display:flex;align-items:center;box-shadow:0 8px 32px rgba(10,31,74,0.08)}
+.input-box:focus-within{border-color:var(--gold);box-shadow:0 0 0 4px rgba(212,175,55,0.12)}
+.input-box .prompt{color:var(--gold);margin-right:10px;font-size:18px;font-family:serif}
+.input-box input{flex:1;border:0;outline:0;font-size:15px;font-family:'Noto Sans SC';color:var(--ink-deep)}
+.send-btn{height:52px;padding:0 28px;background:var(--ink-deep);color:var(--gold);border:1px solid var(--ink-deep);border-radius:30px;font-family:'Cinzel',serif;font-weight:700;font-size:13px;letter-spacing:4px;cursor:pointer;transition:all .25s}
+.send-btn:hover{background:var(--ink);box-shadow:0 0 0 4px rgba(212,175,55,0.2),0 8px 24px rgba(10,31,74,0.25)}
+
+/* ===== Footer ===== */
+.footer{max-width:1100px;margin:0 auto;padding:0 28px 24px;font-size:11px;color:var(--ink-soft);display:flex;justify-content:center;gap:18px;flex-wrap:wrap;letter-spacing:1px;font-family:'Cinzel',serif}
+.footer span em{color:var(--ink);font-style:normal;font-weight:600}
+.footer a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+
+.back{position:fixed;top:18px;right:18px;z-index:50;background:rgba(0,0,0,0.5);border:1px solid var(--gold);color:var(--gold);padding:6px 14px;font-size:11px;letter-spacing:2px;text-decoration:none;font-family:'Cinzel',serif;backdrop-filter:blur(10px)}
+.back:hover{background:var(--gold);color:#000}
+</style>
+</head>
+<body>
+<a href="index.html" class="back">← BACK</a>
+
+<nav class="nav">
+  <div class="logo">
+    <div class="logo-mark"><span>⧫</span></div>
+    <div class="logo-text">LAPLACE</div>
+  </div>
+  <div class="actions">
+    <div class="ico">＋</div><div class="ico">⌖</div><div class="ico">✦</div>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-mark">⧫</div>
+  <h1 class="hero-title">LAPLACE</h1>
+  <div class="hero-sub">— 迦勒底·答疑终端 —</div>
+  <div class="hero-tags">
+    <span>NATURAL LANGUAGE</span>
+    <span>623 NICKNAMES</span>
+    <span>LOSTBELT GUIDES</span>
+  </div>
+  <div class="hero-cta">SCROLL TO BEGIN</div>
+</section>
+
+<main>
+  <div class="section-title">
+    <div class="line"></div>
+    <h2><em>Ⅰ</em>SUMMONING SESSION</h2>
+    <div class="line"></div>
+  </div>
+
+  <div class="chat">
+    <div class="msg-user"><p>30NP 自充以上的 Caster 有哪些？最好五星。</p></div>
+
+    <div class="msg-ai">
+      <div class="ai-head">
+        <div class="avatar">⧫</div>
+        <div class="ai-name">LAPLACE</div>
+        <div class="ai-time">12:34:21</div>
+      </div>
+      <div class="thinking">
+        <div class="step done">解析意图：Caster · NP ≥ 30 · ★5</div>
+        <div class="step done">召唤 NP 充能模块 → 4 名候选</div>
+        <div class="step">合并结果 · 按 NP 量降序</div>
+      </div>
+      <p>御主，圣杯回应了你的呼唤。共检索到 <strong>4 位</strong>符合条件的英灵：</p>
+      <div class="cards">
+        <div class="servant-card">
+          <div class="card-art"><div class="roman">Ⅰ</div></div>
+          <div class="card-info"><div class="name">MERLIN</div><div class="alias">梅林·花之魔术师</div><div class="stats"><span class="tag">Caster</span><span class="tag gold-tag">+50 NP</span><span class="tag">B</span></div></div>
+        </div>
+        <div class="servant-card">
+          <div class="card-art"><div class="roman">Ⅱ</div></div>
+          <div class="card-info"><div class="name">TAMAMO</div><div class="alias">玉藻前·妖狐</div><div class="stats"><span class="tag">Caster</span><span class="tag gold-tag">+50 NP</span><span class="tag">A</span></div></div>
+        </div>
+        <div class="servant-card">
+          <div class="card-art"><div class="roman">Ⅲ</div></div>
+          <div class="card-info"><div class="name">LIMBO</div><div class="alias">芦屋道满</div><div class="stats"><span class="tag">Caster</span><span class="tag gold-tag">+30 NP</span><span class="tag">A</span></div></div>
+        </div>
+        <div class="servant-card">
+          <div class="card-art"><div class="roman">Ⅳ</div></div>
+          <div class="card-info"><div class="name">CASTORIA</div><div class="alias">呆毛 Caster</div><div class="stats"><span class="tag">Caster</span><span class="tag gold-tag">+30 NP</span><span class="tag">A</span></div></div>
+        </div>
+      </div>
+      <p style="margin-top:14px">建议 <strong>梅林 / 玉藻前</strong> 作为 50% 自充辅助首选。</p>
+    </div>
+  </div>
+</main>
+
+<div class="input-area">
+  <div class="input-wrap">
+    <div class="input-box">
+      <span class="prompt">⧫</span>
+      <input type="text" placeholder="献上你的疑问，圣杯将回应... 例如「分析 Castoria 技能」">
+    </div>
+    <button class="send-btn">SUMMON</button>
+  </div>
+</div>
+
+<div class="footer">
+  <span>ATLAS · CHALDEA</span>
+  <span>合作 <em>怀旧大金</em></span>
+  <span><a href="#">☕ 打赏项目</a></span>
+  <span>v0.3.0</span>
+</div>
+
+</body>
+</html>
