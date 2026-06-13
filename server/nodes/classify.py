@@ -38,6 +38,12 @@ async def classify_node(state: PipelineState) -> PipelineState:
     - 把 prev_turn 写到 state.extras["prev_turn"]，供下游 merge_filters 节点使用
     - turn_type == MAJOR 时调用 SessionStore.clear_session() 清空遗留状态
     """
+    # ── SSE：入口 thinking 事件（流式模式才注入）──
+    if state.extras.get("streaming"):
+        state.pending_events.append(
+            {"type": "thinking", "data": {"phase": "routing", "message": "正在分析问题类型..."}}
+        )
+
     # ── 多轮：加载上一轮快照 ──
     session_store: SessionStore | None = state.extras.get("session_store")
     prev_summary: str | None = None

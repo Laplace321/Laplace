@@ -17,6 +17,7 @@ query / model_used，作为终态节点直接连 END。Agent 失败时按各 rea
 from __future__ import annotations
 
 import time
+from collections.abc import AsyncGenerator
 
 from server.agent.agent_loop import AgentResult, agent_route
 from server.agent.tool_handlers import TOOL_HANDLERS
@@ -210,3 +211,146 @@ async def agent_fallback_node(state: PipelineState) -> PipelineState:
         if cfg["error_model"] is not None:
             state.model_used = cfg["error_model"]
         return state
+
+
+# Agent 工具名 → 用户友好中文描述（与 pipeline._AGENT_TOOL_DISPLAY 一致）
+_AGENT_TOOL_DISPLAY = {
+    "search_servants": "搜索从者",
+    "lookup_servant": "查询从者详情",
+    "compare_servants": "对比从者",
+    "list_effects": "查询效果列表",
+    "list_traits": "查询特性列表",
+    "list_classes": "查询职阶列表",
+    "lookup_skill_detail": "查询技能数值",
+}
+
+
+def _build_agent_progress_messages(tool_trace: list[dict]) -> list[str]:
+    """将 Agent tool_trace 转换为用户友好的中文进度消息列表。"""
+    messages: list[str] = []
+    for entry in tool_trace:
+        tool_name = entry.get("tool", "")
+        display_name = _AGENT_TOOL_DISPLAY.get(tool_name, tool_name)
+        summary = entry.get("result_summary", "")
+        messages.append(f"{display_name}：{summary}" if summary else display_name)
+    return messages
+
+
+def _agent_thinking_message(reason: str) -> str:
+    """根据 bail_out 原因返回 Agent fallback 入口的 thinking message（与原 SSE 文案对齐）。"""
+    if reason == "low_confidence_agent":
+        return "正在启动智能搜索..."
+    if reason == "routing_failed":
+        return "路由异常，正在启动智能搜索..."
+    return "需要更深入分析，启动智能搜索..."
+
+
+async def agent_fallback_stream_node(state: PipelineState) -> AsyncGenerator[dict | PipelineState, None]:
+    """Agent 兜底节点（SSE 流式版） — 与 ``agent_fallback_node`` 行为等价，差异仅在 yield 进度事件。
+
+    yield 顺序：
+    1. ``thinking phase=agent_fallback`` 入口提示（按 reason 选择文案）
+    2. agent_route 完成后：``thinking phase=agent_tool`` * N（每个工具调用一条）
+    3. 有从者数据时：``servants`` 事件
+    4. ``delta`` 事件（一次性，agent reply 不能逐 token 流）
+    5. yield 终态 state
+    """
+    cfg = _build_agent_config(state)
+    reason = state.extras.get("bail_out", "unknown")
+    trace_id = state.trace_id
+    request_start = state.request_start
+    oneshot_ctx = cfg["oneshot_context"]
+
+    yield {
+        "type": "thinking",
+        "data": {"phase": "agent_fallback", "message": _agent_thinking_message(reason)},
+    }
+
+    try:
+        if oneshot_ctx is not None:
+            agent_result: AgentResult = await agent_route(
+                state.user_message, TOOL_HANDLERS, trace_id, oneshot_context=oneshot_ctx
+            )
+        else:
+            agent_result = await agent_route(state.user_message, TOOL_HANDLERS, trace_id)
+
+        state.trace_total_tokens += agent_result.total_tokens
+        category, clean_reply = classify_agent_reply(agent_result.reply)
+        returned = agent_result.servants_data[:MAX_RESULTS] if agent_result.servants_data and not category else []
+
+        # 推送工具进度
+        for progress_msg in _build_agent_progress_messages(agent_result.tool_trace):
+            yield {"type": "thinking", "data": {"phase": "agent_tool", "message": progress_msg}}
+
+        # 推送卡片
+        if agent_result.servants_data and not category:
+            yield {
+                "type": "servants",
+                "data": {
+                    "servants": returned,
+                    "count": len(returned),
+                    "total": len(agent_result.servants_data),
+                },
+            }
+
+        # 推送 reply（一次性 delta）
+        yield {"type": "delta", "data": {"text": clean_reply}}
+
+        agent_detail_payload: dict = {
+            "rounds": agent_result.rounds,
+            "agent_tokens": agent_result.total_tokens,
+            "tool_trace": agent_result.tool_trace,
+            "reply": clean_reply,
+        }
+        if oneshot_ctx is not None:
+            agent_detail_payload["agent_elapsed_ms"] = round(agent_result.elapsed_ms, 2)
+        await log_trace_event(trace_id, "agent_detail", agent_detail_payload)
+
+        await log_trace_event(
+            trace_id,
+            "final",
+            {
+                "total_time_ms": (time.monotonic() - request_start) * 1000,
+                "result": cfg["result_label"],
+                "mode": "agent_fallback",
+                "total_found": len(agent_result.servants_data),
+                "total_tokens": state.trace_total_tokens,
+            },
+        )
+
+        query_payload: dict = {"mode": cfg["extra_query_mode"]}
+        if cfg["extra_query_extra"]:
+            query_payload.update(cfg["extra_query_extra"])
+
+        state.reply = clean_reply
+        state.servants = returned
+        state.count = len(agent_result.servants_data)
+        state.query = query_payload
+        state.model_used = f"agent_{agent_result.rounds}r"
+        yield state
+        return
+
+    except Exception as agent_err:  # noqa: BLE001
+        await log_trace_event(
+            trace_id,
+            "final",
+            {
+                "total_time_ms": (time.monotonic() - request_start) * 1000,
+                "result": cfg["error_result"],
+                "mode": cfg["error_mode"],
+                "total_tokens": state.trace_total_tokens,
+            },
+            error=str(agent_err) if cfg["error_result"] == "routing_error" else None,
+        )
+        state.reply = cfg["error_fallback_reply"]
+        state.servants = []
+        state.count = 0
+        state.query = cfg["error_query"]
+        if cfg["error_model"] is not None:
+            state.model_used = cfg["error_model"]
+        # 兜底：确保前端有内容
+        try:
+            yield {"type": "delta", "data": {"text": state.reply}}
+        except Exception:  # noqa: BLE001
+            pass
+        yield state

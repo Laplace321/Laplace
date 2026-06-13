@@ -30,7 +30,7 @@ from server.admin.routes import router as admin_routes_router
 # ── 业务模块 ──
 from server.llm import chat_completion
 from server.logger import find_trace, read_trace_summaries, read_traces
-from server.pipeline import ChatResponse, handle_skill_mode, resume_skill_mode, stream_event_generator
+from server.pipeline import ChatResponse, handle_skill_mode, resume_skill_mode, stream_chat_events
 from server.prompts import build_routing_prompt
 from server.query_executor import load_database
 from server.rate_limiter import RateLimitMiddleware
@@ -468,11 +468,9 @@ async def chat_stream(
     支持 preset_name 参数：有值时跳过 LLM 路由，直接展开预设 skill_calls。
     支持 confirmation_context 参数：用户确认选择后携带的上下文，用于精确路由。
     支持 confirmation_id 参数：用户选择的选项 ID（collectionNo），用于精确定位实体。
-    支持 session_id 参数：前端会话 ID，用于多轮对话状态关联（当前 SSE 路径暂不消费，
-    Task 5 中将统一接通 SessionStore 完成多轮闭环）。
+    支持 session_id 参数：前端会话 ID，用于多轮对话状态关联，由 stream_chat_events
+    透传到 SessionStore 完成多轮闭环。
     """
-    # session_id 当前 SSE 路径暂不消费，仅作前向兼容占位
-    _ = session_id
     client_ip = (
         request.headers.get("x-forwarded-for", "").split(",")[0].strip() or request.client.host
         if request.client
@@ -480,12 +478,13 @@ async def chat_stream(
     )
 
     async def event_generator():
-        async for event in stream_event_generator(
+        async for event in stream_chat_events(
             message,
             preset_name,
             client_ip=client_ip,
             confirmation_context=confirmation_context,
             confirmation_id=confirmation_id,
+            session_id=session_id,
         ):
             yield event
 
