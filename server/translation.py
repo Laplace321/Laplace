@@ -32,6 +32,52 @@ def get_np_target_map() -> dict:
 
 
 _effect_map: dict | None = None
+_trait_map: dict[int, str] | None = None
+
+
+def get_trait_translation(trait_id: int) -> str | None:
+    """将 trait ID 翻译为中文名称。首次调用时加载并缓存映射。
+
+    Returns:
+        中文名称；查不到或为 'None' 时返回 None。
+    """
+    global _trait_map
+    if _trait_map is None:
+        _trait_map = {}
+        mappings_path = Path(__file__).parent / "knowledge" / "mappings.json"
+        if mappings_path.exists():
+            with open(mappings_path, encoding="utf-8") as f:
+                data = json.load(f)
+                for k, v in (data.get("traits") or {}).items():
+                    cn = v.get("CN") if isinstance(v, dict) else None
+                    if cn and cn != "None":
+                        try:
+                            _trait_map[int(k)] = cn
+                        except (TypeError, ValueError):
+                            continue
+    return _trait_map.get(int(trait_id)) if trait_id is not None else None
+
+
+def translate_traits(trait_ids: list, *, exclude_meta: bool = True) -> list[str]:
+    """批量翻译 trait ID 列表，过滤无映射项。
+
+    Args:
+        trait_ids: trait ID 整数列表
+        exclude_meta: 是否过滤掉在 entry 其他字段已呈现的元数据
+            （性别/职阶/主副属性/稀有度/“从者”通用标签），
+            默认 True。
+    """
+    META_PREFIXES = ("性别:", "职阶:", "属性:", "副属性:", "★")
+    META_EXACT = {"从者"}
+    out: list[str] = []
+    for tid in trait_ids or []:
+        cn = get_trait_translation(tid)
+        if not cn:
+            continue
+        if exclude_meta and (cn.startswith(META_PREFIXES) or cn in META_EXACT):
+            continue
+        out.append(cn)
+    return out
 
 
 def get_effect_translation(effect_code: str) -> str:
