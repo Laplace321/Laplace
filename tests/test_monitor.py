@@ -165,11 +165,12 @@ class TestAlerter:
     def test_skip_without_config(self):
         """未配置 TELEGRAM_BOT_TOKEN 时静默跳过。"""
         with patch.dict("os.environ", {}, clear=False):
-            # 确保环境变量不存在
+            # 确保环境变量不存在（本地 .env 通过 server.main 注入后会污染 env，需一并清理）
             import os
 
             os.environ.pop("TELEGRAM_BOT_TOKEN", None)
             os.environ.pop("TELEGRAM_CHAT_ID", None)
+            os.environ.pop("BARK_URL", None)
             alerter = Alerter()
             assert not alerter.is_configured
 
@@ -205,10 +206,12 @@ class TestAlerter:
     async def test_send_alert_skip_unconfigured(self):
         """未配置时 send_alert 返回 False，不发送。"""
         with patch.dict("os.environ", {}, clear=False):
+            # 本地 .env 通过 server.main 注入后会污染 env，需一并清理 BARK_URL
             import os
 
             os.environ.pop("TELEGRAM_BOT_TOKEN", None)
             os.environ.pop("TELEGRAM_CHAT_ID", None)
+            os.environ.pop("BARK_URL", None)
             alerter = Alerter()
             result = await alerter.send_alert("CRITICAL", "Test", "test message")
             assert result is False
