@@ -4,6 +4,7 @@
 
 | 日期 | 事件 | 备注 |
 | :--- | :--- | :--- |
+| 2026-06-13 | v0.4.5 职阶中文查询零命中修复 (hotfix) | 线上 trace c997876c 暴露：LLM 按预消化输出 className=「狂阶」中文，但 search_by_class.filter 直接与 servant.className=「berserker」英文做 lower() 比较永不命中；三层防御修复：A 防御层 search_by_class.filter 用 get_class_map() 反向查表中→英，B 显示层 translation.describe_filters 兼容 camelCase/snake_case 双 key + 英文反查中文显示（消除「职阶 = 」空白 bug），C 引导层 prompts.py 明确 className 指定时传中文 + skill description 补充中英文说明；新增 tests/test_search_by_class.py 11 例单元测试 |
 | 2026-06-13 | v0.4.4 灵衣特性识别与反向查询修复 | 「灵衣」别名补全（"持有灵衣"/"有灵衣" → “灵衣持有者”）与 costume 换装语义边界明确（灵衣指 FGO trait，与角色界面换装无关）；反向特性查询数据投影补齐——详情/列表模式均投影「特性」字段（translate_traits 过滤性别/职阶/属性等元数据），支持“XX 从者是否有 YY 特性”类问题明确回答是/否；lookup_servant 新增中文职阶限定词识别（狂阶宫本武藏/宫本武藏（狂阶）等 19 个职阶词的前缀/括号后缀形式），避免已明确职阶仅名重名的从者误触多候选澄清；统一 FGO 术语“特性”（去除自造词“战斗特性”）；ADR-025 补充“未识别特性时的主动澄清”关联议题章节 |
 | 2026-06-12 | v0.4.3 从者数据库深度升级 | 多宝具从者拆分识别（卫宫/BB迪拜/太空伊什塔尔/托勒密变身）；条件触发效果模型（回合结束/攻击后/延迟触发/中弹反击 等 17 种）；A/B/C/D 类乘区标签烘焙到效果条目；特攻目标特性反查索引（antiTraitIndex）；宝具数值双维度（npValues NP1-5 + ocValues OC1-5）完整保留，D 类宝具特攻按 OC 维度烘焙；玩家视角 function 过滤（剔除仅敌方生效条目）；条件触发常量外置 translations.json；多效果筛选 SSE 描述兼容 effects 数组；修复 obao 推理泄漏 / Agent XML 标签泄漏 / A 类乘区路由误判 / detail_mode 数值不全；新增伤害公式攻略 |
 | 2026-06-10 | v0.4.2 全站视觉重构 | 主页/历史日志/管理后台/更新日志四个前端页面统一改造为 FGO 档案室风格（纸白+海军蓝+古金、直角硬阴影、Cinzel+思源宋体）；用户头像替换为芙芙形象；修复 PC 流式期间卡片单列跳变（assistant message-content flex:1 1 auto）+ 移动端长名卡片溢出（grid 子项 min-width:0）+ 响应式降级策略（minmax(280px,1fr) auto-fit，不够自动单列保证信息完整） |
