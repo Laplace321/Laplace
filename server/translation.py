@@ -95,12 +95,22 @@ def describe_filters(skill_calls: list[dict]) -> list[str]:
         params = call.get("params", {})
         if name == "search_by_effect":
             effect = params.get("effect", "")
-            translated = get_effect_translation(effect) if effect else effect
+            effects = params.get("effects")
             source = params.get("source", "both")
             qualifier = effect_qualifier(params)
             max_cd = params.get("maxCd") or params.get("max_cd")
             cd_suffix = f" + CD ≤ {max_cd}回合" if max_cd else ""
-            if not effect and max_cd:
+            effects_op = params.get("effectsOp", "and")
+            # 多效果数组
+            if effects and isinstance(effects, list):
+                translated_list = [get_effect_translation(e) for e in effects]
+                joiner = " / " if effects_op == "or" else " + "
+                translated = joiner.join(translated_list)
+            elif effect:
+                translated = get_effect_translation(effect)
+            else:
+                translated = ""
+            if not effect and not effects and max_cd:
                 # 纯 CD 查询
                 descriptions.append(f"技能CD ≤ {max_cd}回合")
             elif source == "skill":
@@ -111,17 +121,35 @@ def describe_filters(skill_calls: list[dict]) -> list[str]:
                 descriptions.append(f"效果包含「{qualifier}{translated}」{cd_suffix}")
         elif name == "search_by_skill_effect":
             effect = params.get("skillEffect") or params.get("effect", "")
-            translated = get_effect_translation(effect) if effect else effect
+            effects = params.get("effects") or params.get("skillEffects")
             qualifier = effect_qualifier(params)
             max_cd = params.get("maxCd") or params.get("max_cd")
             cd_suffix = f" + CD ≤ {max_cd}回合" if max_cd else ""
-            if not effect and max_cd:
+            effects_op = params.get("effectsOp") or params.get("skillEffectsOp") or "and"
+            if effects and isinstance(effects, list):
+                translated_list = [get_effect_translation(e) for e in effects]
+                joiner = " / " if effects_op == "or" else " + "
+                translated = joiner.join(translated_list)
+            elif effect:
+                translated = get_effect_translation(effect)
+            else:
+                translated = ""
+            if not effect and not effects and max_cd:
                 descriptions.append(f"技能CD ≤ {max_cd}回合")
             else:
                 descriptions.append(f"技能效果包含「{qualifier}{translated}」{cd_suffix}")
         elif name == "search_by_np_effect":
             effect = params.get("npEffect") or params.get("effect", "")
-            translated = get_effect_translation(effect) if effect else effect
+            effects = params.get("effects") or params.get("npEffects")
+            effects_op = params.get("effectsOp") or params.get("npEffectsOp") or "and"
+            if effects and isinstance(effects, list):
+                translated_list = [get_effect_translation(e) for e in effects]
+                joiner = " / " if effects_op == "or" else " + "
+                translated = joiner.join(translated_list)
+            elif effect:
+                translated = get_effect_translation(effect)
+            else:
+                translated = ""
             descriptions.append(f"宝具效果包含「{translated}」")
         elif name == "search_by_rarity":
             op = params.get("op", "eq")

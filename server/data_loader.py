@@ -100,6 +100,16 @@ def load_svt_names_mapping() -> dict:
     return data.get("svt_names", {})
 
 
+def load_traits_mapping() -> dict:
+    """加载 mappings.json 中的特性 ID→多语言名称映射。"""
+    mappings_path = KNOWLEDGE_DIR / "mappings.json"
+    if not mappings_path.exists():
+        return {}
+    with open(mappings_path, encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("traits", {})
+
+
 # CN 服从者数据 URL（用于获取中文技能名/宝具名）
 CN_SERVANT_URL = f"{API_BASE}/export/CN/nice_servant.json"
 # CN 服礼装数据 URL（用于获取中文礼装名和效果描述）
@@ -692,6 +702,84 @@ def get_face_url(servant: dict) -> str:
     return f"/faces/{filename}" if filename else ""
 
 
+# ============================================================
+# Player-View Function Filter（对齐 chaldea describeFunctions）
+# ============================================================
+#
+# 与 chaldea 从者技能/宝具页的 function 过滤逻辑严格一致：
+#   showPlayer=True, showEnemy=False（默认玩家视角）
+#
+# 参考实现：
+#   - chaldea/lib/app/descriptors/func/func.dart::describe (L53-152)
+#   - chaldea/lib/models/gamedata/func.dart::isPlayerOnlyFunc / isEnemyOnlyFunc (L421-426)
+#   - chaldea/lib/models/gamedata/func.dart::FuncTargetType.isAlly / isEnemy (L717-720)
+#
+# 过滤规则：
+#   1) funcType == "none" → 直接丢弃
+#   2) funcTargetTeam == "playerAndEnemy"（FuncApplyTarget.all）→ 保留
+#   3) isPlayerOnlyFunc → 保留（showPlayer=True）
+#   4) isEnemyOnlyFunc → 丢弃（showEnemy=False）
+#   5) 其他（双方都能用 / field / dynamic / noTarget）→ 保留
+#
+# 典型案例：莎乐美三技能「七面纱舞」存在两条 funcId 不同但效果完全相同的 delayFunction，
+#         其中 funcTargetTeam=enemy 那条只在敌方持有时生效，玩家页面应剔除。
+
+# FuncTargetType.isAlly 判定：name.startsWith('pt') 或属于这两种特殊值
+_FUNC_TARGET_ALLY_EXTRAS = frozenset({"self", "commandTypeSelfTreasureDevice"})
+# FuncTargetType.isEnemy 判定：name.startsWith('enemy') 但排除这一种动态目标
+_FUNC_TARGET_ENEMY_EXCLUDE = "enemyOneNoTargetNoAction"
+
+
+def _func_target_is_ally(target_type: str) -> bool:
+    """对齐 chaldea FuncTargetType.isAlly。"""
+    return target_type.startswith("pt") or target_type in _FUNC_TARGET_ALLY_EXTRAS
+
+
+def _func_target_is_enemy(target_type: str) -> bool:
+    """对齐 chaldea FuncTargetType.isEnemy。"""
+    return target_type.startswith("enemy") and target_type != _FUNC_TARGET_ENEMY_EXCLUDE
+
+
+def _is_player_only_func(team: str, target_type: str) -> bool:
+    """对齐 chaldea BaseFunctionX.isPlayerOnlyFunc。"""
+    return (team == "enemy" and _func_target_is_enemy(target_type)) or (
+        team == "player" and _func_target_is_ally(target_type)
+    )
+
+
+def _is_enemy_only_func(team: str, target_type: str) -> bool:
+    """对齐 chaldea BaseFunctionX.isEnemyOnlyFunc。"""
+    return (team == "enemy" and _func_target_is_ally(target_type)) or (
+        team == "player" and _func_target_is_enemy(target_type)
+    )
+
+
+def is_player_visible_func(func: dict, *, show_player: bool = True, show_enemy: bool = False) -> bool:
+    """与 chaldea describeFunctions 玩家视角过滤逻辑严格一致。
+
+    Args:
+        func: Atlas API 原始 function 对象
+        show_player: 是否展示「玩家持有时生效」的 function（从者页默认 True）
+        show_enemy: 是否展示「敌方持有时生效」的 function（从者页默认 False）
+
+    Returns:
+        True 表示该 function 应保留，False 表示应过滤掉。
+    """
+    if func.get("funcType", "") == "none":
+        return False
+    team = func.get("funcTargetTeam", "")
+    # FuncApplyTarget.all 在 Atlas JSON 里序列化为 "playerAndEnemy"
+    if team in ("playerAndEnemy", "all"):
+        return True
+    target_type = func.get("funcTargetType", "")
+    if _is_player_only_func(team, target_type):
+        return show_player
+    if _is_enemy_only_func(team, target_type):
+        return show_enemy
+    # 含 field / dynamic / noTarget 等通用场景，chaldea 默认放行
+    return True
+
+
 def _digest_append_passives(raw_passives: list[dict]) -> list[dict]:
     """预消化追加被动：只保留满级数值和解锁素材，丢弃完整 functions 嵌套。"""
     result = []
@@ -737,6 +825,9 @@ def _digest_skills(raw_skills: list[dict]) -> list[dict]:
     for sk in raw_skills:
         funcs = []
         for fn in sk.get("functions", []):
+            # 对齐 chaldea describeFunctions：过滤掉 funcType=none / 仅敌方持有生效的 function
+            if not is_player_visible_func(fn):
+                continue
             # svals 只保留满级（最后一个元素 = Lv.10）
             svals = fn.get("svals", [])
             max_sval = svals[-1] if svals else None
@@ -793,6 +884,9 @@ def _digest_noble_phantasms(raw_nps: list[dict]) -> list[dict]:
     for np_data in raw_nps:
         funcs = []
         for fn in np_data.get("functions", []):
+            # 对齐 chaldea describeFunctions：过滤掉 funcType=none / 仅敌方持有生效的 function
+            if not is_player_visible_func(fn):
+                continue
             digested_buffs = []
             for b in fn.get("buffs", []):
                 digested_buff: dict = {
@@ -976,6 +1070,10 @@ def extract_skill_effects(
         skill_num = skill.get("num", 0)
         skill_effects: list[dict] = []
         for func in skill.get("functions", []):
+            # 对齐 chaldea describeFunctions：过滤掉仅敌方持有生效的 function
+            # （否则莎乐美等从者会出现重复延迟触发等技术性副本条目）
+            if not is_player_visible_func(func):
+                continue
             func_type = func.get("funcType", "")
             target_type = func.get("funcTargetType", "")
 
@@ -1022,6 +1120,10 @@ def extract_skill_effects(
                     buff_type = buff.get("type", "")
                     if buff_type not in _CONDITIONAL_TRIGGER_BUFF_TYPES:
                         continue
+                    # 烘焙触发器伞名到 skillEffects 集合，使 search_by_skill_effect
+                    # 能通过 triggerFunc（虚拟伞）或具体 buff_type（如 attackAfterFunction）命中
+                    all_effects.add("triggerFunc")
+                    all_effects.add(buff_type)
                     # 获取子 skill ID（svals.Value）和触发概率（svals.Rate）
                     trigger_sval = (
                         raw_svals[-1]
@@ -1100,6 +1202,7 @@ def build_database(
     total_with_effects = 0
     cn_skills = (skill_cn_map or {}).get("skills", {})
     cn_tds = (skill_cn_map or {}).get("tds", {})
+    traits_mapping = load_traits_mapping()
 
     for svt in servants:
         skill_effects, skill_details = extract_skill_effects(svt, matcher, conditional_skill_map)
@@ -1159,6 +1262,9 @@ def build_database(
             np_effect_entries: list[dict] = []
             this_np_target = "unknown"
             for func in np.get("functions", []):
+                # 对齐 chaldea describeFunctions：过滤掉仅敌方持有生效的 function
+                if not is_player_visible_func(func):
+                    continue
                 ftype = func.get("funcType", "")
                 func_target = func.get("funcTargetType", "")
 
@@ -1209,15 +1315,55 @@ def build_database(
                         np_entry["damageClass"] = damage_class
                     # antiTarget: D类宝具特攻（damageNpSP）
                     # Atlas API 中特攻目标存储在 svals[].Target（trait ID）
+                    # 对于 damageNpSP，特攻倍率才是用户关心的数值（Correction 字段）：
+                    #  - npValues 维度：NP Lv1~5 在 OC1 下的 Correction（通常恒定）
+                    #  - ocValues 维度：OC1~5 在 NP1 下的 Correction（OC 影响特攻倍率）
                     if eff_name == "damageNpSP":
                         target_trait_id = lv1_sval.get("Target", 0)
                         if target_trait_id:
+                            trait_meta = (traits_mapping or {}).get(str(target_trait_id), {})
+                            trait_name_cn = trait_meta.get("CN") or trait_meta.get("JP") or ""
                             np_entry["antiTarget"] = {
                                 "traitId": target_trait_id,
+                                "trait": trait_name_cn,
                             }
+                        # 重写 npValues / ocValues 为 Correction 维度
+                        sp_np_values = (
+                            [(raw_svals[i].get("Correction", 0) if i < len(raw_svals) else 0) for i in range(5)]
+                            if isinstance(raw_svals, list)
+                            else [lv1_sval.get("Correction", 0)] * 5
+                        )
+                        sp_oc_values = []
+                        for oc_key in oc_keys:
+                            oc_svals = func.get(oc_key, [])
+                            oc_corr = (
+                                oc_svals[0].get("Correction", 0)
+                                if isinstance(oc_svals, list) and oc_svals and isinstance(oc_svals[0], dict)
+                                else 0
+                            )
+                            sp_oc_values.append(oc_corr)
+                        if any(sp_np_values) or any(sp_oc_values):
+                            np_entry["npValues"] = sp_np_values
+                            np_entry["ocValues"] = sp_oc_values
                         correction = lv1_sval.get("Correction", 0)
                         if correction:
                             np_entry["correction"] = correction
+                    # antiTarget: C类特攻状态（upDamage + ckOpIndv），从 buff 提取特攻特性
+                    elif eff_name == "upDamage":
+                        for buff in func.get("buffs", []):
+                            if buff.get("type") != "upDamage":
+                                continue
+                            ck_op = buff.get("ckOpIndv", [])
+                            if ck_op:
+                                trait = ck_op[0]
+                                trait_id = trait.get("id", trait) if isinstance(trait, dict) else trait
+                                trait_meta = (traits_mapping or {}).get(str(trait_id), {})
+                                trait_name_cn = trait_meta.get("CN") or trait_meta.get("JP") or ""
+                                np_entry["antiTarget"] = {
+                                    "traitId": trait_id,
+                                    "trait": trait_name_cn,
+                                }
+                                break
                     np_effect_entries.append(np_entry)
 
                 if "damage" in ftype.lower():
@@ -1671,6 +1817,9 @@ def _extract_ce_effects(
         # 跳过活动限定的 eventDropUp 等效果（skillNum > 1 通常是活动加成）
         # 但保留 num=1 的核心效果
         for func in skill.get("functions", []):
+            # 对齐 chaldea describeFunctions：过滤掉仅敌方持有生效的 function
+            if not is_player_visible_func(func):
+                continue
             func_type = func.get("funcType", "")
             # 跳过活动掉落加成
             if func_type == "eventDropUp":

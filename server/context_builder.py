@@ -44,7 +44,7 @@ _HP_EFFECTS = {
     "reduceHp",
     "subSelfdamage",
 }  # 直接数值
-_DAMAGE_EFFECTS = {"addDamage", "damageNpSP"}  # 直接数值
+_DAMAGE_EFFECTS = {"addDamage"}  # 直接数值（固定伤害附加，如 +1000 伤害）
 _COUNT_EFFECTS = {"shortenSkill", "upChagetd"}  # 直接数值，无单位后缀
 
 
@@ -93,6 +93,16 @@ def format_effect_detail(eff: dict, is_np: bool = False) -> str:
     effect_name = get_effect_translation(eff.get("type", ""))
     target = TARGET_TYPE_MAP.get(eff.get("targetType", ""), "")
     eff_type = eff.get("type", "")
+
+    # 特攻效果：拼接特攻目标特性（C类 upDamage / D类 damageNpSP）
+    anti_target = eff.get("antiTarget")
+    if anti_target and eff_type in ("upDamage", "damageNpSP"):
+        trait_name = anti_target.get("trait") or ""
+        if trait_name:
+            if eff_type == "damageNpSP":
+                effect_name = f"宝具对（{trait_name}）特攻"
+            else:
+                effect_name = f"对（{trait_name}）特攻"
 
     # 宝具效果：优先从 npValues[0] 取值（NP1 OC1），向后兼容 valueLv1
     if is_np:
