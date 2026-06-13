@@ -1,34 +1,62 @@
 /* ==============================================
    Laplace — Changelog Page Styles
-   复用主站设计系统（CSS 变量、字体、深色主题）
+   FGO 迦勒底档案室视觉系统 v3.0
+   遵循 docs/DESIGN.md 9 节规范
    ============================================== */
 
-/* --- CSS Custom Properties (与 style.css 保持一致) --- */
+/* --- Design Tokens (与 style.css 同步) --- */
 :root {
-  --bg-primary: #0a0b1a;
-  --bg-secondary: #12142b;
-  --bg-card: #191c3a;
-  --bg-card-hover: #222550;
-  --bg-glass: rgba(25, 28, 58, 0.85);
+  /* Core Palette */
+  --bg: #F5F6F8;
+  --paper: #FFFFFF;
+  --ink-deep: #061535;
+  --ink: #0A1F4A;
+  --ink-soft: #1F3366;
+  --gold: #C9A961;
+  --gold-soft: #E0C988;
+  --cyan: #2E7BC4;
+  --cyan-soft: #EAF1FB;
+  --rule: #D8DEE8;
+  --rule-strong: #A9B3C7;
+  --grid: rgba(46, 123, 196, 0.08);
 
-  --accent-gold: #d4a843;
-  --accent-gold-dim: #9a7a30;
-  --accent-blue: #4a7dff;
-  --accent-purple: #8b5cf6;
-  --accent-cyan: #22d3ee;
-  --accent-green: #34d399;
+  /* Semantic Accents */
+  --success: #2F7A4D;
+  --success-soft: #E2F1E8;
+  --warn: #B5731A;
+  --warn-soft: #F7ECD9;
+  --danger: #A8324A;
+  --danger-soft: #F6E1E6;
 
-  --text-primary: #e8e6f0;
-  --text-secondary: #9896a8;
-  --text-muted: #5c5a6e;
-  --text-gold: #f0d78c;
+  /* Text */
+  --text-primary: var(--ink-deep);
+  --text-secondary: var(--ink-soft);
+  --text-muted: #5C6680;
+  --text-on-dark: #F5F6F8;
+  --text-gold: #8E7635;
 
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-gold: rgba(212, 168, 67, 0.3);
+  /* Compatibility Aliases */
+  --bg-primary: var(--bg);
+  --bg-secondary: var(--paper);
+  --bg-card: var(--paper);
+  --bg-card-hover: var(--cyan-soft);
+  --bg-glass: rgba(245, 246, 248, 0.92);
+  --accent-gold: var(--gold);
+  --accent-gold-dim: #8E7635;
+  --accent-blue: var(--cyan);
+  --accent-cyan: var(--cyan);
+  --accent-green: var(--success);
+  --accent-purple: var(--ink);
+  --border-subtle: var(--rule);
+  --border-gold: var(--gold);
 
-  --font-body: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-display: 'Orbitron', sans-serif;
+  /* Typography */
+  --font-display: 'Cinzel', 'Cormorant Garamond', 'Noto Serif SC', serif;
+  --font-serif: 'Cormorant Garamond', 'Noto Serif SC', Georgia, serif;
+  --font-body: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace;
 
+  /* Spacing */
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 16px;
@@ -36,12 +64,15 @@
   --space-xl: 32px;
   --space-2xl: 48px;
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  /* Radius — 全部直角 */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
 
-  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
-  --shadow-glow: 0 0 20px rgba(212, 168, 67, 0.15);
+  /* Shadow — 偏移硬阴影 */
+  --shadow-card: 4px 4px 0 var(--ink-deep);
+  --shadow-card-hover: 6px 6px 0 var(--ink-deep);
+  --shadow-glow: 4px 4px 0 var(--gold);
 }
 
 /* --- Reset --- */
@@ -58,15 +89,16 @@ html, body {
 
 body {
   font-family: var(--font-body);
-  background: var(--bg-primary);
+  background: var(--bg);
   color: var(--text-primary);
-  line-height: 1.6;
+  line-height: 1.65;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   background-image:
-    radial-gradient(ellipse at 20% 0%, rgba(138, 92, 246, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(74, 125, 255, 0.06) 0%, transparent 50%);
+    repeating-linear-gradient(0deg, transparent 0, transparent 23px, var(--grid) 23px, var(--grid) 24px),
+    repeating-linear-gradient(90deg, transparent 0, transparent 23px, var(--grid) 23px, var(--grid) 24px);
+  background-attachment: fixed;
 }
 
 /* --- Header --- */
@@ -75,9 +107,20 @@ body {
   top: 0;
   z-index: 100;
   background: var(--bg-glass);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border-subtle);
+  backdrop-filter: blur(8px);
+  border-bottom: 2px solid var(--ink);
   padding: var(--space-md) var(--space-xl);
+  position: relative;
+}
+
+.cl-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -5px;
+  height: 1px;
+  background: var(--gold);
 }
 
 .cl-header-content {
@@ -94,12 +137,21 @@ body {
   gap: var(--space-xs);
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 14px;
-  transition: color 0.2s;
+  font-size: 13px;
+  font-family: var(--font-display);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  transition: all 0.18s ease;
 }
 
 .cl-back-link:hover {
-  color: var(--accent-gold);
+  color: var(--gold);
+  background: var(--ink);
+  box-shadow: 3px 3px 0 var(--ink-deep);
+  transform: translate(-1px, -1px);
 }
 
 .cl-logo-group {
@@ -109,22 +161,27 @@ body {
 }
 
 .cl-logo-icon {
-  font-size: 20px;
-  color: var(--accent-gold);
+  font-size: 22px;
+  color: var(--gold);
+  font-family: var(--font-display);
+  filter: drop-shadow(1px 1px 0 var(--ink));
 }
 
 .cl-logo-text h1 {
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: 2px;
+  color: var(--ink-deep);
+  letter-spacing: 4px;
 }
 
 .cl-tagline {
   font-size: 11px;
   color: var(--text-secondary);
-  letter-spacing: 1px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-family: var(--font-display);
+  font-weight: 600;
 }
 
 .cl-header-spacer {
@@ -148,30 +205,53 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  box-shadow: var(--shadow-card);
+  position: relative;
+}
+
+.cl-version-nav::before {
+  content: "VERSIONS";
+  position: absolute;
+  top: -10px;
+  left: 16px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--ink);
+  background: var(--bg);
+  padding: 0 8px;
+  font-weight: 700;
 }
 
 .cl-version-btn {
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--bg-card);
+  padding: 6px 14px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 0;
+  background: var(--paper);
   color: var(--text-secondary);
   font-size: 13px;
-  font-family: var(--font-body);
+  font-family: var(--font-mono);
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.18s ease;
+  letter-spacing: 0.5px;
 }
 
 .cl-version-btn:hover {
-  border-color: var(--border-gold);
-  color: var(--text-gold);
+  border-color: var(--ink);
+  color: var(--ink);
+  background: var(--cyan-soft);
 }
 
 .cl-version-btn.active {
-  background: linear-gradient(135deg, rgba(212, 168, 67, 0.15), rgba(212, 168, 67, 0.05));
-  border-color: var(--accent-gold);
-  color: var(--accent-gold);
-  font-weight: 500;
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--gold);
+  font-weight: 700;
+  box-shadow: 2px 2px 0 var(--ink-deep);
 }
 
 /* --- Version Content --- */
@@ -185,6 +265,10 @@ body {
   text-align: center;
   color: var(--text-muted);
   padding: var(--space-2xl);
+  font-family: var(--font-display);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  font-size: 13px;
 }
 
 /* --- Version Header --- */
@@ -192,14 +276,20 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-  padding-bottom: var(--space-lg);
-  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-lg);
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  border-left: 5px solid var(--gold);
+  box-shadow: var(--shadow-card);
+  position: relative;
 }
 
 .cl-version-title {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--ink-deep);
+  font-family: var(--font-display);
+  letter-spacing: 1.5px;
 }
 
 .cl-version-meta {
@@ -208,16 +298,20 @@ body {
   gap: var(--space-md);
   font-size: 13px;
   color: var(--text-secondary);
+  font-family: var(--font-mono);
 }
 
 .cl-version-badge {
   font-family: var(--font-display);
-  font-size: 12px;
-  color: var(--accent-gold);
-  background: rgba(212, 168, 67, 0.1);
-  border: 1px solid var(--border-gold);
-  padding: 2px 10px;
-  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold);
+  background: var(--ink);
+  border: 1px solid var(--ink-deep);
+  padding: 3px 12px;
+  border-radius: 0;
+  letter-spacing: 2px;
+  text-transform: uppercase;
 }
 
 /* --- Section (features / fixes / others) --- */
@@ -231,73 +325,102 @@ body {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: var(--font-display);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--rule);
 }
 
 .cl-section-icon {
   width: 24px;
   height: 24px;
-  border-radius: 50%;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
+  font-weight: 700;
+  border: 1px solid currentColor;
 }
 
 .cl-section--features .cl-section-icon {
-  background: rgba(52, 211, 153, 0.15);
-  color: var(--accent-green);
+  background: var(--success-soft);
+  color: var(--success);
 }
 
 .cl-section--features .cl-section-header {
-  color: var(--accent-green);
+  color: var(--success);
 }
 
 .cl-section--fixes .cl-section-icon {
-  background: rgba(251, 146, 60, 0.15);
-  color: #fb923c;
+  background: var(--warn-soft);
+  color: var(--warn);
 }
 
 .cl-section--fixes .cl-section-header {
-  color: #fb923c;
+  color: var(--warn);
 }
 
 .cl-section--others .cl-section-icon {
-  background: rgba(74, 125, 255, 0.15);
-  color: var(--accent-blue);
+  background: var(--cyan-soft);
+  color: var(--cyan);
 }
 
 .cl-section--others .cl-section-header {
-  color: var(--accent-blue);
+  color: var(--cyan);
 }
 
 /* --- Item Card --- */
 .cl-item {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: 0;
   padding: var(--space-md) var(--space-lg);
-  transition: all 0.2s;
+  transition: all 0.18s ease;
+  position: relative;
 }
 
+.cl-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--rule-strong);
+  transition: background 0.18s ease;
+}
+
+.cl-section--features .cl-item::before { background: var(--success); }
+.cl-section--fixes .cl-item::before { background: var(--warn); }
+.cl-section--others .cl-item::before { background: var(--cyan); }
+
 .cl-item:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--border-gold);
-  box-shadow: var(--shadow-glow);
+  background: var(--paper);
+  border-color: var(--ink);
+  box-shadow: var(--shadow-card);
+  transform: translate(-2px, -2px);
+}
+
+.cl-item:hover::before {
+  background: var(--gold);
 }
 
 .cl-item-title {
   font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 700;
+  color: var(--ink-deep);
   margin-bottom: var(--space-xs);
+  letter-spacing: 0.3px;
 }
 
 .cl-item-desc {
   font-size: 13px;
   color: var(--text-secondary);
-  line-height: 1.5;
+  line-height: 1.65;
 }
 
 /* --- Footer --- */
@@ -305,8 +428,23 @@ body {
   text-align: center;
   padding: var(--space-xl);
   color: var(--text-muted);
-  font-size: 12px;
-  border-top: 1px solid var(--border-subtle);
+  font-size: 11px;
+  border-top: 2px solid var(--ink);
+  background: var(--paper);
+  font-family: var(--font-display);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  position: relative;
+}
+
+.cl-footer::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -5px;
+  height: 1px;
+  background: var(--gold);
 }
 
 /* --- Responsive --- */
@@ -317,9 +455,38 @@ body {
 
   .cl-version-title {
     font-size: 20px;
+    letter-spacing: 1px;
   }
 
   .cl-header-content {
     padding: 0 var(--space-md);
+    gap: var(--space-md);
+  }
+
+  .cl-logo-text h1 {
+    font-size: 18px;
+    letter-spacing: 2px;
+  }
+
+  .cl-version-header {
+    padding: var(--space-md);
+  }
+
+  .cl-item {
+    padding: var(--space-sm) var(--space-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .cl-main {
+    padding: var(--space-md) var(--space-sm);
+  }
+
+  .cl-version-nav {
+    padding: var(--space-sm);
+  }
+
+  .cl-tagline {
+    display: none;
   }
 }
