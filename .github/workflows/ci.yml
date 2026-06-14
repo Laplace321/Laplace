@@ -52,7 +52,7 @@ jobs:
               'os', 'sys', 're', 'json', 'time', 'uuid', 'pathlib', 'typing',
               'dataclasses', 'enum', 'abc', 'collections', 'functools', 'itertools',
               'logging', 'hashlib', 'math', 'datetime', 'copy', 'io', 'textwrap',
-              'contextlib', 'asyncio', 'concurrent', 'threading', 'multiprocessing',
+              'contextlib', 'contextvars', 'asyncio', 'concurrent', 'threading', 'multiprocessing',
               'importlib', 'inspect', 'traceback', 'warnings', 'unittest', 'string',
               'struct', 'socket', 'http', 'urllib', 'email', 'html', 'xml',
               'csv', 'sqlite3', 'gzip', 'zipfile', 'tarfile', 'tempfile', 'shutil',
