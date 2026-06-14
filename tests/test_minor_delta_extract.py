@@ -378,3 +378,89 @@ def test_params_key_stable_order():
 
 def test_params_key_non_dict_returns_empty():
     assert _params_key("not a dict") == ""  # type: ignore[arg-type]
+
+
+# ────────────────────────────────────────────────────────────
+# Streaming SSE — MINOR 追问下推送筛选条件 thinking 事件
+# ────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_merge_filters_streaming_pushes_routed_event_on_append():
+    """streaming=True 且 op=append_filters 时，应推送 phase=routed 的 thinking 事件，
+    detail 包含合并后的全部筛选条件中文描述（覆盖『其中弓阶的』场景）。"""
+    prev = _make_prev_turn(
+        skill_calls=[
+            {"skill_name": "search_by_skill_effect", "params": {"effect": "NP增加"}},
+        ],
+    )
+
+    async def fake_chat_completion(**_kwargs):
+        return {
+            "op": "append_filters",
+            "skill_calls": [
+                {"skill_name": "search_by_class", "params": {"className": "archer"}},
+            ],
+            "response_skill": None,
+            "patches": [],
+            "rationale": "其中弓阶的",
+            "_model": "fake",
+            "_usage": {},
+        }
+
+    state = PipelineState(
+        user_message="其中弓阶的",
+        trace_id="t-merge-stream-append",
+        session_id="sid-x",
+        turn_type="MINOR",
+    )
+    state.extras["prev_turn"] = prev
+    state.extras["streaming"] = True  # 开启流式
+
+    with patch("server.nodes.merge_filters.chat_completion", side_effect=fake_chat_completion):
+        out = await merge_filters_node(state)
+
+    # 至少推送了 1 个 thinking 事件
+    routed_events = [
+        e for e in out.pending_events if e.get("type") == "thinking" and e.get("data", {}).get("phase") == "routed"
+    ]
+    assert len(routed_events) == 1
+    payload = routed_events[0]["data"]
+    assert payload["message"] == "已在上一轮基础上追加筛选"
+    # detail 应包含合并后的两个筛选条件（描述顺序由 describe_filters 决定）
+    assert payload["detail"]
+    assert "弓阶" in payload["detail"] or "Archer" in payload["detail"]
+
+
+@pytest.mark.asyncio
+async def test_merge_filters_no_streaming_no_thinking_event():
+    """非 streaming 模式不应推送 thinking 事件，避免污染 pending_events。"""
+    prev = _make_prev_turn()
+
+    async def fake_chat_completion(**_kwargs):
+        return {
+            "op": "reuse",
+            "skill_calls": [],
+            "response_skill": None,
+            "patches": [],
+            "rationale": "",
+            "_model": "fake",
+            "_usage": {},
+        }
+
+    state = PipelineState(
+        user_message="再看看",
+        trace_id="t-merge-no-stream",
+        session_id="sid-x",
+        turn_type="MINOR",
+    )
+    state.extras["prev_turn"] = prev
+    # 不设置 streaming
+
+    with patch("server.nodes.merge_filters.chat_completion", side_effect=fake_chat_completion):
+        out = await merge_filters_node(state)
+
+    routed_events = [
+        e for e in out.pending_events if e.get("type") == "thinking" and e.get("data", {}).get("phase") == "routed"
+    ]
+    assert routed_events == []
