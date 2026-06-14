@@ -232,6 +232,48 @@ class TestCEDescribeFilters:
         assert "礼装效果" in result[0]
         assert "满破" in result[0]
 
+    def test_ce_effect_description_with_min_value(self):
+        """trace 839f5b63 回归：min_value 必须出现在前端筛选条件展示中。"""
+        from server.translation import describe_filters
+
+        result = describe_filters(
+            [{"skill_name": "ce_search_by_effect", "params": {"effect": "gainNp", "min_value": 50}}]
+        )
+        assert "礼装效果" in result[0]
+        assert "NP增加" in result[0]
+        assert "≥ 50%" in result[0]
+        assert "满破" in result[0]
+
+    def test_ce_effect_description_with_alias_min_value(self):
+        """trace 839f5b63 回归：routing 阶段 skill_calls 用 alias key（minValue），同样要被识别。"""
+        from server.translation import describe_filters
+
+        result = describe_filters(
+            [{"skill_name": "ce_search_by_effect", "params": {"effect": "gainNp", "minValue": 50}}]
+        )
+        assert "≥ 50%" in result[0]
+
+    def test_ce_effect_description_with_max_value(self):
+        from server.translation import describe_filters
+
+        result = describe_filters(
+            [{"skill_name": "ce_search_by_effect", "params": {"effect": "gainNp", "max_value": 80}}]
+        )
+        assert "≤ 80%" in result[0]
+
+    def test_ce_effect_description_with_range(self):
+        from server.translation import describe_filters
+
+        result = describe_filters(
+            [
+                {
+                    "skill_name": "ce_search_by_effect",
+                    "params": {"effect": "gainNp", "min_value": 50, "max_value": 80},
+                }
+            ]
+        )
+        assert "50%~80%" in result[0]
+
     def test_ce_rarity_description(self):
         from server.translation import describe_filters
 

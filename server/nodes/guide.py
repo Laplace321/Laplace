@@ -55,6 +55,39 @@ def _extract_guide_tags(query: str) -> list[str]:
     return tags
 
 
+def _extract_prev_servant_context(state: PipelineState) -> tuple[str, str | None]:
+    """MINOR / CORRECTION 续问时，从 prev_turn 抽取主从者实体用于查询改写与上下文注入。
+
+    返回 ``(effective_search_query, prev_servant_label)``：
+    - ``effective_search_query``：交给 BM25 检索的查询串。命中条件下拼上从者名以提升召回精度，
+      其余情况返回 ``state.user_message`` 原文。
+    - ``prev_servant_label``：注入 generation_prompt 的从者名，``None`` 表示无上一轮实体。
+
+    命中条件（全部满足）：
+    1. ``state.turn_type`` ∈ {MINOR, CORRECTION}
+    2. ``state.extras["prev_turn"]`` 存在且 ``servants`` 非空
+    3. 第一个 servant 含非空 ``name``
+    """
+    if state.turn_type not in ("MINOR", "CORRECTION"):
+        return state.user_message, None
+    prev_turn = state.extras.get("prev_turn")
+    if prev_turn is None:
+        return state.user_message, None
+    servants = getattr(prev_turn, "servants", None) or []
+    if not servants:
+        return state.user_message, None
+    first = servants[0]
+    if not isinstance(first, dict):
+        return state.user_message, None
+    name = (first.get("name") or "").strip()
+    if not name:
+        return state.user_message, None
+    # 已经显式提到该从者名时不重复拼接，避免「水呆 水呆 在...」之类的污染
+    if name in state.user_message:
+        return state.user_message, name
+    return f"{name} {state.user_message}", name
+
+
 def _prepare_guide_context(user_message: str) -> tuple[list, set[str], dict[str, str]] | None:
     """BM25 检索攻略文档并构建上下文。
 
@@ -92,11 +125,25 @@ def _build_guide_context_text(chunks: list) -> str:
     return "\n\n---\n\n".join(context_lines)
 
 
-def _build_guide_generation_prompt(guide_context: str, user_message: str) -> str:
-    """构建链路 C generation 阶段的 system prompt。"""
+def _build_guide_generation_prompt(
+    guide_context: str,
+    user_message: str,
+    prev_servant_label: str | None = None,
+) -> str:
+    """构建链路 C generation 阶段的 system prompt。
+
+    ``prev_servant_label`` 非 None 时，会在 prompt 中注入「上一轮已确定的从者」上下文，
+    让 LLM 把本轮的指代词（这个从者 / TA / 这个角色等）锚定到该实体。
+    """
+    context_section = ""
+    if prev_servant_label:
+        context_section = (
+            "## 上下文\n"
+            f"用户上一轮已确定在询问从者「{prev_servant_label}」。本轮中的「这个从者 / 这个角色 / TA / 他 / 她 / 它」均指代此从者，"
+            "请直接代入该名字回答，禁止反问『用户问的是哪位从者』。\n\n"
+        )
     return (
-        "你是 FGO 攻略助手。根据以下攻略文档内容回答用户问题。\n\n"
-        "## 知识范围\n"
+        "你是 FGO 攻略助手。根据以下攻略文档内容回答用户问题。\n\n" + context_section + "## 知识范围\n"
         "- 仅基于提供的攻略内容回答，严禁使用自身训练知识补充或猜测\n"
         "- 如果攻略中未涉及用户问的内容，必须明确说「攻略中暂未收录这部分内容」\n"
         "- 如果攻略内容不足以完整回答，明确告知哪些部分缺少资料\n\n"
@@ -138,12 +185,18 @@ def _format_source_suffix(source_labels: set[str], source_authors: dict[str, str
 @with_trace(Phase.NODE_GUIDE)
 async def guide_node(state: PipelineState) -> PipelineState:
     """Pipeline C 主节点：BM25 检索攻略文档 → LLM 生成回复 → 来源标注。"""
-    result = _prepare_guide_context(state.user_message)
+    effective_query, prev_servant_label = _extract_prev_servant_context(state)
+    result = _prepare_guide_context(effective_query)
 
     await log_trace_event(
         state.trace_id,
         "guide_search",
-        {"query": state.user_message, "result_count": len(result[0]) if result else 0},
+        {
+            "query": effective_query,
+            "original_query": state.user_message,
+            "prev_servant": prev_servant_label or "",
+            "result_count": len(result[0]) if result else 0,
+        },
     )
 
     if result is None:
@@ -167,7 +220,9 @@ async def guide_node(state: PipelineState) -> PipelineState:
 
     chunks, source_labels, source_authors = result
     guide_context = _build_guide_context_text(chunks)
-    generation_prompt = _build_guide_generation_prompt(guide_context, state.user_message)
+    generation_prompt = _build_guide_generation_prompt(
+        guide_context, state.user_message, prev_servant_label=prev_servant_label
+    )
 
     gen_result = await chat_completion(
         system_prompt=generation_prompt,
@@ -221,6 +276,7 @@ __all__ = [
     "_build_guide_generation_prompt",
     "_format_source_suffix",
     "_extract_guide_tags",
+    "_extract_prev_servant_context",
 ]
 
 
@@ -240,11 +296,17 @@ async def guide_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pipel
         "data": {"phase": "routing", "message": "识别为攻略文档检索，正在检索..."},
     }
 
-    result = _prepare_guide_context(state.user_message)
+    effective_query, prev_servant_label = _extract_prev_servant_context(state)
+    result = _prepare_guide_context(effective_query)
     await log_trace_event(
         state.trace_id,
         "guide_search",
-        {"query": state.user_message, "result_count": len(result[0]) if result else 0},
+        {
+            "query": effective_query,
+            "original_query": state.user_message,
+            "prev_servant": prev_servant_label or "",
+            "result_count": len(result[0]) if result else 0,
+        },
     )
 
     if result is None:
@@ -271,7 +333,9 @@ async def guide_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pipel
 
     chunks, source_labels, source_authors = result
     guide_context = _build_guide_context_text(chunks)
-    generation_prompt = _build_guide_generation_prompt(guide_context, state.user_message)
+    generation_prompt = _build_guide_generation_prompt(
+        guide_context, state.user_message, prev_servant_label=prev_servant_label
+    )
 
     full_reply_parts: list[str] = []
     metadata = StreamMetadata()
