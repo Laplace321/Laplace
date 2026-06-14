@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
   <link href="https://fonts.loli.net/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500;1,700&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" crossorigin>
-  <link rel="stylesheet" href="logs.css?v=3">
+  <link rel="stylesheet" href="logs.css?v=4">
 </head>
 <body>
   <!-- Header -->
@@ -90,6 +90,27 @@
         <div class="chart-body" id="chart-modes"></div>
       </div>
     </div>
+    <!-- v0.5.1 BI 维度图卡 -->
+    <div class="stats-charts-row">
+      <div class="chart-card">
+        <h3>Pipeline 分布（含错误率）</h3>
+        <div class="chart-body" id="chart-pipelines"></div>
+      </div>
+      <div class="chart-card">
+        <h3>对话轮次类型</h3>
+        <div class="chart-body" id="chart-turn-types"></div>
+      </div>
+    </div>
+    <div class="stats-charts-row">
+      <div class="chart-card">
+        <h3>Skill 调用 Top 10</h3>
+        <div class="chart-body" id="chart-skills"></div>
+      </div>
+      <div class="chart-card">
+        <h3>异常原因分布</h3>
+        <div class="chart-body" id="chart-errors"></div>
+      </div>
+    </div>
   </section>
 
   <!-- Detail View (existing) -->
@@ -118,6 +139,9 @@
           <th class="col-time">时间</th>
           <th class="col-trace">TraceID</th>
           <th class="col-query">用户查询</th>
+          <th class="col-pipeline">链路</th>
+          <th class="col-turntype">轮次</th>
+          <th class="col-skills">Skills</th>
           <th class="col-status">状态</th>
           <th class="col-mode">模式</th>
           <th class="col-rating">评分</th>
@@ -155,6 +179,6 @@
     </div>
   </div>
 
-  <script src="logs.js?v=1"></script>
+  <script src="logs.js?v=2"></script>
 </body>
 </html>

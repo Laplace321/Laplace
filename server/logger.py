@@ -523,6 +523,12 @@ def read_trace_summaries(
         trace_rating = None
         is_confirmation = False
         clarification_question = ""
+        # v0.5.1 BI 维度字段（从 classifier_output / execution / final.metric_labels 抓取）
+        pipeline_label = None
+        turn_type = None
+        skill_names = None
+        error_reason = None
+        clarification_type = None
 
         for e in events:
             phase = e.get("phase", "")
@@ -532,10 +538,20 @@ def read_trace_summaries(
                 timestamp = e.get("timestamp", timestamp)
                 if data.get("is_confirmation"):
                     is_confirmation = True
+            elif phase == "classifier_output":
+                pipeline_label = data.get("pipeline") or pipeline_label
+                turn_type = data.get("turn_type") or turn_type
+            elif phase == "execution":
+                names = data.get("skill_names")
+                if isinstance(names, list) and names:
+                    skill_names = ",".join(str(n) for n in names)
+                elif isinstance(names, str) and names:
+                    skill_names = names
             elif phase == "rating":
                 trace_rating = data.get("rating")
             elif phase in ("clarification_requested", "execution_clarification_requested"):
                 clarification_question = data.get("question", "")
+                clarification_type = "execution" if phase == "execution_clarification_requested" else "routing"
             elif phase == "final":
                 status = data.get("result", "unknown")
                 duration_ms = data.get("total_time_ms")
@@ -543,6 +559,14 @@ def read_trace_summaries(
                 total_tokens = data.get("total_tokens")
                 if e.get("error"):
                     error_msg = e["error"][:200]
+                # final.metric_labels 兜底：classifier 阶段缺失时从此补
+                labels = data.get("metric_labels") or {}
+                if isinstance(labels, dict):
+                    pipeline_label = labels.get("pipeline") or pipeline_label
+                    turn_type = labels.get("turn_type") or turn_type
+                    skill_names = labels.get("skill_names") or skill_names
+                    error_reason = labels.get("error_reason") or error_reason
+                    clarification_type = labels.get("clarification_type") or clarification_type
             # 旧模式兼容
             if not query and "query" in e:
                 query = e["query"]
@@ -563,6 +587,12 @@ def read_trace_summaries(
             "mode": mode,
             "total_tokens": total_tokens,
             "rating": trace_rating,
+            # v0.5.1 维度
+            "pipeline": pipeline_label,
+            "turn_type": turn_type,
+            "skill_names": skill_names,
+            "error_reason": error_reason,
+            "clarification_type": clarification_type,
         }
         if is_confirmation:
             summary["is_confirmation"] = True
