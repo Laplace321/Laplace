@@ -172,6 +172,16 @@ class MetricsCollector:
                 if fail_count >= self._alert_threshold and provider not in self._warned_providers:
                     self._warned_providers.add(provider)
                     should_send_warning = True
+                # v0.5.1：把当前 trace_id 写入 alerter 缓冲区，下次告警渲染回溯链接
+                try:
+                    from server.logger import get_trace_id
+                    from server.monitor.alerter import get_alerter
+
+                    tid = get_trace_id()
+                    if tid and tid != "unknown":
+                        get_alerter().push_failure_trace(tid)
+                except Exception:  # noqa: BLE001
+                    pass
 
             if is_fallback:
                 bucket.llm_fallbacks += 1

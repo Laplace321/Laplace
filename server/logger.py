@@ -10,8 +10,14 @@ Phase 命名统一在 ``Phase`` 字符串常量类，所有节点和 pipeline.py
 trace_id 通过 ``current_trace_id`` ContextVar 在协程间自动传播，节点和
 pipeline.py 调用 log_trace_event 时可以省略 trace_id 参数。入口处必须
 显式调用 ``bind_trace_id(trace_id)`` 注入当前请求的 trace_id。
+
+v0.5.1：JSONL 文件按天切分（``query_trace.YYYY-MM-DD.jsonl``）。
+- 写入路径：``_get_log_file_for_today()``，跨午夜自动切换文件
+- 读取路径：``_iter_log_files()`` 遍历目录所有匹配文件 + legacy 单文件
+- 清理：``python -m server.logger cleanup --keep-days 30`` 按需触发
 """
 
+import argparse
 import asyncio
 import json
 import os
@@ -23,10 +29,77 @@ from pathlib import Path
 _BEIJING_TZ = timezone(timedelta(hours=8))
 
 LOG_DIR = Path(__file__).parent / "logs"
-LOG_FILE = LOG_DIR / "query_trace.jsonl"
+_LOG_PREFIX = "query_trace"
+
+# Legacy 单文件路径（v0.5.1 之前写入此处；保留为只读 fallback 兼容历史日志）。
+# ``LOG_FILE`` 仍以模块属性形式导出，便于 ``bi_index`` 与既有测试 patch；
+# 新代码请使用 ``_get_log_file_for_today()`` 与 ``_iter_log_files()``。
+LOG_FILE = LOG_DIR / f"{_LOG_PREFIX}.jsonl"
 
 # 确保日志目录存在
 os.makedirs(LOG_DIR, exist_ok=True)
+
+
+# ============================================================
+# 日志文件路由（按天轮转）
+# ============================================================
+
+
+def _get_log_file_for_today() -> Path:
+    """返回当天写入的 JSONL 文件路径（北京时间）。
+
+    每次写入前调用，进程跨午夜后自动切换到新文件，无需重启。
+    """
+    today = datetime.now(_BEIJING_TZ).strftime("%Y-%m-%d")
+    return LOG_DIR / f"{_LOG_PREFIX}.{today}.jsonl"
+
+
+def _iter_log_files() -> list[Path]:
+    """返回所有可读取的 JSONL 文件，按时间升序（旧→新）。
+
+    - 按天文件 ``query_trace.YYYY-MM-DD.jsonl`` 命名按字典序即时间序
+    - Legacy 单文件 ``query_trace.jsonl`` 作为只读 fallback 排在最前
+    """
+    files: list[Path] = []
+    legacy = LOG_DIR / f"{_LOG_PREFIX}.jsonl"
+    if legacy.exists():
+        files.append(legacy)
+    files.extend(sorted(LOG_DIR.glob(f"{_LOG_PREFIX}.*.jsonl")))
+    # 去重（理论不会与 legacy 重名，仍兜底）
+    seen: set[Path] = set()
+    out: list[Path] = []
+    for f in files:
+        key = f.resolve()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(f)
+    return out
+
+
+def cleanup_old_logs(keep_days: int = 30) -> dict:
+    """删除超过 ``keep_days`` 天的按天 JSONL 文件（不动 legacy 单文件）。
+
+    返回：{"deleted": [...], "kept_days": int, "scanned": int}
+    """
+    cutoff = (datetime.now(_BEIJING_TZ) - timedelta(days=keep_days)).date()
+    deleted: list[str] = []
+    scanned = 0
+    for f in LOG_DIR.glob(f"{_LOG_PREFIX}.*.jsonl"):
+        scanned += 1
+        # 文件 stem 形如 ``query_trace.YYYY-MM-DD``；只解析这一种
+        try:
+            _, date_str = f.stem.split(".", 1)
+            file_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except (ValueError, IndexError):
+            continue
+        if file_date < cutoff:
+            try:
+                f.unlink()
+                deleted.append(f.name)
+            except OSError:
+                continue
+    return {"deleted": deleted, "kept_days": keep_days, "scanned": scanned}
 
 
 # ============================================================
@@ -210,9 +283,9 @@ def _build_trace_event(
 
 
 def _write_event_sync(event_data: dict):
-    """同步写入单条事件到 JSONL 文件。"""
+    """同步写入单条事件到当天 JSONL 文件（按天轮转）。"""
     line = json.dumps(event_data, ensure_ascii=False)
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
+    with open(_get_log_file_for_today(), "a", encoding="utf-8") as f:
         f.write(line + "\n")
 
 
@@ -271,21 +344,23 @@ def log_trace_event_sync(
 
 
 def find_trace_events(trace_id: str) -> list[dict]:
-    """按 traceId 聚合查询所有阶段事件（按时间顺序）。"""
-    if not LOG_FILE.exists():
-        return []
+    """按 traceId 聚合查询所有阶段事件（按时间顺序），跨所有日志文件。"""
     events = []
-    with open(LOG_FILE, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-                if entry.get("traceId") == trace_id:
-                    events.append(entry)
-            except json.JSONDecodeError:
-                continue
+    for log_path in _iter_log_files():
+        try:
+            with open(log_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        if entry.get("traceId") == trace_id:
+                            events.append(entry)
+                    except json.JSONDecodeError:
+                        continue
+        except OSError:
+            continue
     return events
 
 
@@ -295,18 +370,20 @@ def find_trace_events(trace_id: str) -> list[dict]:
 
 
 def read_traces(limit: int = 20) -> list[dict]:
-    """读取最近 N 条 trace 日志（倒序，最新在前）。"""
-    if not LOG_FILE.exists():
-        return []
+    """读取最近 N 条 trace 日志（倒序，最新在前），跨所有日志文件。"""
     traces = []
-    with open(LOG_FILE, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    traces.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
+    for log_path in _iter_log_files():
+        try:
+            with open(log_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            traces.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            continue
+        except OSError:
+            continue
     return traces[-limit:][::-1]
 
 
@@ -408,26 +485,30 @@ def read_trace_summaries(
     Returns:
         {"total": int, "items": [{"traceId", "timestamp", "query", "status", "duration_ms"}, ...]}
     """
-    if not LOG_FILE.exists():
+    if not _iter_log_files():
         return {"total": 0, "items": []}
 
     # 1. 读取所有行并按 traceId 分组
     from collections import OrderedDict
 
     groups: OrderedDict[str, list[dict]] = OrderedDict()
-    with open(LOG_FILE, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            tid = entry.get("traceId")
-            if not tid:
-                continue
-            groups.setdefault(tid, []).append(entry)
+    for log_path in _iter_log_files():
+        try:
+            with open(log_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    tid = entry.get("traceId")
+                    if not tid:
+                        continue
+                    groups.setdefault(tid, []).append(entry)
+        except OSError:
+            continue
 
     # 2. 提取每个 traceId 的摘要
     summaries: list[dict] = []
@@ -537,10 +618,11 @@ def compute_log_stats(days: int = 7) -> dict:
 
 
 def _compute_log_stats_legacy(days: int = 7) -> dict:
-    """旧 JSONL 全表扫描实现（fallback / 单测对照用）。"""
+    """旧 JSONL 全表扫描实现（fallback / 单测对照用），跨所有日志文件。"""
     from collections import defaultdict
 
-    if not LOG_FILE.exists():
+    log_files = _iter_log_files()
+    if not log_files:
         return {
             "pv": 0,
             "uv": 0,
@@ -557,52 +639,57 @@ def _compute_log_stats_legacy(days: int = 7) -> dict:
     trace_data: dict[str, dict] = {}  # traceId -> aggregated info
     ratings = {"bad": 0, "ok": 0, "good": 0}
 
-    with open(LOG_FILE, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
+    for log_path in log_files:
+        try:
+            f = open(log_path, encoding="utf-8")
+        except OSError:
+            continue
+        with f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
 
-            timestamp = entry.get("timestamp", "")
-            if timestamp < cutoff_str:
-                continue
+                timestamp = entry.get("timestamp", "")
+                if timestamp < cutoff_str:
+                    continue
 
-            tid = entry.get("traceId")
-            if not tid:
-                continue
+                tid = entry.get("traceId")
+                if not tid:
+                    continue
 
-            phase = entry.get("phase", "")
+                phase = entry.get("phase", "")
 
-            # 评分事件单独计数
-            if phase == "rating":
-                rating_value = entry.get("data", {}).get("rating", "")
-                if rating_value in ratings:
-                    ratings[rating_value] += 1
-                continue
+                # 评分事件单独计数
+                if phase == "rating":
+                    rating_value = entry.get("data", {}).get("rating", "")
+                    if rating_value in ratings:
+                        ratings[rating_value] += 1
+                    continue
 
-            # 首次出现的 trace 初始化
-            if tid not in trace_data:
-                trace_data[tid] = {
-                    "date": timestamp[:10],  # YYYY-MM-DD
-                    "ip": "",
-                    "query": "",
-                    "mode": "",
-                }
+                # 首次出现的 trace 初始化
+                if tid not in trace_data:
+                    trace_data[tid] = {
+                        "date": timestamp[:10],  # YYYY-MM-DD
+                        "ip": "",
+                        "query": "",
+                        "mode": "",
+                    }
 
-            data = entry.get("data", {})
-            if phase == "routing_input":
-                trace_data[tid]["query"] = data.get("query", "")
-                trace_data[tid]["ip"] = data.get("client_ip", "")
-            elif phase == "final":
-                trace_data[tid]["mode"] = data.get("mode", "")
+                data = entry.get("data", {})
+                if phase == "routing_input":
+                    trace_data[tid]["query"] = data.get("query", "")
+                    trace_data[tid]["ip"] = data.get("client_ip", "")
+                elif phase == "final":
+                    trace_data[tid]["mode"] = data.get("mode", "")
 
-            # 旧模式兼容
-            if not trace_data[tid]["query"] and "query" in entry:
-                trace_data[tid]["query"] = entry["query"]
+                # 旧模式兼容
+                if not trace_data[tid]["query"] and "query" in entry:
+                    trace_data[tid]["query"] = entry["query"]
 
     # 统计汇总
     daily_pv: dict[str, int] = defaultdict(int)
@@ -658,3 +745,25 @@ def _compute_log_stats_legacy(days: int = 7) -> dict:
         "ratings": ratings,
         "modes": modes,
     }
+
+
+# ============================================================
+# CLI（``python -m server.logger``）
+# ============================================================
+
+
+def _main() -> int:
+    parser = argparse.ArgumentParser(prog="python -m server.logger")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    p_cleanup = sub.add_parser("cleanup", help="按天清理过期 JSONL 日志（保留 legacy 单文件）")
+    p_cleanup.add_argument("--keep-days", type=int, default=30, help="保留最近 N 天，默认 30")
+
+    args = parser.parse_args()
+    if args.cmd == "cleanup":
+        result = cleanup_old_logs(keep_days=args.keep_days)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

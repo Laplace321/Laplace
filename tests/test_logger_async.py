@@ -8,7 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-# 需要在导入前 patch LOG_FILE，避免污染真实日志
+# 需要在导入前 patch 写入/读取路径，避免污染真实日志（v0.5.1 起按天轮转，
+# 单测仍用单文件 _tmp_log，通过 patch _get_log_file_for_today / _iter_log_files 注入）。
 _tmp_dir = tempfile.mkdtemp()
 _tmp_log = Path(_tmp_dir) / "test_trace.jsonl"
 
@@ -18,7 +19,11 @@ def _patch_log_file():
     """每个测试用独立的临时日志文件。"""
     # 清空文件
     _tmp_log.write_text("")
-    with patch("server.logger.LOG_FILE", _tmp_log):
+    with (
+        patch("server.logger._get_log_file_for_today", return_value=_tmp_log),
+        patch("server.logger._iter_log_files", return_value=[_tmp_log]),
+        patch("server.logger.LOG_FILE", _tmp_log),
+    ):
         yield
 
 

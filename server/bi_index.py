@@ -28,7 +28,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from server.logger import _BEIJING_TZ, LOG_DIR, LOG_FILE, find_trace_events
+from server.logger import _BEIJING_TZ, LOG_DIR, _iter_log_files, find_trace_events
 
 logger = logging.getLogger(__name__)
 
@@ -252,32 +252,43 @@ def reindex_from_jsonl(jsonl_path: Path | None = None, *, drop_first: bool = Tru
     """从 JSONL 重建整个 turn_summary 索引。
 
     Args:
-        jsonl_path: 默认读 ``server/logs/query_trace.jsonl``
+        jsonl_path: 默认遍历 ``server/logger._iter_log_files()`` 返回的全部
+            ``query_trace.*.jsonl`` 文件 + legacy 单文件；若显式传入路径则
+            只索引该文件。
         drop_first: True 表示先 ``DELETE FROM`` 再批量 upsert（推荐）
 
     Returns:
         { "scanned_lines": int, "indexed_traces": int, "skipped_no_final": int }
     """
-    src = jsonl_path or LOG_FILE
+    sources: list[Path]
+    if jsonl_path is not None:
+        sources = [jsonl_path] if jsonl_path.exists() else []
+    else:
+        sources = _iter_log_files()
     stats = {"scanned_lines": 0, "indexed_traces": 0, "skipped_no_final": 0}
-    if not src.exists():
+    if not sources:
         return stats
 
     groups: OrderedDict[str, list[dict]] = OrderedDict()
-    with open(src, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            stats["scanned_lines"] += 1
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            tid = entry.get("traceId")
-            if not tid:
-                continue
-            groups.setdefault(tid, []).append(entry)
+    for src in sources:
+        try:
+            f = open(src, encoding="utf-8")
+        except OSError:
+            continue
+        with f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                stats["scanned_lines"] += 1
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                tid = entry.get("traceId")
+                if not tid:
+                    continue
+                groups.setdefault(tid, []).append(entry)
 
     with _connect() as conn:
         _ensure_schema(conn)
