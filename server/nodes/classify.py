@@ -25,6 +25,113 @@ from server.logger import Phase, log_trace_event
 from server.prompts import build_classifier_prompt
 from server.schemas import classifier_response_json_schema, parse_classifier_response
 
+# FALLBACK 后置防误判：含任一信号则视为 FGO 查询，强制改回 A 链路
+# 关键词覆盖：职阶、星级、FGO 专有名词、常见效果、数值条件
+# 注意：从者名/特性等长词典放在 servants_db 与 traits 表里，此处只做"廉价兜底"
+_FGO_SIGNAL_KEYWORDS: tuple[str, ...] = (
+    # 职阶
+    "剑阶",
+    "弓阶",
+    "枪阶",
+    "骑阶",
+    "术阶",
+    "杀阶",
+    "狂阶",
+    "saber",
+    "archer",
+    "lancer",
+    "rider",
+    "caster",
+    "assassin",
+    "berserker",
+    "ruler",
+    "avenger",
+    "alterego",
+    "moon",
+    "foreigner",
+    "pretender",
+    "shielder",
+    "裁定者",
+    "复仇者",
+    "月癌",
+    "降临者",
+    "盾兵",
+    # FGO 专有名词
+    "宝具",
+    "技能",
+    "羁绊",
+    "灵基",
+    "礼装",
+    "概念礼装",
+    "卡池",
+    "复刻",
+    "活动",
+    "戴冠战",
+    "冠位",
+    "高难",
+    "主线",
+    "特异点",
+    "章节",
+    "周年",
+    "联动",
+    "up",
+    # 效果与机制
+    "充能",
+    "无敌",
+    "闪避",
+    "暴击",
+    "出星",
+    "特攻",
+    "增伤",
+    "buff",
+    "debuff",
+    "魔放",
+    "攻击力",
+    "防御力",
+    "宝具威力",
+    "暴击威力",
+    "嘲讽",
+    "回避",
+    "无敌贯通",
+    "a类",
+    "b类",
+    "c类",
+    "d类",
+    "乘区",
+    "伤害公式",
+    # 数值/筛选词
+    "推荐",
+    "查一下",
+    "对比",
+    "有哪些",
+    "筛选",
+    "查询",
+    "克制",
+    "5星",
+    "4星",
+    "3星",
+    "五星",
+    "四星",
+    "三星",
+    "%以上",
+    "%up",
+    "np",
+    "atk",
+    "hp",
+)
+
+
+def _has_fgo_query_signal(message: str) -> bool:
+    """检测用户输入是否包含 FGO 查询信号，用于 FALLBACK 后置防误判。
+
+    任一关键词命中即返回 True，调用方应把 pipeline 强制改回 A。
+    匹配为大小写不敏感子串匹配，覆盖中英文常见信号。
+    """
+    if not message:
+        return False
+    lower = message.lower()
+    return any(kw in lower for kw in _FGO_SIGNAL_KEYWORDS)
+
 
 @with_trace(Phase.NODE_CLASSIFY)
 async def classify_node(state: PipelineState) -> PipelineState:
@@ -104,6 +211,26 @@ async def classify_node(state: PipelineState) -> PipelineState:
     state.classifier_confidence = classifier_result.get("confidence", 0.0)
     state.classifier_model = classifier_model
 
+    # ── FALLBACK 后置校验（防误判）──
+    # 仅当 LLM 输出 FALLBACK 时执行：检查用户消息是否含 FGO 查询信号，含则强制改回 A
+    fallback_code = classifier_result.get("fallback_code")
+    if state.classified_pipeline == "FALLBACK":
+        if _has_fgo_query_signal(state.user_message or ""):
+            print(
+                f"⚠️ [{state.trace_id}] classify 后置兜底：LLM 判 FALLBACK 但含查询信号，"
+                f"强制改 A (msg={state.user_message!r})"
+            )
+            state.classified_pipeline = "A"
+            fallback_code = None
+        elif fallback_code not in ("greeting", "out_of_scope"):
+            # FALLBACK 必须带合法 code，缺失则按 greeting 兜底
+            fallback_code = "greeting"
+    else:
+        # 非 FALLBACK 路径必须清空 fallback_code，避免污染
+        fallback_code = None
+    if fallback_code:
+        state.extras["fallback_code"] = fallback_code
+
     # turn_type 解析（schema 默认 MAJOR；无 prev_turn 强制改回 MAJOR 防御 LLM 误判）
     turn_type = classifier_result.get("turn_type", "MAJOR") or "MAJOR"
     if turn_type not in ("MAJOR", "MINOR", "CORRECTION"):
@@ -176,6 +303,7 @@ async def classify_node(state: PipelineState) -> PipelineState:
             "turn_type": state.turn_type,
             "has_prev_turn": "prev_turn" in state.extras,
             "model": classifier_model,
+            "fallback_code": state.extras.get("fallback_code"),
             "usage": classifier_usage,
         },
     )

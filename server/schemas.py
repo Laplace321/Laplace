@@ -96,8 +96,11 @@ class ClassifierResponse(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    pipeline: Literal["A", "B", "C"] = Field(
-        description="目标链路：A=从者/礼装结构化查询, B=游戏事实知识问答, C=攻略/评价/主观推荐",
+    pipeline: Literal["A", "B", "C", "FALLBACK"] = Field(
+        description=(
+            "目标链路：A=从者/礼装结构化查询, B=游戏事实知识问答, "
+            "C=攻略/评价/主观推荐, FALLBACK=问候/超出范围（直接走预置模板回复）"
+        ),
     )
     confidence: float = Field(
         ge=0.0,
@@ -112,6 +115,15 @@ class ClassifierResponse(BaseModel):
             "MINOR=在上一轮结果上追加过滤/切换回复粒度（如「其中弓阶的」「详细说说」）；"
             "CORRECTION=修正上一轮关键参数（如「我说的是Alter版」）。"
             "无多轮上下文时默认为 MAJOR。"
+        ),
+    )
+    fallback_code: Literal["greeting", "out_of_scope"] | None = Field(
+        default=None,
+        description=(
+            "仅当 pipeline=FALLBACK 时使用："
+            "greeting=问候/能力咨询（如「你好」「你能做什么」）；"
+            "out_of_scope=与 FGO 无关的问题（如「明天天气」「推荐充电器」）。"
+            "其他 pipeline 必须保持 null。"
         ),
     )
 

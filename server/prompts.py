@@ -181,7 +181,7 @@ def build_classifier_prompt(prev_summary: str | None = None) -> str:
 
     return f"""你是 Laplace 链路分类器。根据用户的自然语言问题，判断应走哪条处理链路 + 本轮相对上一轮的关系。
 
-## 三条链路定义
+## 四条链路定义
 
 **链路 A — 从者/礼装结构化数据查询**
 用户想从数据库中按条件筛选、查找、对比从者或概念礼装。
@@ -198,40 +198,62 @@ def build_classifier_prompt(prev_summary: str | None = None) -> str:
 典型场景：关卡攻略、配队推荐、强度评价、戴冠战相关问题、游戏机制解释（伤害公式、buff 分类、乘区原理等）。
 关键信号：攻略、打法、配队、阵容、推荐（主观性的）、评价、强度、tier、戴冠战/冠位/剑冠/弓冠/星图、伤害公式、乘区、A类/B类/C类/D类buff。
 
+**链路 FALLBACK — 问候/能力咨询/超出范围**
+用户输入与 FGO 数据查询、知识问答、攻略推荐**完全无关**，无法用任何 Skill 处理。需要返回预置模板回复。
+两种子类型（必须同时输出 `fallback_code`）：
+- `greeting`：问候语 / 询问助手能力 / 自我介绍。例：「你好」「hi」「在吗」「你能做什么」「帮助」「介绍下自己」
+- `out_of_scope`：与 FGO 完全无关的问题。例：「明天天气」「推荐充电器」「今晚吃什么」「写首诗」「2+2 等于几」
+
 ## 消歧义规则（关键）
 
 1. **「职阶 + 效果/能力 + 推荐」= 链路 A**：当用户问"XX阶有XX效果的从者推荐"时，本质是按条件筛选从者，走链路 A。例如"剑阶出星推荐"="筛选出星能力强的剑阶从者"，是数据查询不是攻略推荐。判断标准：如果"推荐"可以被替换为"有哪些"且语义不变，则走 A。
 2. **「戴冠战」相关 = 链路 C**：只要提到"戴冠战/冠位/剑冠/弓冠/星图"等戴冠战专有词，无论问什么都走链路 C。但"XX职阶的从者"不含戴冠战关键词时走链路 A。
 3. **可拆解为具体筛选条件 = 链路 A**：如果用户的问题可以被拆解为明确的筛选参数（职阶名 + 效果名 + 数值等），走链路 A。只有无法拆解为具体条件的泛泛推荐（"推荐几个好用的从者"）才走链路 C。
-4. **从者/礼装名称查询 = 链路 A**：用户问某个从者或礼装的信息（"查一下梅林"、"梅林技能"），走链路 A，不是链路 B。链路 B 是查游戏事实（"梅林什么时候复刻"）。
+4. **从者/礼装名称查询 = 链路 A**：用户问某个从者或礼装的信息（"查一下梅林"、"梅林技能"、"梅林是谁"、"介绍下梅林"），走链路 A，不是链路 B、C 或 FALLBACK。链路 B 是查游戏事实（"梅林什么时候复刻"）。
 5. **职阶克制 = 链路 A**：用户问克制关系（"什么克制XX"、"打XX用什么职阶"），走链路 A。
 6. **游戏机制原理 = 链路 C**：用户问"什么是 X 类 buff"、"伤害公式怎么算"、"乘区是什么意思"等游戏机制解释类问题，走链路 C。注意区分：问"有哪些从者有 X 效果"是数据查询（A），问"X 效果的计算原理是什么"是机制解释（C）。
 7. **「从者名 + X类buff」= 链路 A**：当用户问某个从者能提供多少 A/B/C/D 类 buff 时（如"梅林能提供多少A类buff"），本质是查询该从者的具体技能数值，走链路 A。只有不涉及具体从者的纯机制性问题（"A类buff是什么"）才走链路 C。
+8. **FALLBACK 严格判定（防误判）**：仅当输入**完全不含任何**以下信号时才输出 FALLBACK：
+   - 任何 FGO 从者名 / 昵称 / 礼装名（含日文/中文/英文）
+   - 任何职阶词（剑/弓/枪/骑/术/杀/狂/Saber/Caster 等）
+   - 任何效果/特性词（充能/无敌/闪避/暴击/星星/特攻 等）
+   - 任何 FGO 专有名词（宝具/技能/羁绊/灵基/概念礼装/卡池/主线/活动/戴冠战/冠位 等）
+   - 任何数值条件（"30%以上"、"5星" 等）
+   有任一信号 → 必须走 A/B/C 之一。
 {multiturn_block}
 
 ## 输出格式
 
 严格按以下 JSON 格式输出，不要有任何其他内容：
 ```json
-{{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR"}}
+{{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
 ```
 
-- `pipeline`：链路标识，只能是 "A"、"B"、"C" 之一
+- `pipeline`：链路标识，只能是 "A"、"B"、"C"、"FALLBACK" 之一
 - `confidence`：你对这个链路分类的置信度，0.0~1.0。对于明确匹配的查询给高置信度（>0.8），对于边界 case 给较低置信度（0.5~0.7）
 - `turn_type`：本轮相对上一轮的关系，只能是 "MAJOR"、"MINOR"、"CORRECTION" 之一
+- `fallback_code`：仅当 pipeline=FALLBACK 时填 "greeting" 或 "out_of_scope"，其余必须为 null
 
 ## 示例
 
-用户："30自充以上的术阶" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR"}}
-用户："剑阶出星推荐" → {{"pipeline": "A", "confidence": 0.9, "turn_type": "MAJOR"}}
-用户："查一下梅林" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR"}}
-用户："克制月癌的从者" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR"}}
-用户："有NP充能效果的五星礼装" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR"}}
-用户："梅林什么时候复刻" → {{"pipeline": "B", "confidence": 0.95, "turn_type": "MAJOR"}}
-用户："最近有什么活动" → {{"pipeline": "B", "confidence": 0.9, "turn_type": "MAJOR"}}
-用户："龙之牙在哪里掉" → {{"pipeline": "B", "confidence": 0.9, "turn_type": "MAJOR"}}
-用户："戴冠战剑阶怎么打" → {{"pipeline": "C", "confidence": 0.95, "turn_type": "MAJOR"}}
-用户："高难配队推荐" → {{"pipeline": "C", "confidence": 0.9, "turn_type": "MAJOR"}}
+用户："30自充以上的术阶" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
+用户："剑阶出星推荐" → {{"pipeline": "A", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": null}}
+用户："查一下梅林" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
+用户："梅林是谁" → {{"pipeline": "A", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": null}}  # 含从者名 → A
+用户："克制月癌的从者" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
+用户："有NP充能效果的五星礼装" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
+用户："梅林什么时候复刻" → {{"pipeline": "B", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
+用户："最近有什么活动" → {{"pipeline": "B", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": null}}
+用户："龙之牙在哪里掉" → {{"pipeline": "B", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": null}}
+用户："戴冠战剑阶怎么打" → {{"pipeline": "C", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
+用户："高难配队推荐" → {{"pipeline": "C", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": null}}
+用户："你好" → {{"pipeline": "FALLBACK", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": "greeting"}}
+用户："hi" → {{"pipeline": "FALLBACK", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": "greeting"}}
+用户："你能做什么" → {{"pipeline": "FALLBACK", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": "greeting"}}
+用户："帮助" → {{"pipeline": "FALLBACK", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": "greeting"}}
+用户："明天天气怎么样" → {{"pipeline": "FALLBACK", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": "out_of_scope"}}
+用户："推荐充电器" → {{"pipeline": "FALLBACK", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": "out_of_scope"}}
+用户："2+2 等于几" → {{"pipeline": "FALLBACK", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": "out_of_scope"}}
 """
 
 
