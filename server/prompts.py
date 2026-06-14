@@ -146,18 +146,32 @@ def build_classifier_prompt(prev_summary: str | None = None) -> str:
 
 判断本轮 user 输入与上一轮的关系，输出 `turn_type`：
 - **MAJOR**：全新查询，与上一轮主题无关（默认值，无上下文时使用）
-- **MINOR**：在上一轮结果上追加过滤、切换粒度或追问细节。典型信号：
-  - "其中弓阶的"、"再筛一下..."（追加过滤条件）
-  - "详细说说"、"展开第一个"、"对比下前两个"（切换回复粒度）
-  - "再帮我看看宝具效果"、"那他的技能呢"（在同一从者/查询基础上追问）
+- **MINOR**：在上一轮结果上追加过滤、切换粒度或追问细节。**必须包含显式承接词或指代词**，典型信号：
+  - "**其中**弓阶的"、"**再**筛一下..."、"**那些**里 5 星的"（追加过滤条件）
+  - "**详细**说说"、"**展开**第一个"、"**对比下**前两个"（切换回复粒度）
+  - "**再**帮我看看宝具效果"、"**那他**的技能呢"、"**第一个**那个"（在同一从者/查询基础上追问）
 - **CORRECTION**：修正上一轮的关键参数。典型信号：
   - "我说的是 Alter 版"、"不是这个，我说的是..."、"应该是..."（指代错误纠正）
 
-判断规则：
-1. 如果本轮文本明确换主题（提到全新从者名、礼装、活动等），输出 MAJOR
-2. 如果本轮文本是承接式短句（"其中..."、"那..."、"详细说..."），输出 MINOR
-3. 如果本轮文本含修正语气词（"不是..."、"我说的是..."、"应该是..."），输出 CORRECTION
-4. 模糊场景下倾向 MAJOR（更安全，避免污染新查询）"""
+判断规则（按优先级）：
+1. **完整独立查询 → MAJOR（最高优先级）**：如果本轮句子单独看就是一个完整可独立解释的查询（包含完整筛选维度组合，如"职阶 + 稀有度"、"职阶 + 效果"、"从者名 + 属性"、"X 阶有 Y 效果的从者"等），即使上一轮也是同类查询，也应当输出 **MAJOR**。判断标准：把本轮句子单独丢给系统，能不能独立得到合理答案？能 → MAJOR。
+2. **承接词触发 MINOR**：只有当本轮明确含承接/指代词（"其中"、"那"、"再"、"上面"、"刚才"、"那些"、"第一个"、"详细"、"展开"等）时才输出 MINOR
+3. **修正语气 → CORRECTION**：本轮含修正语气词（"不是..."、"我说的是..."、"应该是..."）
+4. **模糊场景倾向 MAJOR**（更安全，避免把新查询污染成追问）
+
+## 多轮示例
+
+上一轮："为你筛选出 12 位高自充的术阶从者..."
+用户："其中五星的" → {{"pipeline": "A", "confidence": 0.9, "turn_type": "MINOR"}}
+用户："详细说说第一个" → {{"pipeline": "A", "confidence": 0.9, "turn_type": "MINOR"}}
+用户："我说的是 Caster 不是 Saber" → {{"pipeline": "A", "confidence": 0.85, "turn_type": "CORRECTION"}}
+用户："最近有什么活动" → {{"pipeline": "B", "confidence": 0.9, "turn_type": "MAJOR"}}
+
+上一轮："为你筛选出 6 位 NP 100% 自充的从者..."
+用户："弓阶的 5 星从者" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR"}}  # 完整独立查询，无承接词
+用户："剑阶出星推荐" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR"}}  # 完整独立查询
+用户："查一下梅林" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR"}}  # 全新对象
+用户："其中弓阶的 5 星" → {{"pipeline": "A", "confidence": 0.9, "turn_type": "MINOR"}}  # 含"其中"承接词，才是 MINOR"""
     else:
         multiturn_block = """
 
@@ -218,14 +232,6 @@ def build_classifier_prompt(prev_summary: str | None = None) -> str:
 用户："龙之牙在哪里掉" → {{"pipeline": "B", "confidence": 0.9, "turn_type": "MAJOR"}}
 用户："戴冠战剑阶怎么打" → {{"pipeline": "C", "confidence": 0.95, "turn_type": "MAJOR"}}
 用户："高难配队推荐" → {{"pipeline": "C", "confidence": 0.9, "turn_type": "MAJOR"}}
-
-## 多轮示例（仅在有上一轮上下文时适用）
-
-上一轮："为你筛选出 12 位高自充的术阶从者..."
-用户："其中五星的" → {{"pipeline": "A", "confidence": 0.9, "turn_type": "MINOR"}}
-用户："详细说说第一个" → {{"pipeline": "A", "confidence": 0.9, "turn_type": "MINOR"}}
-用户："我说的是 Caster 不是 Saber" → {{"pipeline": "A", "confidence": 0.85, "turn_type": "CORRECTION"}}
-用户："最近有什么活动" → {{"pipeline": "B", "confidence": 0.9, "turn_type": "MAJOR"}}
 """
 
 

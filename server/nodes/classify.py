@@ -111,6 +111,45 @@ async def classify_node(state: PipelineState) -> PipelineState:
     if "prev_turn" not in state.extras and turn_type != "MAJOR":
         # 没有上一轮上下文却判 MINOR/CORRECTION 是 LLM 漂移，强制纠正为 MAJOR
         turn_type = "MAJOR"
+
+    # 后置规则兜底：MINOR 必须含显式承接/指代词，否则强制改回 MAJOR
+    # 防御 LLM 把完整独立查询（如"弓阶的 5 星从者"）误判为追问
+    if turn_type == "MINOR":
+        msg = (state.user_message or "").strip()
+        # 承接/指代词白名单（出现任一即视为有效追问信号）
+        anchor_keywords = (
+            "其中",
+            "那些",
+            "上面",
+            "刚才",
+            "前面",
+            "详细",
+            "展开",
+            "对比",
+            "具体说",
+            "第一",
+            "第二",
+            "第三",
+            "第四",
+            "第五",
+            "再筛",
+            "再看",
+            "再帮",
+            "再问",
+            "那他",
+            "那她",
+            "那它",
+            "那个",
+            "这个",
+            "上一",
+            "刚提",
+            "上面那",
+            "刚才那",
+        )
+        if not any(kw in msg for kw in anchor_keywords):
+            print(f"⚠️ [{state.trace_id}] classify 后置兜底：LLM 判 MINOR 但无承接词，强制改 MAJOR (msg={msg!r})")
+            turn_type = "MAJOR"
+
     state.turn_type = turn_type
 
     # ── 多轮副作用：MAJOR 时清空 session ──
