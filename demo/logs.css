@@ -349,13 +349,17 @@ body {
   background: var(--cyan-soft);
 }
 
-.col-time { width: 160px; }
-.col-trace { width: 100px; }
+.col-time { width: 150px; }
+.col-trace { width: 90px; }
 .col-query { }
-.col-status { width: 80px; text-align: center; }
+.col-pipeline { width: 80px; text-align: center; }
+.col-turntype { width: 70px; text-align: center; }
+.col-skills { width: 140px; }
+.col-status { width: 70px; text-align: center; }
 .col-mode { width: 80px; text-align: center; }
-.col-tokens { width: 80px; text-align: right; }
-.col-duration { width: 90px; text-align: right; }
+.col-rating { width: 70px; text-align: center; }
+.col-tokens { width: 70px; text-align: right; }
+.col-duration { width: 80px; text-align: right; }
 
 .trace-id {
   font-family: var(--font-mono);
@@ -429,6 +433,117 @@ body {
 .mode-fallback {
   background: var(--rule);
   color: var(--text-muted);
+}
+
+/* === v0.5.1 BI 维度 Badge === */
+.pipeline-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 0;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-display);
+  letter-spacing: 1px;
+  border: 1px solid currentColor;
+  background: var(--paper);
+  white-space: nowrap;
+}
+
+.pipeline-A {
+  background: var(--cyan-soft);
+  color: var(--cyan);
+}
+
+.pipeline-B {
+  background: rgba(201, 169, 97, 0.15);
+  color: var(--text-gold);
+}
+
+.pipeline-C {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.pipeline-agent {
+  background: rgba(10, 31, 74, 0.08);
+  color: var(--ink);
+}
+
+.pipeline-preset,
+.pipeline-direct {
+  background: var(--rule);
+  color: var(--text-secondary);
+}
+
+.pipeline-confirmation {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.pipeline-fallback {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.pipeline-full_a,
+.pipeline-sse {
+  background: var(--cyan-soft);
+  color: var(--ink);
+}
+
+.pipeline-unknown {
+  background: var(--rule);
+  color: var(--text-muted);
+}
+
+.turntype-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 0;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-display);
+  letter-spacing: 1px;
+  border: 1px solid currentColor;
+  background: var(--paper);
+  white-space: nowrap;
+}
+
+.turntype-MAJOR {
+  background: var(--cyan-soft);
+  color: var(--cyan);
+}
+
+.turntype-MINOR {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.turntype-CORRECTION {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.turntype-RESUME {
+  background: rgba(201, 169, 97, 0.15);
+  color: var(--text-gold);
+}
+
+.turntype-unknown {
+  background: var(--rule);
+  color: var(--text-muted);
+}
+
+.skills-cell {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  max-width: 140px;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .rating-badge {
@@ -1013,6 +1128,7 @@ body {
   border-radius: 0;
   overflow: hidden;
   border: 1px solid var(--rule-strong);
+  position: relative;
 }
 
 .h-bar-fill {
@@ -1022,6 +1138,31 @@ body {
   transition: width 0.3s;
   min-width: 2px;
   border-right: 2px solid var(--gold);
+}
+
+.h-bar-error-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--danger),
+    var(--danger) 4px,
+    var(--danger-soft) 4px,
+    var(--danger-soft) 8px
+  );
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.h-bar-row.has-error .h-bar-label {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.h-bar-row.has-error .h-bar-value {
+  color: var(--danger);
 }
 
 .h-bar-value {
@@ -1045,12 +1186,12 @@ body {
   .logo-text h1 { font-size: 16px; letter-spacing: 2px; }
 
   /* 表格在小屏隐藏次要列 */
-  .col-mode, .col-tokens { display: none; }
+  .col-mode, .col-tokens, .col-skills, .col-turntype { display: none; }
 }
 
 @media (max-width: 480px) {
   .stats-kpi-row { grid-template-columns: 1fr; }
-  .col-trace { display: none; }
+  .col-trace, .col-pipeline, .col-rating { display: none; }
   #log-table { font-size: 11px; }
   #log-table th, #log-table td { padding: 7px 8px; }
 }

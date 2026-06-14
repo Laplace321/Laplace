@@ -134,10 +134,26 @@ async def admin_list_logs(
 
 @app.get("/api/admin/logs/stats")
 async def admin_logs_stats(days: int = 7, _=Depends(require_admin)):
-    """日志统计汇总（PV/UV/路径分布/日期趋势/评分分布）。"""
+    """日志统计汇总（PV/UV/路径分布/日期趋势/评分分布 + v0.5.1 BI 维度）。
+
+    在原 ``compute_log_stats`` 输出基础上叠加 ``dimensions`` 字段，
+    展示 pipeline / turn_type / skill_name / error_reason 切分。
+    """
+    from server.bi_index import query_dimension_stats
     from server.logger import compute_log_stats
 
-    return compute_log_stats(days=days)
+    base = compute_log_stats(days=days)
+    try:
+        base["dimensions"] = query_dimension_stats(days=days)
+    except Exception:
+        # 任何异常不阻塞老 schema 字段返回
+        base["dimensions"] = {
+            "by_pipeline": [],
+            "by_turn_type": [],
+            "by_skill": [],
+            "by_error_reason": [],
+        }
+    return base
 
 
 @app.get("/api/admin/logs/{trace_id}")

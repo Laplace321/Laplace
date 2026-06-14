@@ -88,6 +88,80 @@ function formatTokens(tokens) {
   return tokens.toLocaleString();
 }
 
+// === v0.5.1 BI 维度展示 ===
+const PIPELINE_LABELS = {
+  A: "A 主链路",
+  B: "B Atlas",
+  C: "C 攻略",
+  agent: "Agent 兜底",
+  preset: "预设回复",
+  confirmation: "二次确认",
+  fallback: "降级",
+  direct: "直接回复",
+  full_a: "A 完整流程",
+  sse: "SSE 流式",
+  unknown: "未知",
+};
+
+const TURN_TYPE_LABELS = {
+  MAJOR: "新话题",
+  MINOR: "追问",
+  CORRECTION: "纠正",
+  RESUME: "中断恢复",
+  unknown: "未知",
+};
+
+const SKILL_DISPLAY_NAMES = {
+  search_by_effect: "效果筛选",
+  search_by_class: "职阶筛选",
+  search_by_trait: "特性筛选",
+  search_by_rarity: "星级筛选",
+  search_by_npcharge: "充能筛选",
+  lookup_servant: "从者查询",
+  lookup_ce: "礼装查询",
+  respond_servant_detail: "从者详情",
+  respond_servant_list: "从者列表",
+  respond_recommendation: "推荐回复",
+  atlas_search: "Atlas 检索",
+  guide_search: "攻略检索",
+  fact_verify: "事实校验",
+};
+
+function getPipelineLabel(p) {
+  if (!p) return "-";
+  return PIPELINE_LABELS[p] || p;
+}
+
+function getTurnTypeLabel(t) {
+  if (!t) return "-";
+  return TURN_TYPE_LABELS[t] || t;
+}
+
+function formatSkillsCell(names) {
+  if (!names) return "-";
+  const arr = String(names).split(",").map(s => s.trim()).filter(Boolean);
+  if (arr.length === 0) return "-";
+  const labels = arr.map(n => SKILL_DISPLAY_NAMES[n] || n);
+  if (labels.length <= 2) return escapeHtml(labels.join(" + "));
+  // 超过 2 个，前 2 个 + …
+  return `<span title="${escapeHtml(labels.join(" + "))}">${escapeHtml(labels.slice(0, 2).join(" + "))}…</span>`;
+}
+
+function getErrorReasonLabel(reason) {
+  if (!reason) return "-";
+  const map = {
+    routing_error: "路由错误",
+    stream_error: "流式异常",
+    preset_stream_error: "预设流异常",
+    confirmation_stream_error: "确认流异常",
+    execution_error: "执行错误",
+    llm_error: "LLM 错误",
+    rate_limit: "限流",
+    timeout: "超时",
+  };
+  return map[reason] || reason;
+}
+
 // === Fetch Logs ===
 async function fetchLogs() {
   loadingState.classList.remove("hidden");
@@ -147,10 +221,18 @@ function renderLogs(items) {
     const ratingLabel = getRatingLabel(item.rating);
     const ratingClass = getRatingClass(item.rating);
 
+    // v0.5.1 维度
+    const pipelineLabel = getPipelineLabel(item.pipeline);
+    const turnTypeLabel = getTurnTypeLabel(item.turn_type);
+    const skillsCell = formatSkillsCell(item.skill_names);
+
     return `<tr data-trace-id="${escapeHtml(item.traceId)}">
       <td class="time-cell">${time}</td>
       <td><span class="trace-id">${escapeHtml(item.traceId)}</span></td>
       <td><span class="query-text" title="${query}">${query}</span></td>
+      <td style="text-align:center"><span class="pipeline-badge pipeline-${escapeHtml(item.pipeline || "unknown")}">${escapeHtml(pipelineLabel)}</span></td>
+      <td style="text-align:center"><span class="turntype-badge turntype-${escapeHtml(item.turn_type || "unknown")}">${escapeHtml(turnTypeLabel)}</span></td>
+      <td><span class="skills-cell">${skillsCell}</span></td>
       <td style="text-align:center"><span class="status-badge ${statusClass}">${statusLabel}</span></td>
       <td style="text-align:center"><span class="mode-badge ${modeClass}">${modeLabel}</span></td>
       <td style="text-align:center"><span class="rating-badge ${ratingClass}">${ratingLabel}</span></td>
@@ -404,6 +486,51 @@ function renderStats(data) {
   renderBarChart("chart-paths", data.paths.map(p => ({ label: p.path, value: p.count })));
   // Modes Chart
   renderBarChart("chart-modes", data.modes.map(m => ({ label: m.mode, value: m.count })));
+
+  // v0.5.1 BI 维度图
+  const dims = data.dimensions || {};
+  renderPipelineChart("chart-pipelines", dims.by_pipeline || []);
+  renderBarChart(
+    "chart-turn-types",
+    (dims.by_turn_type || []).map(t => ({ label: getTurnTypeLabel(t.turn_type), value: t.count }))
+  );
+  renderBarChart(
+    "chart-skills",
+    (dims.by_skill || []).slice(0, 10).map(s => ({
+      label: SKILL_DISPLAY_NAMES[s.skill_name] || s.skill_name,
+      value: s.count,
+    }))
+  );
+  renderBarChart(
+    "chart-errors",
+    (dims.by_error_reason || []).map(e => ({ label: getErrorReasonLabel(e.error_reason), value: e.count }))
+  );
+}
+
+// Pipeline 专用图：在条形上叠加错误率百分比
+function renderPipelineChart(containerId, items) {
+  const container = document.getElementById(containerId);
+  if (!items || items.length === 0) {
+    container.innerHTML = '<div class="chart-empty">暂无数据</div>';
+    return;
+  }
+  const maxVal = Math.max(...items.map(i => i.count), 1);
+  const html = items.map(item => {
+    const pct = Math.round((item.count / maxVal) * 100);
+    const errPct = item.count > 0 ? Math.round((item.error_count / item.count) * 100) : 0;
+    const avgLat = item.avg_latency_ms != null ? `${Math.round(item.avg_latency_ms)}ms` : "-";
+    const errClass = errPct > 0 ? " has-error" : "";
+    const label = getPipelineLabel(item.pipeline);
+    return `<div class="h-bar-row${errClass}">
+      <span class="h-bar-label" title="${escapeHtml(item.pipeline)}">${escapeHtml(label)}</span>
+      <div class="h-bar-track">
+        <div class="h-bar-fill" style="width:${pct}%"></div>
+        ${errPct > 0 ? `<div class="h-bar-error-overlay" style="width:${pct * (errPct / 100)}%"></div>` : ""}
+      </div>
+      <span class="h-bar-value">${item.count} · 错误${errPct}% · ${avgLat}</span>
+    </div>`;
+  }).join("");
+  container.innerHTML = html;
 }
 
 function renderDailyChart(daily) {
