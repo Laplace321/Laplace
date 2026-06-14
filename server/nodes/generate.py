@@ -19,7 +19,7 @@ import json
 import time
 from collections.abc import AsyncGenerator
 
-from server.context_builder import MAX_RESULTS, build_ce_context, build_context
+from server.context_builder import MAX_RESULTS, build_ce_context, build_context, build_servant_brief
 from server.graph.decorators import with_trace
 from server.graph.session import PREV_SUMMARY_MAX_CHARS, SessionStore, TurnSnapshot
 from server.graph.state import PipelineState
@@ -42,6 +42,33 @@ def _latency_bucket(total_ms: float) -> str:
     if total_ms < 5000:
         return "3000-5000ms"
     return ">=5000ms"
+
+
+#: 当 returned_servants 数量不大于该值时，为本轮生成 servant_briefs。
+#: 超过则视为列表场景（如「五星弓阶」），仅依赖 servants 名字字段做下一轮锚定。
+_BRIEF_MAX_SERVANTS = 3
+
+
+def _compute_servant_briefs(state: PipelineState, returned_servants: list[dict]) -> list[str]:
+    """根据本轮命中情况决定是否生成 servant_briefs（ADR-031 / Phase 1）。
+
+    命中条件（全部满足才生成）：
+    1. state.classified_pipeline == "A"（B/C 链路当前不写 turn，无需此字段）
+    2. ``len(returned_servants) <= _BRIEF_MAX_SERVANTS``（避免列表场景污染 token 预算）
+    3. returned_servants 全部为 dict
+    """
+    if state.classified_pipeline != "A":
+        return []
+    if not returned_servants or len(returned_servants) > _BRIEF_MAX_SERVANTS:
+        return []
+    briefs: list[str] = []
+    for s in returned_servants:
+        if not isinstance(s, dict):
+            continue
+        text = build_servant_brief(s)
+        if text:
+            briefs.append(text)
+    return briefs
 
 
 @with_trace(Phase.NODE_GENERATE)
@@ -205,6 +232,7 @@ async def generate_node(state: PipelineState) -> PipelineState:
                     for s in returned_servants
                     if isinstance(s, dict)
                 ],
+                servant_briefs=_compute_servant_briefs(state, returned_servants),
                 query=query_info,
                 turn_type=state.turn_type or "MAJOR",
                 timestamp=time.time(),
@@ -413,6 +441,7 @@ async def generate_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pi
                     for s in returned_servants
                     if isinstance(s, dict)
                 ],
+                servant_briefs=_compute_servant_briefs(state, returned_servants),
                 query=query_info,
                 turn_type=state.turn_type or "MAJOR",
                 timestamp=time.time(),

@@ -55,13 +55,17 @@ def _extract_guide_tags(query: str) -> list[str]:
     return tags
 
 
-def _extract_prev_servant_context(state: PipelineState) -> tuple[str, str | None]:
+def _extract_prev_servant_context(
+    state: PipelineState,
+) -> tuple[str, str | None, list[str]]:
     """MINOR / CORRECTION 续问时，从 prev_turn 抽取主从者实体用于查询改写与上下文注入。
 
-    返回 ``(effective_search_query, prev_servant_label)``：
+    返回 ``(effective_search_query, prev_servant_label, prev_servant_briefs)``：
     - ``effective_search_query``：交给 BM25 检索的查询串。命中条件下拼上从者名以提升召回精度，
       其余情况返回 ``state.user_message`` 原文。
     - ``prev_servant_label``：注入 generation_prompt 的从者名，``None`` 表示无上一轮实体。
+    - ``prev_servant_briefs``：上一轮已预消化的从者基础数据摘要列表（ADR-031），
+      最多取前 3 条；不存在则返回 ``[]``。
 
     命中条件（全部满足）：
     1. ``state.turn_type`` ∈ {MINOR, CORRECTION}
@@ -69,23 +73,25 @@ def _extract_prev_servant_context(state: PipelineState) -> tuple[str, str | None
     3. 第一个 servant 含非空 ``name``
     """
     if state.turn_type not in ("MINOR", "CORRECTION"):
-        return state.user_message, None
+        return state.user_message, None, []
     prev_turn = state.extras.get("prev_turn")
     if prev_turn is None:
-        return state.user_message, None
+        return state.user_message, None, []
     servants = getattr(prev_turn, "servants", None) or []
     if not servants:
-        return state.user_message, None
+        return state.user_message, None, []
     first = servants[0]
     if not isinstance(first, dict):
-        return state.user_message, None
+        return state.user_message, None, []
     name = (first.get("name") or "").strip()
     if not name:
-        return state.user_message, None
+        return state.user_message, None, []
+    briefs_raw = getattr(prev_turn, "servant_briefs", None) or []
+    briefs = [b for b in briefs_raw if isinstance(b, str) and b.strip()][:3]
     # 已经显式提到该从者名时不重复拼接，避免「水呆 水呆 在...」之类的污染
     if name in state.user_message:
-        return state.user_message, name
-    return f"{name} {state.user_message}", name
+        return state.user_message, name, briefs
+    return f"{name} {state.user_message}", name, briefs
 
 
 def _prepare_guide_context(user_message: str) -> tuple[list, set[str], dict[str, str]] | None:
@@ -129,11 +135,15 @@ def _build_guide_generation_prompt(
     guide_context: str,
     user_message: str,
     prev_servant_label: str | None = None,
+    prev_servant_briefs: list[str] | None = None,
 ) -> str:
     """构建链路 C generation 阶段的 system prompt。
 
     ``prev_servant_label`` 非 None 时，会在 prompt 中注入「上一轮已确定的从者」上下文，
     让 LLM 把本轮的指代词（这个从者 / TA / 这个角色等）锚定到该实体。
+
+    ``prev_servant_briefs`` 非空时，会在 prompt 中追加「上一轮的从者基础数据」段，
+    让 LLM 在攻略推荐时可以结合从者真实属性 / 技能 / 宝具进行准确分析（ADR-031）。
     """
     context_section = ""
     if prev_servant_label:
@@ -142,6 +152,16 @@ def _build_guide_generation_prompt(
             f"用户上一轮已确定在询问从者「{prev_servant_label}」。本轮中的「这个从者 / 这个角色 / TA / 他 / 她 / 它」均指代此从者，"
             "请直接代入该名字回答，禁止反问『用户问的是哪位从者』。\n\n"
         )
+        if prev_servant_briefs:
+            briefs_block = "\n\n".join(prev_servant_briefs)
+            context_section += (
+                "## 上下文 - 从者基础数据（来自上一轮查询，权威结构化数据）\n"
+                "下方为该从者的真实属性、技能与宝具。回答前必须先核对：\n"
+                "- 职阶 / 卡色 / 宝具类型 与攻略要求是否吻合（如戴冠战职阶限制）\n"
+                "- 技能效果 / 宝具效果 是否能满足攻略中描述的角色定位\n"
+                "- 若该从者并不适合攻略场景（如职阶不匹配），必须明确指出并给出替代建议\n\n"
+                f"{briefs_block}\n\n"
+            )
     return (
         "你是 FGO 攻略助手。根据以下攻略文档内容回答用户问题。\n\n" + context_section + "## 知识范围\n"
         "- 仅基于提供的攻略内容回答，严禁使用自身训练知识补充或猜测\n"
@@ -185,7 +205,7 @@ def _format_source_suffix(source_labels: set[str], source_authors: dict[str, str
 @with_trace(Phase.NODE_GUIDE)
 async def guide_node(state: PipelineState) -> PipelineState:
     """Pipeline C 主节点：BM25 检索攻略文档 → LLM 生成回复 → 来源标注。"""
-    effective_query, prev_servant_label = _extract_prev_servant_context(state)
+    effective_query, prev_servant_label, prev_servant_briefs = _extract_prev_servant_context(state)
     result = _prepare_guide_context(effective_query)
 
     await log_trace_event(
@@ -195,6 +215,7 @@ async def guide_node(state: PipelineState) -> PipelineState:
             "query": effective_query,
             "original_query": state.user_message,
             "prev_servant": prev_servant_label or "",
+            "prev_servant_briefs_count": len(prev_servant_briefs),
             "result_count": len(result[0]) if result else 0,
         },
     )
@@ -221,7 +242,10 @@ async def guide_node(state: PipelineState) -> PipelineState:
     chunks, source_labels, source_authors = result
     guide_context = _build_guide_context_text(chunks)
     generation_prompt = _build_guide_generation_prompt(
-        guide_context, state.user_message, prev_servant_label=prev_servant_label
+        guide_context,
+        state.user_message,
+        prev_servant_label=prev_servant_label,
+        prev_servant_briefs=prev_servant_briefs,
     )
 
     gen_result = await chat_completion(
@@ -296,7 +320,7 @@ async def guide_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pipel
         "data": {"phase": "routing", "message": "识别为攻略文档检索，正在检索..."},
     }
 
-    effective_query, prev_servant_label = _extract_prev_servant_context(state)
+    effective_query, prev_servant_label, prev_servant_briefs = _extract_prev_servant_context(state)
     result = _prepare_guide_context(effective_query)
     await log_trace_event(
         state.trace_id,
@@ -305,6 +329,7 @@ async def guide_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pipel
             "query": effective_query,
             "original_query": state.user_message,
             "prev_servant": prev_servant_label or "",
+            "prev_servant_briefs_count": len(prev_servant_briefs),
             "result_count": len(result[0]) if result else 0,
         },
     )
@@ -334,7 +359,10 @@ async def guide_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pipel
     chunks, source_labels, source_authors = result
     guide_context = _build_guide_context_text(chunks)
     generation_prompt = _build_guide_generation_prompt(
-        guide_context, state.user_message, prev_servant_label=prev_servant_label
+        guide_context,
+        state.user_message,
+        prev_servant_label=prev_servant_label,
+        prev_servant_briefs=prev_servant_briefs,
     )
 
     full_reply_parts: list[str] = []

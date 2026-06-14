@@ -472,3 +472,83 @@ def build_ce_context(
         "全局统计": stats_summary,
         "代表礼装详情": top_results,
     }, top_results
+
+
+# ============================================================
+# 跨轮上下文 Brief（ADR-031）
+# ============================================================
+
+#: 单条从者 brief 的字符上限。超过则在末尾截断并加省略号。
+SERVANT_BRIEF_MAX_CHARS = 1500
+
+
+def build_servant_brief(servant: dict) -> str:
+    """生成单个从者的预消化中文摘要，用于跨轮上下文注入（Pipeline A → C）。
+
+    输出格式为 plain-text Markdown，可直接拼接到下一轮 LLM 的 system prompt。
+    与 ``build_context`` 的 detail_mode 共用同一套翻译/技能详情/宝具详情构造器，
+    确保跨轮上下文与单轮回答的语义口径一致。
+
+    输出字段（按重要性排序）：
+    - 名称 / 中文名
+    - 职阶 / 稀有度 / 配卡 / 宝具卡色 / 宝具目标 / 总充能
+    - 特性（已过滤性别 / 职阶 / 属性等元数据）
+    - 技能详情（前 3 个，含数值 / 目标 / 持续回合）
+    - 宝具详情（首个，含倍率 / 效果列表）
+
+    硬截断至 ``SERVANT_BRIEF_MAX_CHARS`` 字符以控制 token 成本。
+    """
+    if not servant or not isinstance(servant, dict):
+        return ""
+
+    class_map = get_class_map()
+    np_card_map = get_np_card_map()
+    np_target_map = get_np_target_map()
+
+    raw_class_name = servant.get("className")
+    raw_np_card = servant.get("npCard")
+    raw_np_target = servant.get("npTarget")
+
+    name_cn = servant.get("aliasCN") or ""
+    name_en = servant.get("name") or ""
+    display_name = f"{name_cn}（{name_en}）" if name_cn and name_en else (name_cn or name_en or "未知从者")
+
+    lines: list[str] = [f"### {display_name}"]
+    base_attrs = [
+        f"职阶：{class_map.get(str(raw_class_name).lower(), raw_class_name)}",
+        f"稀有度：{servant.get('rarity', '?')}★",
+        f"配卡：{servant.get('cards', '?')}",
+        f"宝具卡色：{np_card_map.get(str(raw_np_card).lower(), raw_np_card)}",
+        f"宝具目标：{np_target_map.get(str(raw_np_target).lower(), raw_np_target)}",
+        f"总充能：{servant.get('totalSelfCharge', '?')}",
+    ]
+    lines.append("- " + " | ".join(base_attrs))
+
+    trait_names = translate_traits(servant.get("traits", []))
+    if trait_names:
+        lines.append(f"- 特性：{'、'.join(trait_names[:12])}")
+
+    # 技能详情（取前 3 个；详情模式已含数值 / 目标 / 持续回合）
+    skill_details = build_skill_details(servant)
+    if skill_details:
+        lines.append("- 技能详情：")
+        for sd in skill_details[:3]:
+            sk_name = sd.get("技能名") or sd.get("name") or "?"
+            sk_effects = sd.get("效果") or sd.get("effects") or []
+            effects_str = "；".join(str(e) for e in sk_effects[:4])
+            lines.append(f"  - {sk_name}：{effects_str}")
+
+    # 宝具详情（仅取首个，省 token）
+    np_details = build_np_details(servant)
+    if np_details:
+        nd = np_details[0]
+        np_name = nd.get("宝具名") or nd.get("name") or "?"
+        np_effects = nd.get("效果") or nd.get("effects") or []
+        lines.append(f"- 宝具：{np_name}")
+        for e in np_effects[:4]:
+            lines.append(f"  - {e}")
+
+    text = "\n".join(lines)
+    if len(text) > SERVANT_BRIEF_MAX_CHARS:
+        text = text[: SERVANT_BRIEF_MAX_CHARS - 1] + "…"
+    return text

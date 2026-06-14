@@ -50,6 +50,9 @@ class TurnSnapshot:
         response_skill_name: 本轮使用的回复技能名（如 respond_servant_list），用于 MINOR G3 切换。
         servants: 本轮返回的从者列表（精简版，只保留 collectionNo / name），
                   用于 MINOR CORRECTION 时锚定上下文。
+        servant_briefs: 本轮已预消化的从者中文摘要（ADR-031），用于跨轮注入到 Pipeline C 的
+                        generation prompt。仅 A 链路 + servants ≤ 3 时填充；C 链路 save_turn
+                        时透传 prev_turn.servant_briefs（最多透传 1 轮，避免上下文漂移）。
         query: 本轮组装好的 query 字段（透传给前端的 ChatResponse.query）。
         turn_type: 本轮的 turn_type（MAJOR/MINOR/CORRECTION），用于审计与下游策略。
         timestamp: 写入时间（unix 秒），由 Checkpointer 内部维护，此处仅作冗余。
@@ -63,6 +66,7 @@ class TurnSnapshot:
     skill_calls: list[dict] = field(default_factory=list)
     response_skill_name: str = "respond_servant_list"
     servants: list[dict] = field(default_factory=list)
+    servant_briefs: list[str] = field(default_factory=list)
     query: dict[str, Any] = field(default_factory=dict)
     turn_type: str = "MAJOR"
     timestamp: float = 0.0
