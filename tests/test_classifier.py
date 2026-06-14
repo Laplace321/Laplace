@@ -166,3 +166,132 @@ class TestBoundaryCases:
         assert "search_by_effect" not in prompt
         assert "lookup_servant" not in prompt
         assert "search_by_class" not in prompt
+
+
+# ============================================================
+# classify_node 后置兜底规则测试（trace a365ac5c 修复）
+# ============================================================
+
+
+class TestClassifyNodeAnchorGuard:
+    """classify_node 后置兜底：MINOR 必须含承接词，否则强制改回 MAJOR。
+
+    防御 LLM 把"弓阶的 5 星从者"等完整独立查询误判为追问。
+    """
+
+    @staticmethod
+    def _make_prev_turn():
+        from server.graph.session import TurnSnapshot
+
+        return TurnSnapshot(
+            session_id="sid-anchor",
+            user_message="3 回合内充满 NP 100% 的从者",
+            reply="为你筛选出 6 位...",
+            summary="上一轮：NP 100% 自充；命中 6 条",
+            pipeline="A",
+            skill_calls=[{"skill_name": "search_by_effect", "params": {"effect": "gainNp", "minValue": 100}}],
+            response_skill_name="respond_servant_list",
+            servants=[],
+            query={},
+            turn_type="MAJOR",
+            timestamp=1.0,
+        )
+
+    @pytest.mark.asyncio
+    async def test_minor_without_anchor_word_is_forced_to_major(self):
+        """LLM 误判 MINOR 但 user_message 不含承接词 → 强制 MAJOR。"""
+        from unittest.mock import AsyncMock, patch
+
+        from server.graph.state import PipelineState
+        from server.nodes.classify import classify_node
+
+        state = PipelineState(
+            user_message="弓阶的 5 星从者",
+            trace_id="t-anchor-guard-1",
+            session_id="sid-anchor",
+            turn_type="MAJOR",
+        )
+        state.extras["prev_turn"] = self._make_prev_turn()
+
+        fake_resp = {
+            "pipeline": "A",
+            "confidence": 0.95,
+            "turn_type": "MINOR",  # LLM 误判
+            "_model": "fake",
+            "_usage": {"total_tokens": 100},
+        }
+
+        with patch(
+            "server.nodes.classify.chat_completion",
+            new=AsyncMock(return_value=fake_resp),
+        ):
+            out = await classify_node(state)
+
+        assert out.turn_type == "MAJOR", "无承接词的完整查询应被兜底改回 MAJOR"
+        # 兜底改 MAJOR 后，metric_labels 也应反映正确的 turn_type
+        assert out.metric_labels.get("turn_type") == "MAJOR"
+
+    @pytest.mark.asyncio
+    async def test_minor_with_anchor_word_is_preserved(self):
+        """含承接词（"其中"）的 MINOR 判断应被保留。"""
+        from unittest.mock import AsyncMock, patch
+
+        from server.graph.state import PipelineState
+        from server.nodes.classify import classify_node
+
+        state = PipelineState(
+            user_message="其中弓阶的",
+            trace_id="t-anchor-guard-2",
+            session_id="sid-anchor",
+            turn_type="MAJOR",
+        )
+        state.extras["prev_turn"] = self._make_prev_turn()
+
+        fake_resp = {
+            "pipeline": "A",
+            "confidence": 0.9,
+            "turn_type": "MINOR",
+            "_model": "fake",
+            "_usage": {"total_tokens": 100},
+        }
+
+        with patch(
+            "server.nodes.classify.chat_completion",
+            new=AsyncMock(return_value=fake_resp),
+        ):
+            out = await classify_node(state)
+
+        assert out.turn_type == "MINOR", "含承接词应保留 MINOR 判断"
+        assert "prev_turn" in out.extras
+
+    @pytest.mark.asyncio
+    async def test_minor_with_detail_anchor_is_preserved(self):
+        """含"详细"承接词的 MINOR 判断应被保留。"""
+        from unittest.mock import AsyncMock, patch
+
+        from server.graph.state import PipelineState
+        from server.nodes.classify import classify_node
+
+        state = PipelineState(
+            user_message="详细说说第一个",
+            trace_id="t-anchor-guard-3",
+            session_id="sid-anchor",
+            turn_type="MAJOR",
+        )
+        state.extras["prev_turn"] = self._make_prev_turn()
+
+        fake_resp = {
+            "pipeline": "A",
+            "confidence": 0.9,
+            "turn_type": "MINOR",
+            "_model": "fake",
+            "_usage": {"total_tokens": 100},
+        }
+
+        with patch(
+            "server.nodes.classify.chat_completion",
+            new=AsyncMock(return_value=fake_resp),
+        ):
+            out = await classify_node(state)
+
+        assert out.turn_type == "MINOR"
