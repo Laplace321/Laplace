@@ -34,6 +34,7 @@ from server.schemas import (
     minor_merge_response_json_schema,
     parse_minor_merge_response,
 )
+from server.translation import describe_filters
 
 
 @with_trace(Phase.NODE_MERGE_FILTERS)
@@ -200,6 +201,27 @@ async def merge_filters_node(state: PipelineState) -> PipelineState:
         "target_pipeline": "A",
         "source": "minor_merge",
     }
+
+    # 与 route_node 对齐：streaming 场景下推送筛选条件 SSE，避免 MINOR 追问下前端
+    # thinking 区缺失「已应用筛选条件」明细（用户体验与 MAJOR 一致）。
+    streaming = bool(state.extras.get("streaming"))
+    if streaming and merged_calls:
+        merge_message_map = {
+            "reuse": "已沿用上一轮筛选条件",
+            "append_filters": "已在上一轮基础上追加筛选",
+            "switch_response": "已切换回复方式",
+            "patch_params": "已修正上一轮筛选条件",
+        }
+        state.pending_events.append(
+            {
+                "type": "thinking",
+                "data": {
+                    "phase": "routed",
+                    "message": merge_message_map.get(op, "意图识别完成"),
+                    "detail": "、".join(describe_filters(merged_calls)),
+                },
+            }
+        )
 
     await log_trace_event(
         state.trace_id,
