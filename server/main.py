@@ -180,9 +180,19 @@ async def rate_response(body: RateRequest):
     """记录用户对 AI 回复的评分（糟糕/一般/优秀）。"""
     if body.rating not in ("bad", "ok", "good"):
         return JSONResponse(status_code=400, content={"error": "rating 必须为 bad/ok/good"})
+    import asyncio
+
+    from server.bi_index import upsert_turn
     from server.logger import log_trace_event
 
     await log_trace_event(body.trace_id, "rating", {"rating": body.rating})
+    # ADR-032：评分写入 JSONL 后同步刷新 BI 索引（rating 列），确保统计面板可见。
+    # upsert_turn 是同步 SQLite 写，使用 to_thread 避免阻塞事件循环。
+    try:
+        await asyncio.to_thread(upsert_turn, body.trace_id)
+    except Exception:  # noqa: BLE001
+        # upsert_turn 内部已 try/except，此处仅 belt-and-suspenders
+        pass
     return {"ok": True}
 
 

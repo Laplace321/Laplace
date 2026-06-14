@@ -49,6 +49,38 @@ def test_after_classify_a_at_threshold_routes_to_route():
 
 
 # ────────────────────────────────────────────────────────────
+# after_classify — FALLBACK 链路（ADR-032）
+# ────────────────────────────────────────────────────────────
+
+
+def test_after_classify_fallback_greeting_routes_to_template_fallback():
+    """FALLBACK + greeting → template_fallback，并写入 routing_result.fallback。"""
+    state = PipelineState(classified_pipeline="FALLBACK", classifier_confidence=0.97)
+    state.extras["fallback_code"] = "greeting"
+    assert after_classify(state) == "template_fallback"
+    routing = state.extras.get("routing_result")
+    assert routing is not None
+    assert routing["fallback"]["code"] == "greeting"
+    assert routing["skill_calls"] == []
+
+
+def test_after_classify_fallback_out_of_scope_routes_to_template_fallback():
+    """FALLBACK + out_of_scope → template_fallback，code 透传。"""
+    state = PipelineState(classified_pipeline="FALLBACK", classifier_confidence=0.93)
+    state.extras["fallback_code"] = "out_of_scope"
+    assert after_classify(state) == "template_fallback"
+    assert state.extras["routing_result"]["fallback"]["code"] == "out_of_scope"
+
+
+def test_after_classify_fallback_missing_code_defaults_to_greeting():
+    """FALLBACK 但 extras 缺 fallback_code → 默认 greeting，避免下游崩溃。"""
+    state = PipelineState(classified_pipeline="FALLBACK", classifier_confidence=0.9)
+    # 故意不设置 fallback_code
+    assert after_classify(state) == "template_fallback"
+    assert state.extras["routing_result"]["fallback"]["code"] == "greeting"
+
+
+# ────────────────────────────────────────────────────────────
 # after_route — bail_out 分发到 agent / clarify / template_fallback
 # ────────────────────────────────────────────────────────────
 

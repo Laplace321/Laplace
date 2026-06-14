@@ -40,6 +40,7 @@
 | 029 | [Trace ContextVar 协程级传播 + Phase 常量化](docs/adr/ADR-029-trace-contextvar.md) | 2026-06-15 | 已实施 |
 | 030 | [BI 索引层（JSONL + SQLite）](docs/adr/ADR-030-bi-sqlite-index.md) | 2026-06-15 | 已实施 |
 | 031 | [跨轮从者基础数据注入 Pipeline C](docs/adr/ADR-031-cross-turn-servant-brief-injection.md) | 2026-06-12 | 已实施 |
+| 032 | [分类器 FALLBACK 链路 + 评分 BI 同步双修复](docs/adr/ADR-032-classifier-fallback-and-rating-bi-sync.md) | 2026-06-12 | 已实施 |
 
 ## 技术备忘
 

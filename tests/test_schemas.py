@@ -359,7 +359,20 @@ class TestClassifierJsonSchema:
     def test_pipeline_enum_values(self):
         schema = classifier_response_json_schema()
         pipeline_prop = schema["properties"]["pipeline"]
-        assert set(pipeline_prop.get("enum", [])) == {"A", "B", "C"}
+        # ADR-032：FALLBACK 链路加入 Stage 0 输出枚举
+        assert set(pipeline_prop.get("enum", [])) == {"A", "B", "C", "FALLBACK"}
+
+    def test_fallback_code_enum_values(self):
+        """ADR-032：fallback_code 字段的合法枚举为 greeting / out_of_scope / null。"""
+        schema = classifier_response_json_schema()
+        props = schema["properties"]
+        assert "fallback_code" in props
+        # Pydantic 把 Optional[Literal[...]] 表示为 anyOf；提取 enum 值
+        prop = props["fallback_code"]
+        enum_values: set[str] = set()
+        for branch in prop.get("anyOf", []):
+            enum_values.update(branch.get("enum", []) or [])
+        assert {"greeting", "out_of_scope"}.issubset(enum_values)
 
 
 class TestParseClassifierResponse:

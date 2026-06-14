@@ -43,12 +43,23 @@ def _dispatch_bail_out(reason: str) -> str:
 
 
 def after_classify(state: PipelineState) -> str:
-    """Stage 0 分类后路由：A→route / B→atlas / C→guide / 低置信度→agent_fallback。
+    """Stage 0 分类后路由：A→route / B→atlas / C→guide / FALLBACK→template_fallback / 低置信度→agent_fallback。
 
     Task 4 Batch B：当 turn_type ∈ {MINOR, CORRECTION} 且存在 prev_turn 时，
     跳过 route_node 直接走 merge_filters 节点合并 delta。
+
+    ADR-032：当 classifier 输出 ``pipeline=FALLBACK`` 时，根据 ``state.extras["fallback_code"]``
+    构造 ``routing_result.fallback`` 并直接路由到 ``template_fallback`` 节点输出预置文案。
     """
     pipeline = state.classified_pipeline
+    if pipeline == "FALLBACK":
+        code = state.extras.get("fallback_code") or "greeting"
+        # template_fallback_node 从 routing_result.fallback.code 读取索引模板
+        state.extras["routing_result"] = {
+            "fallback": {"code": code, "message": ""},
+            "skill_calls": [],
+        }
+        return "template_fallback"
     if pipeline == "B":
         return "atlas"
     if pipeline == "C":
