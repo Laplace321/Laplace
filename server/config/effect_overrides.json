@@ -278,6 +278,307 @@
       "buffTypes": [],
       "aliases_zh": ["回避成功时", "闪避成功时"],
       "description": "从者闪避/回避成功时触发的追加效果"
+    },
+    {
+      "_comment": "以下为对敌负面 debuff 系列镜像。chaldea SkillEffect 仅暴露 up* 友好分类，对应 down* 全部缺失。补齐后烘焙阶段可正确识别敌方减防/减攻/减暴击等 debuff 函数，避免 npDetails 静默丢效果。",
+      "name": "downAtk",
+      "category": "debuff",
+      "damageClass": "B",
+      "funcTypes": [],
+      "buffTypes": ["downAtk"],
+      "aliases_zh": ["攻击力下降", "减攻", "攻击下降", "弱攻"],
+      "description": "降低敌方攻击力，减少敌方所有攻击的基础伤害"
+    },
+    {
+      "name": "downArts",
+      "category": "debuff",
+      "damageClass": "A",
+      "funcTypes": [],
+      "buffTypes": ["downCommandall", "downCommandatk", "downCommandstar", "downCommanstar", "downCommandnp", "downCommandnpLegacy"],
+      "validate": {"type": "buff_ckSelfIndv_contains", "trait": "cardArts", "traitValue": 4001},
+      "aliases_zh": ["Arts耐性下降", "蓝卡耐性下降", "蓝卡性能下降", "A卡耐性下降"],
+      "description": "降低敌方Arts卡(蓝卡)的性能，减少Arts指令卡伤害和NP获取"
+    },
+    {
+      "name": "downBuster",
+      "category": "debuff",
+      "damageClass": "A",
+      "funcTypes": [],
+      "buffTypes": ["downCommandall", "downCommandatk", "downCommandstar", "downCommanstar", "downCommandnp", "downCommandnpLegacy"],
+      "validate": {"type": "buff_ckSelfIndv_contains", "trait": "cardBuster", "traitValue": 4002},
+      "aliases_zh": ["Buster耐性下降", "红卡耐性下降", "红卡性能下降", "B卡耐性下降"],
+      "description": "降低敌方Buster卡(红卡)的性能，减少Buster指令卡伤害"
+    },
+    {
+      "name": "downQuick",
+      "category": "debuff",
+      "damageClass": "A",
+      "funcTypes": [],
+      "buffTypes": ["downCommandall", "downCommandatk", "downCommandstar", "downCommanstar", "downCommandnp", "downCommandnpLegacy"],
+      "validate": {"type": "buff_ckSelfIndv_contains", "trait": "cardQuick", "traitValue": 4003},
+      "aliases_zh": ["Quick耐性下降", "绿卡耐性下降", "绿卡性能下降", "Q卡耐性下降"],
+      "description": "降低敌方Quick卡(绿卡)的性能，减少Quick指令卡伤害、NP获取和产星"
+    },
+    {
+      "name": "downDamage",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downDamage", "downDamageIndividuality", "downDamageIndividualityActiveonly"],
+      "aliases_zh": ["造成伤害下降", "弱攻状态", "造成伤害减少"],
+      "description": "降低敌方造成的伤害（特定特性下生效），等同对玩家方的特防"
+    },
+    {
+      "name": "downCriticaldamage",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downCriticaldamage"],
+      "aliases_zh": ["暴击威力下降", "弱爆伤", "暴击伤害下降"],
+      "description": "降低敌方暴击时的伤害倍率"
+    },
+    {
+      "name": "downCriticalrate",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downCriticalrate"],
+      "aliases_zh": ["暴击率下降", "暴击发生率下降", "降暴"],
+      "description": "降低敌方的暴击发生概率"
+    },
+    {
+      "name": "downCriticalpoint",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downCriticalpoint"],
+      "aliases_zh": ["暴击星掉落下降", "产星下降", "出星下降"],
+      "description": "降低敌方暴击星的掉落率"
+    },
+    {
+      "name": "downStarweight",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downStarweight"],
+      "aliases_zh": ["暴击星集中度下降", "集星下降"],
+      "description": "降低敌方暴击星的集中度"
+    },
+    {
+      "name": "downNpdamage",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downNpdamage"],
+      "aliases_zh": ["宝具威力下降", "宝伤下降", "宝具伤害下降"],
+      "description": "降低敌方宝具的伤害倍率"
+    },
+    {
+      "name": "downDropnp",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downDropnp"],
+      "aliases_zh": ["NP获得量下降", "NP获取下降"],
+      "description": "降低敌方的NP获得量"
+    },
+    {
+      "name": "downDefence",
+      "category": "debuff",
+      "damageClass": "B",
+      "funcTypes": [],
+      "buffTypes": ["downDefence"],
+      "aliases_zh": ["防御力下降", "减防", "防御下降"],
+      "description": "降低敌方防御力，增加敌方受到的伤害"
+    },
+    {
+      "name": "downSpecialdefence",
+      "category": "debuff",
+      "damageClass": "B",
+      "funcTypes": [],
+      "buffTypes": ["downSpecialdefence"],
+      "aliases_zh": ["特殊防御下降", "特防下降"],
+      "description": "降低敌方对特定攻击的特殊防御"
+    },
+    {
+      "name": "downGainHp",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downGainHp", "downGivegainHp"],
+      "aliases_zh": ["HP回复量下降", "回血下降"],
+      "description": "降低敌方HP回复量"
+    },
+    {
+      "name": "downMaxhp",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downMaxhp"],
+      "aliases_zh": ["最大HP下降", "上限HP下降"],
+      "description": "降低敌方最大HP上限"
+    },
+    {
+      "name": "downTolerance",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downTolerance"],
+      "validate": {"type": "buff_ckOpIndv_every_not_in", "traits": ["buffPositiveEffect", "buffIncreaseDamage"], "traitValues": [3004, 3006]},
+      "aliases_zh": ["弱体耐性下降", "异常耐性下降", "易付与"],
+      "description": "降低敌方对弱体效果(debuff)的耐性，使其更容易被弱化"
+    },
+    {
+      "name": "downToleranceSubstate",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downToleranceSubstate"],
+      "aliases_zh": ["强化解除耐性下降"],
+      "description": "降低敌方对强化解除的耐性"
+    },
+    {
+      "name": "downGrantstate",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downGrantstate"],
+      "aliases_zh": ["状态付与成功率下降"],
+      "description": "降低敌方付与状态的成功率"
+    },
+    {
+      "name": "downGrantInstantdeath",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downGrantInstantdeath"],
+      "aliases_zh": ["即死付与率下降"],
+      "description": "降低敌方付与即死状态的成功率"
+    },
+    {
+      "name": "downGiveNp",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downGiveNp"],
+      "aliases_zh": ["给予NP下降", "我方NP获得量下降"],
+      "description": "降低敌方给予我方的NP收益（玩家不利状态）"
+    },
+    {
+      "name": "downDamagedropnp",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downDamagedropnp"],
+      "aliases_zh": ["受击NP获得下降"],
+      "description": "降低敌方受击时回收的NP数量"
+    },
+    {
+      "name": "downGrantSubstate",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downGrantSubstate"],
+      "aliases_zh": ["sub状态付与下降"],
+      "description": "降低敌方付与子状态(sub state)的成功率"
+    },
+    {
+      "_comment": "以下为「自身受到XXX伤害下降」减伤类（玩家友好），分类为 defence。BuffType 名以 down 开头但语义是为玩家方提供减伤保护。",
+      "name": "downDefenceDamage",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": ["downDefenceDamage"],
+      "aliases_zh": ["受到伤害下降", "受击伤害减免", "减伤"],
+      "description": "降低自身受到的伤害，玩家方减伤效果"
+    },
+    {
+      "name": "downDefencecommandall",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": ["downDefencecommandall"],
+      "aliases_zh": ["受指令卡伤害下降", "受卡攻击减免"],
+      "description": "降低自身受到的指令卡综合伤害"
+    },
+    {
+      "name": "downDefenceCommanddamage",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": ["downDefenceCommanddamage"],
+      "aliases_zh": ["受指令卡攻击伤害下降"],
+      "description": "降低自身受到指令卡攻击时的伤害"
+    },
+    {
+      "name": "downDefenceNpdamage",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": ["downDefenceNpdamage"],
+      "aliases_zh": ["受宝具伤害下降", "宝具减伤"],
+      "description": "降低自身受到宝具的伤害"
+    },
+    {
+      "name": "downDefenceCriticaldamage",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": ["downDefenceCriticaldamage"],
+      "aliases_zh": ["受暴击伤害下降"],
+      "description": "降低自身受到暴击时的伤害"
+    },
+    {
+      "name": "downSelfdamage",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": ["downSelfdamage"],
+      "aliases_zh": ["自身伤害减免下降"],
+      "description": "降低自身受到的固定数值伤害"
+    },
+    {
+      "_comment": "低频 down* 兜底（罕见技能场景）",
+      "name": "downActionCount",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downActionCount"],
+      "aliases_zh": ["行动次数下降"],
+      "description": "降低敌方的行动次数"
+    },
+    {
+      "name": "downBuffUseRate",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downBuffUseRate"],
+      "aliases_zh": ["buff使用率下降"],
+      "description": "降低敌方buff的使用率"
+    },
+    {
+      "name": "downGutsHp",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downGutsHp"],
+      "aliases_zh": ["毅力回复HP下降"],
+      "description": "降低敌方毅力发动时回复的HP"
+    },
+    {
+      "name": "downCriticalStarDamageTaken",
+      "category": "defence",
+      "funcTypes": [],
+      "buffTypes": ["downCriticalStarDamageTaken"],
+      "aliases_zh": ["受暴击星伤害下降"],
+      "description": "降低自身受到暴击星相关伤害"
+    },
+    {
+      "name": "downFuncgainNp",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downFuncgainNp"],
+      "aliases_zh": ["技能NP获得下降"],
+      "description": "降低敌方技能产生的NP获得量"
+    },
+    {
+      "name": "downFuncHpReduce",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downFuncHpReduce"],
+      "aliases_zh": ["HP减少效果下降"],
+      "description": "降低敌方HP减少类效果的强度"
+    },
+    {
+      "name": "downResistanceDelayNpturn",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downResistanceDelayNpturn"],
+      "aliases_zh": ["延迟NP耐性下降"],
+      "description": "降低敌方对延迟NP充能效果的耐性"
+    },
+    {
+      "name": "downNpturnval",
+      "category": "debuff",
+      "funcTypes": [],
+      "buffTypes": ["downNpturnval"],
+      "aliases_zh": ["NP回合值下降"],
+      "description": "降低敌方每回合NP增减值"
     }
   ]
 }
