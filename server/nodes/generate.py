@@ -24,7 +24,7 @@ from server.graph.decorators import with_trace
 from server.graph.session import PREV_SUMMARY_MAX_CHARS, SessionStore, TurnSnapshot
 from server.graph.state import PipelineState
 from server.llm import StreamMetadata, chat_completion, chat_completion_stream
-from server.logger import Phase, log_trace_event
+from server.logger import Phase, log_trace_event, log_trace_event_sync
 from server.prompts import get_generation_prompt
 from server.translation import describe_filters
 
@@ -259,199 +259,226 @@ async def generate_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pi
     4. yield 最终 state（引擎检测到非事件 dict 时视为新 state）
 
     生成失败时仍 yield 一次性兜底 delta，保证前端有内容；trace + save_turn 行为与非流式版一致。
+
+    多轮持久化保护（修复线上 a37bf312 bug）：
+    - 客户端 SSE 中断会向 async generator 注入 GeneratorExit/CancelledError，
+      若 ``save_turn`` 处于 yield 之后或紧邻 await 处会被取消、静默丢失；
+    - 因此把 TurnSnapshot 构造提前到 LLM 完成时，保存动作放在最外层 try/finally；
+    - finally 仅做同步调用（``session_store.save_turn`` 与 ``log_trace_event_sync``），
+      避免在取消语境中再次 await。
     """
-    result = state.extras.get("executor_result")
-    if result is None:
-        # 防御性兜底：execute_node 未运行时不应到达此处
-        state.reply = "暂时无法生成回复，请稍后重试。"
-        state.query = {"mode": "skill", "skill_calls": state.skill_calls}
-        yield {"type": "delta", "data": {"text": state.reply}}
-        yield state
-        return
-
-    skill_calls = state.skill_calls
-    response_skill_name = state.response_skill_name
-    servants = result.servants
-    total_found = result.total_found
-    returned_servants = servants[:MAX_RESULTS]
-
-    # 卡片先行（与 stream_event_generator 行为对齐）
-    if returned_servants:
-        yield {
-            "type": "servants",
-            "data": {
-                "servants": returned_servants,
-                "count": len(returned_servants),
-                "total": total_found,
-            },
-        }
-
-    # ── 构建 context（与 generate_node 完全一致）──
-    applied_filters = describe_filters(skill_calls)
-    if result.custom_context:
-        context_data = {
-            "知识数据": result.custom_context,
-            "已应用的筛选条件": applied_filters,
-            "关联从者数量": total_found,
-        }
-    elif response_skill_name == "respond_ce_list":
-        context_data, _ = build_ce_context(servants, skill_calls=skill_calls)
-        context_data["已应用的筛选条件"] = applied_filters
-        context_data["筛选条件"] = applied_filters
-    else:
-        detail_mode = response_skill_name in (
-            "respond_servant_detail",
-            "respond_support_analysis",
-            "respond_servant_compare",
-        )
-        context_data, _ = build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
-        context_data["已应用的筛选条件"] = applied_filters
-        context_data["筛选条件"] = applied_filters
-
-    context_json = json.dumps(context_data, ensure_ascii=False)
-
-    await log_trace_event(
-        state.trace_id,
-        "context_build",
-        {"applied_filters": applied_filters, "context_data": context_data},
-    )
-
-    if result.response_skill is not None:
-        gen_prompt = result.response_skill.build_prompt(state.user_message, context_json)
-    else:
-        gen_prompt = get_generation_prompt(state.user_message, context_json)
-
-    await log_trace_event(
-        state.trace_id,
-        "generation_input",
-        {"generation_prompt": gen_prompt},
-    )
-
-    yield {"type": "thinking", "data": {"phase": "generating", "message": "正在生成分析..."}}
-
-    # ── LLM 流式调用 ──
-    full_reply_parts: list[str] = []
-    final_result = "success"
-    gen_usage: dict = {}
-    gen_model: str = "unknown"
-    final_reply = ""
-    try:
-        stream_metadata = StreamMetadata()
-        async for chunk in chat_completion_stream(
-            system_prompt=(
-                "You are a helpful AI assistant. You MUST strictly follow "
-                "the provided data and NEVER use your internal knowledge about FGO."
-            ),
-            user_message=gen_prompt,
-            temperature=0.1,
-            max_tokens=2048,
-            metadata=stream_metadata,
-        ):
-            full_reply_parts.append(chunk)
-            yield {"type": "delta", "data": {"text": chunk}}
-
-        final_reply = "".join(full_reply_parts).strip()
-        gen_usage = stream_metadata.usage
-        gen_model = stream_metadata.model or "unknown"
-        state.trace_total_tokens += gen_usage.get("total_tokens", 0)
-        if not final_reply:
-            raise ValueError("Empty response from LLM")
-    except Exception as gen_err:  # noqa: BLE001
-        # 失败兜底：与原 stream_event_generator 行为一致 — 已有内容则保留，否则 yield 模板
-        if full_reply_parts:
-            final_reply = "".join(full_reply_parts).strip()
-        else:
-            final_reply = (
-                f"为你找到了 {total_found} 个礼装。"
-                if response_skill_name == "respond_ce_list"
-                else (
-                    f"为你找到了 {total_found} 位从者。"
-                    if not result.custom_context
-                    else "暂时无法生成回复，请稍后重试。"
-                )
-            )
-            final_result = "generation_error"
-            try:
-                yield {"type": "delta", "data": {"text": final_reply}}
-            except Exception:  # noqa: BLE001
-                final_result = "client_disconnected"
-        await log_trace_event(
-            state.trace_id,
-            "generation_output",
-            {"reply": final_reply},
-            error=str(gen_err),
-        )
-    else:
-        await log_trace_event(
-            state.trace_id,
-            "generation_output",
-            {"reply": final_reply, "generation_usage": gen_usage},
-        )
-
-    # ── BI 维度回填（流式版）──
-    total_time_ms = round((time.monotonic() - state.request_start) * 1000, 2)
-    state.metric_labels.update(
-        {
-            "model": gen_model,
-            "total_tokens": int(state.trace_total_tokens),
-            "latency_bucket": _latency_bucket(total_time_ms),
-        }
-    )
-
-    await log_trace_event(
-        state.trace_id,
-        "final",
-        {
-            "total_time_ms": round((time.monotonic() - state.request_start) * 1000, 2),
-            "total_found": total_found,
-            "result": final_result,
-            "mode": "oneshot",
-            "total_tokens": state.trace_total_tokens,
-            "metric_labels": dict(state.metric_labels),
-        },
-    )
-
-    query_info: dict = {"mode": "skill", "skill_calls": skill_calls}
-    if result.rejected_skills:
-        query_info["rejected_skills"] = result.rejected_skills
-
-    state.reply = final_reply
-    state.servants = returned_servants
-    state.count = total_found
-    state.query = query_info
-
-    # ── 多轮：写 TurnSnapshot（与 generate_node 一致）──
+    # ── 兜底持久化变量（即使在中途异常退出也会被 finally 读取）──
+    pending_snapshot: TurnSnapshot | None = None
     session_store: SessionStore | None = state.extras.get("session_store")
-    if session_store is not None and state.session_id:
-        applied_brief = applied_filters or "（无筛选条件）"
-        raw_summary = f"上一轮：{applied_brief}；命中 {total_found} 条；回复要点：{final_reply}"
-        if len(raw_summary) > PREV_SUMMARY_MAX_CHARS:
-            raw_summary = raw_summary[: PREV_SUMMARY_MAX_CHARS - 1] + "…"
-        try:
-            snapshot = TurnSnapshot(
-                session_id=state.session_id,
-                user_message=state.user_message,
-                reply=final_reply,
-                summary=raw_summary,
-                pipeline=state.classified_pipeline or "A",
-                skill_calls=list(skill_calls or []),
-                response_skill_name=response_skill_name or "respond_servant_list",
-                servants=[
-                    {"collectionNo": s.get("collectionNo"), "name": s.get("name", "")}
-                    for s in returned_servants
-                    if isinstance(s, dict)
-                ],
-                servant_briefs=_compute_servant_briefs(state, returned_servants),
-                query=query_info,
-                turn_type=state.turn_type or "MAJOR",
-                timestamp=time.time(),
-            )
-            session_store.save_turn(snapshot)
-        except Exception as save_err:  # noqa: BLE001
-            await log_trace_event(
-                state.trace_id,
-                "session_save_turn_failed",
-                {"error": str(save_err)},
-            )
+    save_enabled = session_store is not None and bool(state.session_id)
 
-    yield state
+    try:
+        result = state.extras.get("executor_result")
+        if result is None:
+            # 防御性兜底：execute_node 未运行时不应到达此处
+            state.reply = "暂时无法生成回复，请稍后重试。"
+            state.query = {"mode": "skill", "skill_calls": state.skill_calls}
+            yield {"type": "delta", "data": {"text": state.reply}}
+            yield state
+            return
+
+        skill_calls = state.skill_calls
+        response_skill_name = state.response_skill_name
+        servants = result.servants
+        total_found = result.total_found
+        returned_servants = servants[:MAX_RESULTS]
+
+        # 卡片先行（与 stream_event_generator 行为对齐）
+        if returned_servants:
+            yield {
+                "type": "servants",
+                "data": {
+                    "servants": returned_servants,
+                    "count": len(returned_servants),
+                    "total": total_found,
+                },
+            }
+
+        # ── 构建 context（与 generate_node 完全一致）──
+        applied_filters = describe_filters(skill_calls)
+        if result.custom_context:
+            context_data = {
+                "知识数据": result.custom_context,
+                "已应用的筛选条件": applied_filters,
+                "关联从者数量": total_found,
+            }
+        elif response_skill_name == "respond_ce_list":
+            context_data, _ = build_ce_context(servants, skill_calls=skill_calls)
+            context_data["已应用的筛选条件"] = applied_filters
+            context_data["筛选条件"] = applied_filters
+        else:
+            detail_mode = response_skill_name in (
+                "respond_servant_detail",
+                "respond_support_analysis",
+                "respond_servant_compare",
+            )
+            context_data, _ = build_context(servants, detail_mode=detail_mode, skill_calls=skill_calls)
+            context_data["已应用的筛选条件"] = applied_filters
+            context_data["筛选条件"] = applied_filters
+
+        context_json = json.dumps(context_data, ensure_ascii=False)
+
+        await log_trace_event(
+            state.trace_id,
+            "context_build",
+            {"applied_filters": applied_filters, "context_data": context_data},
+        )
+
+        if result.response_skill is not None:
+            gen_prompt = result.response_skill.build_prompt(state.user_message, context_json)
+        else:
+            gen_prompt = get_generation_prompt(state.user_message, context_json)
+
+        await log_trace_event(
+            state.trace_id,
+            "generation_input",
+            {"generation_prompt": gen_prompt},
+        )
+
+        yield {"type": "thinking", "data": {"phase": "generating", "message": "正在生成分析..."}}
+
+        # ── LLM 流式调用 ──
+        full_reply_parts: list[str] = []
+        final_result = "success"
+        gen_usage: dict = {}
+        gen_model: str = "unknown"
+        final_reply = ""
+        gen_log_data: dict = {}
+        gen_log_error: str | None = None
+        try:
+            stream_metadata = StreamMetadata()
+            async for chunk in chat_completion_stream(
+                system_prompt=(
+                    "You are a helpful AI assistant. You MUST strictly follow "
+                    "the provided data and NEVER use your internal knowledge about FGO."
+                ),
+                user_message=gen_prompt,
+                temperature=0.1,
+                max_tokens=2048,
+                metadata=stream_metadata,
+            ):
+                full_reply_parts.append(chunk)
+                yield {"type": "delta", "data": {"text": chunk}}
+
+            final_reply = "".join(full_reply_parts).strip()
+            gen_usage = stream_metadata.usage
+            gen_model = stream_metadata.model or "unknown"
+            state.trace_total_tokens += gen_usage.get("total_tokens", 0)
+            if not final_reply:
+                raise ValueError("Empty response from LLM")
+            gen_log_data = {"reply": final_reply, "generation_usage": gen_usage}
+        except Exception as gen_err:  # noqa: BLE001
+            # 失败兜底：与原 stream_event_generator 行为一致 — 已有内容则保留，否则 yield 模板
+            if full_reply_parts:
+                final_reply = "".join(full_reply_parts).strip()
+            else:
+                final_reply = (
+                    f"为你找到了 {total_found} 个礼装。"
+                    if response_skill_name == "respond_ce_list"
+                    else (
+                        f"为你找到了 {total_found} 位从者。"
+                        if not result.custom_context
+                        else "暂时无法生成回复，请稍后重试。"
+                    )
+                )
+                final_result = "generation_error"
+                try:
+                    yield {"type": "delta", "data": {"text": final_reply}}
+                except Exception:  # noqa: BLE001
+                    final_result = "client_disconnected"
+            gen_log_data = {"reply": final_reply}
+            gen_log_error = str(gen_err)
+
+        # ── 同步可完成的状态回填 + 提前构造 pending_snapshot ──
+        # 关键修复点（a37bf312 bug）：final_reply 一确定就立即同步构造快照，
+        # 避免后续 await log_trace_event 在取消语境中被中断导致 save_turn 丢失。
+        query_info: dict = {"mode": "skill", "skill_calls": skill_calls}
+        if result.rejected_skills:
+            query_info["rejected_skills"] = result.rejected_skills
+
+        state.reply = final_reply
+        state.servants = returned_servants
+        state.count = total_found
+        state.query = query_info
+
+        if save_enabled:
+            applied_brief = applied_filters or "（无筛选条件）"
+            raw_summary = f"上一轮：{applied_brief}；命中 {total_found} 条；回复要点：{final_reply}"
+            if len(raw_summary) > PREV_SUMMARY_MAX_CHARS:
+                raw_summary = raw_summary[: PREV_SUMMARY_MAX_CHARS - 1] + "…"
+            try:
+                pending_snapshot = TurnSnapshot(
+                    session_id=state.session_id,
+                    user_message=state.user_message,
+                    reply=final_reply,
+                    summary=raw_summary,
+                    pipeline=state.classified_pipeline or "A",
+                    skill_calls=list(skill_calls or []),
+                    response_skill_name=response_skill_name or "respond_servant_list",
+                    servants=[
+                        {"collectionNo": s.get("collectionNo"), "name": s.get("name", "")}
+                        for s in returned_servants
+                        if isinstance(s, dict)
+                    ],
+                    servant_briefs=_compute_servant_briefs(state, returned_servants),
+                    query=query_info,
+                    turn_type=state.turn_type or "MAJOR",
+                    timestamp=time.time(),
+                )
+            except Exception as build_err:  # noqa: BLE001
+                # 构造失败也用同步日志记录（避免 await 在取消语境下静默丢失）
+                log_trace_event_sync(
+                    state.trace_id,
+                    "session_save_turn_failed",
+                    {"error": f"build:{build_err}"},
+                )
+
+        # ── 事件日志（在 pending_snapshot 就位后，被取消也不影响持久化）──
+        await log_trace_event(
+            state.trace_id,
+            "generation_output",
+            gen_log_data,
+            error=gen_log_error,
+        )
+
+        # ── BI 维度回填（流式版）──
+        total_time_ms = round((time.monotonic() - state.request_start) * 1000, 2)
+        state.metric_labels.update(
+            {
+                "model": gen_model,
+                "total_tokens": int(state.trace_total_tokens),
+                "latency_bucket": _latency_bucket(total_time_ms),
+            }
+        )
+
+        await log_trace_event(
+            state.trace_id,
+            "final",
+            {
+                "total_time_ms": round((time.monotonic() - state.request_start) * 1000, 2),
+                "total_found": total_found,
+                "result": final_result,
+                "mode": "oneshot",
+                "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
+            },
+        )
+
+        yield state
+    finally:
+        # 客户端 SSE 中断会触发 GeneratorExit；在 finally 中只用同步操作兜底持久化，
+        # 保证下一轮分类器能加载到 prev_turn（修复线上 a37bf312 bug）。
+        if pending_snapshot is not None and session_store is not None:
+            try:
+                session_store.save_turn(pending_snapshot)
+            except Exception as save_err:  # noqa: BLE001
+                log_trace_event_sync(
+                    state.trace_id,
+                    "session_save_turn_failed",
+                    {"error": str(save_err)},
+                )
