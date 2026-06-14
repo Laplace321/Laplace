@@ -11,11 +11,13 @@
 from __future__ import annotations
 
 from server.context_builder import MAX_RESULTS
+from server.graph.decorators import with_trace
 from server.graph.state import PipelineState
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 from server.skills.executor import SkillExecutor
 
 
+@with_trace(Phase.NODE_EXECUTE)
 async def execute_node(state: PipelineState) -> PipelineState:
     """Skill 执行：调度 QuerySkill → 收敛 servants/total_found。"""
     streaming = bool(state.extras.get("streaming"))
@@ -36,6 +38,40 @@ async def execute_node(state: PipelineState) -> PipelineState:
 
     executor = SkillExecutor()
     result = executor.execute(state.skill_calls, state.response_skill_name)
+
+    # BI 维度回填：accepted skills（按字典序去重拼接，控制基数）
+    if result.accepted_skills:
+        skill_name_set = {
+            s.get("skill_name", "") for s in result.accepted_skills if isinstance(s, dict) and s.get("skill_name")
+        }
+        if skill_name_set:
+            state.metric_labels["skill_names"] = ",".join(sorted(skill_name_set))
+
+    # Prometheus：每个 accepted skill 单独计一次（domain 由 SKILL_REGISTRY 提供）
+    try:
+        from server.monitor.metrics import get_collector
+        from server.skills.base import SKILL_REGISTRY
+
+        collector = get_collector()
+        for s in result.accepted_skills or []:
+            if not isinstance(s, dict):
+                continue
+            sname = s.get("skill_name", "")
+            if not sname:
+                continue
+            domain = getattr(SKILL_REGISTRY.get(sname), "domain", "") or "response"
+            collector.record_skill_call(sname, domain, "success")
+        for s in result.rejected_skills or []:
+            if not isinstance(s, dict):
+                continue
+            sname = s.get("skill_name", "")
+            if not sname:
+                continue
+            domain = getattr(SKILL_REGISTRY.get(sname), "domain", "") or "response"
+            collector.record_skill_call(sname, domain, "rejected")
+    except Exception:  # noqa: BLE001
+        # 监控失败不影响主流程
+        pass
 
     # ── Trace: execution ──
     await log_trace_event(

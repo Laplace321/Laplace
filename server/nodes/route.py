@@ -14,9 +14,10 @@ bail_out 时把已计算的中间产物存入 state.extras["routing_result"] / e
 
 from __future__ import annotations
 
+from server.graph.decorators import with_trace
 from server.graph.state import PipelineState
 from server.llm import chat_completion
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 from server.prompts import build_routing_prompt
 from server.schemas import (
     parse_routing_response,
@@ -26,6 +27,7 @@ from server.skills.base import SKILL_REGISTRY, QuerySkill
 from server.translation import describe_filters
 
 
+@with_trace(Phase.NODE_ROUTE)
 async def route_node(state: PipelineState) -> PipelineState:
     """Stage 1：Skill 路由（仅 A 链路）。
 

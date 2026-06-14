@@ -14,10 +14,12 @@ from __future__ import annotations
 import time
 
 from server.fallback import FALLBACK_TEMPLATES
+from server.graph.decorators import with_trace
 from server.graph.state import PipelineState
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 
 
+@with_trace(Phase.NODE_FALLBACK)
 async def template_fallback_node(state: PipelineState) -> PipelineState:
     """模板回复节点：根据 routing_result.fallback.code 写入预置文案。"""
     trace_id = state.trace_id
@@ -29,6 +31,14 @@ async def template_fallback_node(state: PipelineState) -> PipelineState:
     fb_msg = fallback.get("message", "无法理解你的问题，请尝试更具体的描述。")
     template_reply = FALLBACK_TEMPLATES.get(fb_code.upper(), fb_msg)
 
+    # ── BI 维度回填 ──
+    state.metric_labels.update(
+        {
+            "pipeline": "fallback",
+            "error_reason": f"fallback_{fb_code}",
+        }
+    )
+
     await log_trace_event(
         trace_id,
         "final",
@@ -37,6 +47,7 @@ async def template_fallback_node(state: PipelineState) -> PipelineState:
             "result": f"fallback_{fb_code}",
             "mode": f"fallback_{fb_code}",
             "total_tokens": state.trace_total_tokens,
+            "metric_labels": dict(state.metric_labels),
         },
     )
 

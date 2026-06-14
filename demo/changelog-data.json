@@ -1,6 +1,33 @@
 {
   "versions": [
     {
+      "version": "v0.5.1",
+      "date": "2026-06-15",
+      "title": "全链路埋点与 BI 适配性改造（工程内部）",
+      "sections": {
+        "features": [],
+        "fixes": [],
+        "others": [
+          {
+            "title": "trace_id 协程级自动传播",
+            "desc": "前端用户无感。后台 trace_id 改用 ContextVar 自动传播，告别 state 显式透传；11 节点全量接入 @with_trace 装饰器统一日志 schema（详见 ADR-029）"
+          },
+          {
+            "title": "BI 索引层（JSONL + SQLite）",
+            "desc": "JSONL 仍是事实源，新增 SQLite 索引层（bi_index.sqlite）支撑多维聚合查询，admin 后台聚合从全文件扫描升级为 SQL group by；维度新增 pipeline / turn_type / skill_names / clarification_type / error_reason（详见 ADR-030）"
+          },
+          {
+            "title": "Prometheus 业务维度指标",
+            "desc": "新增 pipeline_requests_total / skill_calls_total / node_latency_seconds / clarifications_total 4 个业务维度指标，label 基数受控（skill_name 集合 == SKILL_REGISTRY）"
+          },
+          {
+            "title": "日志按天轮转 + 告警关联 trace_id",
+            "desc": "日志文件按北京时间天分（query_trace.YYYY-MM-DD.jsonl），CLI cleanup --keep-days 30 清理；Bark/Telegram 告警通知正文自动渲染最近失败 trace_id 的回溯链接"
+          }
+        ]
+      }
+    },
+    {
       "version": "v0.4.5",
       "date": "2026-06-13",
       "title": "职阶筛选修复，问「狂阶」「术阶」不再返回空结果",

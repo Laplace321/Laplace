@@ -19,11 +19,23 @@ from __future__ import annotations
 
 import time
 
+from server.graph.decorators import with_trace
 from server.graph.session import SessionStore
 from server.graph.state import PipelineState
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 
 
+def _record_clarification_metric(clarification_type: str) -> None:
+    """软依赖：失败不影响主流程。"""
+    try:
+        from server.monitor.metrics import get_collector
+
+        get_collector().record_clarification(clarification_type)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+@with_trace(Phase.NODE_CLARIFY)
 async def clarify_node(state: PipelineState) -> PipelineState:
     """澄清提示节点：把 routing/execution 层的 clarification 数据写入 state.query。"""
     reason = state.extras.get("bail_out", "unknown")
@@ -34,6 +46,10 @@ async def clarify_node(state: PipelineState) -> PipelineState:
     if reason == "clarification":
         routing_result = state.extras.get("routing_result", {}) or {}
         clarification = routing_result.get("clarification", {}) or {}
+        # BI 维度回填
+        state.metric_labels["clarification_type"] = clarification.get("type") or "routing"
+        # Prometheus 计数（routing 层澄清，type 字段优先，fallback 为 'routing'）
+        _record_clarification_metric(state.metric_labels["clarification_type"])
         await log_trace_event(
             trace_id,
             "clarification_requested",
@@ -51,6 +67,7 @@ async def clarify_node(state: PipelineState) -> PipelineState:
                 "result": "clarification_requested",
                 "mode": "clarification",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
         )
         state.reply = ""
@@ -74,6 +91,9 @@ async def clarify_node(state: PipelineState) -> PipelineState:
     # execution_clarification
     result = state.extras.get("executor_result")
     clarification = (result.clarification if result else {}) or {}
+    # BI 维度回填
+    state.metric_labels["clarification_type"] = clarification.get("type") or "execution"
+    _record_clarification_metric(state.metric_labels["clarification_type"])
     await log_trace_event(
         trace_id,
         "execution_clarification_requested",
@@ -92,6 +112,7 @@ async def clarify_node(state: PipelineState) -> PipelineState:
             "result": "execution_clarification_requested",
             "mode": "clarification",
             "total_tokens": state.trace_total_tokens,
+            "metric_labels": dict(state.metric_labels),
         },
     )
     state.reply = ""
@@ -161,6 +182,7 @@ async def _maybe_save_pending(state: PipelineState, *, source: str) -> None:
         count=state.count,
         query=state.query,
         extras=snapshot_extras,
+        metric_labels=dict(state.metric_labels),
     )
     try:
         session_store.save_pending(state.session_id, pending_state)

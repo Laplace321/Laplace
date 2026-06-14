@@ -23,8 +23,9 @@ from server.agent.agent_loop import AgentResult, agent_route
 from server.agent.tool_handlers import TOOL_HANDLERS
 from server.context_builder import MAX_RESULTS
 from server.fallback import build_oneshot_context, classify_agent_reply
+from server.graph.decorators import with_trace
 from server.graph.state import PipelineState
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 
 
 def _build_agent_config(state: PipelineState) -> dict:
@@ -129,6 +130,7 @@ def _build_agent_config(state: PipelineState) -> dict:
     }
 
 
+@with_trace(Phase.NODE_AGENT)
 async def agent_fallback_node(state: PipelineState) -> PipelineState:
     """统一 Agent 兜底节点（4 处合 1）。
 
@@ -167,6 +169,15 @@ async def agent_fallback_node(state: PipelineState) -> PipelineState:
             agent_detail_payload["agent_elapsed_ms"] = round(agent_result.elapsed_ms, 2)
         await log_trace_event(trace_id, "agent_detail", agent_detail_payload)
 
+        # ── BI 维度回填（agent fallback 成功路径）──
+        state.metric_labels.update(
+            {
+                "model": f"agent_{agent_result.rounds}r",
+                "total_tokens": int(state.trace_total_tokens),
+                "pipeline": "agent",
+            }
+        )
+
         # ── Trace: final ──
         await log_trace_event(
             trace_id,
@@ -177,6 +188,7 @@ async def agent_fallback_node(state: PipelineState) -> PipelineState:
                 "mode": "agent_fallback",
                 "total_found": len(agent_result.servants_data),
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
         )
 
@@ -192,6 +204,13 @@ async def agent_fallback_node(state: PipelineState) -> PipelineState:
         return state
 
     except Exception as agent_err:  # noqa: BLE001
+        # ── BI 维度回填（agent fallback 失败路径）──
+        state.metric_labels.update(
+            {
+                "error_reason": cfg["error_result"],
+                "pipeline": "agent",
+            }
+        )
         # ── Trace: final（失败）──
         await log_trace_event(
             trace_id,
@@ -201,6 +220,7 @@ async def agent_fallback_node(state: PipelineState) -> PipelineState:
                 "result": cfg["error_result"],
                 "mode": cfg["error_mode"],
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
             error=str(agent_err) if cfg["error_result"] == "routing_error" else None,
         )
@@ -306,6 +326,15 @@ async def agent_fallback_stream_node(state: PipelineState) -> AsyncGenerator[dic
             agent_detail_payload["agent_elapsed_ms"] = round(agent_result.elapsed_ms, 2)
         await log_trace_event(trace_id, "agent_detail", agent_detail_payload)
 
+        # ── BI 维度回填（agent fallback stream 成功路径）──
+        state.metric_labels.update(
+            {
+                "model": f"agent_{agent_result.rounds}r",
+                "total_tokens": int(state.trace_total_tokens),
+                "pipeline": "agent",
+            }
+        )
+
         await log_trace_event(
             trace_id,
             "final",
@@ -315,6 +344,7 @@ async def agent_fallback_stream_node(state: PipelineState) -> AsyncGenerator[dic
                 "mode": "agent_fallback",
                 "total_found": len(agent_result.servants_data),
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
         )
 
@@ -331,6 +361,13 @@ async def agent_fallback_stream_node(state: PipelineState) -> AsyncGenerator[dic
         return
 
     except Exception as agent_err:  # noqa: BLE001
+        # ── BI 维度回填（agent fallback stream 失败路径）──
+        state.metric_labels.update(
+            {
+                "error_reason": cfg["error_result"],
+                "pipeline": "agent",
+            }
+        )
         await log_trace_event(
             trace_id,
             "final",
@@ -339,6 +376,7 @@ async def agent_fallback_stream_node(state: PipelineState) -> AsyncGenerator[dic
                 "result": cfg["error_result"],
                 "mode": cfg["error_mode"],
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
             error=str(agent_err) if cfg["error_result"] == "routing_error" else None,
         )

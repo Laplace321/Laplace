@@ -28,7 +28,7 @@ from server.graph import END, PipelineState, StateGraph
 from server.graph.checkpointer import SqliteCheckpointer
 from server.graph.session import SessionStore
 from server.llm import chat_completion
-from server.logger import log_trace_event
+from server.logger import bind_trace_id, log_trace_event
 from server.nodes.agent import agent_fallback_node, agent_fallback_stream_node
 from server.nodes.atlas import atlas_node, atlas_stream_node
 from server.nodes.clarify import clarify_node
@@ -336,6 +336,7 @@ async def handle_skill_mode(
     if confirmation_context:
         user_message = f"{user_message}\n[用户确认：{confirmation_context}]"
     request_start = time.monotonic()
+    bind_trace_id(trace_id)
 
     # ── 直传 skill_calls 路径（preset / 前端直传）──
     if skill_calls is not None:
@@ -379,6 +380,7 @@ async def handle_skill_mode(
         try:
             state = await _get_pipeline_direct_graph().run(state)
         except Exception as e:
+            state.metric_labels["error_reason"] = "routing_error"
             await log_trace_event(
                 trace_id,
                 "final",
@@ -387,6 +389,7 @@ async def handle_skill_mode(
                     "result": "routing_error",
                     "mode": "routing_error",
                     "total_tokens": state.trace_total_tokens,
+                    "metric_labels": dict(state.metric_labels),
                 },
                 error=str(e),
             )
@@ -433,6 +436,7 @@ async def handle_skill_mode(
     try:
         state = await _get_pipeline_a_graph().run(state)
     except Exception as e:
+        state.metric_labels["error_reason"] = "routing_error"
         await log_trace_event(
             trace_id,
             "final",
@@ -441,6 +445,7 @@ async def handle_skill_mode(
                 "result": "routing_error",
                 "mode": "routing_error",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
             error=str(e),
         )
@@ -543,6 +548,7 @@ async def stream_chat_events(
     """
     trace_id = uuid.uuid4().hex[:8]
     stream_start = time.monotonic()
+    bind_trace_id(trace_id)
 
     # ── 路径 1：confirmation_id 直达（用户选择具体实体，跳过路由+执行）──
     if confirmation_id and confirmation_id.isdigit():
@@ -607,6 +613,7 @@ async def stream_chat_events(
         async for produced in _get_pipeline_a_stream_graph().run_stream(state):
             yield sse_event(produced["type"], produced["data"])
     except Exception as e:  # noqa: BLE001
+        state.metric_labels["error_reason"] = "stream_error"
         await log_trace_event(
             trace_id,
             "final",
@@ -615,6 +622,7 @@ async def stream_chat_events(
                 "result": "stream_error",
                 "mode": "stream_error",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
             error=str(e),
         )
@@ -657,6 +665,7 @@ async def _stream_confirmation_direct(
     事件顺序：thinking routing → thinking routed → thinking querying →
     （由 generate_stream_node 接管）servants → thinking generating → delta * N → done。
     """
+    bind_trace_id(trace_id)
     from server.query_executor import load_ce_database, load_database
 
     yield sse_event("thinking", {"phase": "routing", "message": "正在理解你的问题..."})
@@ -695,6 +704,10 @@ async def _stream_confirmation_direct(
             {
                 "total_time_ms": (time.monotonic() - stream_start) * 1000,
                 "result": "confirmation_not_found",
+                "metric_labels": {
+                    "pipeline": "confirmation",
+                    "error_reason": "confirmation_not_found",
+                },
             },
         )
         yield sse_event("done", {"model": "confirmation_direct", "traceId": trace_id})
@@ -757,6 +770,8 @@ async def _stream_confirmation_direct(
         async for produced in _get_pipeline_confirmation_stream_graph().run_stream(state):
             yield sse_event(produced["type"], produced["data"])
     except Exception as e:  # noqa: BLE001
+        state.metric_labels["error_reason"] = "confirmation_stream_error"
+        state.metric_labels.setdefault("pipeline", "confirmation")
         await log_trace_event(
             trace_id,
             "final",
@@ -765,6 +780,7 @@ async def _stream_confirmation_direct(
                 "result": "confirmation_stream_error",
                 "mode": "confirmation_direct",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
             error=str(e),
         )
@@ -792,6 +808,7 @@ async def _stream_preset(
 
     支持 B1 策略：用户补充文字时通过 Stage 2 LLM 合并额外 skill_calls。
     """
+    bind_trace_id(trace_id)
     yield sse_event("thinking", {"phase": "routing", "message": "正在解析预设..."})
 
     preset = PRESET_REGISTRY.get(preset_name)
@@ -906,6 +923,8 @@ async def _stream_preset(
         async for produced in _get_pipeline_direct_stream_graph().run_stream(state):
             yield sse_event(produced["type"], produced["data"])
     except Exception as e:  # noqa: BLE001
+        state.metric_labels["error_reason"] = "preset_stream_error"
+        state.metric_labels.setdefault("pipeline", "preset")
         await log_trace_event(
             trace_id,
             "final",
@@ -914,6 +933,7 @@ async def _stream_preset(
                 "result": "preset_stream_error",
                 "mode": "preset",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
             error=str(e),
         )

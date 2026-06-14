@@ -17,14 +17,16 @@ Task 4 Batch B 多轮对话扩展：
 
 from __future__ import annotations
 
+from server.graph.decorators import with_trace
 from server.graph.session import SessionStore
 from server.graph.state import PipelineState
 from server.llm import chat_completion
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 from server.prompts import build_classifier_prompt
 from server.schemas import classifier_response_json_schema, parse_classifier_response
 
 
+@with_trace(Phase.NODE_CLASSIFY)
 async def classify_node(state: PipelineState) -> PipelineState:
     """Stage 0：链路分类（A=Skill 查询 / B=Atlas 知识 / C=攻略文档）。
 
@@ -82,6 +84,14 @@ async def classify_node(state: PipelineState) -> PipelineState:
         # 多轮防御：分类失败时也按 MAJOR 处理，主动清状态避免污染
         if session_store is not None and state.session_id:
             session_store.clear_session(state.session_id)
+        # BI 维度回填（即使降级也写）
+        state.metric_labels.update(
+            {
+                "pipeline": "A",
+                "turn_type": "MAJOR",
+                "has_prev_turn": 0,
+            }
+        )
         return state
 
     classifier_model = classifier_result.pop("_model", "unknown")
@@ -108,6 +118,15 @@ async def classify_node(state: PipelineState) -> PipelineState:
         session_store.clear_session(state.session_id)
         # 已清的 prev_turn 也从 extras 中移除，下游不应再使用
         state.extras.pop("prev_turn", None)
+
+    # BI 维度回填：分类成功路径
+    state.metric_labels.update(
+        {
+            "pipeline": state.classified_pipeline,
+            "turn_type": state.turn_type,
+            "has_prev_turn": 1 if "prev_turn" in state.extras else 0,
+        }
+    )
 
     await log_trace_event(
         state.trace_id,

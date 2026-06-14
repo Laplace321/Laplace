@@ -10,10 +10,11 @@ from __future__ import annotations
 import time
 from collections.abc import AsyncGenerator
 
+from server.graph.decorators import with_trace
 from server.graph.state import PipelineState
 from server.guide_retriever import GuideRetriever
 from server.llm import StreamMetadata, chat_completion, chat_completion_stream
-from server.logger import log_trace_event
+from server.logger import Phase, log_trace_event
 
 # 职阶关键词 → 对应 tag（优先匹配中文简称/俗称）
 _CLASS_TAG_MAP: dict[str, str] = {
@@ -134,6 +135,7 @@ def _format_source_suffix(source_labels: set[str], source_authors: dict[str, str
     return "\n\n📖 参考：" + ", ".join(labels_with_author)
 
 
+@with_trace(Phase.NODE_GUIDE)
 async def guide_node(state: PipelineState) -> PipelineState:
     """Pipeline C 主节点：BM25 检索攻略文档 → LLM 生成回复 → 来源标注。"""
     result = _prepare_guide_context(state.user_message)
@@ -149,6 +151,7 @@ async def guide_node(state: PipelineState) -> PipelineState:
         state.servants = []
         state.count = 0
         state.query = {"mode": "guide_pipeline"}
+        state.metric_labels.update({"pipeline": "C", "error_reason": "guide_no_match"})
         await log_trace_event(
             state.trace_id,
             "final",
@@ -157,6 +160,7 @@ async def guide_node(state: PipelineState) -> PipelineState:
                 "result": "guide_no_match",
                 "mode": "guide_pipeline",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
         )
         return state
@@ -178,6 +182,14 @@ async def guide_node(state: PipelineState) -> PipelineState:
 
     reply += _format_source_suffix(source_labels, source_authors)
 
+    state.metric_labels.update(
+        {
+            "pipeline": "C",
+            "model": state.model_used or "unknown",
+            "total_tokens": int(state.trace_total_tokens),
+        }
+    )
+
     await log_trace_event(
         state.trace_id,
         "final",
@@ -188,6 +200,7 @@ async def guide_node(state: PipelineState) -> PipelineState:
             "guide_chunks": len(chunks),
             "sources": list(source_labels),
             "total_tokens": state.trace_total_tokens,
+            "metric_labels": dict(state.metric_labels),
         },
     )
 
@@ -240,6 +253,7 @@ async def guide_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pipel
         state.servants = []
         state.count = 0
         state.query = {"mode": "guide_pipeline"}
+        state.metric_labels.update({"pipeline": "C", "error_reason": "guide_no_match"})
         yield {"type": "delta", "data": {"text": no_match_reply}}
         await log_trace_event(
             state.trace_id,
@@ -249,6 +263,7 @@ async def guide_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pipel
                 "result": "guide_no_match",
                 "mode": "guide_pipeline",
                 "total_tokens": state.trace_total_tokens,
+                "metric_labels": dict(state.metric_labels),
             },
         )
         yield state
@@ -310,6 +325,16 @@ async def guide_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pipel
     if metadata.model:
         state.model_used = metadata.model
 
+    state.metric_labels.update(
+        {
+            "pipeline": "C",
+            "model": state.model_used or "unknown",
+            "total_tokens": int(state.trace_total_tokens),
+        }
+    )
+    if guide_gen_failed:
+        state.metric_labels["error_reason"] = "guide_generation_failed"
+
     await log_trace_event(
         state.trace_id,
         "final",
@@ -320,6 +345,7 @@ async def guide_stream_node(state: PipelineState) -> AsyncGenerator[dict | Pipel
             "guide_chunks": len(chunks),
             "sources": list(source_labels),
             "total_tokens": state.trace_total_tokens,
+            "metric_labels": dict(state.metric_labels),
         },
     )
 
