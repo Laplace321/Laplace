@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from server.query_executor import _match_effect, _match_np_effect
 from server.skills.base import QuerySkill, register_skill
 from server.skills.query.search_by_skill_effect import _expand_effect
+from server.skills.query.search_by_traits import resolve_trait_names
 
 # 效果类型→percentBase 映射（参考 Chaldea const_data.dart）
 # - base=100: gainNp 系 FuncType（Value÷100=百分比，如 3000=30%）
@@ -32,6 +33,11 @@ class Params(BaseModel):
     min_value: int | None = Field(default=None, alias="minValue", description="效果最小数值（百分比，如50表示≥50%）")
     max_value: int | None = Field(default=None, alias="maxValue", description="效果最大数值（百分比）")
     max_cd: int | None = Field(default=None, alias="maxCd", description="技能CD上限（回合数），同一技能内联合校验")
+    anti_trait: str | None = Field(
+        default=None,
+        alias="antiTrait",
+        description="特攻目标特性名（中文，如'龙'、'神性'、'王'），仅在查询特攻(upDamage/damageNpSP)时使用",
+    )
 
 
 def _convert_value(
@@ -123,6 +129,46 @@ def _match_skill_with_cd(
     return False
 
 
+def _match_anti_trait(servant: dict, anti_trait: str, source: str = "both") -> bool:
+    """检查从者的 antiTraitIndex 是否包含指定特攻目标特性。
+
+    优先通过 resolve_trait_names 解析为 traitId 精确匹配，
+    若无法解析则退化为特性名子串匹配。
+
+    Args:
+        servant: 从者数据
+        anti_trait: 用户输入的特攻目标特性名（中文，如"龙"）
+        source: 搜索来源 - skill / np / both
+    """
+    anti_index = servant.get("antiTraitIndex")
+    if not anti_index:
+        return False
+
+    # 尝试解析为 trait ID（精确匹配）
+    resolved_ids = resolve_trait_names([anti_trait])
+    target_id = resolved_ids[0] if resolved_ids else None
+
+    for entry in anti_index:
+        # 来源过滤
+        entry_source = entry.get("source", "")
+        if source == "skill" and entry_source != "skill":
+            continue
+        if source == "np" and entry_source != "np":
+            continue
+
+        # 优先按 traitId 匹配
+        if target_id is not None:
+            if entry.get("traitId") == target_id:
+                return True
+        else:
+            # 退化为特性名子串匹配
+            entry_trait = entry.get("trait", "")
+            if anti_trait in entry_trait or entry_trait in anti_trait:
+                return True
+
+    return False
+
+
 @register_skill
 class SearchByEffect(QuerySkill):
     name = "search_by_effect"
@@ -141,6 +187,13 @@ class SearchByEffect(QuerySkill):
         raw_min = params.get("min_value")
         raw_max = params.get("max_value")
         max_cd = params.get("max_cd")
+        anti_trait = params.get("anti_trait")
+
+        # ── 特攻目标特性过滤（antiTrait 前置检查） ──
+        # 当指定了 antiTrait 时，从者必须在 antiTraitIndex 中有对应条目
+        if anti_trait:
+            if not _match_anti_trait(servant, anti_trait, source):
+                return False
 
         # ── CD 联合匹配路径（同一技能粒度内） ──
         # 当 max_cd 有值时，必须在单个技能内同时满足效果+数值+CD
