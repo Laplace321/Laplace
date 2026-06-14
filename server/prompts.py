@@ -384,8 +384,14 @@ def build_routing_prompt(
     - rarity 未指定 → 默认查全部
     - className 未指定 → 默认查全部；指定时**传中文**（如「狂阶」「剑阶」「术阶」「裁定者」），系统也兼容英文（Caster/berserker/saber）
     - minValue/maxValue 未指定 → 默认不限
-    - 用户明确说了"自充"/"群充"/"全队" → 已有明确 targetType，无需确认
-    - 用户查询的效果仅有单一合理 targetType（如"无敌"默认是自身）→ 无需确认
+    - 用户明确说了“自充”/“群充”/“全队” → 已有明确 targetType，无需确认
+    - 用户查询的效果仅有单一合理 targetType（如“无敌”默认是自身）→ 无需确认
+20. **特攻目标特性筛选（antiTrait 参数，重要）**：当用户查询“对XX特攻”/“拥有对XX的特攻”/“对XX特效”/“打XX伤害增加”等表达时，必须在 `search_by_effect` 中同时传 `effect: "upDamage"` 和 `antiTrait: "XX"`（中文特性名）。同理，宝具特攻用 `search_by_effect(effect="damageNpSP", antiTrait="XX", source="np")`。
+    - `antiTrait` 传中文特性名，系统会自动通过特性映射表解析为 ID。常见特攻目标特性包括：魔性、龙、神性、王、超巨大、死灵、巨人、猛兽、人类的威胁、影、人类、罗马、亚瑟、骑乘、圆桌骑士、鬼、七骑士从者、源氏、机械等，以及阵营/属性类（秩序、混沌、善、恶等）和副属性类（天、地、人、星、兽）
+    - **关键区分**：“对龙特攻”（攻击拥有龙特性的敌人时伤害增加）≠“龙特性”（从者自身拥有龙特性）。前者用 `search_by_effect(effect="upDamage", antiTrait="龙")`，后者用 `search_by_traits(traitNames=["龙"])`
+    - **简单判断**：用户说“对XX特攻”/“打XX特效”/“对XX伤害提升”/“XX特攻”→ antiTrait；用户说“拥有XX特性的从者”/“XX特性从者”→ search_by_traits
+    - 如果用户没有指定特攻来源（技能/宝具），默认 `source: "both"` 同时搜索技能特攻和宝具特攻
+    - 用户说“技能对XX特攻”→ `search_by_effect(effect="upDamage", antiTrait="XX", source="skill")`；用户说“宝具对XX特攻”→ `search_by_effect(effect="damageNpSP", antiTrait="XX", source="np")`。**注意**：当涉及 antiTrait 时，统一使用 `search_by_effect`，不走 `search_by_skill_effect` 或 `search_by_np_effect`（因为后两者不支持 antiTrait 参数）
 
 24. **clarification 输出格式**：触发确认时，输出 `clarification` 对象，skill_calls 必须为空数组：
     ```json
@@ -463,7 +469,27 @@ def build_routing_prompt(
 {{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "gainNp", "targetType": "self", "minValue": 50}}}}, {{"skill_name": "search_by_effect", "params": {{"effect": "gainNp", "targetType": "party", "minValue": 30}}}}], "response_skill": "respond_servant_list"}}
 ```
 
-用户："有20他充的从者"（单独提到他充 → 用 targetType: ptOne）
+用户：“有对龙特攻的从者”（特攻目标特性筛选 → antiTrait，同时覆盖C类技能特攻和D类宝具特攻）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effects": ["upDamage", "damageNpSP"], "effectsOp": "or", "antiTrait": "龙"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户：“宝具对魔性特攻的从者”（仅D类宝具特攻 + 目标特性）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "damageNpSP", "antiTrait": "魔性", "source": "np"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户：“对神性敌人伤害提升的从者”（同“对神性特攻”，默认同时搜C+D类）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effects": ["upDamage", "damageNpSP"], "effectsOp": "or", "antiTrait": "神性"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户：“技能带对死灵特攻的从者”（用户指定“技能”→ 仅C类 + source=skill）
+```json
+{{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "upDamage", "antiTrait": "死灵", "source": "skill"}}}}], "response_skill": "respond_servant_list"}}
+```
+
+用户：“有20他充的从者”（单独提到他充 → 用 targetType: ptOne）
 ```json
 {{"skill_calls": [{{"skill_name": "search_by_effect", "params": {{"effect": "gainNp", "targetType": "ptOne", "minValue": 20}}}}], "response_skill": "respond_servant_list"}}
 ```
