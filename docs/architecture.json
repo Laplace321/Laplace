@@ -521,9 +521,10 @@
     },
     "logging": {
       "file": "server/logger.py",
-      "description": "多阶段事件流 Trace 日志系统",
-      "storage": "JSONL (server/logs/query_trace.jsonl)",
+      "description": "多阶段事件流 Trace 日志系统（v0.5.1：ContextVar 协程级传播 + Phase 常量化 + 按天轮转）",
+      "storage": "JSONL (server/logs/query_trace.YYYY-MM-DD.jsonl)，legacy 单文件 query_trace.jsonl 作为只读 fallback",
       "asyncWrite": "asyncio.to_thread 避免阻塞 Event Loop",
+      "traceIdPropagation": "current_trace_id ContextVar + bind_trace_id() / get_trace_id()，告别参数显式透传（详见 ADR-029）",
       "phases": [
         {"name": "routing_input", "content": "用户 query、mode、Skill 列表数量"},
         {"name": "routing_output", "content": "skill_calls、response_skill、fallback、model、usage"},
@@ -534,8 +535,24 @@
         {"name": "clarification_requested", "content": "路由层确认问题、选项列表、歧义参数名"},
         {"name": "execution_clarification_requested", "content": "执行层确认问题、选项列表（多候选/空结果引导）、类型"},
         {"name": "agent_detail", "content": "Agent 轮次、tokens、tool_trace"},
-        {"name": "final", "content": "总耗时、mode、total_tokens"}
-      ]
+        {"name": "node_*_input/output/error", "content": "11 节点经 @with_trace 装饰器自动埋点"},
+        {"name": "final", "content": "总耗时、mode、total_tokens、metric_labels（pipeline/turn_type/skill_names/clarification_type/error_reason）"}
+      ],
+      "rotation": {
+        "fileNamePattern": "query_trace.YYYY-MM-DD.jsonl (北京时间)",
+        "iterApi": "_iter_log_files() 跨当天 + 历史 + legacy 统一遍历",
+        "cleanupCli": "python -m server.logger cleanup --keep-days 30"
+      }
+    },
+    "biIndex": {
+      "file": "server/bi_index.py",
+      "description": "BI 索引层（v0.5.1 新增）：JSONL 事实源 + SQLite 派生索引，支撑多维聚合查询（详见 ADR-030）",
+      "storage": "SQLite (server/logs/bi_index.sqlite)",
+      "table": "turn_summary",
+      "columns": ["trace_id PK", "ts", "session_id", "turn_type", "pipeline", "skill_names", "clarification_type", "error_reason", "latency_ms", "total_tokens", "rating", "model", "query_hash", "query_preview"],
+      "indexes": ["(ts)", "(pipeline, turn_type)", "(error_reason)", "(session_id, ts)"],
+      "api": ["upsert_turn(event) — final 事件触发，try/except 容错", "query_stats(filters) — admin 后台 SQL 聚合", "reindex_from_jsonl() — 从历史 JSONL 全量重建"],
+      "cli": "python -m server.bi_index reindex"
     }
   },
   "businessFlows": [
@@ -621,8 +638,9 @@
     {"id": "ADR-020", "title": "Effect Quantitative Filter", "summary": "效果量化筛选（数值/目标/回合数三维过滤）"},
     {"id": "ADR-021", "title": "Agentic Tool-Use Routing", "summary": "OneShot 优先 + Agent 兜底混合路由策略"},
     {"id": "ADR-023", "title": "Link-A Clarification Mechanism", "summary": "链路 A 两阶段路由：LLM 参数完整性检查 + 用户确认机制，解决歧义查询问题"},
+    {"id": "ADR-025", "title": "Multi-Turn Conversation State", "summary": "v0.5.0 引入 turn_type（MAJOR/MINOR/CORRECTION）+ SessionStore + SqliteCheckpointer，支持 4 种 MINOR 粒度复用 prev_turn"},
     {"id": "ADR-028", "title": "Self-Built DAG Graph Engine", "summary": "v0.5.0 自研 ~280 行 StateGraph 替换硬编码三管线，零外部依赖、节点级 trace 追踪、声明式拓扑、流式与同步统一 API"},
-    {"id": "ADR-029", "title": "Multi-Turn Conversation State", "summary": "v0.5.0 引入 turn_type（MAJOR/MINOR/CORRECTION）+ SessionStore + SqliteCheckpointer，支持 4 种 MINOR 粒度复用 prev_turn"},
-    {"id": "ADR-030", "title": "SSE Per-Node Streaming", "summary": "v0.5.0 节点级实时 SSE：流式节点 yield 立即推送，普通节点 pending_events 缓冲，三套图实例统一入口 stream_chat_events"}
+    {"id": "ADR-029", "title": "Trace ContextVar Propagation + Phase Constants + with_trace", "summary": "v0.5.1 trace_id 走 ContextVar 协程级自动传播；Phase 常量化 + 11 节点全量接入 @with_trace 装饰器统一 input/output/error schema"},
+    {"id": "ADR-030", "title": "BI Index Layer (JSONL + SQLite)", "summary": "v0.5.1 JSONL 是事实源 + SQLite (bi_index.sqlite) 是 final 事件派生索引；admin 后台聚合走 SQL group by；维度扩充至 pipeline/turn_type/skill_names/clarification_type/error_reason"}
   ]
 }

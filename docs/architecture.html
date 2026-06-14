@@ -707,9 +707,9 @@ class SearchByClass(QuerySkill):
 </ol>
 
 <!-- 9. 日志追踪系统 -->
-<h2 id="logging">9. 日志追踪系统</h2>
+<h2 id="logging">9. 日志追踪系统 + BI 索引层（v0.5.1）</h2>
 <div class="card">
-<p><code>server/logger.py</code> 实现多阶段事件流日志，同一 <code>traceId</code> 下按阶段记录：</p>
+<p><code>server/logger.py</code> 实现多阶段事件流日志，<code>traceId</code> 通过 ContextVar 协程级自动传播（<a href="adr/ADR-029-trace-contextvar.md">ADR-029</a>），按阶段记录：</p>
 <table>
   <tr><th>Phase</th><th>记录内容</th></tr>
   <tr><td><code>routing_input</code></td><td>用户 query、mode、Skill 列表数量</td></tr>
@@ -718,10 +718,13 @@ class SearchByClass(QuerySkill):
   <tr><td><code>context_build</code></td><td>applied_filters、context 大小</td></tr>
   <tr><td><code>generation_input</code></td><td>Generation Prompt 元数据</td></tr>
   <tr><td><code>generation_output</code></td><td>最终回复、generation_usage</td></tr>
+  <tr><td><code>node_*_input/output/error</code></td><td>11 节点经 <code>@with_trace</code> 装饰器自动埋点（统一 schema）</td></tr>
   <tr><td><code>agent_detail</code></td><td>Agent 轮次、tokens、tool_trace</td></tr>
-  <tr><td><code>final</code></td><td>总耗时、mode、total_tokens</td></tr>
+  <tr><td><code>final</code></td><td>总耗时、mode、total_tokens、metric_labels（pipeline / turn_type / skill_names / clarification_type / error_reason）</td></tr>
 </table>
-<p>存储格式：JSONL (<code>server/logs/query_trace.jsonl</code>)，异步写入 (<code>asyncio.to_thread</code>) 避免阻塞 Event Loop。</p>
+<p>存储：JSONL（<code>server/logs/query_trace.YYYY-MM-DD.jsonl</code>，按北京时间天分；legacy 单文件 <code>query_trace.jsonl</code> 保留为只读 fallback），异步写入（<code>asyncio.to_thread</code>）避免阻塞 Event Loop。CLI：<code>python -m server.logger cleanup --keep-days 30</code>。</p>
+<p><strong>BI 索引层（<a href="adr/ADR-030-bi-sqlite-index.md">ADR-030</a>）</strong>：JSONL 仍是事实源，<code>server/bi_index.py</code> 在 final 事件触发时同步 upsert 到 SQLite (<code>server/logs/bi_index.sqlite</code>)，admin 后台聚合走 SQL group by。表 <code>turn_summary</code> 含 trace_id PK + ts / session_id / turn_type / pipeline / skill_names / clarification_type / error_reason / latency_ms / total_tokens / rating / model / query_hash。CLI 全量重建：<code>python -m server.bi_index reindex</code>。</p>
+<p><strong>告警关联</strong>：<code>server/monitor/alerter.py</code> 维护 <code>_recent_failure_traces</code> FIFO buffer（上限 5），LLM/节点失败自动 push，Bark/Telegram 通知正文渲染 <code>/admin/logs?trace_id=xxx</code> 链接。</p>
 </div>
 
 <!-- 10. 部署架构 -->

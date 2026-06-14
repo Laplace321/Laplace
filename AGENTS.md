@@ -230,9 +230,26 @@
 - **目的**：杜绝 LLM 翻译幻觉，降低 Token 消耗。
 
 ### 2. 全链路日志追踪 (Structured Logging)
-- **准则**：所有的查询、解析和生成过程必须携带 `trace_id`。
-- **执行**：使用 `server/logger.py` 记录结构化 JSONL 日志。每增加一个处理阶段（如新增 RAG 召回策略），必须在日志中记录其输入输出。
-- **目的**：确保每个 Bug 都能通过 TraceID 回溯根因。
+- **准则**：所有的查询、解析和生成过程必须携带 `trace_id`。`trace_id` 通过 ContextVar 协程级自动传播，**严禁**再走 state 显式传递或函数参数透传。
+- **ContextVar 强制使用**（v0.5.1 起，详见 [ADR-029](docs/adr/ADR-029-trace-contextvar.md)）：
+  1. 入口（`handle_skill_mode` / `stream_chat_events` / `_stream_*`）必须先调 `bind_trace_id(state.trace_id)` 再启动 DAG
+  2. 业务代码读 trace_id 必须用 `from server.logger import get_trace_id`，**严禁**从参数里透传
+  3. `log_trace_event` 的 `trace_id` 缺省即可（自动从 ContextVar 取）
+- **Phase 常量化纪律**：
+  1. 所有 phase 字符串必须来自 `server.logger.Phase` 类常量，**严禁**裸字符串 `log_trace_event(phase="xxx", ...)`
+  2. 新加 phase 必须先扩 `Phase` 类 + `PHASES` frozenset，单测 `tests/test_logger_phase_constants.py` 强制约束
+- **新 Skill / 新节点必须接 with_trace**：
+  1. 任何新增 DAG 节点必须 `@with_trace("<phase>")`，phase 用 `Phase.NODE_*` 常量
+  2. 装饰器自动埋 input/output/error 三事件 + 调 `record_node_latency`，节点函数不应再写显式 `log_trace_event`
+  3. 节点内的中间阶段（如 generate 的 `context_build`）允许显式埋点，但 phase 必须用 `Phase` 常量
+- **BI 维度回填**（v0.5.1 起，详见 [ADR-030](docs/adr/ADR-030-bi-sqlite-index.md)）：
+  - 节点产出后回填 `state.metric_labels`：classify 写 `turn_type`/`pipeline`，execute 写 `skill_names`，clarify 写 `clarification_type`，generate 写 `model`/`total_tokens`，异常路径写 `error_reason`
+  - final 事件由 `bi_index.upsert_turn` 同步索引到 SQLite，admin 后台聚合走 SQL
+- **日志轮转纪律**：
+  - 文件名 `server/logs/query_trace.YYYY-MM-DD.jsonl`（北京时间）；legacy 单文件 `query_trace.jsonl` 保留为只读 fallback
+  - 跨文件读取走 `_iter_log_files()`，**严禁**直接读 `LOG_FILE`
+  - 定期清理：`python -m server.logger cleanup --keep-days 30`（cron 触发，启动时不自动跑）
+- **目的**：确保每个 Bug 都能通过 TraceID 回溯根因；告警通知（Bark/Telegram）正文自动渲染最近 5 个失败 trace_id 的 `/admin/logs?trace_id=xxx` 链接。
 
 ### 3. Schema Mirror 同步机制
 - **准则**：领域知识（FuncType, BuffType）必须源自 `sync_chaldea.py` 的提取。

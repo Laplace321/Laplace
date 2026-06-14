@@ -634,32 +634,55 @@ tokens = re.findall(r"[\u4e00-\u9fff]+|[a-zA-Z0-9]+", text.lower())
 
 ## 14. 监控与基础设施
 
-### 12.1 日志系统（`server/logger.py`，528 行）
+### 12.1 日志系统（`server/logger.py`）
 
-- **格式**：JSONL 结构化日志
-- **15 种 Phase 类型**：覆盖完整请求生命周期
+- **格式**：JSONL 结构化日志，按北京时间天分文件 `query_trace.YYYY-MM-DD.jsonl`（v0.5.1 起）；legacy 单文件 `query_trace.jsonl` 保留为只读 fallback
+- **30+ 种 Phase 类型**（`Phase` 类常量 + `PHASES` frozenset）：覆盖完整请求生命周期，单测强制约束
+- **trace_id 协程级自动传播**：`current_trace_id` ContextVar + `bind_trace_id()` / `get_trace_id()`，告别显式参数透传（详见 [ADR-029](adr/ADR-029-trace-contextvar.md)）
+- **跨文件读取**：`_iter_log_files()` 统一遍历当天 + 历史 + legacy
+- **CLI 工具**：`python -m server.logger cleanup --keep-days 30`
 - `find_trace(trace_id)` — 按 trace ID 聚合日志
-- `compute_log_stats()` — UV 统计（基于 IP hash）
+- `compute_log_stats()` — 走 SQLite SQL group by（v0.5.1 起，见 12.6）
 
-### 12.2 速率限制（`server/rate_limiter.py`，132 行）
+### 12.2 BI 索引层（`server/bi_index.py`，v0.5.1 新增）
+
+- **双层存储**：JSONL 是事实源，SQLite (`server/logs/bi_index.sqlite`) 是 final 事件派生索引（详见 [ADR-030](adr/ADR-030-bi-sqlite-index.md)）
+- **表 `turn_summary`**：trace_id PK + ts / session_id / turn_type / pipeline / skill_names / clarification_type / error_reason / latency_ms / total_tokens / rating / model / query_hash / query_preview
+- **索引**：`(ts)` / `(pipeline, turn_type)` / `(error_reason)` / `(session_id, ts)`
+- **API**：`upsert_turn(event)`（final 事件触发，try/except 容错不阻塞 JSONL）、`query_stats(filters)`、`reindex_from_jsonl()`
+- **CLI**：`python -m server.bi_index reindex` 全量重建
+
+### 12.3 with_trace 装饰器（`server/graph/decorators.py`）
+
+- 11 节点统一接入 `@with_trace("<phase>")`（v0.5.1 起）
+- 自动埋 input/output/error 三事件，统一 schema：`node_name` / `state_summary` / `latency_ms` / `result` / `metric_labels` 切片
+- 出口同步调 `record_node_latency(node_name, result, latency_ms)`
+
+### 12.4 速率限制（`server/rate_limiter.py`，132 行）
 
 - **双层限制**：per-IP + 全局
 - **滑动窗口**：60 秒清理周期
 - **IP 提取**：支持 `X-Forwarded-For` 头
 
-### 12.3 指标收集（`server/monitor/metrics.py`，399 行）
+### 12.5 指标收集（`server/monitor/metrics.py`）
 
-- `MetricsCollector` — 60 分钟环形缓冲区
-- **被动告警**：连续失败触发
+- `MetricsCollector` — 60 分钟环形缓冲区（LLM 维度）
+- **业务维度指标**（v0.5.1 起）：
+  - `laplace_pipeline_requests_total{pipeline, turn_type, status}`
+  - `laplace_skill_calls_total{skill_name, domain, status}` —— skill_name 受控于 SKILL_REGISTRY
+  - `laplace_node_latency_seconds_bucket{node_name, result}` —— Histogram
+  - `laplace_clarifications_total{clarification_type}`
+- **被动告警**：连续失败触发 + 自动 push trace_id 到 Alerter
 - **输出格式**：Prometheus text exposition
 
-### 12.4 告警系统（`server/monitor/alerter.py`，209 行）
+### 12.6 告警系统（`server/monitor/alerter.py`）
 
 - **双通道**：Bark（iOS 推送）+ Telegram
 - **去重**：30 分钟去重窗口
 - **历史**：100 条告警记录
+- **trace_id 关联**（v0.5.1 起）：`_recent_failure_traces` FIFO buffer（上限 5），LLM/节点失败自动 push，`send_alert` 在非 RECOVERY 级别时把 trace_id 渲染为 `/admin/logs?trace_id=xxx` 链接拼到 message 末尾
 
-### 12.5 健康检查（`server/monitor/health_checker.py`，138 行）
+### 12.7 健康检查（`server/monitor/health_checker.py`，138 行）
 
 - **主动探测**：定期向 LLM 供应商发送 probe 请求
 - **可配间隔**：默认间隔可通过环境变量配置
