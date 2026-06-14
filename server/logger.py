@@ -1,25 +1,27 @@
 """
 Laplace — 结构化 Trace 日志
 
-支持两种日志模式：
-1. 旧模式（向后兼容）：log_chat_trace_async / log_chat_trace — 单条最终 trace
-2. 新模式（多阶段事件流）：log_trace_event — 同一 traceId 下按阶段记录事件
+多阶段事件流模式：log_trace_event — 同一 traceId 下按阶段记录事件。
 
-Phase 枚举：
-  routing_input  → 路由前（query、mode、skill 列表数量）
-  routing_output → 路由后（skill_calls、model、routing_usage）
-  execution      → Skill 执行结果（accepted/rejected、耗时）
-  context_build  → Context 构建（applied_filters、context 大小）
-  generation_input  → 生成 Prompt 元数据
-  generation_output → 生成结果（reply、generation_usage）
-  agent_detail   → Agent 兜底详情（rounds、agent_tokens、tool_trace）
-  rating         → 用户评分（bad/ok/good）
-  final          → 请求结束（总耗时、mode、total_tokens）
+Phase 命名统一在 ``Phase`` 字符串常量类，所有节点和 pipeline.py 必须引用常量
+而非裸字符串字面量；新增 phase 时同步加入 ``PHASES`` 集合，便于通过
+``validate_phase()`` 在测试中检查未声明的 phase。
+
+trace_id 通过 ``current_trace_id`` ContextVar 在协程间自动传播，节点和
+pipeline.py 调用 log_trace_event 时可以省略 trace_id 参数。入口处必须
+显式调用 ``bind_trace_id(trace_id)`` 注入当前请求的 trace_id。
+
+v0.5.1：JSONL 文件按天切分（``query_trace.YYYY-MM-DD.jsonl``）。
+- 写入路径：``_get_log_file_for_today()``，跨午夜自动切换文件
+- 读取路径：``_iter_log_files()`` 遍历目录所有匹配文件 + legacy 单文件
+- 清理：``python -m server.logger cleanup --keep-days 30`` 按需触发
 """
 
+import argparse
 import asyncio
 import json
 import os
+from contextvars import ContextVar, Token
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -27,10 +29,233 @@ from pathlib import Path
 _BEIJING_TZ = timezone(timedelta(hours=8))
 
 LOG_DIR = Path(__file__).parent / "logs"
-LOG_FILE = LOG_DIR / "query_trace.jsonl"
+_LOG_PREFIX = "query_trace"
+
+# Legacy 单文件路径（v0.5.1 之前写入此处；保留为只读 fallback 兼容历史日志）。
+# ``LOG_FILE`` 仍以模块属性形式导出，便于 ``bi_index`` 与既有测试 patch；
+# 新代码请使用 ``_get_log_file_for_today()`` 与 ``_iter_log_files()``。
+LOG_FILE = LOG_DIR / f"{_LOG_PREFIX}.jsonl"
 
 # 确保日志目录存在
 os.makedirs(LOG_DIR, exist_ok=True)
+
+
+# ============================================================
+# 日志文件路由（按天轮转）
+# ============================================================
+
+
+def _get_log_file_for_today() -> Path:
+    """返回当天写入的 JSONL 文件路径（北京时间）。
+
+    每次写入前调用，进程跨午夜后自动切换到新文件，无需重启。
+    """
+    today = datetime.now(_BEIJING_TZ).strftime("%Y-%m-%d")
+    return LOG_DIR / f"{_LOG_PREFIX}.{today}.jsonl"
+
+
+def _iter_log_files() -> list[Path]:
+    """返回所有可读取的 JSONL 文件，按时间升序（旧→新）。
+
+    - 按天文件 ``query_trace.YYYY-MM-DD.jsonl`` 命名按字典序即时间序
+    - Legacy 单文件 ``query_trace.jsonl`` 作为只读 fallback 排在最前
+    """
+    files: list[Path] = []
+    legacy = LOG_DIR / f"{_LOG_PREFIX}.jsonl"
+    if legacy.exists():
+        files.append(legacy)
+    files.extend(sorted(LOG_DIR.glob(f"{_LOG_PREFIX}.*.jsonl")))
+    # 去重（理论不会与 legacy 重名，仍兜底）
+    seen: set[Path] = set()
+    out: list[Path] = []
+    for f in files:
+        key = f.resolve()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(f)
+    return out
+
+
+def cleanup_old_logs(keep_days: int = 30) -> dict:
+    """删除超过 ``keep_days`` 天的按天 JSONL 文件（不动 legacy 单文件）。
+
+    返回：{"deleted": [...], "kept_days": int, "scanned": int}
+    """
+    cutoff = (datetime.now(_BEIJING_TZ) - timedelta(days=keep_days)).date()
+    deleted: list[str] = []
+    scanned = 0
+    for f in LOG_DIR.glob(f"{_LOG_PREFIX}.*.jsonl"):
+        scanned += 1
+        # 文件 stem 形如 ``query_trace.YYYY-MM-DD``；只解析这一种
+        try:
+            _, date_str = f.stem.split(".", 1)
+            file_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except (ValueError, IndexError):
+            continue
+        if file_date < cutoff:
+            try:
+                f.unlink()
+                deleted.append(f.name)
+            except OSError:
+                continue
+    return {"deleted": deleted, "kept_days": keep_days, "scanned": scanned}
+
+
+# ============================================================
+# Phase 常量（统一命名）
+# ============================================================
+
+
+class Phase:
+    """节点埋点的 phase 字符串常量。
+
+    所有 ``log_trace_event(phase=...)`` 调用必须引用此处常量，禁止裸字面量。
+    新增 phase 时同步追加到 ``PHASES`` frozenset，便于 ``validate_phase()`` 校验。
+    """
+
+    # ── 路由 / 分类 ──
+    ROUTING_INPUT = "routing_input"
+    ROUTING_OUTPUT = "routing_output"
+    CLASSIFIER_OUTPUT = "classifier_output"
+
+    # ── Skill 执行 ──
+    EXECUTION = "execution"
+    EXECUTION_RESOLVE_NICKNAME = "execution_resolve_nickname"
+    EXECUTION_CLARIFICATION_REQUESTED = "execution_clarification_requested"
+
+    # ── 生成阶段 ──
+    CONTEXT_BUILD = "context_build"
+    GENERATION_INPUT = "generation_input"
+    GENERATION_OUTPUT = "generation_output"
+    AGENT_DETAIL = "agent_detail"
+
+    # ── 澄清 / 多轮 ──
+    CLARIFICATION_REQUESTED = "clarification_requested"
+    MINOR_MERGE_SKIPPED = "minor_merge_skipped"
+    MINOR_MERGE_FAILED = "minor_merge_failed"
+    MINOR_MERGE_OUTPUT = "minor_merge_output"
+
+    # ── 知识检索 ──
+    ATLAS_SEARCH = "atlas_search"
+    ATLAS_SEARCH_FALLBACK = "atlas_search_fallback"
+    FACT_VERIFY = "fact_verify"
+    GUIDE_SEARCH = "guide_search"
+
+    # ── 会话持久化 ──
+    SESSION_SAVE_TURN_FAILED = "session_save_turn_failed"
+    PENDING_QUESTION_SAVED = "pending_question_saved"
+    RESUME_LOADED = "resume_loaded"
+
+    # ── 终态 ──
+    RATING = "rating"
+    FINAL = "final"
+
+    # ── 前端事件 ──
+    FRONTEND_FEEDBACK = "frontend_feedback"
+    FRONTEND_VISIT = "frontend_visit"
+
+    # ── 节点装饰器自动事件（with_trace 写入）──
+    NODE_INPUT_SUFFIX = "_input"
+    NODE_OUTPUT_SUFFIX = "_output"
+    NODE_ERROR_SUFFIX = "_error"
+
+    # ── 节点级 phase 前缀（仅供 @with_trace 装饰器使用，与业务 phase 命名隔离）──
+    NODE_CLASSIFY = "node_classify"
+    NODE_ROUTE = "node_route"
+    NODE_EXECUTE = "node_execute"
+    NODE_GENERATE = "node_generate"
+    NODE_GUIDE = "node_guide"
+    NODE_CLARIFY = "node_clarify"
+    NODE_ATLAS = "node_atlas"
+    NODE_FACT_VERIFY = "node_fact_verify"
+    NODE_MERGE_FILTERS = "node_merge_filters"
+    NODE_FALLBACK = "node_fallback"
+    NODE_AGENT = "node_agent"
+
+
+PHASES: frozenset[str] = frozenset(
+    {
+        Phase.ROUTING_INPUT,
+        Phase.ROUTING_OUTPUT,
+        Phase.CLASSIFIER_OUTPUT,
+        Phase.EXECUTION,
+        Phase.EXECUTION_RESOLVE_NICKNAME,
+        Phase.EXECUTION_CLARIFICATION_REQUESTED,
+        Phase.CONTEXT_BUILD,
+        Phase.GENERATION_INPUT,
+        Phase.GENERATION_OUTPUT,
+        Phase.AGENT_DETAIL,
+        Phase.CLARIFICATION_REQUESTED,
+        Phase.MINOR_MERGE_SKIPPED,
+        Phase.MINOR_MERGE_FAILED,
+        Phase.MINOR_MERGE_OUTPUT,
+        Phase.ATLAS_SEARCH,
+        Phase.ATLAS_SEARCH_FALLBACK,
+        Phase.FACT_VERIFY,
+        Phase.GUIDE_SEARCH,
+        Phase.SESSION_SAVE_TURN_FAILED,
+        Phase.PENDING_QUESTION_SAVED,
+        Phase.RESUME_LOADED,
+        Phase.RATING,
+        Phase.FINAL,
+        Phase.FRONTEND_FEEDBACK,
+        Phase.FRONTEND_VISIT,
+        Phase.NODE_CLASSIFY,
+        Phase.NODE_ROUTE,
+        Phase.NODE_EXECUTE,
+        Phase.NODE_GENERATE,
+        Phase.NODE_GUIDE,
+        Phase.NODE_CLARIFY,
+        Phase.NODE_ATLAS,
+        Phase.NODE_FACT_VERIFY,
+        Phase.NODE_MERGE_FILTERS,
+        Phase.NODE_FALLBACK,
+        Phase.NODE_AGENT,
+    }
+)
+
+
+def validate_phase(phase: str) -> bool:
+    """校验 phase 是否在已声明集合中。
+
+    装饰器自动产生的 ``{name}_input/_output/_error`` 事件视为合法。
+    返回 False 时上层可选择记录 warning 但不阻塞主流程。
+    """
+    if phase in PHASES:
+        return True
+    for suffix in (Phase.NODE_INPUT_SUFFIX, Phase.NODE_OUTPUT_SUFFIX, Phase.NODE_ERROR_SUFFIX):
+        if phase.endswith(suffix):
+            return True
+    return False
+
+
+# ============================================================
+# trace_id ContextVar（协程级自动传播）
+# ============================================================
+
+
+current_trace_id: ContextVar[str | None] = ContextVar("current_trace_id", default=None)
+
+
+def bind_trace_id(trace_id: str) -> Token:
+    """将 trace_id 绑定到当前 ContextVar，返回 reset Token。
+
+    入口处（main.py / pipeline.py）必须显式调用，节点内通过 ``get_trace_id()``
+    或 log_trace_event 缺省 trace_id 自动获取。
+    """
+    return current_trace_id.set(trace_id)
+
+
+def reset_trace_id(token: Token) -> None:
+    """通过 Token 还原 ContextVar（成对调用）。"""
+    current_trace_id.reset(token)
+
+
+def get_trace_id() -> str:
+    """读取当前 ContextVar 中的 trace_id；未绑定时返回 ``"unknown"``。"""
+    tid = current_trace_id.get()
+    return tid if tid else "unknown"
 
 
 # ============================================================
@@ -58,109 +283,85 @@ def _build_trace_event(
 
 
 def _write_event_sync(event_data: dict):
-    """同步写入单条事件到 JSONL 文件。"""
+    """同步写入单条事件到当天 JSONL 文件（按天轮转）。"""
     line = json.dumps(event_data, ensure_ascii=False)
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
+    with open(_get_log_file_for_today(), "a", encoding="utf-8") as f:
         f.write(line + "\n")
 
 
 async def log_trace_event(
-    trace_id: str,
+    trace_id: str | None,
     phase: str,
     data: dict | None = None,
     error: str | None = None,
 ):
-    """异步写入单阶段事件（通过线程池避免阻塞 Event Loop）。"""
+    """异步写入单阶段事件（通过线程池避免阻塞 Event Loop）。
+
+    ``trace_id`` 传 None 时自动从 ContextVar ``current_trace_id`` 读取；如未
+    绑定则回落为 ``"unknown"``。调用方通常应在请求入口先 ``bind_trace_id``，
+    后续节点可显式传 None 让其自动传播。
+
+    phase == "final" 时同步触发 BI 索引层 upsert（写 SQLite），失败仅记 ERROR
+    日志，不影响 JSONL 落盘。
+    """
+    if trace_id is None:
+        trace_id = get_trace_id()
     event = _build_trace_event(trace_id, phase, data, error)
     await asyncio.to_thread(_write_event_sync, event)
+    if phase == Phase.FINAL and trace_id and trace_id != "unknown":
+        # 1) BI 索引层 upsert（写 SQLite）
+        from server.bi_index import upsert_turn
+
+        try:
+            await asyncio.to_thread(upsert_turn, trace_id)
+        except Exception:  # noqa: BLE001
+            # upsert_turn 内部已 try/except，此处 belt-and-suspenders
+            pass
+        # 2) Prometheus pipeline_requests counter
+        try:
+            from server.monitor.metrics import get_collector
+
+            labels = (data or {}).get("metric_labels") or {}
+            pipeline = labels.get("pipeline") or "unknown"
+            turn_type = labels.get("turn_type") or "unknown"
+            status = (data or {}).get("result") or "unknown"
+            get_collector().record_pipeline_request(pipeline, turn_type, status)
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def log_trace_event_sync(
-    trace_id: str,
+    trace_id: str | None,
     phase: str,
     data: dict | None = None,
     error: str | None = None,
 ):
     """同步写入单阶段事件（供测试和非异步上下文使用）。"""
+    if trace_id is None:
+        trace_id = get_trace_id()
     event = _build_trace_event(trace_id, phase, data, error)
     _write_event_sync(event)
 
 
 def find_trace_events(trace_id: str) -> list[dict]:
-    """按 traceId 聚合查询所有阶段事件（按时间顺序）。"""
-    if not LOG_FILE.exists():
-        return []
+    """按 traceId 聚合查询所有阶段事件（按时间顺序），跨所有日志文件。"""
     events = []
-    with open(LOG_FILE, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-                if entry.get("traceId") == trace_id:
-                    events.append(entry)
-            except json.JSONDecodeError:
-                continue
+    for log_path in _iter_log_files():
+        try:
+            with open(log_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        if entry.get("traceId") == trace_id:
+                            events.append(entry)
+                    except json.JSONDecodeError:
+                        continue
+        except OSError:
+            continue
     return events
-
-
-# ============================================================
-# 旧模式（向后兼容）
-# ============================================================
-
-
-def _build_trace_data(
-    trace_id: str,
-    user_message: str,
-    parsed_intent: dict,
-    found_count: int,
-    final_reply: str,
-    context: dict = None,
-    error: str = None,
-) -> dict:
-    """构建 trace 日志数据结构（旧模式）。"""
-    trace_data = {
-        "timestamp": datetime.now(_BEIJING_TZ).isoformat(),
-        "level": "ERROR" if error else "INFO",
-        "traceId": trace_id,
-        "query": user_message,
-        "intent": parsed_intent,
-        "results_count": found_count,
-        "reply": final_reply,
-        "context": context,
-    }
-    if error:
-        trace_data["error"] = error
-    return trace_data
-
-
-async def log_chat_trace_async(
-    trace_id: str,
-    user_message: str,
-    parsed_intent: dict,
-    found_count: int,
-    final_reply: str,
-    context: dict = None,
-    error: str = None,
-):
-    """异步版 trace 日志写入（旧模式，向后兼容）。"""
-    trace_data = _build_trace_data(trace_id, user_message, parsed_intent, found_count, final_reply, context, error)
-    await asyncio.to_thread(_write_event_sync, trace_data)
-
-
-def log_chat_trace(
-    trace_id: str,
-    user_message: str,
-    parsed_intent: dict,
-    found_count: int,
-    final_reply: str,
-    context: dict = None,
-    error: str = None,
-):
-    """同步版 trace 日志写入（旧模式，向后兼容）。"""
-    trace_data = _build_trace_data(trace_id, user_message, parsed_intent, found_count, final_reply, context, error)
-    _write_event_sync(trace_data)
 
 
 # ============================================================
@@ -169,18 +370,20 @@ def log_chat_trace(
 
 
 def read_traces(limit: int = 20) -> list[dict]:
-    """读取最近 N 条 trace 日志（倒序，最新在前）。"""
-    if not LOG_FILE.exists():
-        return []
+    """读取最近 N 条 trace 日志（倒序，最新在前），跨所有日志文件。"""
     traces = []
-    with open(LOG_FILE, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    traces.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
+    for log_path in _iter_log_files():
+        try:
+            with open(log_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            traces.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            continue
+        except OSError:
+            continue
     return traces[-limit:][::-1]
 
 
@@ -282,26 +485,30 @@ def read_trace_summaries(
     Returns:
         {"total": int, "items": [{"traceId", "timestamp", "query", "status", "duration_ms"}, ...]}
     """
-    if not LOG_FILE.exists():
+    if not _iter_log_files():
         return {"total": 0, "items": []}
 
     # 1. 读取所有行并按 traceId 分组
     from collections import OrderedDict
 
     groups: OrderedDict[str, list[dict]] = OrderedDict()
-    with open(LOG_FILE, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            tid = entry.get("traceId")
-            if not tid:
-                continue
-            groups.setdefault(tid, []).append(entry)
+    for log_path in _iter_log_files():
+        try:
+            with open(log_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    tid = entry.get("traceId")
+                    if not tid:
+                        continue
+                    groups.setdefault(tid, []).append(entry)
+        except OSError:
+            continue
 
     # 2. 提取每个 traceId 的摘要
     summaries: list[dict] = []
@@ -316,6 +523,12 @@ def read_trace_summaries(
         trace_rating = None
         is_confirmation = False
         clarification_question = ""
+        # v0.5.1 BI 维度字段（从 classifier_output / execution / final.metric_labels 抓取）
+        pipeline_label = None
+        turn_type = None
+        skill_names = None
+        error_reason = None
+        clarification_type = None
 
         for e in events:
             phase = e.get("phase", "")
@@ -325,10 +538,20 @@ def read_trace_summaries(
                 timestamp = e.get("timestamp", timestamp)
                 if data.get("is_confirmation"):
                     is_confirmation = True
+            elif phase == "classifier_output":
+                pipeline_label = data.get("pipeline") or pipeline_label
+                turn_type = data.get("turn_type") or turn_type
+            elif phase == "execution":
+                names = data.get("skill_names")
+                if isinstance(names, list) and names:
+                    skill_names = ",".join(str(n) for n in names)
+                elif isinstance(names, str) and names:
+                    skill_names = names
             elif phase == "rating":
                 trace_rating = data.get("rating")
             elif phase in ("clarification_requested", "execution_clarification_requested"):
                 clarification_question = data.get("question", "")
+                clarification_type = "execution" if phase == "execution_clarification_requested" else "routing"
             elif phase == "final":
                 status = data.get("result", "unknown")
                 duration_ms = data.get("total_time_ms")
@@ -336,6 +559,14 @@ def read_trace_summaries(
                 total_tokens = data.get("total_tokens")
                 if e.get("error"):
                     error_msg = e["error"][:200]
+                # final.metric_labels 兜底：classifier 阶段缺失时从此补
+                labels = data.get("metric_labels") or {}
+                if isinstance(labels, dict):
+                    pipeline_label = labels.get("pipeline") or pipeline_label
+                    turn_type = labels.get("turn_type") or turn_type
+                    skill_names = labels.get("skill_names") or skill_names
+                    error_reason = labels.get("error_reason") or error_reason
+                    clarification_type = labels.get("clarification_type") or clarification_type
             # 旧模式兼容
             if not query and "query" in e:
                 query = e["query"]
@@ -356,6 +587,12 @@ def read_trace_summaries(
             "mode": mode,
             "total_tokens": total_tokens,
             "rating": trace_rating,
+            # v0.5.1 维度
+            "pipeline": pipeline_label,
+            "turn_type": turn_type,
+            "skill_names": skill_names,
+            "error_reason": error_reason,
+            "clarification_type": clarification_type,
         }
         if is_confirmation:
             summary["is_confirmation"] = True
@@ -395,19 +632,27 @@ def read_trace_summaries(
 def compute_log_stats(days: int = 7) -> dict:
     """计算最近 N 天的日志统计数据。
 
-    Returns:
-        {
-            "pv": int,              # 总请求数
-            "uv": int,              # 独立 IP 数
-            "paths": [{"path": str, "count": int}, ...],  # 路径分布 Top 10
-            "daily": [{"date": str, "pv": int, "uv": int}, ...],  # 每日趋势
-            "ratings": {"bad": int, "ok": int, "good": int},  # 评分分布
-            "modes": [{"mode": str, "count": int}, ...],  # 模式分布
-        }
+    v0.5.1 起改走 SQLite 索引层（``server.bi_index.query_stats``），输出 schema
+    与历史完全一致以兼容 admin 后台。SQLite 缺失或聚合异常时回退到 JSONL 全表
+    扫描（_legacy 实现）。
     """
+    try:
+        from server.bi_index import DB_PATH, query_stats
+
+        if DB_PATH.exists():
+            return query_stats(days=days)
+    except Exception:  # noqa: BLE001
+        # bi_index 异常时不阻塞 admin，回退到 legacy 路径
+        pass
+    return _compute_log_stats_legacy(days=days)
+
+
+def _compute_log_stats_legacy(days: int = 7) -> dict:
+    """旧 JSONL 全表扫描实现（fallback / 单测对照用），跨所有日志文件。"""
     from collections import defaultdict
 
-    if not LOG_FILE.exists():
+    log_files = _iter_log_files()
+    if not log_files:
         return {
             "pv": 0,
             "uv": 0,
@@ -424,52 +669,57 @@ def compute_log_stats(days: int = 7) -> dict:
     trace_data: dict[str, dict] = {}  # traceId -> aggregated info
     ratings = {"bad": 0, "ok": 0, "good": 0}
 
-    with open(LOG_FILE, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
+    for log_path in log_files:
+        try:
+            f = open(log_path, encoding="utf-8")
+        except OSError:
+            continue
+        with f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
 
-            timestamp = entry.get("timestamp", "")
-            if timestamp < cutoff_str:
-                continue
+                timestamp = entry.get("timestamp", "")
+                if timestamp < cutoff_str:
+                    continue
 
-            tid = entry.get("traceId")
-            if not tid:
-                continue
+                tid = entry.get("traceId")
+                if not tid:
+                    continue
 
-            phase = entry.get("phase", "")
+                phase = entry.get("phase", "")
 
-            # 评分事件单独计数
-            if phase == "rating":
-                rating_value = entry.get("data", {}).get("rating", "")
-                if rating_value in ratings:
-                    ratings[rating_value] += 1
-                continue
+                # 评分事件单独计数
+                if phase == "rating":
+                    rating_value = entry.get("data", {}).get("rating", "")
+                    if rating_value in ratings:
+                        ratings[rating_value] += 1
+                    continue
 
-            # 首次出现的 trace 初始化
-            if tid not in trace_data:
-                trace_data[tid] = {
-                    "date": timestamp[:10],  # YYYY-MM-DD
-                    "ip": "",
-                    "query": "",
-                    "mode": "",
-                }
+                # 首次出现的 trace 初始化
+                if tid not in trace_data:
+                    trace_data[tid] = {
+                        "date": timestamp[:10],  # YYYY-MM-DD
+                        "ip": "",
+                        "query": "",
+                        "mode": "",
+                    }
 
-            data = entry.get("data", {})
-            if phase == "routing_input":
-                trace_data[tid]["query"] = data.get("query", "")
-                trace_data[tid]["ip"] = data.get("client_ip", "")
-            elif phase == "final":
-                trace_data[tid]["mode"] = data.get("mode", "")
+                data = entry.get("data", {})
+                if phase == "routing_input":
+                    trace_data[tid]["query"] = data.get("query", "")
+                    trace_data[tid]["ip"] = data.get("client_ip", "")
+                elif phase == "final":
+                    trace_data[tid]["mode"] = data.get("mode", "")
 
-            # 旧模式兼容
-            if not trace_data[tid]["query"] and "query" in entry:
-                trace_data[tid]["query"] = entry["query"]
+                # 旧模式兼容
+                if not trace_data[tid]["query"] and "query" in entry:
+                    trace_data[tid]["query"] = entry["query"]
 
     # 统计汇总
     daily_pv: dict[str, int] = defaultdict(int)
@@ -525,3 +775,25 @@ def compute_log_stats(days: int = 7) -> dict:
         "ratings": ratings,
         "modes": modes,
     }
+
+
+# ============================================================
+# CLI（``python -m server.logger``）
+# ============================================================
+
+
+def _main() -> int:
+    parser = argparse.ArgumentParser(prog="python -m server.logger")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    p_cleanup = sub.add_parser("cleanup", help="按天清理过期 JSONL 日志（保留 legacy 单文件）")
+    p_cleanup.add_argument("--keep-days", type=int, default=30, help="保留最近 N 天，默认 30")
+
+    args = parser.parse_args()
+    if args.cmd == "cleanup":
+        result = cleanup_old_logs(keep_days=args.keep_days)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

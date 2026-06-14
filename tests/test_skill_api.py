@@ -12,6 +12,7 @@ Skill 模式 API 集成测试。
 """
 
 from collections import deque
+from contextlib import ExitStack, contextmanager
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -19,6 +20,26 @@ from httpx import ASGITransport, AsyncClient
 
 import server.skills  # noqa: F401 — 触发 @register_skill 注册
 from server.main import app
+
+
+@contextmanager
+def _patch_chat_completion_everywhere(side_effect):
+    """同时 patch server.pipeline + 三个节点模块的 ``chat_completion``。
+
+    Task 2 起 Pipeline A 走图引擎，``chat_completion`` 调用迁移到
+    ``server.nodes.{classify,route,generate}``，老的 ``server.pipeline.chat_completion``
+    仅 ``stream_event_generator`` 使用。统一在此处 patch 以保持测试行为不变。
+    """
+    targets = (
+        "server.pipeline.chat_completion",
+        "server.nodes.classify.chat_completion",
+        "server.nodes.route.chat_completion",
+        "server.nodes.generate.chat_completion",
+    )
+    with ExitStack() as stack:
+        for target in targets:
+            stack.enter_context(patch(target, new=AsyncMock(side_effect=side_effect)))
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -148,7 +169,7 @@ class TestSkillModePreset:
     @pytest.mark.anyio
     async def test_preset_cycle_farming(self, mock_chat_completion_rag):
         """preset=cycle_farming 应直接执行预设 Skills，不调 LLM 路由。"""
-        with patch("server.pipeline.chat_completion", new=AsyncMock(side_effect=mock_chat_completion_rag)):
+        with _patch_chat_completion_everywhere(mock_chat_completion_rag):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
                     "/api/chat",
@@ -167,7 +188,7 @@ class TestSkillModePreset:
     @pytest.mark.anyio
     async def test_preset_with_params_override(self, mock_chat_completion_rag):
         """preset + params 覆盖：用户指定参数覆盖预设默认值。"""
-        with patch("server.pipeline.chat_completion", new=AsyncMock(side_effect=mock_chat_completion_rag)):
+        with _patch_chat_completion_everywhere(mock_chat_completion_rag):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
                     "/api/chat",
@@ -216,7 +237,7 @@ class TestSkillModeDirectParams:
     @pytest.mark.anyio
     async def test_direct_params_list(self, mock_chat_completion_rag):
         """直传 params 列表格式：[{"skill_name": ..., "params": ...}]。"""
-        with patch("server.pipeline.chat_completion", new=AsyncMock(side_effect=mock_chat_completion_rag)):
+        with _patch_chat_completion_everywhere(mock_chat_completion_rag):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
                     "/api/chat",
@@ -240,7 +261,7 @@ class TestSkillModeDirectParams:
     @pytest.mark.anyio
     async def test_direct_params_dict(self, mock_chat_completion_rag):
         """直传 params dict 格式（单个 skill_call）。"""
-        with patch("server.pipeline.chat_completion", new=AsyncMock(side_effect=mock_chat_completion_rag)):
+        with _patch_chat_completion_everywhere(mock_chat_completion_rag):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
                     "/api/chat",
@@ -268,7 +289,7 @@ class TestSkillModeLLMRouting:
     @pytest.mark.anyio
     async def test_llm_routing_success(self, mock_chat_completion_routing_and_rag):
         """LLM 路由成功：返回 Saber 职阶从者。"""
-        with patch("server.pipeline.chat_completion", new=AsyncMock(side_effect=mock_chat_completion_routing_and_rag)):
+        with _patch_chat_completion_everywhere(mock_chat_completion_routing_and_rag):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
                     "/api/chat",
@@ -283,7 +304,7 @@ class TestSkillModeLLMRouting:
     @pytest.mark.anyio
     async def test_llm_routing_fallback(self, mock_chat_completion_fallback):
         """LLM 路由 fallback（out_of_scope）：返回模板回复。"""
-        with patch("server.pipeline.chat_completion", new=AsyncMock(side_effect=mock_chat_completion_fallback)):
+        with _patch_chat_completion_everywhere(mock_chat_completion_fallback):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
                     "/api/chat",
@@ -307,8 +328,8 @@ class TestSkillModeLLMRouting:
             servants_data=[],
         )
         with (
-            patch("server.pipeline.chat_completion", new=AsyncMock(side_effect=mock_chat_completion_empty_skills)),
-            patch("server.pipeline.agent_route", new=AsyncMock(return_value=mock_agent_result)),
+            _patch_chat_completion_everywhere(mock_chat_completion_empty_skills),
+            patch("server.nodes.agent.agent_route", new=AsyncMock(return_value=mock_agent_result)),
         ):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
@@ -328,7 +349,10 @@ class TestSkillModeLLMRouting:
         async def raise_error(**kwargs):
             raise ConnectionError("Network error")
 
-        with patch("server.pipeline.chat_completion", new=AsyncMock(side_effect=raise_error)):
+        with (
+            patch("server.nodes.classify.chat_completion", new=AsyncMock(side_effect=raise_error)),
+            patch("server.nodes.route.chat_completion", new=AsyncMock(side_effect=raise_error)),
+        ):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
                     "/api/chat",
@@ -372,7 +396,7 @@ class TestPresetB1SupplementParsing:
 
         with (
             patch("server.main.chat_completion", new=AsyncMock(side_effect=side_effect)),
-            patch("server.pipeline.chat_completion", new=AsyncMock(side_effect=side_effect)),
+            _patch_chat_completion_everywhere(side_effect),
         ):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
@@ -408,7 +432,7 @@ class TestPresetB1SupplementParsing:
 
         with (
             patch("server.main.chat_completion", new=AsyncMock(side_effect=side_effect)),
-            patch("server.pipeline.chat_completion", new=AsyncMock(side_effect=side_effect)),
+            _patch_chat_completion_everywhere(side_effect),
         ):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(

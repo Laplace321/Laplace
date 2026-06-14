@@ -29,8 +29,8 @@ from server.admin.routes import router as admin_routes_router
 
 # ── 业务模块 ──
 from server.llm import chat_completion
-from server.logger import find_trace, read_trace_summaries, read_traces
-from server.pipeline import ChatResponse, handle_skill_mode, stream_event_generator
+from server.logger import bind_trace_id, find_trace, read_trace_summaries, read_traces
+from server.pipeline import ChatResponse, handle_skill_mode, resume_skill_mode, stream_chat_events
 from server.prompts import build_routing_prompt
 from server.query_executor import load_database
 from server.rate_limiter import RateLimitMiddleware
@@ -86,6 +86,19 @@ class ChatRequest(BaseModel):
     params: dict | list | None = None
     response_skill: str | None = None
     confirmation_context: str | None = None
+    # Task 4 Batch B：多轮对话会话 ID（前端 UUID）。空字符串=单轮模式。
+    session_id: str = ""
+
+
+class ResumeRequest(BaseModel):
+    """从 pending checkpoint 恢复执行的请求（Task 4 Batch B）。
+
+    系统在 clarify_node 主动中断时会把 PipelineState 保存到 SessionStore，
+    前端拿到带 ``query.pending=True`` 的响应后让用户补充答复，再调 ``/api/chat/resume``。
+    """
+
+    session_id: str
+    message: str
 
 
 @app.get("/api/traces")
@@ -121,10 +134,26 @@ async def admin_list_logs(
 
 @app.get("/api/admin/logs/stats")
 async def admin_logs_stats(days: int = 7, _=Depends(require_admin)):
-    """日志统计汇总（PV/UV/路径分布/日期趋势/评分分布）。"""
+    """日志统计汇总（PV/UV/路径分布/日期趋势/评分分布 + v0.5.1 BI 维度）。
+
+    在原 ``compute_log_stats`` 输出基础上叠加 ``dimensions`` 字段，
+    展示 pipeline / turn_type / skill_name / error_reason 切分。
+    """
+    from server.bi_index import query_dimension_stats
     from server.logger import compute_log_stats
 
-    return compute_log_stats(days=days)
+    base = compute_log_stats(days=days)
+    try:
+        base["dimensions"] = query_dimension_stats(days=days)
+    except Exception:
+        # 任何异常不阻塞老 schema 字段返回
+        base["dimensions"] = {
+            "by_pipeline": [],
+            "by_turn_type": [],
+            "by_skill": [],
+            "by_error_reason": [],
+        }
+    return base
 
 
 @app.get("/api/admin/logs/{trace_id}")
@@ -151,9 +180,19 @@ async def rate_response(body: RateRequest):
     """记录用户对 AI 回复的评分（糟糕/一般/优秀）。"""
     if body.rating not in ("bad", "ok", "good"):
         return JSONResponse(status_code=400, content={"error": "rating 必须为 bad/ok/good"})
+    import asyncio
+
+    from server.bi_index import upsert_turn
     from server.logger import log_trace_event
 
     await log_trace_event(body.trace_id, "rating", {"rating": body.rating})
+    # ADR-032：评分写入 JSONL 后同步刷新 BI 索引（rating 列），确保统计面板可见。
+    # upsert_turn 是同步 SQLite 写，使用 to_thread 避免阻塞事件循环。
+    try:
+        await asyncio.to_thread(upsert_turn, body.trace_id)
+    except Exception:  # noqa: BLE001
+        # upsert_turn 内部已 try/except，此处仅 belt-and-suspenders
+        pass
     return {"ok": True}
 
 
@@ -308,6 +347,7 @@ async def chat(request: ChatRequest, raw_request: Request):
     """处理用户对话请求（Skill-Based Architecture）。"""
     user_message = request.message
     trace_id = uuid.uuid4().hex[:8]
+    bind_trace_id(trace_id)
     client_ip = raw_request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
         raw_request.client.host if raw_request.client else "unknown"
     )
@@ -407,6 +447,37 @@ async def chat(request: ChatRequest, raw_request: Request):
         client_ip=client_ip,
         target_pipeline=resolved_target_pipeline,
         confirmation_context=request.confirmation_context,
+        session_id=request.session_id or "",
+    )
+
+
+@app.post("/api/chat/resume", response_model=ChatResponse)
+async def chat_resume(request: ResumeRequest, raw_request: Request):
+    """从 pending checkpoint 恢复执行（Task 4 Batch B）。
+
+    场景：``/api/chat`` 返回 ``query.pending=True`` 的 clarification 响应后，
+    用户在前端补充答复（如选择某个选项），调本端口续做。
+    与 ``confirmation_context`` 机制等价但保留多轮 ``session_id`` 链路。
+    """
+    if not request.session_id:
+        return ChatResponse(
+            reply="缺少 session_id，无法恢复对话。",
+            servants=[],
+            count=0,
+            query={"error": "missing_session_id"},
+            model="error",
+            traceId=None,
+        )
+    trace_id = uuid.uuid4().hex[:8]
+    bind_trace_id(trace_id)
+    client_ip = raw_request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
+        raw_request.client.host if raw_request.client else "unknown"
+    )
+    return await resume_skill_mode(
+        session_id=request.session_id,
+        supplement_message=request.message or "",
+        trace_id=trace_id,
+        client_ip=client_ip,
     )
 
 
@@ -417,6 +488,7 @@ async def chat_stream(
     preset_name: str | None = None,
     confirmation_context: str | None = None,
     confirmation_id: str | None = None,
+    session_id: str = "",
 ):
     """SSE 流式对话端点 — 分阶段推送思考过程和结果。
 
@@ -424,6 +496,8 @@ async def chat_stream(
     支持 preset_name 参数：有值时跳过 LLM 路由，直接展开预设 skill_calls。
     支持 confirmation_context 参数：用户确认选择后携带的上下文，用于精确路由。
     支持 confirmation_id 参数：用户选择的选项 ID（collectionNo），用于精确定位实体。
+    支持 session_id 参数：前端会话 ID，用于多轮对话状态关联，由 stream_chat_events
+    透传到 SessionStore 完成多轮闭环。
     """
     client_ip = (
         request.headers.get("x-forwarded-for", "").split(",")[0].strip() or request.client.host
@@ -432,12 +506,13 @@ async def chat_stream(
     )
 
     async def event_generator():
-        async for event in stream_event_generator(
+        async for event in stream_chat_events(
             message,
             preset_name,
             client_ip=client_ip,
             confirmation_context=confirmation_context,
             confirmation_id=confirmation_id,
+            session_id=session_id,
         ):
             yield event
 

@@ -93,6 +93,75 @@ class TestCESkills:
         names = [ce["name"] for ce in results]
         assert "Kaleidoscope" in names
 
+    def test_ce_search_by_effect_min_value_filters_np_50(self, ce_db):
+        """trace f58de3cc 回归：minValue=50 应过滤掉 NP<50% 的礼装。"""
+        from server.skills.query.ce_search_by_effect import CESearchByEffect
+
+        skill = CESearchByEffect()
+        # 全量带 gainNp 的礼装数量（基线）
+        all_gain_np = skill.execute(ce_db, {"effect": "gainNp", "limit_break": True})
+        # NP >= 50% 的子集应严格更少（params 走 SkillExecutor 已转 snake_case）
+        ge_50 = skill.execute(ce_db, {"effect": "gainNp", "limit_break": True, "min_value": 50})
+        assert 0 < len(ge_50) < len(all_gain_np), f"min_value=50 应严格过滤，实得 {len(ge_50)}/{len(all_gain_np)}"
+
+        # 万圣节公主（满破 NP 50%）应保留
+        names_50 = {ce["name"] for ce in ge_50}
+        assert "Halloween Princess" in names_50
+        # 万花筒（满破 NP 100%）应保留
+        assert "Kaleidoscope" in names_50
+
+        # 所有命中礼装的 effectDetailsLB 中 gainNp 必须 >= 5000（千分比 = 50%）
+        for ce in ge_50:
+            details = ce.get("effectDetailsLB", [])
+            gain_np_values = [d["value"] for d in details if d.get("name") == "gainNp"]
+            assert any(v >= 5000 for v in gain_np_values), f"{ce['name']} 不应通过 min_value=50 过滤"
+
+    def test_ce_search_by_effect_min_value_with_rarity(self, ce_db):
+        """组合筛选：5星 + gainNp >= 50% 应得到符合截图预期的小集合。"""
+        from server.skills.query.ce_search_by_effect import CESearchByEffect
+        from server.skills.query.ce_search_by_rarity import CESearchByRarity
+
+        eff = CESearchByEffect()
+        rar = CESearchByRarity()
+
+        ge_50 = eff.execute(ce_db, {"effect": "gainNp", "limit_break": True, "min_value": 50})
+        rare5 = rar.execute(ce_db, {"op": "eq", "value": 5})
+        rare5_ids = {ce["id"] for ce in rare5}
+        combined = [ce for ce in ge_50 if ce["id"] in rare5_ids]
+
+        # 5星 NP>=50% 应远小于 trace 中的 110（仅 gainNp+5星 不带阈值的全量）
+        assert 0 < len(combined) < 110
+        # 万华镜（5星 100%）应在
+        assert any(ce["name"] == "Kaleidoscope" for ce in combined)
+        # 万圣节公主（5星 50%）应在
+        assert any(ce["name"] == "Halloween Princess" for ce in combined)
+
+    def test_ce_search_by_effect_max_value(self, ce_db):
+        """maxValue 上界过滤：max_value=30 应排除 NP>30% 的礼装。"""
+        from server.skills.query.ce_search_by_effect import CESearchByEffect
+
+        skill = CESearchByEffect()
+        results = skill.execute(ce_db, {"effect": "gainNp", "limit_break": True, "max_value": 30})
+        # 万花筒（100%）和万圣节公主（50%）都不应在
+        names = {ce["name"] for ce in results}
+        assert "Kaleidoscope" not in names
+        assert "Halloween Princess" not in names
+
+    def test_ce_search_by_effect_alias_routing(self, ce_db):
+        """SkillExecutor 路径：LLM 传 minValue（alias）应等价于 min_value。"""
+        from server.skills.query.ce_search_by_effect import CESearchByEffect, Params
+
+        skill = CESearchByEffect()
+        # 模拟 SkillExecutor 的 alias 解析
+        validated = Params(**{"effect": "gainNp", "limit_break": True, "minValue": 50})
+        params = validated.model_dump(by_alias=False)
+        assert params["min_value"] == 50
+
+        results = skill.execute(ce_db, params)
+        names = {ce["name"] for ce in results}
+        assert "Kaleidoscope" in names
+        assert "Halloween Princess" in names
+
     def test_ce_search_by_rarity(self, ce_db):
         """按稀有度筛选礼装。"""
         from server.skills.query.ce_search_by_rarity import CESearchByRarity
@@ -162,6 +231,48 @@ class TestCEDescribeFilters:
         result = describe_filters([{"skill_name": "ce_search_by_effect", "params": {"effect": "gainNp"}}])
         assert "礼装效果" in result[0]
         assert "满破" in result[0]
+
+    def test_ce_effect_description_with_min_value(self):
+        """trace 839f5b63 回归：min_value 必须出现在前端筛选条件展示中。"""
+        from server.translation import describe_filters
+
+        result = describe_filters(
+            [{"skill_name": "ce_search_by_effect", "params": {"effect": "gainNp", "min_value": 50}}]
+        )
+        assert "礼装效果" in result[0]
+        assert "NP增加" in result[0]
+        assert "≥ 50%" in result[0]
+        assert "满破" in result[0]
+
+    def test_ce_effect_description_with_alias_min_value(self):
+        """trace 839f5b63 回归：routing 阶段 skill_calls 用 alias key（minValue），同样要被识别。"""
+        from server.translation import describe_filters
+
+        result = describe_filters(
+            [{"skill_name": "ce_search_by_effect", "params": {"effect": "gainNp", "minValue": 50}}]
+        )
+        assert "≥ 50%" in result[0]
+
+    def test_ce_effect_description_with_max_value(self):
+        from server.translation import describe_filters
+
+        result = describe_filters(
+            [{"skill_name": "ce_search_by_effect", "params": {"effect": "gainNp", "max_value": 80}}]
+        )
+        assert "≤ 80%" in result[0]
+
+    def test_ce_effect_description_with_range(self):
+        from server.translation import describe_filters
+
+        result = describe_filters(
+            [
+                {
+                    "skill_name": "ce_search_by_effect",
+                    "params": {"effect": "gainNp", "min_value": 50, "max_value": 80},
+                }
+            ]
+        )
+        assert "50%~80%" in result[0]
 
     def test_ce_rarity_description(self):
         from server.translation import describe_filters

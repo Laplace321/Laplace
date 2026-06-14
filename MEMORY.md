@@ -36,6 +36,11 @@
 | 011 | [Chaldea 依赖边界](docs/adr/ADR-011-chaldea-dependency-boundary.md) | 2026-05-06 | 已采纳 |
 | 012 | [LLM 迁移至 Responses API](docs/adr/ADR-012-responses-api-migration.md) | 2026-05-06 | 已采纳 |
 | 013 | [Thinking Steps SSE](docs/adr/ADR-013-thinking-steps-sse.md) | 2026-05-06 | 已采纳 |
+| 028 | [声明式管线架构迁移](docs/adr/ADR-028-declarative-pipeline-migration.md) | 2026-06-12 | 已实施 |
+| 029 | [Trace ContextVar 协程级传播 + Phase 常量化](docs/adr/ADR-029-trace-contextvar.md) | 2026-06-15 | 已实施 |
+| 030 | [BI 索引层（JSONL + SQLite）](docs/adr/ADR-030-bi-sqlite-index.md) | 2026-06-15 | 已实施 |
+| 031 | [跨轮从者基础数据注入 Pipeline C](docs/adr/ADR-031-cross-turn-servant-brief-injection.md) | 2026-06-12 | 已实施 |
+| 032 | [分类器 FALLBACK 链路 + 评分 BI 同步双修复](docs/adr/ADR-032-classifier-fallback-and-rating-bi-sync.md) | 2026-06-12 | 已实施 |
 
 ## 技术备忘
 
@@ -46,3 +51,6 @@
 - **Chaldea 关键数据路径**: `servant.skills[] → skill.functions[] → function.svals[9].Value` (Lv.10数值)
 - **效果分类体系**: 攻击(20种) / 防御(11种) / 异常(15种) / 辅助(9种) = 55+ 子分类
 - **测试命令**: 默认回归测试使用 `.venv/bin/python -m pytest`；真实 LLM smoke test 使用 `RUN_LIVE_LLM_TESTS=1 .venv/bin/python -m pytest tests/test_llm_client_live.py -s`
+- **Trace 体系（v0.5.1）**: trace_id 走 ContextVar 自动传播（`bind_trace_id` / `get_trace_id`）；phase 必须用 `server.logger.Phase` 常量；DAG 节点用 `@with_trace`；详见 ADR-029
+- **BI 索引（v0.5.1）**: JSONL 是事实源，SQLite (`server/logs/bi_index.sqlite`) 是 final 事件派生索引；admin 聚合走 SQL；`python -m server.bi_index reindex` 全量重建；详见 ADR-030
+- **日志轮转**: 文件名 `query_trace.YYYY-MM-DD.jsonl`，legacy 单文件作为 fallback；清理 `python -m server.logger cleanup --keep-days 30`

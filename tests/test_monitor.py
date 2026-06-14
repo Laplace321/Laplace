@@ -511,3 +511,102 @@ class TestConsecutiveFailureAlert:
                     assert "dashscope/qwen" in call_args[0][1]
         finally:
             _alerter_mod._alerter = old_alerter
+
+
+# ══════════════════════════════════════════
+#  v0.5.1 Task 5：业务维度指标
+# ══════════════════════════════════════════
+
+
+class TestBusinessDimensionMetrics:
+    """v0.5.1 新增：pipeline_requests / skill_calls / clarifications / node_latency。"""
+
+    def test_record_pipeline_request_basic(self):
+        c = MetricsCollector()
+        c.record_pipeline_request("A", "MAJOR", "success")
+        c.record_pipeline_request("A", "MAJOR", "success")
+        c.record_pipeline_request("agent", "MAJOR", "routing_error")
+        assert c._pipeline_requests[("A", "MAJOR", "success")] == 2
+        assert c._pipeline_requests[("agent", "MAJOR", "routing_error")] == 1
+
+    def test_record_pipeline_request_unknown_fallback(self):
+        c = MetricsCollector()
+        c.record_pipeline_request("", "", "")
+        assert c._pipeline_requests[("unknown", "unknown", "unknown")] == 1
+
+    def test_record_skill_call_known(self):
+        """已注册 skill_name 直接落库。"""
+        c = MetricsCollector()
+        import server.skills  # noqa: F401
+
+        c.record_skill_call("search_by_class", "servant", "success")
+        assert c._skill_calls[("search_by_class", "servant", "success")] == 1
+
+    def test_metrics_skill_label_cardinality(self):
+        """label 基数审计：未注册 skill_name 必须归到 'unknown'。"""
+        c = MetricsCollector()
+        import server.skills  # noqa: F401
+
+        c.record_skill_call("definitely_not_a_real_skill_xyz", "servant", "success")
+        c.record_skill_call("another_fake_skill", "servant", "success")
+        assert c._skill_calls[("unknown", "servant", "success")] == 2
+        assert ("definitely_not_a_real_skill_xyz", "servant", "success") not in c._skill_calls
+
+    def test_record_clarification(self):
+        c = MetricsCollector()
+        c.record_clarification("routing")
+        c.record_clarification("execution")
+        c.record_clarification("routing")
+        assert c._clarifications["routing"] == 2
+        assert c._clarifications["execution"] == 1
+
+    def test_record_clarification_unknown_fallback(self):
+        c = MetricsCollector()
+        c.record_clarification("")
+        assert c._clarifications["unknown"] == 1
+
+    def test_record_node_latency_histogram(self):
+        c = MetricsCollector()
+        c.record_node_latency("classify_node", "success", 30.0)
+        c.record_node_latency("classify_node", "success", 80.0)
+        c.record_node_latency("classify_node", "success", 600.0)
+        c.record_node_latency("classify_node", "error", 12000.0)
+        assert c._node_latency_count[("classify_node", "success")] == 3
+        assert c._node_latency_count[("classify_node", "error")] == 1
+        assert c._node_latency_buckets["classify_node"]["success"][50] == 1
+        assert c._node_latency_buckets["classify_node"]["success"][100] == 1
+        assert c._node_latency_buckets["classify_node"]["success"][1000] == 1
+        assert c._node_latency_buckets["classify_node"]["error"][-1.0] == 1
+
+    def test_prometheus_text_includes_new_metrics(self):
+        """to_prometheus_text 必须输出 4 个新指标 + Histogram bucket/sum/count。"""
+        c = MetricsCollector()
+        import server.skills  # noqa: F401
+
+        c.record_pipeline_request("A", "MAJOR", "success")
+        c.record_skill_call("search_by_class", "servant", "success")
+        c.record_clarification("routing")
+        c.record_node_latency("classify_node", "success", 80.0)
+
+        text = c.to_prometheus_text()
+        assert 'laplace_pipeline_requests_total{pipeline="A",turn_type="MAJOR",status="success"} 1' in text
+        assert 'laplace_skill_calls_total{skill_name="search_by_class",domain="servant",status="success"} 1' in text
+        assert 'laplace_clarifications_total{clarification_type="routing"} 1' in text
+        assert "laplace_node_latency_seconds_bucket" in text
+        assert 'laplace_node_latency_seconds_sum{node_name="classify_node",result="success"}' in text
+        assert 'laplace_node_latency_seconds_count{node_name="classify_node",result="success"} 1' in text
+        assert 'le="+Inf"' in text
+
+    def test_skill_registry_alignment(self):
+        """label 基数硬约束：record_skill_call 输出的 skill_name 必须 ⊂ SKILL_REGISTRY ∪ {unknown}。"""
+        import server.skills  # noqa: F401
+        from server.skills.base import SKILL_REGISTRY
+
+        c = MetricsCollector()
+        for name in list(SKILL_REGISTRY.keys())[:3]:
+            c.record_skill_call(name, getattr(SKILL_REGISTRY[name], "domain", "response"), "success")
+        c.record_skill_call("__bogus__", "servant", "success")
+
+        observed = {entry[0] for entry in c._skill_calls}
+        allowed = set(SKILL_REGISTRY.keys()) | {"unknown"}
+        assert observed.issubset(allowed), f"Unexpected skill_name labels: {observed - allowed}"

@@ -122,18 +122,66 @@ def get_generation_prompt(user_query: str, context_json: str) -> str:
 # ============================================================
 
 
-def build_classifier_prompt() -> str:
+def build_classifier_prompt(prev_summary: str | None = None) -> str:
     """构建 Stage 0 分类器 Prompt。
 
-    极简 Prompt，只判断用户查询应走 A/B/C 哪条链路，不做参数提取。
-    输出链路标识 + 置信度分数。
+    极简 Prompt，判断用户查询应走 A/B/C 哪条链路 + 与上一轮的关系（turn_type）。
+
+    Args:
+        prev_summary: 上一轮对话的摘要（≤200 字符），来自 SessionStore 的 TurnSnapshot.summary。
+                      None 或空字符串 → 单轮场景，提示词中省略多轮上下文段。
 
     Returns:
         系统 Prompt 字符串
     """
-    return """你是 Laplace 链路分类器。根据用户的自然语言问题，判断应走哪条处理链路。
+    multiturn_block = ""
+    if prev_summary:
+        # 截断防御：调用方 truncated_summary 通常已截断，这里再加一层兜底
+        safe_summary = prev_summary if len(prev_summary) <= 200 else prev_summary[:199] + "…"
+        multiturn_block = f"""
 
-## 三条链路定义
+## 多轮对话上下文（重要）
+
+上一轮系统总结：{safe_summary}
+
+判断本轮 user 输入与上一轮的关系，输出 `turn_type`：
+- **MAJOR**：全新查询，与上一轮主题无关（默认值，无上下文时使用）
+- **MINOR**：在上一轮结果上追加过滤、切换粒度或追问细节。**必须包含显式承接词或指代词**，典型信号：
+  - "**其中**弓阶的"、"**再**筛一下..."、"**那些**里 5 星的"（追加过滤条件）
+  - "**详细**说说"、"**展开**第一个"、"**对比下**前两个"（切换回复粒度）
+  - "**再**帮我看看宝具效果"、"**那他**的技能呢"、"**第一个**那个"（在同一从者/查询基础上追问）
+- **CORRECTION**：修正上一轮的关键参数。典型信号：
+  - "我说的是 Alter 版"、"不是这个，我说的是..."、"应该是..."（指代错误纠正）
+
+判断规则（按优先级）：
+1. **完整独立查询 → MAJOR（最高优先级）**：如果本轮句子单独看就是一个完整可独立解释的查询（包含完整筛选维度组合，如"职阶 + 稀有度"、"职阶 + 效果"、"从者名 + 属性"、"X 阶有 Y 效果的从者"等），即使上一轮也是同类查询，也应当输出 **MAJOR**。判断标准：把本轮句子单独丢给系统，能不能独立得到合理答案？能 → MAJOR。
+2. **承接词触发 MINOR**：只有当本轮明确含承接/指代词（"其中"、"那"、"再"、"上面"、"刚才"、"那些"、"第一个"、"详细"、"展开"等）时才输出 MINOR
+3. **修正语气 → CORRECTION**：本轮含修正语气词（"不是..."、"我说的是..."、"应该是..."）
+4. **模糊场景倾向 MAJOR**（更安全，避免把新查询污染成追问）
+
+## 多轮示例
+
+上一轮："为你筛选出 12 位高自充的术阶从者..."
+用户："其中五星的" → {{"pipeline": "A", "confidence": 0.9, "turn_type": "MINOR"}}
+用户："详细说说第一个" → {{"pipeline": "A", "confidence": 0.9, "turn_type": "MINOR"}}
+用户："我说的是 Caster 不是 Saber" → {{"pipeline": "A", "confidence": 0.85, "turn_type": "CORRECTION"}}
+用户："最近有什么活动" → {{"pipeline": "B", "confidence": 0.9, "turn_type": "MAJOR"}}
+
+上一轮："为你筛选出 6 位 NP 100% 自充的从者..."
+用户："弓阶的 5 星从者" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR"}}  # 完整独立查询，无承接词
+用户："剑阶出星推荐" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR"}}  # 完整独立查询
+用户："查一下梅林" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR"}}  # 全新对象
+用户："其中弓阶的 5 星" → {{"pipeline": "A", "confidence": 0.9, "turn_type": "MINOR"}}  # 含"其中"承接词，才是 MINOR"""
+    else:
+        multiturn_block = """
+
+## 多轮对话上下文
+
+本轮无上一轮上下文，`turn_type` 固定输出 `MAJOR`。"""
+
+    return f"""你是 Laplace 链路分类器。根据用户的自然语言问题，判断应走哪条处理链路 + 本轮相对上一轮的关系。
+
+## 四条链路定义
 
 **链路 A — 从者/礼装结构化数据查询**
 用户想从数据库中按条件筛选、查找、对比从者或概念礼装。
@@ -150,43 +198,62 @@ def build_classifier_prompt() -> str:
 典型场景：关卡攻略、配队推荐、强度评价、戴冠战相关问题、游戏机制解释（伤害公式、buff 分类、乘区原理等）。
 关键信号：攻略、打法、配队、阵容、推荐（主观性的）、评价、强度、tier、戴冠战/冠位/剑冠/弓冠/星图、伤害公式、乘区、A类/B类/C类/D类buff。
 
+**链路 FALLBACK — 问候/能力咨询/超出范围**
+用户输入与 FGO 数据查询、知识问答、攻略推荐**完全无关**，无法用任何 Skill 处理。需要返回预置模板回复。
+两种子类型（必须同时输出 `fallback_code`）：
+- `greeting`：问候语 / 询问助手能力 / 自我介绍。例：「你好」「hi」「在吗」「你能做什么」「帮助」「介绍下自己」
+- `out_of_scope`：与 FGO 完全无关的问题。例：「明天天气」「推荐充电器」「今晚吃什么」「写首诗」「2+2 等于几」
+
 ## 消歧义规则（关键）
 
 1. **「职阶 + 效果/能力 + 推荐」= 链路 A**：当用户问"XX阶有XX效果的从者推荐"时，本质是按条件筛选从者，走链路 A。例如"剑阶出星推荐"="筛选出星能力强的剑阶从者"，是数据查询不是攻略推荐。判断标准：如果"推荐"可以被替换为"有哪些"且语义不变，则走 A。
 2. **「戴冠战」相关 = 链路 C**：只要提到"戴冠战/冠位/剑冠/弓冠/星图"等戴冠战专有词，无论问什么都走链路 C。但"XX职阶的从者"不含戴冠战关键词时走链路 A。
 3. **可拆解为具体筛选条件 = 链路 A**：如果用户的问题可以被拆解为明确的筛选参数（职阶名 + 效果名 + 数值等），走链路 A。只有无法拆解为具体条件的泛泛推荐（"推荐几个好用的从者"）才走链路 C。
-4. **从者/礼装名称查询 = 链路 A**：用户问某个从者或礼装的信息（"查一下梅林"、"梅林技能"），走链路 A，不是链路 B。链路 B 是查游戏事实（"梅林什么时候复刻"）。
+4. **从者/礼装名称查询 = 链路 A**：用户问某个从者或礼装的信息（"查一下梅林"、"梅林技能"、"梅林是谁"、"介绍下梅林"），走链路 A，不是链路 B、C 或 FALLBACK。链路 B 是查游戏事实（"梅林什么时候复刻"）。
 5. **职阶克制 = 链路 A**：用户问克制关系（"什么克制XX"、"打XX用什么职阶"），走链路 A。
 6. **游戏机制原理 = 链路 C**：用户问"什么是 X 类 buff"、"伤害公式怎么算"、"乘区是什么意思"等游戏机制解释类问题，走链路 C。注意区分：问"有哪些从者有 X 效果"是数据查询（A），问"X 效果的计算原理是什么"是机制解释（C）。
 7. **「从者名 + X类buff」= 链路 A**：当用户问某个从者能提供多少 A/B/C/D 类 buff 时（如"梅林能提供多少A类buff"），本质是查询该从者的具体技能数值，走链路 A。只有不涉及具体从者的纯机制性问题（"A类buff是什么"）才走链路 C。
+8. **FALLBACK 严格判定（防误判）**：仅当输入**完全不含任何**以下信号时才输出 FALLBACK：
+   - 任何 FGO 从者名 / 昵称 / 礼装名（含日文/中文/英文）
+   - 任何职阶词（剑/弓/枪/骑/术/杀/狂/Saber/Caster 等）
+   - 任何效果/特性词（充能/无敌/闪避/暴击/星星/特攻 等）
+   - 任何 FGO 专有名词（宝具/技能/羁绊/灵基/概念礼装/卡池/主线/活动/戴冠战/冠位 等）
+   - 任何数值条件（"30%以上"、"5星" 等）
+   有任一信号 → 必须走 A/B/C 之一。
+{multiturn_block}
 
 ## 输出格式
 
 严格按以下 JSON 格式输出，不要有任何其他内容：
 ```json
-{"pipeline": "A", "confidence": 0.95}
+{{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
 ```
 
-- `pipeline`：链路标识，只能是 "A"、"B"、"C" 之一
-- `confidence`：你对这个分类判断的置信度，0.0~1.0。对于明确匹配的查询给高置信度（>0.8），对于边界 case 给较低置信度（0.5~0.7）
+- `pipeline`：链路标识，只能是 "A"、"B"、"C"、"FALLBACK" 之一
+- `confidence`：你对这个链路分类的置信度，0.0~1.0。对于明确匹配的查询给高置信度（>0.8），对于边界 case 给较低置信度（0.5~0.7）
+- `turn_type`：本轮相对上一轮的关系，只能是 "MAJOR"、"MINOR"、"CORRECTION" 之一
+- `fallback_code`：仅当 pipeline=FALLBACK 时填 "greeting" 或 "out_of_scope"，其余必须为 null
 
 ## 示例
 
-用户："30自充以上的术阶" → {"pipeline": "A", "confidence": 0.95}
-用户："剑阶出星推荐" → {"pipeline": "A", "confidence": 0.9}
-用户："查一下梅林" → {"pipeline": "A", "confidence": 0.95}
-用户："克制月癌的从者" → {"pipeline": "A", "confidence": 0.95}
-用户："有NP充能效果的五星礼装" → {"pipeline": "A", "confidence": 0.95}
-用户："梅林什么时候复刻" → {"pipeline": "B", "confidence": 0.95}
-用户："最近有什么活动" → {"pipeline": "B", "confidence": 0.9}
-用户："龙之牙在哪里掉" → {"pipeline": "B", "confidence": 0.9}
-用户："戴冠战剑阶怎么打" → {"pipeline": "C", "confidence": 0.95}
-用户："高难配队推荐" → {"pipeline": "C", "confidence": 0.9}
-用户："村正值不值得练" → {"pipeline": "C", "confidence": 0.85}
-用户："什么是C类buff" → {"pipeline": "C", "confidence": 0.95}
-用户："伤害公式怎么算" → {"pipeline": "C", "confidence": 0.95}
-用户："A类和B类乘区有什么区别" → {"pipeline": "C", "confidence": 0.9}
-用户："梅林能提供多少A类buff" → {"pipeline": "A", "confidence": 0.9}
+用户："30自充以上的术阶" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
+用户："剑阶出星推荐" → {{"pipeline": "A", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": null}}
+用户："查一下梅林" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
+用户："梅林是谁" → {{"pipeline": "A", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": null}}  # 含从者名 → A
+用户："克制月癌的从者" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
+用户："有NP充能效果的五星礼装" → {{"pipeline": "A", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
+用户："梅林什么时候复刻" → {{"pipeline": "B", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
+用户："最近有什么活动" → {{"pipeline": "B", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": null}}
+用户："龙之牙在哪里掉" → {{"pipeline": "B", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": null}}
+用户："戴冠战剑阶怎么打" → {{"pipeline": "C", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": null}}
+用户："高难配队推荐" → {{"pipeline": "C", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": null}}
+用户："你好" → {{"pipeline": "FALLBACK", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": "greeting"}}
+用户："hi" → {{"pipeline": "FALLBACK", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": "greeting"}}
+用户："你能做什么" → {{"pipeline": "FALLBACK", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": "greeting"}}
+用户："帮助" → {{"pipeline": "FALLBACK", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": "greeting"}}
+用户："明天天气怎么样" → {{"pipeline": "FALLBACK", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": "out_of_scope"}}
+用户："推荐充电器" → {{"pipeline": "FALLBACK", "confidence": 0.95, "turn_type": "MAJOR", "fallback_code": "out_of_scope"}}
+用户："2+2 等于几" → {{"pipeline": "FALLBACK", "confidence": 0.9, "turn_type": "MAJOR", "fallback_code": "out_of_scope"}}
 """
 
 
@@ -531,4 +598,104 @@ def build_params_prompt(
 ```
 
 只输出 JSON 数组，不要有任何其他内容。
+"""
+
+
+# ============================================================
+# Task 4 Batch B：MINOR/CORRECTION delta 合并 Prompt
+# ============================================================
+
+
+def build_minor_merge_prompt(
+    user_message: str,
+    turn_type: str,
+    prev_skill_calls: list[dict],
+    prev_response_skill: str,
+    prev_summary: str,
+) -> str:
+    """构建 MINOR/CORRECTION 多轮合并 Prompt。
+
+    输出由 ``MinorMergeResponse`` 校验，决定如何在 prev_turn 上合并出本轮的最终 skill_calls。
+
+    Args:
+        user_message: 本轮用户原始输入。
+        turn_type: ``MINOR`` 或 ``CORRECTION``，由 classify_node 决定。
+        prev_skill_calls: 上一轮已执行的 skill_calls（用于复用 / 追加 / 修正）。
+        prev_response_skill: 上一轮的 response_skill 名称。
+        prev_summary: 上一轮系统摘要（≤200 char），帮助 LLM 理解语义上下文。
+
+    Returns:
+        系统 Prompt 字符串。
+    """
+    prev_calls_json = json.dumps(prev_skill_calls, ensure_ascii=False)
+    safe_summary = prev_summary if len(prev_summary) <= 200 else prev_summary[:199] + "…"
+
+    if turn_type == "CORRECTION":
+        op_hint = (
+            "本轮 turn_type=CORRECTION，**首选** op=patch_params 修正某个 prev SkillCall 的关键参数；"
+            "如果只是切换回复粒度可用 switch_response。**禁止**输出 reuse/append_filters。"
+        )
+    else:
+        op_hint = (
+            "本轮 turn_type=MINOR：根据用户意图选择最合适的 op："
+            "若仅追问已有结果的细节（如「再帮我看看宝具效果」「那他的技能呢」）→ reuse；"
+            "若追加过滤条件（如「其中弓阶的」「再筛 5 星的」）→ append_filters；"
+            "若切换回复粒度（如「详细说说」「展开第一个」「对比一下」）→ switch_response；"
+            "若属于参数修正 → patch_params。"
+        )
+
+    return f"""你是 Laplace 多轮合并器。系统已识别本轮用户输入与上一轮属于同一会话延续，请基于上一轮的查询计划和本轮用户输入，输出一个合并操作。
+
+## 上一轮上下文
+- 系统摘要：{safe_summary}
+- prev_response_skill：`{prev_response_skill}`
+- prev_skill_calls：
+```json
+{prev_calls_json}
+```
+
+## 本轮用户输入
+{user_message}
+
+## 合并粒度（op）
+
+- **reuse**（G1 复用管线）：本轮只是追问上一轮同一对象的另一面（如「那他的宝具呢」「再看看技能」）。
+  - skill_calls 留空、response_skill 留 null、patches 留空。
+- **append_filters**（G2 追加过滤）：本轮在上一轮结果上叠加新的筛选条件（如「其中弓阶的」「再筛 5 星」）。
+  - 在 `skill_calls` 中**只填新追加的** SkillCall（不要重复 prev_skill_calls 里已有的），系统会自动拼接到末尾。
+  - 如同时需要切换回复粒度，可附带 `response_skill`。
+- **switch_response**（G3 切换回复）：保留筛选条件，仅切换回复呈现方式（如「详细说说」「对比下前两个」「展开第一个」）。
+  - 必须填 `response_skill`，常见值：`respond_servant_list` / `respond_servant_detail` / `respond_servant_compare` / `respond_support_analysis` / `respond_ce_list`。
+- **patch_params**（G4 / CORRECTION）：用户在修正上一轮某个 SkillCall 的关键参数（如「我说的是Alter版」「不是Saber是Caster」）。
+  - 在 `patches` 中给出每条要修正的 `skill_name` + `params`（仅给出要覆盖的键，系统会按 dict.update 合并到对应 SkillCall）。
+  - skill_name 必须在 prev_skill_calls 中存在，否则输出会被丢弃。
+
+{op_hint}
+
+## 输出格式
+
+严格按以下 JSON 输出，不要有任何其他内容：
+
+```json
+{{"op": "reuse", "skill_calls": [], "response_skill": null, "patches": [], "rationale": "..."}}
+```
+
+字段说明：
+- `op`：四选一（reuse / append_filters / switch_response / patch_params）
+- `skill_calls`：list，仅 op=append_filters 时填写新追加的 SkillCall；其它情况留空数组
+- `response_skill`：string 或 null，op=switch_response 必填
+- `patches`：list，仅 op=patch_params 时填写
+- `rationale`：≤30 字简述意图，便于审计；可为空字符串
+
+## 示例
+
+prev_skill_calls = `[{{"skill_name": "search_by_class", "params": {{"class_name": "Caster"}}}}]`，prev_response_skill=`respond_servant_list`
+
+用户：「再帮我看看宝具效果」 → `{{"op": "reuse", "skill_calls": [], "response_skill": null, "patches": [], "rationale": "复用筛选追问宝具"}}`
+用户：「其中五星的」 → `{{"op": "append_filters", "skill_calls": [{{"skill_name": "search_by_rarity", "params": {{"op": "eq", "value": 5}}}}], "response_skill": null, "patches": [], "rationale": "追加 5 星筛选"}}`
+用户：「详细说说第一个」 → `{{"op": "switch_response", "skill_calls": [], "response_skill": "respond_servant_detail", "patches": [], "rationale": "切详情视图"}}`
+
+prev_skill_calls = `[{{"skill_name": "lookup_servant", "params": {{"name": "玛修"}}}}]`
+
+用户：「我说的是Alter版」 → `{{"op": "patch_params", "skill_calls": [], "response_skill": null, "patches": [{{"skill_name": "lookup_servant", "params": {{"name": "玛修(Alter)"}}}}], "rationale": "修正名字为Alter"}}`
 """

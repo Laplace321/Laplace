@@ -87,17 +87,44 @@ class RoutingResponse(BaseModel):
 
 
 class ClassifierResponse(BaseModel):
-    """Stage 0 分类器输出：判断用户查询应走哪条链路。"""
+    """Stage 0 分类器输出：判断用户查询应走哪条链路。
+
+    Task 4 Batch A 新增 ``turn_type`` 字段：标识本轮相对上一轮的关系。
+    分类器尚未学会输出该字段时默认 ``MAJOR``（全新查询，等价于无多轮），
+    业务侧 Batch B 接入时会调整 prompt 显式输出。
+    """
 
     model_config = ConfigDict(extra="ignore")
 
-    pipeline: Literal["A", "B", "C"] = Field(
-        description="目标链路：A=从者/礼装结构化查询, B=游戏事实知识问答, C=攻略/评价/主观推荐",
+    pipeline: Literal["A", "B", "C", "FALLBACK"] = Field(
+        description=(
+            "目标链路：A=从者/礼装结构化查询, B=游戏事实知识问答, "
+            "C=攻略/评价/主观推荐, FALLBACK=问候/超出范围（直接走预置模板回复）"
+        ),
     )
     confidence: float = Field(
         ge=0.0,
         le=1.0,
         description="分类置信度，0.0~1.0。低于阈值时走 fallback",
+    )
+    turn_type: Literal["MAJOR", "MINOR", "CORRECTION"] = Field(
+        default="MAJOR",
+        description=(
+            "本轮相对上一轮的关系："
+            "MAJOR=全新查询（清空多轮状态）；"
+            "MINOR=在上一轮结果上追加过滤/切换回复粒度（如「其中弓阶的」「详细说说」）；"
+            "CORRECTION=修正上一轮关键参数（如「我说的是Alter版」）。"
+            "无多轮上下文时默认为 MAJOR。"
+        ),
+    )
+    fallback_code: Literal["greeting", "out_of_scope"] | None = Field(
+        default=None,
+        description=(
+            "仅当 pipeline=FALLBACK 时使用："
+            "greeting=问候/能力咨询（如「你好」「你能做什么」）；"
+            "out_of_scope=与 FGO 无关的问题（如「明天天气」「推荐充电器」）。"
+            "其他 pipeline 必须保持 null。"
+        ),
     )
 
 
@@ -123,6 +150,87 @@ def parse_classifier_response(content: str | dict) -> dict:
     except ValidationError as e:
         raise ValueError(f"Classifier response validation failed: {e}") from e
     return parsed.model_dump()
+
+
+# ============================================================
+# Task 4 Batch B：MINOR/CORRECTION delta 抽取 Schema
+# ============================================================
+
+
+class SkillPatch(BaseModel):
+    """对上一轮某个 SkillCall 的参数补丁（CORRECTION 用）。
+
+    例如上一轮 ``lookup_servant({"name": "玛修"})``，本轮用户说「我说的是Alter版」，
+    LLM 输出 ``SkillPatch(skill_name="lookup_servant", params={"name": "玛修(Alter)"})``，
+    业务侧将 params 浅合并到对应 SkillCall。
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    skill_name: str = Field(description="要修补的 SkillCall.skill_name（必须在 prev_turn.skill_calls 中存在）")
+    params: dict = Field(default_factory=dict, description="要覆盖/补充的参数键值，按 dict.update 合并")
+
+
+class MinorMergeResponse(BaseModel):
+    """MINOR/CORRECTION 多轮合并 LLM 输出。
+
+    LLM 基于 prev_turn.skill_calls + prev_turn.response_skill_name + 本轮 user_message，
+    输出一个 ``op`` 决定如何合并：
+
+    - ``reuse``            G1：完全复用 prev skill_calls + response_skill（如「再帮我看看宝具效果」）
+    - ``append_filters``   G2：在 prev skill_calls 末尾追加 ``skill_calls``（如「其中弓阶的」）
+    - ``switch_response``  G3：保留 prev skill_calls，仅切换 ``response_skill``（如「详细说说」）
+    - ``patch_params``     G4 / CORRECTION：对 prev 某个 SkillCall 的参数应用 ``patches``
+
+    多个 op 可同时承载额外字段（如 append_filters 时也可以同时切换 response_skill），
+    业务侧按字段是否非空依次应用。
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    op: Literal["reuse", "append_filters", "switch_response", "patch_params"] = Field(
+        description="合并粒度：reuse=完全复用 / append_filters=追加过滤 / switch_response=切换回复 / patch_params=修正参数",
+    )
+    skill_calls: list[SkillCall] = Field(
+        default_factory=list,
+        description="追加的 SkillCall（仅 op=append_filters 有效）",
+    )
+    response_skill: str | None = Field(
+        default=None,
+        description="新的 response_skill 名称（op=switch_response 必填；其它 op 时为 None 表示保持 prev）",
+    )
+    patches: list[SkillPatch] = Field(
+        default_factory=list,
+        description="对 prev SkillCall 的参数补丁（仅 op=patch_params 有效）",
+    )
+    rationale: str = Field(
+        default="",
+        description="LLM 简述本轮意图，便于审计；可为空字符串",
+    )
+
+
+def minor_merge_response_json_schema() -> dict:
+    """Return the JSON schema for MinorMergeResponse response_format."""
+    return MinorMergeResponse.model_json_schema()
+
+
+def parse_minor_merge_response(content: str | dict) -> dict:
+    """Parse and validate a MinorMergeResponse from LLM。
+
+    可作为 chat_completion 的 response_validator 参数使用。
+    """
+    import json
+
+    from pydantic import ValidationError
+
+    from server.llm import extract_json_object
+
+    raw = content if isinstance(content, dict) else json.loads(extract_json_object(content))
+    try:
+        parsed = MinorMergeResponse.model_validate(raw)
+    except ValidationError as e:
+        raise ValueError(f"MinorMerge response validation failed: {e}") from e
+    return parsed.model_dump(exclude_none=True)
 
 
 def routing_response_json_schema() -> dict:
