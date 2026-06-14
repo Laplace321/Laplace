@@ -278,7 +278,22 @@ def describe_filters(skill_calls: list[dict]) -> list[str]:
             translated = get_effect_translation(effect) if effect else effect
             lb = params.get("limit_break", True)
             lb_label = "满破" if lb else "未满破"
-            descriptions.append(f"礼装效果包含「{translated}」（{lb_label}）")
+            # 兼容 routing 阶段未经 Pydantic 转换的 alias key（minValue/maxValue）
+            min_v = params.get("min_value")
+            if min_v is None:
+                min_v = params.get("minValue")
+            max_v = params.get("max_value")
+            if max_v is None:
+                max_v = params.get("maxValue")
+            if min_v is not None and max_v is not None:
+                value_suffix = f" {min_v}%~{max_v}%"
+            elif min_v is not None:
+                value_suffix = f" ≥ {min_v}%"
+            elif max_v is not None:
+                value_suffix = f" ≤ {max_v}%"
+            else:
+                value_suffix = ""
+            descriptions.append(f"礼装效果包含「{translated}」{value_suffix}（{lb_label}）")
         elif name == "ce_search_by_rarity":
             op = params.get("op", "eq")
             val = params.get("value", "")
