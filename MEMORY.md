@@ -39,6 +39,7 @@
 | 028 | [声明式管线架构迁移](docs/adr/ADR-028-declarative-pipeline-migration.md) | 2026-06-12 | 已实施 |
 | 029 | [Trace ContextVar 协程级传播 + Phase 常量化](docs/adr/ADR-029-trace-contextvar.md) | 2026-06-15 | 已实施 |
 | 030 | [BI 索引层（JSONL + SQLite）](docs/adr/ADR-030-bi-sqlite-index.md) | 2026-06-15 | 已实施 |
+| 031 | [跨轮从者基础数据注入 Pipeline C](docs/adr/ADR-031-cross-turn-servant-brief-injection.md) | 2026-06-12 | 已实施 |
 
 ## 技术备忘
 
