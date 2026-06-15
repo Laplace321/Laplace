@@ -219,3 +219,29 @@ class TestSkillExecutor:
             rarities = [s.get("rarity", 0) for s in result.servants]
             for i in range(len(rarities) - 1):
                 assert rarities[i] >= rarities[i + 1] or (rarities[i] == rarities[i + 1]), "结果未按稀有度降序排序"
+
+    def test_search_by_cards_multi_np_support_target(self):
+        """双宝具从者辅助宝具查询：BB Dubai、玛修等顶层 npTarget 仅反映主宝具，
+        辅助宝具信息在 npDetails 中。search_by_cards 必须能通过遍历 npDetails 命中它们。
+        """
+        # BB Dubai (collectionNo=337): 5星月之癌，双宝具，Arts 辅助宝具应被命中
+        result = self.executor.execute(
+            skill_calls=[
+                {"skill_name": "search_by_class", "params": {"className": "moonCancer"}},
+                {"skill_name": "search_by_cards", "params": {"npCard": "arts", "npTarget": "support"}},
+                {"skill_name": "search_by_rarity", "params": {"op": "eq", "value": 5}},
+            ],
+        )
+        ids = {s.get("id") for s in result.servants}
+        assert 2300600 in ids, f"BB Dubai (id=2300600) 应被命中，当前结果中 ids={sorted(ids)}"
+
+    def test_search_by_cards_top_level_still_works(self):
+        """单宝具从者仍需能被命中。"""
+        # 查全体 Buster 宝具（应返回多名从者，不为空）
+        result = self.executor.execute(
+            skill_calls=[
+                {"skill_name": "search_by_cards", "params": {"npCard": "buster", "npTarget": "all"}},
+                {"skill_name": "search_by_rarity", "params": {"op": "eq", "value": 5}},
+            ],
+        )
+        assert result.total_found > 0
