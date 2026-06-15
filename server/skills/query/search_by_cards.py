@@ -23,7 +23,7 @@ class SearchByCards(QuerySkill):
         return Params
 
     def filter(self, servant: dict, params: dict) -> bool:
-        # 配卡
+        # 配卡（指令卡分布，与具体宝具无关）
         cards = params.get("cards")
         if cards is not None and isinstance(cards, dict):
             servant_cards = servant.get("cards", {})
@@ -31,16 +31,26 @@ class SearchByCards(QuerySkill):
                 if servant_cards.get(card_type, 0) < count:
                     return False
 
-        # 宝具颜色
         np_card = params.get("np_card")
-        if np_card is not None:
-            if servant.get("npCard", "") != np_card:
-                return False
-
-        # 宝具目标
         np_target = params.get("np_target")
-        if np_target is not None:
-            if servant.get("npTarget", "") != np_target:
-                return False
+        if np_card is None and np_target is None:
+            return True
 
+        # 双宝具从者（如 BB Dubai、玛修）顶层 npCard/npTarget 仅反映「主宝具」，
+        # 辅助宝具的属性会被掩盖。优先遍历 npDetails 数组，任一宝具匹配即视为命中。
+        np_details = servant.get("npDetails") or []
+        if np_details:
+            for np in np_details:
+                if np_card is not None and np.get("npCard", "") != np_card:
+                    continue
+                if np_target is not None and np.get("npTarget", "") != np_target:
+                    continue
+                return True
+            return False
+
+        # 兜底：缺少 npDetails 时回退到顶层字段
+        if np_card is not None and servant.get("npCard", "") != np_card:
+            return False
+        if np_target is not None and servant.get("npTarget", "") != np_target:
+            return False
         return True
