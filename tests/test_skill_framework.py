@@ -245,3 +245,17 @@ class TestSkillExecutor:
             ],
         )
         assert result.total_found > 0
+
+    def test_search_by_cards_multi_np_lancer_buster_aoe(self):
+        """双宝具从者另一色卡查询：梅柳齐娜（妖兰 id=304800）顶层 npCard=arts npTarget=one，
+        但第二宝具是 buster+all 红卡光炮，「枪阶 5 星红卡光炮」查询必须命中她。
+        """
+        result = self.executor.execute(
+            skill_calls=[
+                {"skill_name": "search_by_class", "params": {"className": "lancer"}},
+                {"skill_name": "search_by_rarity", "params": {"op": "eq", "value": 5}},
+                {"skill_name": "search_by_cards", "params": {"npCard": "buster", "npTarget": "all"}},
+            ],
+        )
+        ids = {s.get("id") for s in result.servants}
+        assert 304800 in ids, f"梅柳齐娜（妖兰 id=304800）应被命中，当前结果 ids={sorted(ids)}"
