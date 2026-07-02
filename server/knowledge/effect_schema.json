@@ -184,9 +184,8 @@
         "upDamageIndividualityActiveonly"
       ],
       "aliases_zh": [
-        "特攻",
-        "特攻伤害",
-        "特攻威力"
+        "威力提升",
+        "特攻伤害"
       ],
       "description": "对特定特性敌人造成额外伤害的特攻效果"
     },
@@ -670,8 +669,9 @@
       ],
       "buffTypes": [],
       "validate": {
-        "type": "func_target_type_in",
-        "targetTypes": ["enemy", "enemyAll"]
+        "type": "func_vals_contains",
+        "trait": "buffPositiveEffect",
+        "traitValue": 3004
       },
       "aliases_zh": [
         "强化解除"
@@ -686,8 +686,9 @@
       ],
       "buffTypes": [],
       "validate": {
-        "type": "func_target_type_in",
-        "targetTypes": ["self", "ptAll", "ptOne", "ptOther"]
+        "type": "func_vals_contains",
+        "trait": "buffNegativeEffect",
+        "traitValue": 3005
       },
       "aliases_zh": [
         "弱化状态解除",
