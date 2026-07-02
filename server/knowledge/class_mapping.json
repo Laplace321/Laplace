@@ -1,7 +1,7 @@
 {
   "enumName": "SvtClass",
   "source": "common.dart",
-  "totalCount": 78,
+  "totalCount": 79,
   "playableCount": 14,
   "playable": [
     {
@@ -294,6 +294,11 @@
       "name": "beastVII",
       "value": 43,
       "label": "獸Ⅶ"
+    },
+    {
+      "name": "demiBeastUrd",
+      "value": 44,
+      "label": "DEMIBEAST"
     },
     {
       "name": "aquaFragment",

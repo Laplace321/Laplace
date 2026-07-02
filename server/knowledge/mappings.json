@@ -91,6 +91,13 @@
       "NA": "King Ashoka",
       "KR": null
     },
+    "アスカラポス": {
+      "JP": null,
+      "CN": "阿斯卡拉福斯",
+      "TW": null,
+      "NA": null,
+      "KR": null
+    },
     "アスクレピオス": {
       "JP": null,
       "CN": "阿斯克勒庇俄斯",
@@ -171,7 +178,7 @@
     "アビゲイル・ウィリアムズ〔サンタ〕": {
       "JP": null,
       "CN": "阿比盖尔·威廉姆斯〔圣诞〕",
-      "TW": "艾比蓋兒威廉斯〔Santa〕",
+      "TW": "艾比蓋兒．威廉斯〔Santa〕",
       "NA": "Abigail Williams (Santa)",
       "KR": null
     },
@@ -1461,7 +1468,7 @@
       "CN": "图坦卡蒙",
       "TW": "圖坦卡門",
       "NA": "Tutankhamun",
-      "KR": null
+      "KR": "투탕카멘"
     },
     "ティアマト": {
       "JP": null,
@@ -1501,7 +1508,7 @@
     "テュフォン・エフェメロス": {
       "JP": null,
       "CN": "堤丰·厄斐墨洛斯",
-      "TW": "Typhon Ephemeros",
+      "TW": "堤豐．厄斐墨洛斯",
       "NA": "Typhon Ephemeros",
       "KR": "티폰・에페메로스"
     },
@@ -1900,7 +1907,7 @@
     "ヒロインXX・オルタ": {
       "JP": null,
       "CN": "谜之女主角XX·Alter",
-      "TW": "謎之女主角XXAlter",
+      "TW": "謎之女主角XX．Alter",
       "NA": "Heroine XX (Alter)",
       "KR": "히로인 XX 얼터"
     },
@@ -2623,7 +2630,7 @@
       "CN": "梵高〔矿工〕",
       "TW": "梵谷〔礦工〕",
       "NA": "Van Gogh (Miner)",
-      "KR": null
+      "KR": "반 고흐[마이너]"
     },
     "ヴァン・ホーエンハイム・パラケルスス": {
       "JP": null,
@@ -3418,9 +3425,9 @@
     },
     "終末のアーチャー": {
       "JP": null,
-      "CN": null,
+      "CN": "终末的Archer",
       "TW": null,
-      "NA": null,
+      "NA": "Archer of the End",
       "KR": null
     },
     "織田信勝": {
@@ -4165,6 +4172,13 @@
       "CN": "职阶:Beast Ⅶ",
       "TW": "職階:Beast Ⅶ",
       "NA": "Class:Beast Ⅶ",
+      "KR": null
+    },
+    "137": {
+      "JP": "クラス:デミビースト",
+      "CN": "职阶:DEMIBEAST",
+      "TW": null,
+      "NA": "Class:DEMIBEAST",
       "KR": null
     },
     "180": {
@@ -6538,13 +6552,6 @@
       "CN": "\"篡改过去\"",
       "TW": null,
       "NA": null,
-      "KR": null
-    },
-    "94000049": {
-      "JP": "eventNeroFest2",
-      "CN": null,
-      "TW": null,
-      "NA": "eventNeroFest2",
       "KR": null
     }
   }

@@ -219,3 +219,75 @@ class TestSkillExecutor:
             rarities = [s.get("rarity", 0) for s in result.servants]
             for i in range(len(rarities) - 1):
                 assert rarities[i] >= rarities[i + 1] or (rarities[i] == rarities[i + 1]), "结果未按稀有度降序排序"
+
+    def test_search_by_cards_multi_np_support_target(self):
+        """双宝具从者辅助宝具查询：BB Dubai、玛修等顶层 npTarget 仅反映主宝具，
+        辅助宝具信息在 npDetails 中。search_by_cards 必须能通过遍历 npDetails 命中它们。
+        """
+        # BB Dubai (collectionNo=337): 5星月之癌，双宝具，Arts 辅助宝具应被命中
+        result = self.executor.execute(
+            skill_calls=[
+                {"skill_name": "search_by_class", "params": {"className": "moonCancer"}},
+                {"skill_name": "search_by_cards", "params": {"npCard": "arts", "npTarget": "support"}},
+                {"skill_name": "search_by_rarity", "params": {"op": "eq", "value": 5}},
+            ],
+        )
+        ids = {s.get("id") for s in result.servants}
+        assert 2300600 in ids, f"BB Dubai (id=2300600) 应被命中，当前结果中 ids={sorted(ids)}"
+
+    def test_search_by_cards_top_level_still_works(self):
+        """单宝具从者仍需能被命中。"""
+        # 查全体 Buster 宝具（应返回多名从者，不为空）
+        result = self.executor.execute(
+            skill_calls=[
+                {"skill_name": "search_by_cards", "params": {"npCard": "buster", "npTarget": "all"}},
+                {"skill_name": "search_by_rarity", "params": {"op": "eq", "value": 5}},
+            ],
+        )
+        assert result.total_found > 0
+
+    def test_search_by_cards_multi_np_lancer_buster_aoe(self):
+        """双宝具从者另一色卡查询：梅柳齐娜（妖兰 id=304800）顶层 npCard=arts npTarget=one，
+        但第二宝具是 buster+all 红卡光炮，「枪阶 5 星红卡光炮」查询必须命中她。
+        """
+        result = self.executor.execute(
+            skill_calls=[
+                {"skill_name": "search_by_class", "params": {"className": "lancer"}},
+                {"skill_name": "search_by_rarity", "params": {"op": "eq", "value": 5}},
+                {"skill_name": "search_by_cards", "params": {"npCard": "buster", "npTarget": "all"}},
+            ],
+        )
+        ids = {s.get("id") for s in result.servants}
+        assert 304800 in ids, f"梅柳齐娜（妖兰 id=304800）应被命中，当前结果 ids={sorted(ids)}"
+
+    def test_search_by_class_chinese_aliases(self):
+        """职阶名中文别名识别：LLM 路由输出「月之癌」/「狂阶」等玩家圈叫法必须能命中。
+        translations.json 中 mooncancer 的中文是「月癌(MoonCancer)」，LLM 输出「月之癌」反查会失败。
+        """
+        # 「月之癌」 必须被识别为 moonCancer
+        result = self.executor.execute(
+            skill_calls=[{"skill_name": "search_by_class", "params": {"className": "月之癌"}}],
+        )
+        assert result.total_found > 0, "「月之癌」未匹配任何从者"
+        assert all(s.get("className", "").lower() == "mooncancer" for s in result.servants)
+
+        # 「狂阶」路径仍需能命中 berserker
+        result_b = self.executor.execute(
+            skill_calls=[{"skill_name": "search_by_class", "params": {"className": "狂阶"}}],
+        )
+        assert result_b.total_found > 0
+        assert all(s.get("className", "").lower() == "berserker" for s in result_b.servants)
+
+    def test_search_by_class_full_chain_moon_cancer_support(self):
+        """端到端：「五星月之癌蓝卡辅助宝具」应命中 BB Dubai (id=2300600)。
+        同时验证 search_by_class 中文别名 与 search_by_cards 双宝具两项修复协同生效。
+        """
+        result = self.executor.execute(
+            skill_calls=[
+                {"skill_name": "search_by_rarity", "params": {"op": "eq", "value": 5}},
+                {"skill_name": "search_by_class", "params": {"className": "月之癌"}},
+                {"skill_name": "search_by_cards", "params": {"npCard": "arts", "npTarget": "support"}},
+            ],
+        )
+        ids = {s.get("id") for s in result.servants}
+        assert 2300600 in ids, f"「五星月之癌蓝卡辅助宝具」应命中 BB Dubai，当前 ids={sorted(ids)}"

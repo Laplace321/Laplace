@@ -1,12 +1,12 @@
 {
-  "syncedAt": "2026-05-09T08:32:05.620259+00:00",
-  "chaldeaCommit": "b3a096eb830d",
+  "syncedAt": "2026-07-02T03:41:22.186326+00:00",
+  "chaldeaCommit": "105095bdf873",
   "chaldeaPath": "/Users/laplace/Laplace/chaldea-center/chaldea",
   "files": {
     "func_types.json": 130,
-    "func_target_types.json": 35,
+    "func_target_types.json": 37,
     "buff_types.json": 246,
     "effect_schema.json": 55,
-    "class_mapping.json": 78
+    "class_mapping.json": 79
   }
 }
